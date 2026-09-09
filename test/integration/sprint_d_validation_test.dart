@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/license_model.dart';
-import 'package:serenutos/domain/services/license_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/realtime/websocket_manager.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -28,8 +27,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final keys = RsaTestKeys.generate();
     final service = LicenseService(prefs, rsaModulus: keys.modulus);
-    final manager = LicenseManager(service);
-    expect(manager.isLockedDown, isTrue);
+    expect(service.getLicenseInfo(), isNull);
 
     final expiry = DateTime.now().add(const Duration(days: 30)).toUtc();
     final payload = jsonEncode({
@@ -47,8 +45,9 @@ void main() {
       features: const ['realtime'],
       signature: base64Encode(keys.sign(utf8.encode(payload))),
     ).toJson())));
-    expect(await manager.recoverLicense(token), isTrue);
-    expect(manager.isLockedDown, isFalse);
+    final saved = await service.saveLicenseToken(token);
+    expect(saved, isTrue);
+    expect(service.getLicenseInfo(), isNotNull);
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final sockets = <WebSocket>[];

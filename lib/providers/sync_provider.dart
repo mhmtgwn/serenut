@@ -264,10 +264,9 @@ class SyncNotifier extends StateNotifier<SyncState>
       await SmsCloudOutbox(_ref.read(apiClientProvider)).flush();
 
       // Repository consumers keep their own AsyncNotifier caches. Rebuild them
-      // after either a local push or a remote pull so open screens immediately
-      // show changes made on another device.
-      // FIX: also invalidate when pull-only data arrives (no local push pending)
-      if (result.synced > 0 || result.pulled > 0 || result.reconciled > 0) {
+      // after a remote pull so open screens immediately show changes made on another device.
+      // Do not invalidate on local push only, as local writes are already applied.
+      if (result.pulled > 0) {
         _ref.invalidate(settingsProvider);
         _ref.invalidate(settingsNotifierProvider);
         _ref.invalidate(productRepositoryProvider);

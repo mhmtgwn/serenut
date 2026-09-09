@@ -138,9 +138,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(productsControllerProvider.notifier).loadNextPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
+      final hasMore =
+          ref.read(productsControllerProvider.notifier).hasMoreData;
+      final loadingMore = ref.read(productLoadingMoreProvider);
+      if (hasMore && !loadingMore) {
+        ref.read(productsControllerProvider.notifier).loadNextPage();
+      }
     }
   }
 
@@ -210,6 +216,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   @override
   Widget build(BuildContext context) {
     final filteredProductsVal = ref.watch(filteredProductsProvider);
+    final loadingMore = ref.watch(productLoadingMoreProvider);
     final hasMore = ref.watch(productsControllerProvider.notifier).hasMoreData;
     final categoriesVal = ref.watch(productCategoriesProvider);
     final selectedCategory = ref.watch(productCategoryFilterProvider);
@@ -271,16 +278,24 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           ),
         ),
       ],
-      body: filteredProductsVal.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(_kGreen)),
-        ),
-        error: (err, _) => Center(
-          child: Text('Ürünler yüklenirken hata oluştu: $err',
-              style: const TextStyle(color: _kRed)),
-        ),
-        data: (products) {
+      body: Builder(
+        builder: (context) {
+          final cachedProducts = filteredProductsVal.valueOrNull;
+          if (cachedProducts == null && filteredProductsVal.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(_kGreen)),
+            );
+          }
+          if (filteredProductsVal.hasError && cachedProducts == null) {
+            return Center(
+              child: Text(
+                'Ürünler yüklenirken hata oluştu: ${filteredProductsVal.error}',
+                style: const TextStyle(color: _kRed),
+              ),
+            );
+          }
+          final products = cachedProducts ?? const <ProductEntity>[];
           if (products.isEmpty) {
             return Center(
               child: Column(
@@ -296,75 +311,86 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
             );
           }
 
-          return Column(
-            children: [
-              _buildSummaryBar(inventorySummary, products),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () =>
-                      ref.read(productsControllerProvider.notifier).refresh(),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 720;
-                      if (isWide) {
-                        return GridView.builder(
+          return NotificationListener<ScrollNotification>(
+            onNotification: (scrollInfo) {
+              if (scrollInfo.metrics.pixels >=
+                  scrollInfo.metrics.maxScrollExtent - 400) {
+                if (hasMore && !loadingMore) {
+                  ref.read(productsControllerProvider.notifier).loadNextPage();
+                }
+              }
+              return false;
+            },
+            child: Column(
+              children: [
+                _buildSummaryBar(inventorySummary, products),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () =>
+                        ref.read(productsControllerProvider.notifier).refresh(),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 720;
+                        if (isWide) {
+                          return GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 440,
+                              mainAxisExtent: 96,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: products.length + (loadingMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == products.length) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation(_kGreen),
+                                  ),
+                                );
+                              }
+                              final product = products[index];
+                              final isSelected =
+                                  _selectedLabelProductIds.contains(product.id);
+                              return _buildProductCard(product, isSelected);
+                            },
+                          );
+                        }
+
+                        return ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 440,
-                            mainAxisExtent: 96,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: products.length + (hasMore ? 1 : 0),
+                          itemCount: products.length + (loadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == products.length) {
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation(_kGreen),
+                                  ),
                                 ),
                               );
                             }
                             final product = products[index];
                             final isSelected =
                                 _selectedLabelProductIds.contains(product.id);
-                            return _buildProductCard(product, isSelected);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _buildProductCard(product, isSelected),
+                            );
                           },
                         );
-                      }
-
-                      return ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: products.length + (hasMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == products.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation(_kGreen),
-                                ),
-                              ),
-                            );
-                          }
-                          final product = products[index];
-                          final isSelected =
-                              _selectedLabelProductIds.contains(product.id);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _buildProductCard(product, isSelected),
-                          );
-                        },
-                      );
-                    },
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -426,17 +452,30 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         ? 'Tükendi'
         : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
 
+    final cardBg = isSelected
+        ? const Color(0xFFDCFCE7)
+        : (isOutOfStock
+            ? const Color(0xFFFFF5F5)
+            : (isLowStock ? const Color(0xFFFFFDF5) : const Color(0xFFF8FAFC)));
+    final cardBorder = isSelected
+        ? _kGreen
+        : (isOutOfStock
+            ? const Color(0xFFFCA5A5).withValues(alpha: 0.55)
+            : (isLowStock
+                ? const Color(0xFFFCD34D).withValues(alpha: 0.55)
+                : const Color(0xFFCBD5E1).withValues(alpha: 0.55)));
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSelected ? _kGreen : _kBorder,
-          width: isSelected ? 1.5 : 1,
+          color: cardBorder,
+          width: isSelected ? 2 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -445,7 +484,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          splashColor: stockColor.withValues(alpha: 0.08),
+          highlightColor: stockColor.withValues(alpha: 0.04),
           onLongPress: () {
             if (!_isLabelSelectionMode) {
               setState(() => _isLabelSelectionMode = true);
@@ -456,9 +497,19 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               ? _toggleLabelSelection(product)
               : context.push('/products/edit/${product.id}', extra: product),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
+                // ── Sol Dikey Renk Vurgusu ─────────────────
+                Container(
+                  width: 4,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: stockColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 if (_isLabelSelectionMode) ...[
                   Checkbox(
                     value: isSelected,

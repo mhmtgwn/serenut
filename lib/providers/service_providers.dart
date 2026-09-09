@@ -24,8 +24,6 @@ import 'package:serenutos/infrastructure/services/client_health_service.dart';
 import 'package:serenutos/infrastructure/services/crash_recovery_manager.dart';
 import 'package:serenutos/infrastructure/services/release_channel_service.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
-import 'package:serenutos/domain/services/license_manager.dart';
-import 'package:serenutos/domain/services/access_manager.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
 import 'package:serenutos/domain/services/security_gate.dart';
@@ -75,22 +73,6 @@ final deviceFingerprintServiceProvider =
 final trialManagerProvider = Provider<TrialManager>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return TrialManager(prefs);
-});
-
-/// Provides LicenseManager instance.
-final licenseManagerProvider = Provider<LicenseManager>((ref) {
-  final licenseService = ref.watch(licenseServiceProvider);
-  return LicenseManager(licenseService);
-});
-
-/// Provides AccessManager instance.
-final accessManagerProvider = Provider<AccessManager>((ref) {
-  final trialManager = ref.watch(trialManagerProvider);
-  final licenseManager = ref.watch(licenseManagerProvider);
-  return AccessManager(
-    trialManager: trialManager,
-    licenseManager: licenseManager,
-  );
 });
 
 final apiClientProvider = Provider<ApiClient>((ref) {

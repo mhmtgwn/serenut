@@ -38,9 +38,15 @@ class _CustomerSelectionSheetState
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(salesCustomersControllerProvider.notifier).loadNextPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
+      final hasMore =
+          ref.read(salesCustomersControllerProvider.notifier).hasMoreData;
+      final loadingMore = ref.read(customerLoadingMoreProvider);
+      if (hasMore && !loadingMore) {
+        ref.read(salesCustomersControllerProvider.notifier).loadNextPage();
+      }
     }
   }
 
@@ -87,6 +93,9 @@ class _CustomerSelectionSheetState
 
   Widget _buildSelectionView() {
     final customersAsync = ref.watch(salesCustomersControllerProvider);
+    final loadingMore = ref.watch(customerLoadingMoreProvider);
+    final hasMore =
+        ref.watch(salesCustomersControllerProvider.notifier).hasMoreData;
 
     return Column(
       key: const ValueKey('selection_view'),
@@ -102,8 +111,8 @@ class _CustomerSelectionSheetState
                   fontSize: 16, fontWeight: FontWeight.w800, color: _kText),
             ),
             IconButton(
-              icon: const Icon(Icons.close_rounded),
-              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close_rounded, color: _kTextSecondary),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         ),
@@ -115,7 +124,6 @@ class _CustomerSelectionSheetState
                 height: 42,
                 child: TextField(
                   controller: _searchController,
-                  autofocus: true,
                   decoration: InputDecoration(
                     hintText: 'İsim veya telefon ile ara...',
                     hintStyle:
@@ -180,20 +188,26 @@ class _CustomerSelectionSheetState
         ),
         const SizedBox(height: 12),
         Flexible(
-          child: customersAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-            error: (err, _) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Hata: $err',
-                  style: const TextStyle(color: _kRed, fontSize: 12)),
-            ),
-            data: (customersList) {
-              final filtered = customersList;
+          child: Builder(
+            builder: (context) {
+              final cachedCustomers = customersAsync.valueOrNull;
+              if (cachedCustomers == null && customersAsync.isLoading) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+              if (customersAsync.hasError && cachedCustomers == null) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Hata: ${customersAsync.error}',
+                      style: const TextStyle(color: _kRed, fontSize: 12)),
+                );
+              }
+
+              final filtered = cachedCustomers ?? const <CustomerEntity>[];
 
               if (filtered.isEmpty) {
                 return Center(
@@ -230,105 +244,114 @@ class _CustomerSelectionSheetState
                 );
               }
 
-              return ListView.separated(
-                controller: _scrollController,
-                shrinkWrap: true,
-                itemCount: filtered.length +
-                    (ref
-                            .read(salesCustomersControllerProvider.notifier)
-                            .isLoadingMore
-                        ? 1
-                        : 0),
-                separatorBuilder: (context, index) => const SizedBox(height: 6),
-                itemBuilder: (context, idx) {
-                  if (idx == filtered.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(_kGreen),
-                        ),
-                      ),
-                    );
+              return NotificationListener<ScrollNotification>(
+                onNotification: (scrollInfo) {
+                  if (scrollInfo.metrics.pixels >=
+                      scrollInfo.metrics.maxScrollExtent - 400) {
+                    if (hasMore && !loadingMore) {
+                      ref
+                          .read(salesCustomersControllerProvider.notifier)
+                          .loadNextPage();
+                    }
                   }
-                  final cust = filtered[idx];
-                  final isDebt = cust.balance < 0;
-                  final isSelected = widget.initialSelected?.id == cust.id;
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? _kGreenLight.withValues(alpha: 0.5)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? _kGreen : _kBorder,
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: ListTile(
-                      dense: true,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 2),
-                      leading: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: isSelected
-                            ? _kGreen
-                            : (isDebt ? _kRedLight : _kGreenLight),
-                        child: Text(
-                          cust.name.isNotEmpty
-                              ? cust.name[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected
-                                ? Colors.white
-                                : (isDebt ? _kRed : _kGreenDark),
+                  return false;
+                },
+                child: ListView.separated(
+                  controller: _scrollController,
+                  shrinkWrap: true,
+                  itemCount: filtered.length + (loadingMore ? 1 : 0),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 6),
+                  itemBuilder: (context, idx) {
+                    if (idx == filtered.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(_kGreen),
                           ),
                         ),
-                      ),
-                      title: Text(
-                        cust.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: isSelected ? _kGreenDark : _kText,
+                      );
+                    }
+                    final cust = filtered[idx];
+                    final isDebt = cust.balance < 0;
+                    final isSelected = widget.initialSelected?.id == cust.id;
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? _kGreenLight.withValues(alpha: 0.5)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? _kGreen : _kBorder,
+                          width: isSelected ? 1.5 : 1,
                         ),
                       ),
-                      subtitle: Text(
-                        cust.phone.isEmpty ? 'Telefon yok' : cust.phone,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '₺${cust.balance.abs().toStringAsFixed(2)}',
+                      child: ListTile(
+                        dense: true,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 2),
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: isSelected
+                              ? _kGreen
+                              : (isDebt ? _kRedLight : _kGreenLight),
+                          child: Text(
+                            cust.name.isNotEmpty
+                                ? cust.name[0].toUpperCase()
+                                : '?',
                             style: TextStyle(
-                              color: isDebt ? _kRed : _kGreenDark,
-                              fontWeight: FontWeight.w800,
                               fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDebt ? _kRed : _kGreenDark),
                             ),
                           ),
-                          if (isSelected) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.check_circle_rounded,
-                                color: _kGreen, size: 18),
+                        ),
+                        title: Text(
+                          cust.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: isSelected ? _kGreenDark : _kText,
+                          ),
+                        ),
+                        subtitle: Text(
+                          cust.phone.isEmpty ? 'Telefon yok' : cust.phone,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₺${cust.balance.abs().toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: isDebt ? _kRed : _kGreenDark,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check_circle_rounded,
+                                  color: _kGreen, size: 18),
+                            ],
                           ],
-                        ],
+                        ),
+                        onTap: () {
+                          widget.onCustomerChanged(cust);
+                          Navigator.pop(context);
+                        },
                       ),
-                      onTap: () {
-                        widget.onCustomerChanged(cust);
-                        Navigator.pop(context);
-                      },
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               );
             },
           ),

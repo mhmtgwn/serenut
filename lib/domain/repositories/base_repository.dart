@@ -200,6 +200,18 @@ abstract class IFinancialTransactionRepository
   /// İSTEK 3 DÜZELTMESİ: Belirtilen referenceId + type ikilisine sahip kayıt var mı?
   /// payment_service.dart'taki findAll().any() Dart filtresi yerine EXISTS SQL sorgusu kullanır.
   Future<bool> existsByReferenceId(String referenceId, String type);
+
+  /// Belirtilen referenceId (ör. sipariş/satış id) için tüm finansal hareketleri getirir.
+  Future<List<FinancialTransactionEntity>> getByReferenceId(String referenceId);
+
+  /// Sipariş düzenlendiğinde var olan satış kaydını tekil olarak atomik günceller (In-Place Update).
+  Future<int> updateOrderSaleTransaction({
+    required String orderId,
+    required String customerId,
+    required double amount,
+    required double paidAmount,
+    required double debtAmount,
+  });
 }
 
 /// Order repository
@@ -841,31 +853,4 @@ abstract class IDatabaseHealthRepository {
 
   /// Fixes anomalies (deletes orphans, resets negative stock, corrects balance drifts)
   Future<void> repairHealth();
-}
-
-/// DTO representing the unified results from a global search
-class GlobalSearchResult {
-  final List<CustomerEntity> customers;
-  final List<ProductEntity> products;
-  final List<SaleEntity> sales;
-  final List<FinancialTransactionEntity> transactions;
-
-  const GlobalSearchResult({
-    required this.customers,
-    required this.products,
-    required this.sales,
-    required this.transactions,
-  });
-
-  bool get isEmpty =>
-      customers.isEmpty &&
-      products.isEmpty &&
-      sales.isEmpty &&
-      transactions.isEmpty;
-}
-
-/// Interface for executing unified search queries across multiple entities
-abstract class IGlobalSearchRepository {
-  /// Searches all customers, products, sales, and financial transactions for a query
-  Future<GlobalSearchResult> searchAll(String query);
 }

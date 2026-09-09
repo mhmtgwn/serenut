@@ -286,6 +286,8 @@ final saleDetailProvider =
 
 const _kSalesHistoryPageSize = 25;
 
+final salesHistoryLoadingMoreProvider = StateProvider<bool>((ref) => false);
+
 /// Dedicated paginated controller for the Sales History page.
 /// Keeps the existing [SalesController] untouched so that the sales flow,
 /// dashboard, and reports pages are not affected.
@@ -294,17 +296,20 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
 
   int _offset = 0;
   bool _hasMore = true;
+  bool _isLoadingMore = false;
   String? _searchQuery;
   String? _paymentMethod;
   String? _status;
 
   bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
 
   @override
   FutureOr<List<SaleEntity>> build() async {
     _repository = await ref.watch(saleRepositoryProvider.future);
     _offset = 0;
     _hasMore = true;
+    _isLoadingMore = false;
     final page = await _repository.findFiltered(
       searchQuery: _searchQuery,
       paymentMethod: _paymentMethod,
@@ -321,6 +326,7 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
     _searchQuery = (query == null || query.isEmpty) ? null : query;
     _offset = 0;
     _hasMore = true;
+    _isLoadingMore = false;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.findFiltered(
           searchQuery: _searchQuery,
@@ -343,23 +349,38 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
   }
 
   Future<void> loadNextPage() async {
-    if (!_hasMore) return;
-    final current = state.valueOrNull ?? [];
-    final next = await _repository.findFiltered(
-      searchQuery: _searchQuery,
-      paymentMethod: _paymentMethod,
-      status: _status,
-      limit: _kSalesHistoryPageSize,
-      offset: _offset,
-    );
-    if (next.length < _kSalesHistoryPageSize) _hasMore = false;
-    _offset += next.length;
-    state = AsyncValue.data([...current, ...next]);
+    if (!_hasMore || _isLoadingMore) return;
+    _isLoadingMore = true;
+    ref.read(salesHistoryLoadingMoreProvider.notifier).state = true;
+    try {
+      final current = state.valueOrNull ?? [];
+      final next = await _repository.findFiltered(
+        searchQuery: _searchQuery,
+        paymentMethod: _paymentMethod,
+        status: _status,
+        limit: _kSalesHistoryPageSize,
+        offset: _offset,
+      );
+      if (next.length < _kSalesHistoryPageSize) {
+        _hasMore = false;
+      }
+      final existingIds = current.map((s) => s.id).toSet();
+      final dedupedNext =
+          next.where((s) => !existingIds.contains(s.id)).toList();
+      _offset += next.length;
+      state = AsyncValue.data([...current, ...dedupedNext]);
+    } catch (e) {
+      debugPrint('[SalesHistoryController] ⚠️ loadNextPage failed: $e');
+    } finally {
+      _isLoadingMore = false;
+      ref.read(salesHistoryLoadingMoreProvider.notifier).state = false;
+    }
   }
 
   Future<void> refresh() async {
     _offset = 0;
     _hasMore = true;
+    _isLoadingMore = false;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.findFiltered(
           searchQuery: _searchQuery,

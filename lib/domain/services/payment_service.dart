@@ -171,8 +171,15 @@ class PaymentService {
     required double paidAmount,
   }) async {
     // Sadece gerçekten tamamlanmış nihai iptal varsa mükerrerliği engelle (sipariş revizyonu hariç)
-    final existingCancellations = (await _transactionRepository.getByCustomerId(customerId))
-        .where((tx) => tx.referenceId == saleId && tx.type == 'cancellation' && tx.metadata?['reason'] != 'order_revision');
+    final existingTxs = await _transactionRepository.getByReferenceId(saleId);
+    final existingCancellations = existingTxs.isNotEmpty
+        ? existingTxs.where((tx) =>
+            tx.type == 'cancellation' &&
+            tx.metadata?['reason'] != 'order_revision')
+        : (await _transactionRepository.getByCustomerId(customerId)).where((tx) =>
+            tx.referenceId == saleId &&
+            tx.type == 'cancellation' &&
+            tx.metadata?['reason'] != 'order_revision');
     if (existingCancellations.isNotEmpty) {
       return; // Idempotency check: Already processed
     }
@@ -203,8 +210,8 @@ class PaymentService {
     );
   }
 
-  /// Revises an order payment without mutating the append-only ledger.
-  /// The old debt is reversed and the revised debt is recorded as a new sale.
+  /// Revises an order payment atomically in-place.
+  /// Updates the single sale transaction for this order without creating fake cancellations or duplicate sales.
   Future<void> reviseOrderPayment({
     required String orderId,
     required String oldCustomerId,
@@ -212,39 +219,30 @@ class PaymentService {
     required double totalAmount,
     required double paidAmount,
   }) async {
-    final oldTransactions =
-        await _transactionRepository.getByCustomerId(oldCustomerId);
-    final oldSales = oldTransactions.where(
-      (tx) => tx.referenceId == orderId && tx.type == 'sale',
-    );
-
-    if (oldSales.isNotEmpty) {
-      final oldSale = oldSales.last;
-      await _transactionRepository.create(FinancialTransactionEntity(
-        id: _generateTxId('trans-revision-reverse'),
-        type: 'cancellation',
-        customerId: oldSale.customerId,
-        amount: oldSale.amount,
-        paidAmount: oldSale.paidAmount,
-        debtAmount: oldSale.debtAmount,
-        date: DateTime.now(),
-        referenceId: orderId,
-        metadata: {'reason': 'order_revision', 'reverses': oldSale.id},
-      ));
-    }
-
     final debt = MathEngine.calculateDebt(totalAmount, paidAmount);
-    await _transactionRepository.create(FinancialTransactionEntity(
-      id: _generateTxId('trans-revision-sale'),
-      type: 'sale',
+
+    final updatedCount = await _transactionRepository.updateOrderSaleTransaction(
+      orderId: orderId,
       customerId: newCustomerId,
       amount: totalAmount,
       paidAmount: paidAmount,
       debtAmount: debt,
-      date: DateTime.now(),
-      referenceId: orderId,
-      metadata: {'reason': 'order_revision'},
-    ));
+    );
+
+    // Fallback: If no existing sale was found (e.g. legacy order), create initial sale
+    if (updatedCount == 0) {
+      await _transactionRepository.create(FinancialTransactionEntity(
+        id: _generateTxId('trans-order-sale'),
+        type: 'sale',
+        customerId: newCustomerId,
+        amount: totalAmount,
+        paidAmount: paidAmount,
+        debtAmount: debt,
+        date: DateTime.now(),
+        referenceId: orderId,
+        metadata: {'origin': 'order'},
+      ));
+    }
   }
 
   /// Records general customer collection (tahsilat).

@@ -139,11 +139,6 @@ final databaseHealthRepositoryProvider =
   return SqliteDatabaseHealthRepository(gateway);
 });
 
-final globalSearchRepositoryProvider = Provider<IGlobalSearchRepository>((ref) {
-  final gateway = ref.watch(dbGatewayProvider);
-  return SqliteGlobalSearchRepository(gateway);
-});
-
 // ── Cloud BI Analytics Providers (Sprint 7) ──
 final cloudAnalyticsRepositoryProvider =
     Provider<CloudAnalyticsRepository>((ref) {

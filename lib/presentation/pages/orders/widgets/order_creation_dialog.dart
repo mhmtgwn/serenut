@@ -27,6 +27,7 @@ import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 import 'package:serenutos/presentation/widgets/discount_dialog.dart';
+import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -109,7 +110,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   // Step 2: Product Catalog
   final Map<ProductEntity, double> _cart = {};
-  String _selectedCategory = 'Tümü';
   final _barcodeController = TextEditingController();
   final _barcodeFocusNode = FocusNode();
   bool _isProductSearching = false;
@@ -145,8 +145,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   void _onCustomerScroll() {
-    if (_customerScrollController.position.pixels >=
-        _customerScrollController.position.maxScrollExtent - 200) {
+    if (_customerScrollController.hasClients &&
+        _customerScrollController.position.pixels >=
+            _customerScrollController.position.maxScrollExtent - 400) {
       ref.read(ordersCustomersControllerProvider.notifier).loadNextPage();
     }
   }
@@ -276,13 +277,17 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     try {
       final repo =
           await ref.read(financialTransactionRepositoryProvider.future);
-      final transactions = await repo.getByCustomerId(order.customerId);
-      FinancialTransactionEntity? orderTx;
-      for (final t in transactions) {
-        if (t.referenceId == order.id && t.type == 'sale') {
-          orderTx = t;
-          break;
-        }
+      final transactions = await repo.getByReferenceId(order.id);
+      FinancialTransactionEntity? orderTx = transactions
+          .where((t) => t.type == 'sale')
+          .firstOrNull;
+
+      // Fallback if not found by referenceId
+      if (orderTx == null && order.customerId.isNotEmpty) {
+        final custTransactions = await repo.getByCustomerId(order.customerId);
+        orderTx = custTransactions
+            .where((t) => t.referenceId == order.id && t.type == 'sale')
+            .firstOrNull;
       }
       if (orderTx != null) {
         setState(() {
@@ -339,9 +344,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   void _onProductScroll() {
-    if (_productScrollController.position.pixels >=
-        _productScrollController.position.maxScrollExtent - 200) {
-      ref.read(productsControllerProvider.notifier).loadNextPage();
+    if (_productScrollController.hasClients &&
+        _productScrollController.position.pixels >=
+            _productScrollController.position.maxScrollExtent - 400) {
+      ref.read(ordersProductsControllerProvider.notifier).loadNextPage();
     }
   }
 
@@ -969,13 +975,20 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
       // Refresh customers state so updated balance displays on screens
       await ref.read(ordersCustomersControllerProvider.notifier).refresh();
+      ref.invalidate(customersControllerProvider);
+      ref.invalidate(salesCustomersControllerProvider);
+      ref.invalidate(customerBalanceSummaryProvider);
+      ref.invalidate(customerLookupMapProvider);
       ref.invalidate(customerTransactionsProvider(_selectedCustomer!.id));
       ref.invalidate(customerBalanceDetailsProvider(_selectedCustomer!.id));
+      ref.invalidate(customerDetailProvider(_selectedCustomer!.id));
       if (isEdit && _selectedCustomer!.id != widget.existingOrder!.customerId) {
         ref.invalidate(
             customerTransactionsProvider(widget.existingOrder!.customerId));
         ref.invalidate(
             customerBalanceDetailsProvider(widget.existingOrder!.customerId));
+        ref.invalidate(
+            customerDetailProvider(widget.existingOrder!.customerId));
       }
 
       // Print order receipt & labels (isolated to prevent printer network errors from aborting or rolling back saved order)

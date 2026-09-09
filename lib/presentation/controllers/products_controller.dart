@@ -14,6 +14,9 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 
+/// Reactive indicator for product pagination loading state
+final productLoadingMoreProvider = StateProvider<bool>((ref) => false);
+
 class ProductsController extends AsyncNotifier<List<ProductEntity>> {
   late IProductRepository _repository;
   PaginationService<ProductEntity>? _paginationService;
@@ -60,11 +63,14 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     if (_paginationService!.isLoading || !_paginationService!.hasMoreData) {
       return;
     }
+    ref.read(productLoadingMoreProvider.notifier).state = true;
     try {
       await _paginationService!.loadNextPage();
       state = AsyncValue.data(List.from(_paginationService!.items));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
+    } finally {
+      ref.read(productLoadingMoreProvider.notifier).state = false;
     }
   }
 

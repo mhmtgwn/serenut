@@ -126,33 +126,33 @@ Color _statusCardBg(String status, bool isSelected) {
     case 'created':
     case 'pending':
     case 'new':
-      return const Color(0xFFF0F9FF); // Canlı pastel gök mavisi
+      return const Color(0xFFF0F9FF); // Soft gök mavisi
     case 'preparing':
     case 'processing':
     case 'in_progress':
-      return const Color(0xFFFFFBEB); // Canlı pastel amber / sarı
+      return const Color(0xFFFFFDF5); // Dingin, soft amber / krem
     case 'ready':
-      return const Color(0xFFECFDF5); // Canlı pastel zümrüt yeşili
+      return const Color(0xFFF2FBF5); // Ferah nane / zümrüt
     case 'on_way':
     case 'shipped':
     case 'out_for_delivery':
     case 'kuryede':
     case 'dagitimda':
-      return const Color(0xFFF5F3FF); // Canlı pastel lavanta / mor
+      return const Color(0xFFF8F6FF); // Soft lavanta / lila
     case 'delivered':
     case 'completed':
-      return const Color(0xFFF0FDFA); // Canlı pastel turkuaz / teal
+      return const Color(0xFFF4FBF9); // Soft turkuaz / teal
     case 'paid':
-      return const Color(0xFFF0FDF4); // Canlı pastel taze nane
+      return const Color(0xFFF4FAF5); // Dingin taze nane
     case 'cancelled':
     case 'canceled':
-      return const Color(0xFFFEF2F2); // Canlı pastel mercan / gül
+      return const Color(0xFFFFF5F5); // Soft mercan / gül
     case 'refunded':
     case 'returned':
-      return const Color(0xFFFDF2F8); // Canlı pastel fuşya / pembe
+      return const Color(0xFFFFF5FA); // Soft fuşya / pembe
     case 'unpaid':
     case 'failed':
-      return const Color(0xFFFFF7ED); // Canlı pastel turuncu
+      return const Color(0xFFFFF8F2); // Soft turuncu
     default:
       return const Color(0xFFF8FAFC); // Açık slate gri
   }
@@ -164,35 +164,35 @@ Color _statusCardBorder(String status, bool isSelected) {
     case 'created':
     case 'pending':
     case 'new':
-      return const Color(0xFF7DD3FC);
+      return const Color(0xFF7DD3FC).withValues(alpha: 0.55);
     case 'preparing':
     case 'processing':
     case 'in_progress':
-      return const Color(0xFFFCD34D);
+      return const Color(0xFFFCD34D).withValues(alpha: 0.55);
     case 'ready':
-      return const Color(0xFF6EE7B7);
+      return const Color(0xFF6EE7B7).withValues(alpha: 0.55);
     case 'on_way':
     case 'shipped':
     case 'out_for_delivery':
     case 'kuryede':
     case 'dagitimda':
-      return const Color(0xFFC4B5FD);
+      return const Color(0xFFC4B5FD).withValues(alpha: 0.55);
     case 'delivered':
     case 'completed':
-      return const Color(0xFF5EEAD4);
+      return const Color(0xFF5EEAD4).withValues(alpha: 0.55);
     case 'paid':
-      return const Color(0xFF86EFAC);
+      return const Color(0xFF86EFAC).withValues(alpha: 0.55);
     case 'cancelled':
     case 'canceled':
-      return const Color(0xFFFCA5A5);
+      return const Color(0xFFFCA5A5).withValues(alpha: 0.55);
     case 'refunded':
     case 'returned':
-      return const Color(0xFFF472B6);
+      return const Color(0xFFF472B6).withValues(alpha: 0.55);
     case 'unpaid':
     case 'failed':
-      return const Color(0xFFFDBA74);
+      return const Color(0xFFFDBA74).withValues(alpha: 0.55);
     default:
-      return const Color(0xFFCBD5E1);
+      return const Color(0xFFCBD5E1).withValues(alpha: 0.55);
   }
 }
 
@@ -249,9 +249,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   void _onScroll() {
     if (_scrollController.hasClients &&
         _scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 150) {
+            _scrollController.position.maxScrollExtent - 400) {
       final notifier = ref.read(ordersControllerProvider.notifier);
-      if (notifier.hasMore && !notifier.isLoadingMore) {
+      final loadingMore = ref.read(ordersLoadingMoreProvider);
+      if (notifier.hasMore && !loadingMore) {
         notifier.loadNextPage();
       }
     }
@@ -327,6 +328,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersControllerProvider);
     final customerMapVal = ref.watch(customerLookupMapProvider);
+    final isLoadingMore = ref.watch(ordersLoadingMoreProvider);
 
     final ordersList = ordersAsync.valueOrNull;
 
@@ -494,7 +496,21 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                           ),
                         ],
                       )
-                    : LayoutBuilder(
+                    : NotificationListener<ScrollNotification>(
+                        onNotification: (scrollInfo) {
+                          if (scrollInfo.metrics.pixels >=
+                              scrollInfo.metrics.maxScrollExtent - 400) {
+                            final notifier =
+                                ref.read(ordersControllerProvider.notifier);
+                            final loadingMore =
+                                ref.read(ordersLoadingMoreProvider);
+                            if (notifier.hasMore && !loadingMore) {
+                              notifier.loadNextPage();
+                            }
+                          }
+                          return false;
+                        },
+                        child: LayoutBuilder(
                         builder: (context, constraints) {
                           final isWide = constraints.maxWidth >= 720;
                           if (isWide) {
@@ -510,9 +526,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                 mainAxisSpacing: 12,
                               ),
                               itemCount: filtered.length +
-                                  (ref.read(ordersControllerProvider.notifier).isLoadingMore
-                                      ? 1
-                                      : 0),
+                                  (isLoadingMore ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index == filtered.length) {
                                   return const Center(
@@ -583,9 +597,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             controller: _scrollController,
                             padding: const EdgeInsets.all(16),
                             itemCount: filtered.length +
-                                (ref.read(ordersControllerProvider.notifier).isLoadingMore
-                                    ? 1
-                                    : 0),
+                                (isLoadingMore ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index == filtered.length) {
                                 return const Padding(
@@ -651,6 +663,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                           );
                         },
                       ),
+                    ),
               ),
               if (ordersAsync.isLoading && filtered.isEmpty)
                 const Positioned(
@@ -1039,13 +1052,13 @@ class _OrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cardBorder,
-          width: isSelected ? 2 : 1.4,
+          width: isSelected ? 2 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: meta.color.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1053,6 +1066,8 @@ class _OrderCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
+          splashColor: meta.color.withValues(alpha: 0.08),
+          highlightColor: meta.color.withValues(alpha: 0.04),
           onTap: isSelecting
               ? () {
                   if (isSelectable) {

@@ -303,7 +303,9 @@ class SyncV4Service {
         for (final raw in changes.cast<Map>()) {
           await _apply(txn, Map<String, dynamic>.from(raw));
         }
-        reconciled += await _reconcileCustomerBalances(txn);
+        if (changes.isNotEmpty) {
+          reconciled += await _reconcileCustomerBalances(txn);
+        }
         await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
             conflictAlgorithm: ConflictAlgorithm.replace);
       });

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/config/utils.dart';
@@ -43,9 +44,15 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(salesHistoryControllerProvider.notifier).loadNextPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
+      final hasMore =
+          ref.read(salesHistoryControllerProvider.notifier).hasMore;
+      final loadingMore = ref.read(salesHistoryLoadingMoreProvider);
+      if (hasMore && !loadingMore) {
+        ref.read(salesHistoryControllerProvider.notifier).loadNextPage();
+      }
     }
   }
 
@@ -59,6 +66,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(salesHistoryControllerProvider);
+    final isLoadingMore = ref.watch(salesHistoryLoadingMoreProvider);
+    final hasMore = ref.watch(salesHistoryControllerProvider.notifier).hasMore;
     final customerMapVal = ref.watch(customerLookupMapProvider);
 
     // Build customer map for fast lookups
@@ -155,21 +164,26 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
           // Sales List
           Expanded(
-            child: salesAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation(_kGreen)),
-              ),
-              error: (err, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child:
-                      Text('Hata: $err', style: const TextStyle(color: _kRed)),
-                ),
-              ),
-              data: (salesList) {
-                // No Dart-side filtering: controller returns the correct page
-                final filteredSales = salesList;
+            child: Builder(
+              builder: (context) {
+                final cachedSales = salesAsync.valueOrNull;
+                if (cachedSales == null && salesAsync.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(_kGreen)),
+                  );
+                }
+                if (salesAsync.hasError && cachedSales == null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Hata: ${salesAsync.error}',
+                          style: const TextStyle(color: _kRed)),
+                    ),
+                  );
+                }
+
+                final filteredSales = cachedSales ?? const <SaleEntity>[];
 
                 if (filteredSales.isEmpty) {
                   return Center(
@@ -190,26 +204,37 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                   );
                 }
 
-                return RefreshIndicator(
-                  onRefresh: () => ref
-                      .read(salesHistoryControllerProvider.notifier)
-                      .refresh(),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredSales.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == filteredSales.length) {
-                        final hasMore = ref
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (scrollInfo) {
+                    if (scrollInfo.metrics.pixels >=
+                        scrollInfo.metrics.maxScrollExtent - 400) {
+                      if (hasMore && !isLoadingMore) {
+                        ref
                             .read(salesHistoryControllerProvider.notifier)
-                            .hasMore;
-                        if (!hasMore) return const SizedBox.shrink();
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
+                            .loadNextPage();
                       }
+                    }
+                    return false;
+                  },
+                  child: RefreshIndicator(
+                    onRefresh: () => ref
+                        .read(salesHistoryControllerProvider.notifier)
+                        .refresh(),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredSales.length + (isLoadingMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == filteredSales.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation(_kGreen)),
+                            ),
+                          );
+                        }
                       final sale = filteredSales[index];
                       final customerName = sale.customerId.isEmpty
                           ? 'Genel Müşteri'
@@ -255,28 +280,57 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                           _kSurface;
 
                       final isCancelled = sale.status == 'cancelled';
+                      final isDebt = sale.paymentMethod.toLowerCase() == 'debt' ||
+                          sale.paymentMethod.toLowerCase() == 'vadeli';
+                      final Color accentColor = isCancelled
+                          ? _kRed
+                          : (isDebt ? const Color(0xFFD97706) : _kGreen);
+                      final Color cardBg = isCancelled
+                          ? const Color(0xFFFFF5F5)
+                          : (isDebt
+                              ? const Color(0xFFFFFDF5)
+                              : const Color(0xFFF4FAF5));
+                      final Color cardBorder = isCancelled
+                          ? const Color(0xFFFCA5A5).withValues(alpha: 0.55)
+                          : (isDebt
+                              ? const Color(0xFFFCD34D).withValues(alpha: 0.55)
+                              : const Color(0xFF86EFAC).withValues(alpha: 0.55));
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _kBorder),
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: cardBorder, width: 1.0),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 6,
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: InkWell(
                           onTap: () => context.push('/sales/detail/${sale.id}'),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                          splashColor: accentColor.withValues(alpha: 0.08),
+                          highlightColor: accentColor.withValues(alpha: 0.04),
                           child: Padding(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                             child: Row(
                               children: [
+                                // ── Sol Dikey Renk Vurgusu ─────────────────
+                                Container(
+                                  width: 4,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: accentColor,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+
                                 // Icon
                                 Container(
                                   padding: const EdgeInsets.all(8),
@@ -397,10 +451,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       );
                     },
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
+        ),
         ],
       ),
     );

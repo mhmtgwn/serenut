@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
+import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.dart';
 
 part 'catalog/catalog_product_card.dart';
 
@@ -65,9 +66,15 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(salesProductsControllerProvider.notifier).loadNextPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
+      final hasMore =
+          ref.read(salesProductsControllerProvider.notifier).hasMoreData;
+      final loadingMore = ref.read(productLoadingMoreProvider);
+      if (hasMore && !loadingMore) {
+        ref.read(salesProductsControllerProvider.notifier).loadNextPage();
+      }
     }
   }
 
@@ -240,43 +247,55 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
 
         // ── ÜRÜN GRİDİ ───────────────────────────────────────────────────
         Expanded(
-          child: filteredProductsVal.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(_kGreen),
-              ),
-            ),
-            error: (err, _) => Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline_rounded,
-                        size: 36, color: _kRed.withValues(alpha: 0.6)),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Ürünler yüklenirken hata oluştu',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: _kRed,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13),
+          child: Builder(
+            builder: (context) {
+              final cachedProducts = filteredProductsVal.valueOrNull;
+              final loadingMore = ref.watch(productLoadingMoreProvider);
+              final hasMore =
+                  ref.watch(salesProductsControllerProvider.notifier).hasMoreData;
+
+              if (cachedProducts == null && filteredProductsVal.isLoading) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(_kGreen),
+                  ),
+                );
+              }
+              if (filteredProductsVal.hasError && cachedProducts == null) {
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline_rounded,
+                            size: 36, color: _kRed.withValues(alpha: 0.6)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Ürünler yüklenirken hata oluştu',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: _kRed,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          filteredProductsVal.error.toString(),
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: _kTextSecondary, fontSize: 11),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      err.toString(),
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(color: _kTextSecondary, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            data: (products) {
+                  ),
+                );
+              }
+
+              final products = cachedProducts ?? const <ProductEntity>[];
+
               if (products.isEmpty) {
                 return Center(
                   child: Column(
@@ -303,24 +322,47 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 );
               }
 
-              return GridView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(14),
-                // Tablet/Desktop: daha büyük kartlar, daha iyi dokunmatik hedef
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.78,
-                ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  final prod = products[index];
-                  return _CatalogProductCard(
-                    product: prod,
-                    onAddToCart: widget.onAddToCart,
-                  );
+              return NotificationListener<ScrollNotification>(
+                onNotification: (scrollInfo) {
+                  if (scrollInfo.metrics.pixels >=
+                      scrollInfo.metrics.maxScrollExtent - 400) {
+                    if (hasMore && !loadingMore) {
+                      ref
+                          .read(salesProductsControllerProvider.notifier)
+                          .loadNextPage();
+                    }
+                  }
+                  return false;
                 },
+                child: GridView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(14),
+                  // Tablet/Desktop: daha büyük kartlar, daha iyi dokunmatik hedef
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 200,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.78,
+                  ),
+                  itemCount: products.length + (loadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == products.length) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                          ),
+                        ),
+                      );
+                    }
+                    final prod = products[index];
+                    return _CatalogProductCard(
+                      product: prod,
+                      onAddToCart: widget.onAddToCart,
+                    );
+                  },
+                ),
               );
             },
           ),
@@ -330,116 +372,21 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   }
 
   Future<void> _showProductFilters(List<String> categories) async {
-    var category = ref.read(salesProductCategoryFilterProvider);
-    var stock = ref.read(salesProductStockFilterProvider);
-    var sort = ref.read(salesProductSortProvider);
-    await showModalBottomSheet<void>(
+    final currentCat = ref.read(salesProductCategoryFilterProvider);
+    final currentStock = ref.read(salesProductStockFilterProvider);
+    final currentSort = ref.read(salesProductSortProvider);
+
+    await ProductFilterSortDialog.show(
       context: context,
-      useSafeArea: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Ürünleri filtrele',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String?>(
-                value: category,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Kategori'),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Tüm kategoriler'),
-                  ),
-                  ...categories.map(
-                    (item) => DropdownMenuItem<String?>(
-                      value: item,
-                      child: Text(item, overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => setSheetState(() => category = value),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('Tüm stoklar'),
-                    selected: stock == null,
-                    onSelected: (_) => setSheetState(() => stock = null),
-                  ),
-                  ChoiceChip(
-                    label: const Text('Stokta'),
-                    selected: stock == 'in_stock',
-                    onSelected: (_) => setSheetState(() => stock = 'in_stock'),
-                  ),
-                  ChoiceChip(
-                    label: const Text('Kritik stok'),
-                    selected: stock == 'critical',
-                    onSelected: (_) => setSheetState(() => stock = 'critical'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: sort,
-                decoration: const InputDecoration(labelText: 'Sıralama'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('Ürün adına göre')),
-                  DropdownMenuItem(
-                      value: 'best_selling', child: Text('En çok satanlar')),
-                  DropdownMenuItem(
-                      value: 'price_asc',
-                      child: Text('Fiyat: düşükten yükseğe')),
-                  DropdownMenuItem(
-                      value: 'price_desc',
-                      child: Text('Fiyat: yüksekten düşüğe')),
-                ],
-                onChanged: (value) => setSheetState(() => sort = value),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setSheetState(() {
-                          category = null;
-                          stock = null;
-                          sort = null;
-                        });
-                      },
-                      child: const Text('Temizle'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        ref
-                            .read(salesProductCategoryFilterProvider.notifier)
-                            .state = category;
-                        ref
-                            .read(salesProductStockFilterProvider.notifier)
-                            .state = stock;
-                        ref.read(salesProductSortProvider.notifier).state =
-                            sort;
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Uygula'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      initialCategory: currentCat,
+      initialSort: currentSort,
+      initialStock: currentStock,
+      categories: categories,
+      onApply: ({required category, required sortBy, required stockFilter}) {
+        ref.read(salesProductCategoryFilterProvider.notifier).state = category;
+        ref.read(salesProductStockFilterProvider.notifier).state = stockFilter;
+        ref.read(salesProductSortProvider.notifier).state = sortBy;
+      },
     );
   }
 }

@@ -470,9 +470,72 @@ class SqliteFinancialTransactionRepository
   }
 
   @override
+  Future<int> updateOrderSaleTransaction({
+    required String orderId,
+    required String customerId,
+    required double amount,
+    required double paidAmount,
+    required double debtAmount,
+  }) async {
+    return _gateway.transaction(() async {
+      // Find the active sale transaction for this order
+      final existingRows = await _executor.query(
+        'financial_transactions',
+        where: 'reference_id = ? AND type = ?',
+        whereArgs: [orderId, 'sale'],
+        orderBy: 'logical_clock DESC, device_id DESC',
+        limit: 1,
+      );
+
+      if (existingRows.isEmpty) {
+        return 0;
+      }
+
+      final txId = existingRows.first['id'] as String;
+
+      // Temporarily activate bypass flag to permit in-place update while executing trg_ft_update
+      await _executor.update('ledger_bypass_flag', {'active': 1});
+      try {
+        final count = await _executor.update(
+          'financial_transactions',
+          {
+            'customer_id': customerId,
+            'amount': amount,
+            'paid_amount': paidAmount,
+            'debt_amount': debtAmount,
+            'is_synced': 0,
+          },
+          where: 'id = ?',
+          whereArgs: [txId],
+        );
+
+        final updatedRows = await _executor.query(
+          'financial_transactions',
+          where: 'id = ?',
+          whereArgs: [txId],
+          limit: 1,
+        );
+        if (updatedRows.isNotEmpty) {
+          await SyncOutboxV4.enqueue(
+            _executor,
+            entityType: 'financial_transaction',
+            entityId: txId,
+            operation: 'UPSERT',
+            payload: updatedRows.first,
+          );
+        }
+
+        return count;
+      } finally {
+        await _executor.update('ledger_bypass_flag', {'active': 0});
+      }
+    });
+  }
+
+  @override
   Future<int> update(FinancialTransactionEntity entity) async {
     throw UnsupportedError(
-        'Finansal defter kayıtları güncellenemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.');
+        'Finansal defter kayıtları doğrudan güncellenemez. Sipariş düzenlemeleri için updateOrderSaleTransaction kullanın.');
   }
 
   @override
@@ -506,6 +569,19 @@ class SqliteFinancialTransactionRepository
       'financial_transactions',
       where: 'customer_id = ?',
       whereArgs: [customerId],
+      orderBy: 'logical_clock DESC, device_id DESC',
+    );
+    return rows.map((row) => FinancialTransactionEntity.fromMap(row)).toList();
+  }
+
+  @override
+  Future<List<FinancialTransactionEntity>> getByReferenceId(
+      String referenceId) async {
+    if (referenceId.isEmpty) return [];
+    final rows = await _executor.query(
+      'financial_transactions',
+      where: 'reference_id = ?',
+      whereArgs: [referenceId],
       orderBy: 'logical_clock DESC, device_id DESC',
     );
     return rows.map((row) => FinancialTransactionEntity.fromMap(row)).toList();

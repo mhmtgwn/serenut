@@ -8,4 +8,3 @@ export 'sqlite_order_repository.dart';
 export 'sqlite_settings_repository.dart';
 export 'sqlite_user_repository.dart';
 export 'sqlite_database_health_repository.dart';
-export 'sqlite_global_search_repository.dart';

@@ -8,7 +8,9 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
     }
 
     final customersVal = ref.watch(ordersCustomersControllerProvider);
-
+    final loadingMore = ref.watch(customerLoadingMoreProvider);
+    final hasMore =
+        ref.watch(ordersCustomersControllerProvider.notifier).hasMoreData;
     final filtered = customersVal.valueOrNull ?? const <CustomerEntity>[];
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -136,32 +138,39 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                               ],
                             ),
                           )
-                        : Stack(
-                            children: [
-                              ListView.builder(
-                                controller: _customerScrollController,
-                                itemCount: filtered.length +
-                                    (ref
-                                            .read(
-                                                ordersCustomersControllerProvider
-                                                    .notifier)
-                                            .isLoadingMore
-                                        ? 1
-                                        : 0),
-                                itemBuilder: (context, idx) {
-                                  if (idx == filtered.length) {
-                                    return const Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 16),
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation(_kGreen),
-                                        ),
+                        : NotificationListener<ScrollNotification>(
+                            onNotification: (scrollInfo) {
+                              if (scrollInfo.metrics.pixels >=
+                                  scrollInfo.metrics.maxScrollExtent - 400) {
+                                if (hasMore && !loadingMore) {
+                                  ref
+                                      .read(ordersCustomersControllerProvider
+                                          .notifier)
+                                      .loadNextPage();
+                                }
+                              }
+                              return false;
+                            },
+                            child: Stack(
+                              children: [
+                                ListView.builder(
+                                  controller: _customerScrollController,
+                                  itemCount:
+                                      filtered.length + (loadingMore ? 1 : 0),
+                              itemBuilder: (context, idx) {
+                                if (idx == filtered.length) {
+                                  return const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(vertical: 16),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation(_kGreen),
                                       ),
-                                    );
-                                  }
+                                    ),
+                                  );
+                                }
                                   final c = filtered[idx];
                                   final isSel = _selectedCustomer?.id == c.id;
                                   final isDebt = c.balance < 0;
@@ -267,6 +276,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                                 ),
                             ],
                           ),
+                        ),
           ),
         ],
       ),

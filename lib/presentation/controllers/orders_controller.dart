@@ -18,6 +18,9 @@ import 'package:serenutos/providers/sync_provider.dart';
 // ─── Pagination constants ─────────────────────────────────────────────────────
 const _kPageSize = 25;
 
+/// Reactive indicator for orders pagination loading state
+final ordersLoadingMoreProvider = StateProvider<bool>((ref) => false);
+
 class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   late IOrderRepository _repository;
 
@@ -110,6 +113,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   Future<void> loadNextPage() async {
     if (!_hasMore || _isLoadingMore) return;
     _isLoadingMore = true;
+    ref.read(ordersLoadingMoreProvider.notifier).state = true;
     try {
       final current = state.valueOrNull ?? [];
       final next = await _repository.findFiltered(
@@ -128,13 +132,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       final existingIds = current.map((e) => e.id).toSet();
       final uniqueNext =
           next.where((e) => !existingIds.contains(e.id)).toList();
-      if (uniqueNext.isEmpty) {
-        _hasMore = false;
-      } else {
+      if (uniqueNext.isNotEmpty) {
         state = AsyncValue.data([...current, ...uniqueNext]);
       }
     } catch (e, stack) {
-      _hasMore = false;
       TelemetryService().logError(
         e,
         stack,
@@ -143,6 +144,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     } finally {
       _isLoadingMore = false;
+      ref.read(ordersLoadingMoreProvider.notifier).state = false;
     }
   }
 

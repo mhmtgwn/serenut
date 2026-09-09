@@ -13,7 +13,6 @@ import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
 import 'package:serenutos/presentation/pages/login_page.dart';
 import 'package:serenutos/presentation/pages/register_page.dart';
 import 'package:serenutos/presentation/pages/forgot_password_page.dart';
-import 'package:serenutos/presentation/pages/operational_error_page.dart';
 import 'package:serenutos/presentation/pages/home_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
 import 'package:serenutos/presentation/pages/customers_page.dart';
@@ -42,8 +41,6 @@ import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 
-import 'package:serenutos/presentation/pages/paywall_page.dart';
-
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -53,7 +50,6 @@ class AppRoutes {
   static const onboarding =
       '/onboarding'; // Onboarding wizard — tek giriş noktası
   static const activation = '/onboarding'; // Eski alias
-  static const paywall = '/paywall';
   static const home = '/';
   static const sales = '/sales';
   static const customers = '/customers';
@@ -127,14 +123,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         return AppRoutes.home;
       }
 
-      // Lisans durumu, giriş yapmış kullanıcıyı uygulamanın dışına atmaz.
-      // Kullanıcı normal arayüzü salt okunur görür; domain yazma kapıları
-      // lisans gerektiren işlemleri reddetmeye devam eder.
-      if (state.matchedLocation == AppRoutes.paywall ||
-          state.matchedLocation == '/operational-error') {
-        return AppRoutes.home;
-      }
-
       return null;
     },
     routes: [
@@ -200,20 +188,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
         ],
-      ),
-
-      // ── Paywall Screen (no shell) ──────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.paywall,
-        name: 'paywall',
-        builder: (context, state) => const PaywallPage(),
-      ),
-
-      // ── Operational Error (Cashier/Staff Restricted State) ─────────────
-      GoRoute(
-        path: '/operational-error',
-        name: 'operationalError',
-        builder: (context, state) => const OperationalErrorPage(),
       ),
 
       // ── Settings (free route — accessed via AppBar icon) ─────────────

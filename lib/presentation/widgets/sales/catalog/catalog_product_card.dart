@@ -20,21 +20,24 @@ class _CatalogProductCard extends StatelessWidget {
     final Color badgeTextColor = outOfStock
         ? _kRed
         : (isLowStock ? const Color(0xFF854D0E) : _kGreenDark);
-    // Border rengi stok durumuna göre belirlenir
+    // Border ve zemin rengi stok durumuna göre belirlenir
+    final Color cardBg = outOfStock
+        ? const Color(0xFFFFF5F5)
+        : (isLowStock ? const Color(0xFFFFFDF5) : _kCardBg);
     final Color borderColor = outOfStock
-        ? _kRed.withValues(alpha: 0.25)
-        : (isLowStock ? _kAmber.withValues(alpha: 0.35) : _kBorder);
+        ? const Color(0xFFFCA5A5).withValues(alpha: 0.55)
+        : (isLowStock ? _kAmber.withValues(alpha: 0.55) : _kBorder);
 
     return AnimatedOpacity(
       opacity: 1.0,
       duration: const Duration(milliseconds: 150),
       child: Container(
         decoration: BoxDecoration(
-          color: _kCardBg,
+          color: cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: borderColor,
-            width: (outOfStock || isLowStock) ? 1.5 : 1,
+            width: 1.0,
           ),
           boxShadow: [
             BoxShadow(

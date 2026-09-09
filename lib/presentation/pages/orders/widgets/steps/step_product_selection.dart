@@ -4,19 +4,29 @@ part of '../order_creation_dialog.dart';
 extension OrderCreationProductStep on OrderCreationDialogState {
   Widget _buildProductStep() {
     final productsVal = ref.watch(ordersProductsControllerProvider);
+    final loadingMore = ref.watch(productLoadingMoreProvider);
+    final hasMore =
+        ref.watch(ordersProductsControllerProvider.notifier).hasMoreData;
     final categories = ref.watch(productCategoriesProvider);
+    final categoryFilter = ref.watch(ordersProductCategoryFilterProvider);
     final stockFilter = ref.watch(ordersProductStockFilterProvider);
     final sortBy = ref.watch(ordersProductSortProvider);
 
-    return productsVal.when(
-      loading: () => const Center(
-          child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(
-          child: Text('Ürünler yüklenemedi: $err',
-              style: const TextStyle(color: _kRed))),
-      data: (productsList) {
-        final filtered = productsList;
+    final cachedProducts = productsVal.valueOrNull;
+    if (cachedProducts == null && productsVal.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(_kGreen)),
+      );
+    }
+    if (productsVal.hasError && cachedProducts == null) {
+      return Center(
+        child: Text('Ürünler yüklenemedi: ${productsVal.error}',
+            style: const TextStyle(color: _kRed)),
+      );
+    }
+
+    final filtered = cachedProducts ?? const <ProductEntity>[];
         final catalogWidget = Column(
           children: [
             // Search & Category toggle filter bar (like Sales screen catalog)
@@ -84,8 +94,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                     ),
                     Expanded(
                       child: InkWell(
-                        onTap: () =>
-                            _showCategoryBottomSheet(context, categories),
+                        onTap: () => _showOrderProductFilters(categories),
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -103,9 +112,9 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  _selectedCategory == 'Tümü'
+                                  categoryFilter == null || categoryFilter.isEmpty
                                       ? 'Kategori: Tümü'
-                                      : 'Kategori: $_selectedCategory',
+                                      : 'Kategori: $categoryFilter',
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 13,
@@ -124,11 +133,13 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                   ],
                   const SizedBox(width: 4),
                   Badge(
-                    isLabelVisible: stockFilter != null || sortBy != null,
+                    isLabelVisible: categoryFilter != null ||
+                        stockFilter != null ||
+                        sortBy != null,
                     child: IconButton(
-                      onPressed: _showOrderProductFilters,
+                      onPressed: () => _showOrderProductFilters(categories),
                       icon: const Icon(Icons.tune_rounded, color: _kGreen),
-                      tooltip: 'Ürün filtreleri',
+                      tooltip: 'Sıralama ve Filtreler',
                     ),
                   ),
                   // Photo Camera scanner
@@ -137,7 +148,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                       BarcodeScannerDialog.show(
                         context,
                         onBarcodeScanned: (code) {
-                          _handleBarcodeSubmit(code, productsList);
+                          _handleBarcodeSubmit(code, filtered);
                         },
                       );
                     },
@@ -168,18 +179,40 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         ],
                       ),
                     )
-                  : GridView.builder(
-                      controller: _productScrollController,
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 200,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 0.85,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, idx) {
-                        final p = filtered[idx];
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (scrollInfo) {
+                        if (scrollInfo.metrics.pixels >=
+                            scrollInfo.metrics.maxScrollExtent - 400) {
+                          if (hasMore && !loadingMore) {
+                            ref
+                                .read(ordersProductsControllerProvider.notifier)
+                                .loadNextPage();
+                          }
+                        }
+                        return false;
+                      },
+                      child: GridView.builder(
+                        controller: _productScrollController,
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 200,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.85,
+                        ),
+                        itemCount: filtered.length + (loadingMore ? 1 : 0),
+                        itemBuilder: (context, idx) {
+                          if (idx == filtered.length) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                                ),
+                              ),
+                            );
+                          }
+                          final p = filtered[idx];
                         final existingKey = _cart.keys.firstWhere(
                           (item) => item.id == p.id,
                           orElse: () => p,
@@ -415,6 +448,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         );
                       },
                     ),
+                  ),
               ),
             ],
           );
@@ -423,136 +457,23 @@ extension OrderCreationProductStep on OrderCreationDialogState {
           padding: const EdgeInsets.all(16),
           child: catalogWidget,
         );
-      },
-    );
   }
 
+  Future<void> _showOrderProductFilters(List<String> categoriesList) async {
+    final currentCat = ref.read(ordersProductCategoryFilterProvider);
+    final currentSort = ref.read(ordersProductSortProvider);
+    final currentStock = ref.read(ordersProductStockFilterProvider);
 
-
-  Future<void> _showOrderProductFilters() async {
-    var stock = ref.read(ordersProductStockFilterProvider);
-    var sort = ref.read(ordersProductSortProvider);
-    await showModalBottomSheet<void>(
+    await ProductFilterSortDialog.show(
       context: context,
-      useSafeArea: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Ürünleri filtrele',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('Tümü'),
-                    selected: stock == null,
-                    onSelected: (_) => setSheetState(() => stock = null),
-                  ),
-                  ChoiceChip(
-                    label: const Text('Stokta'),
-                    selected: stock == 'in_stock',
-                    onSelected: (_) => setSheetState(() => stock = 'in_stock'),
-                  ),
-                  ChoiceChip(
-                    label: const Text('Kritik'),
-                    selected: stock == 'critical',
-                    onSelected: (_) => setSheetState(() => stock = 'critical'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: sort,
-                decoration: const InputDecoration(labelText: 'Sıralama'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('Ürün adına göre')),
-                  DropdownMenuItem(
-                      value: 'best_selling', child: Text('En çok satanlar')),
-                  DropdownMenuItem(
-                      value: 'price_asc',
-                      child: Text('Fiyat: düşükten yükseğe')),
-                  DropdownMenuItem(
-                      value: 'price_desc',
-                      child: Text('Fiyat: yüksekten düşüğe')),
-                ],
-                onChanged: (value) => setSheetState(() => sort = value),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  ref.read(ordersProductStockFilterProvider.notifier).state =
-                      stock;
-                  ref.read(ordersProductSortProvider.notifier).state = sort;
-                  Navigator.pop(context);
-                },
-                child: const Text('Uygula'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showCategoryBottomSheet(
-      BuildContext context, List<String> categoriesList) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Text(
-                  'Kategori Seçin',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                title: const Text('Tümü'),
-                leading: Icon(
-                  Icons.category_rounded,
-                  color: _selectedCategory == 'Tümü' ? _kGreen : Colors.grey,
-                ),
-                onTap: () {
-                  updateState(() {
-                    _selectedCategory = 'Tümü';
-                  });
-                  Navigator.of(context).pop();
-                },
-              ),
-              ...categoriesList.map((category) {
-                final isSelected = _selectedCategory == category;
-                return ListTile(
-                  title: Text(category),
-                  leading: Icon(
-                    Icons.label_outline_rounded,
-                    color: isSelected ? _kGreen : Colors.grey,
-                  ),
-                  onTap: () {
-                    updateState(() {
-                      _selectedCategory = category;
-                    });
-                    Navigator.of(context).pop();
-                  },
-                );
-              }),
-            ],
-          ),
-        );
+      initialCategory: currentCat,
+      initialSort: currentSort,
+      initialStock: currentStock,
+      categories: categoriesList,
+      onApply: ({required category, required sortBy, required stockFilter}) {
+        ref.read(ordersProductCategoryFilterProvider.notifier).state = category;
+        ref.read(ordersProductSortProvider.notifier).state = sortBy;
+        ref.read(ordersProductStockFilterProvider.notifier).state = stockFilter;
       },
     );
   }

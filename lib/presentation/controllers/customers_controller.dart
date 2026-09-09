@@ -13,6 +13,9 @@ final customerSearchQueryProvider = StateProvider<String>((ref) => '');
 final customerBalanceFilterProvider =
     StateProvider<CustomerBalanceFilter>((ref) => CustomerBalanceFilter.all);
 
+/// Reactive indicator for customer pagination loading state
+final customerLoadingMoreProvider = StateProvider<bool>((ref) => false);
+
 final customerBalanceSummaryProvider =
     FutureProvider<CustomerBalanceSummary>((ref) async {
   final repository = await ref.watch(customerRepositoryProvider.future);
@@ -57,11 +60,14 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     if (_paginationService!.isLoading || !_paginationService!.hasMoreData) {
       return;
     }
+    ref.read(customerLoadingMoreProvider.notifier).state = true;
     try {
       await _paginationService!.loadNextPage();
       state = AsyncValue.data(List.from(_paginationService!.items));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
+    } finally {
+      ref.read(customerLoadingMoreProvider.notifier).state = false;
     }
   }
 

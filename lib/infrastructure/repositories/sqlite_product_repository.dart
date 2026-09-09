@@ -663,6 +663,9 @@ class SqliteProductRepository implements IProductRepository {
     final orderBy = switch (sortBy) {
       'price_asc' => 'price ASC',
       'price_desc' => 'price DESC',
+      'category' => 'category ASC, name ASC',
+      'name_desc' => 'name DESC',
+      'name_asc' => 'name ASC',
       'best_selling' =>
         '(SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si '
             'JOIN sales s ON s.id = si.sale_id '

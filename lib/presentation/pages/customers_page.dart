@@ -63,16 +63,22 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      ref.read(customersControllerProvider.notifier).loadNextPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
+      final hasMore =
+          ref.read(customersControllerProvider.notifier).hasMoreData;
+      final loadingMore = ref.read(customerLoadingMoreProvider);
+      if (hasMore && !loadingMore) {
+        ref.read(customersControllerProvider.notifier).loadNextPage();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final customersAsync = ref.watch(customersControllerProvider);
-    final hasMore = ref.watch(customersControllerProvider.notifier).hasMoreData;
+    final isLoadingMore = ref.watch(customerLoadingMoreProvider);
     final balanceFilter = ref.watch(customerBalanceFilterProvider);
     final balanceSummary = ref.watch(customerBalanceSummaryProvider);
 
@@ -145,16 +151,25 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
             ),
           ),
           Expanded(
-            child: customersAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation(_kGreen)),
-              ),
-              error: (err, _) => Center(
-                child: Text('Müşteriler yüklenirken hata oluştu: $err'),
-              ),
-              data: (customersList) {
-                if (customersList.isEmpty) {
+            child: Builder(
+              builder: (context) {
+                final customersList = customersAsync.valueOrNull;
+
+                if (customersList == null && customersAsync.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(_kGreen)),
+                  );
+                }
+
+                if (customersList == null && customersAsync.hasError) {
+                  return Center(
+                    child: Text(
+                        'Müşteriler yüklenirken hata oluştu: ${customersAsync.error}'),
+                  );
+                }
+
+                if (customersList == null || customersList.isEmpty) {
                   return RefreshIndicator(
                     onRefresh: () => ref
                         .read(customersControllerProvider.notifier)
@@ -196,27 +211,73 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 return RefreshIndicator(
                   onRefresh: () =>
                       ref.read(customersControllerProvider.notifier).refresh(),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 720;
-                      if (isWide) {
-                        return GridView.builder(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (scrollInfo) {
+                      if (scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 400) {
+                        final canLoad = ref
+                            .read(customersControllerProvider.notifier)
+                            .hasMoreData;
+                        final loading = ref.read(customerLoadingMoreProvider);
+                        if (canLoad && !loading) {
+                          ref
+                              .read(customersControllerProvider.notifier)
+                              .loadNextPage();
+                        }
+                      }
+                      return false;
+                    },
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 720;
+                        if (isWide) {
+                          return GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 520,
+                              mainAxisExtent: 110,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount:
+                                customersList.length + (isLoadingMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == customersList.length) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(
+                                      valueColor:
+                                          AlwaysStoppedAnimation(_kGreen),
+                                    ),
+                                  ),
+                                );
+                              }
+                              final customer = customersList[index];
+                              return _CustomerCard(
+                                customer: customer,
+                                isGrid: true,
+                                onTap: () => context.push(
+                                    '/customers/detail/${customer.id}'),
+                              );
+                            },
+                          );
+                        }
+
+                        return ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 520,
-                            mainAxisExtent: 110,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: customersList.length + (hasMore ? 1 : 0),
+                          itemCount:
+                              customersList.length + (isLoadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == customersList.length) {
-                              return const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(12),
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
                                   child: CircularProgressIndicator(
                                     valueColor:
                                         AlwaysStoppedAnimation(_kGreen),
@@ -227,41 +288,14 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                             final customer = customersList[index];
                             return _CustomerCard(
                               customer: customer,
-                              isGrid: true,
+                              isGrid: false,
                               onTap: () => context.push(
                                   '/customers/detail/${customer.id}'),
                             );
                           },
                         );
-                      }
-
-                      return ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: customersList.length + (hasMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == customersList.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  valueColor:
-                                      AlwaysStoppedAnimation(_kGreen),
-                                ),
-                              ),
-                            );
-                          }
-                          final customer = customersList[index];
-                          return _CustomerCard(
-                            customer: customer,
-                            isGrid: false,
-                            onTap: () => context.push(
-                                '/customers/detail/${customer.id}'),
-                          );
-                        },
-                      );
-                    },
+                      },
+                    ),
                   ),
                 );
               },
@@ -599,7 +633,6 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isHighDebt = customer.balance <= -500;
     final isDebt = customer.balance < 0;
     final isClear = customer.balance == 0;
     final absBalance = customer.balance.abs();
@@ -610,50 +643,36 @@ class _CustomerCard extends StatelessWidget {
     final Color cardBg;
     final Color cardBorder;
     final Color accentColor;
-    final Color badgeBg;
-    final Color badgeText;
-    final String badgeLabel;
+    final Color balanceBg;
+    final Color balanceText;
     final Color avatarBg;
     final Color avatarText;
 
-    if (isHighDebt) {
-      // Yüksek Borç: Mercan / Kırmızı
-      cardBg = const Color(0xFFFEF2F2);
-      cardBorder = const Color(0xFFFCA5A5);
+    if (isDebt) {
+      // Borçlu: Mercan / Kırmızı
+      cardBg = const Color(0xFFFFF5F5);
+      cardBorder = const Color(0xFFFCA5A5).withValues(alpha: 0.55);
       accentColor = const Color(0xFFDC2626);
-      badgeBg = const Color(0xFFFEE2E2);
-      badgeText = const Color(0xFFDC2626);
-      badgeLabel = 'Yüksek Borç';
+      balanceBg = const Color(0xFFFEE2E2);
+      balanceText = const Color(0xFFDC2626);
       avatarBg = const Color(0xFFFEE2E2);
       avatarText = const Color(0xFFB91C1C);
-    } else if (isDebt) {
-      // Normal Borç: Sıcak Kehribar / Sarı
-      cardBg = const Color(0xFFFFFBEB);
-      cardBorder = const Color(0xFFFCD34D);
-      accentColor = const Color(0xFFD97706);
-      badgeBg = const Color(0xFFFEF3C7);
-      badgeText = const Color(0xFFD97706);
-      badgeLabel = 'Vadeli Borç';
-      avatarBg = const Color(0xFFFEF3C7);
-      avatarText = const Color(0xFFB45309);
     } else if (isClear) {
-      // Bakiye Yok / Hesap Dengede: Temiz Gök Mavisi
-      cardBg = const Color(0xFFF0F9FF);
-      cardBorder = const Color(0xFFBAE6FD);
-      accentColor = const Color(0xFF0284C7);
-      badgeBg = const Color(0xFFE0F2FE);
-      badgeText = const Color(0xFF0284C7);
-      badgeLabel = 'Hesap Dengede';
-      avatarBg = const Color(0xFFE0F2FE);
-      avatarText = const Color(0xFF0369A1);
+      // 0 Bakiye / Dengede: Dingin Nötr Gri
+      cardBg = const Color(0xFFF8FAFC);
+      cardBorder = const Color(0xFFCBD5E1).withValues(alpha: 0.55);
+      accentColor = const Color(0xFF94A3B8);
+      balanceBg = const Color(0xFFF1F5F9);
+      balanceText = const Color(0xFF64748B);
+      avatarBg = const Color(0xFFF1F5F9);
+      avatarText = const Color(0xFF64748B);
     } else {
-      // Alacaklı / Avans: Zümrüt Yeşili
-      cardBg = const Color(0xFFECFDF5);
-      cardBorder = const Color(0xFF6EE7B7);
+      // Alacaklı: Dingin Zümrüt Yeşili
+      cardBg = const Color(0xFFF2FBF5);
+      cardBorder = const Color(0xFF6EE7B7).withValues(alpha: 0.55);
       accentColor = const Color(0xFF059669);
-      badgeBg = const Color(0xFFD1FAE5);
-      badgeText = const Color(0xFF059669);
-      badgeLabel = 'Avans / Alacak';
+      balanceBg = const Color(0xFFD1FAE5);
+      balanceText = const Color(0xFF059669);
       avatarBg = const Color(0xFFD1FAE5);
       avatarText = const Color(0xFF047857);
     }
@@ -665,13 +684,13 @@ class _CustomerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cardBorder,
-          width: 1.4,
+          width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -679,6 +698,8 @@ class _CustomerCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
+          splashColor: accentColor.withValues(alpha: 0.08),
+          highlightColor: accentColor.withValues(alpha: 0.04),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -722,38 +743,15 @@ class _CustomerCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            customer.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: _kText,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: badgeBg,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              badgeLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: badgeText,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        customer.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: _kText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
                       if (customer.phone.isNotEmpty)
@@ -831,7 +829,7 @@ class _CustomerCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: badgeBg,
+                        color: balanceBg,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -839,7 +837,7 @@ class _CustomerCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
-                          color: badgeText,
+                          color: balanceText,
                         ),
                       ),
                     ),

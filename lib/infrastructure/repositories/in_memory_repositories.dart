@@ -255,6 +255,14 @@ class InMemoryProductRepository implements IProductRepository {
       list.sort((a, b) => a.price.compareTo(b.price));
     } else if (sortBy == 'price_desc') {
       list.sort((a, b) => b.price.compareTo(a.price));
+    } else if (sortBy == 'category') {
+      list.sort((a, b) {
+        final c = a.category.compareTo(b.category);
+        if (c != 0) return c;
+        return a.name.compareTo(b.name);
+      });
+    } else if (sortBy == 'name_desc') {
+      list.sort((a, b) => b.name.compareTo(a.name));
     } else {
       list.sort((a, b) => a.name.compareTo(b.name));
     }
@@ -734,9 +742,47 @@ class InMemoryFinancialTransactionRepository
   }
 
   @override
+  Future<int> updateOrderSaleTransaction({
+    required String orderId,
+    required String customerId,
+    required double amount,
+    required double paidAmount,
+    required double debtAmount,
+  }) async {
+    final idx = InMemoryDb.transactions
+        .indexWhere((t) => t.referenceId == orderId && t.type == 'sale');
+    if (idx == -1) return 0;
+
+    final oldTx = InMemoryDb.transactions[idx];
+    // Reverse old transaction effect
+    _syncCustomerBalance(oldTx.customerId, oldTx, isInsert: false);
+
+    final updatedTx = FinancialTransactionEntity(
+      id: oldTx.id,
+      type: oldTx.type,
+      customerId: customerId,
+      amount: amount,
+      paidAmount: paidAmount,
+      debtAmount: debtAmount,
+      date: oldTx.date,
+      referenceId: oldTx.referenceId,
+      metadata: oldTx.metadata,
+      logicalClock: oldTx.logicalClock,
+      deviceId: oldTx.deviceId,
+    );
+
+    InMemoryDb.transactions[idx] = updatedTx;
+
+    // Apply new transaction effect
+    _syncCustomerBalance(customerId, updatedTx, isInsert: true);
+
+    return 1;
+  }
+
+  @override
   Future<int> update(FinancialTransactionEntity entity) async {
     throw UnsupportedError(
-        'Kritik Hata: Finansal defter kayıtları değiştirilemez (Ledger Immutability).');
+        'Kritik Hata: Finansal defter kayıtları değiştirilemez. Siparişler için updateOrderSaleTransaction kullanın.');
   }
 
   @override
@@ -793,6 +839,21 @@ class InMemoryFinancialTransactionRepository
       String customerId) async {
     final list = InMemoryDb.transactions
         .where((t) => t.customerId == customerId)
+        .toList();
+    list.sort((a, b) {
+      final cmp = b.logicalClock.compareTo(a.logicalClock);
+      if (cmp != 0) return cmp;
+      return (b.deviceId ?? '').compareTo(a.deviceId ?? '');
+    });
+    return list;
+  }
+
+  @override
+  Future<List<FinancialTransactionEntity>> getByReferenceId(
+      String referenceId) async {
+    if (referenceId.isEmpty) return [];
+    final list = InMemoryDb.transactions
+        .where((t) => t.referenceId == referenceId)
         .toList();
     list.sort((a, b) {
       final cmp = b.logicalClock.compareTo(a.logicalClock);
