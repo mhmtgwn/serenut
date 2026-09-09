@@ -183,11 +183,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Ürünleri filtrele'), findsOneWidget);
-      expect(find.text('Kategori'), findsOneWidget);
-      expect(find.text('Tüm stoklar'), findsOneWidget);
-      expect(find.text('Sıralama'), findsOneWidget);
-      expect(find.text('Temizle'), findsOneWidget);
+      expect(find.text('Sıralama ve Filtreleme'), findsOneWidget);
+      expect(find.text('Sıralama Ölçütü'), findsOneWidget);
+      expect(find.text('Kategoriye Göre Filtrele'), findsOneWidget);
+      expect(find.text('Stok Durumu'), findsOneWidget);
+      expect(find.text('İptal'), findsOneWidget);
       expect(find.text('Uygula'), findsOneWidget);
     });
 
