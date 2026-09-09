@@ -62,7 +62,7 @@ class _ErrorLogsPageState extends State<ErrorLogsPage> {
   Future<void> _loadLogs({bool showLoading = true}) async {
     if (showLoading) setState(() => _isLoading = true);
     try {
-      final events = await _telemetry.getEvents();
+      final events = await _telemetry.getEvents(newestFirst: true);
       if (mounted) {
         setState(() {
           _allEvents = events;

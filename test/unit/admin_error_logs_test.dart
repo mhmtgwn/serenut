@@ -62,7 +62,7 @@ void main() {
       expect(emittedEvents.first.level, equals(LogLevel.warning));
     });
 
-    test('getEvents returns events ordered newest-first', () async {
+    test('getEvents returns events ordered newest-first when newestFirst is true', () async {
       await telemetry.logStructured(
         event: 'event_old',
         level: LogLevel.info,
@@ -76,7 +76,7 @@ void main() {
         level: LogLevel.error,
       );
 
-      final events = await telemetry.getEvents();
+      final events = await telemetry.getEvents(newestFirst: true);
       expect(events.length, greaterThanOrEqualTo(2));
       expect(events.first.event, equals('event_new'));
       expect(events[1].event, equals('event_old'));

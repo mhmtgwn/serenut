@@ -307,10 +307,15 @@ class TelemetryService {
   }
 
   /// Retrieves all logged telemetry events, merging durable file logs with
-  /// in-memory queue, deduplicating, and ordering newest-first.
-  Future<List<TelemetryEvent>> getEvents() async {
+  /// Retrieves all logged telemetry events, merging durable file logs with
+  /// in-memory queue, and deduplicating.
+  /// If [newestFirst] is true, returns newest events first (e.g. for log viewers).
+  /// Default is false to preserve natural chronological order.
+  Future<List<TelemetryEvent>> getEvents({bool newestFirst = false}) async {
     if (kIsWeb) {
-      return _inMemoryQueue.reversed.toList();
+      return newestFirst
+          ? _inMemoryQueue.reversed.toList()
+          : _inMemoryQueue.toList();
     }
     final list = <TelemetryEvent>[];
     final seenIds = <String>{};
@@ -345,15 +350,19 @@ class TelemetryService {
       }
     }
 
-    // Sort newest-first so dashboards always show current issues at the top
-    list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (newestFirst) {
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    }
     return list;
   }
 
   /// Retrieves only events at or above [minLevel] severity.
   /// Useful for CRITICAL log viewer screens.
-  Future<List<TelemetryEvent>> getEventsByLevel(LogLevel minLevel) async {
-    final all = await getEvents();
+  Future<List<TelemetryEvent>> getEventsByLevel(
+    LogLevel minLevel, {
+    bool newestFirst = false,
+  }) async {
+    final all = await getEvents(newestFirst: newestFirst);
     return all.where((e) => e.level.index >= minLevel.index).toList();
   }
 

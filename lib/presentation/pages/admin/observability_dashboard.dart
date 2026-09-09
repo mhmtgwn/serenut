@@ -35,7 +35,8 @@ final _healthMetricsProvider =
 
 final _recentLogsProvider =
     FutureProvider.autoDispose<List<TelemetryEvent>>((ref) async {
-  return TelemetryService().getEventsByLevel(LogLevel.warning);
+  return TelemetryService()
+      .getEventsByLevel(LogLevel.warning, newestFirst: true);
 });
 
 final _cloudHealthProvider =
