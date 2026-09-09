@@ -335,7 +335,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
 
   Future<List<HardwareDevice>> _restoreRemoteProfile() async {
     try {
-      return ref.read(deviceHardwareProfileServiceProvider).restore();
+      return await ref.read(deviceHardwareProfileServiceProvider).restore();
     } catch (_) {
       return const [];
     }

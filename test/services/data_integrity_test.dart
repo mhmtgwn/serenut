@@ -37,7 +37,13 @@ class MockTelemetryService implements TelemetryService {
       String? correlationId}) async {}
 
   @override
-  Future<List<TelemetryEvent>> getEvents() async => [];
+  Future<List<TelemetryEvent>> getEvents({bool newestFirst = false}) async => [];
+
+  @override
+  Future<List<TelemetryEvent>> getEventsByLevel(
+    LogLevel minLevel, {
+    bool newestFirst = false,
+  }) async => [];
 
   @override
   Future<void> clearLogs() async {}

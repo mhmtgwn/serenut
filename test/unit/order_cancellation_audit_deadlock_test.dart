@@ -1,5 +1,4 @@
 // test/unit/order_cancellation_audit_deadlock_test.dart
-import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/services/audit_log_service.dart';
