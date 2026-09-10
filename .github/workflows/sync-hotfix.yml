@@ -47,6 +47,7 @@ jobs:
             cd server
             printf '%s' "$META_APP_SECRET" | sh scripts/configure_whatsapp_env.sh
             sh scripts/ensure_maintenance_token.sh
+            sh scripts/ensure_evolution_env.sh
             docker compose -f docker-compose.prod.yml --env-file .env.production build backend maintenance-agent
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/publish-release.js verify-policy
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate maintenance-agent
@@ -57,7 +58,7 @@ jobs:
             if docker container inspect serenut-backend >/dev/null 2>&1; then
               docker rm -f serenut-backend
             fi
-            docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend
+            docker compose -f docker-compose.prod.yml --env-file .env.production --profile evolution up -d backend evolution-api
             curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
             status=$(curl -s -o /dev/null -w '%{http_code}' 'https://api.serenut.com/api/v4/sync/pull?cursor=0')
             test "$status" = "401"

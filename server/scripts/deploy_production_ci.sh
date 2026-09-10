@@ -18,6 +18,7 @@ fi
 # The maintenance agent is isolated from the public network and accepts only
 # allowlisted jobs authenticated with a root-owned shared token.
 sh scripts/ensure_maintenance_token.sh
+sh scripts/ensure_evolution_env.sh
 
 mkdir -p releases
 # GitHub cancellation stops the runner but cannot reliably terminate an SSH
@@ -70,6 +71,7 @@ $COMPOSE run --rm --user root backend sh -c \
   "mkdir -p '$INCOMING_DIR/android' '$INCOMING_DIR/windows' /var/www/serenut-api/releases/android/stable /var/www/serenut-api/releases/windows/stable && chown -R node:node /var/www/serenut-api/releases"
 
 $COMPOSE up -d --remove-orphans
+$COMPOSE --profile evolution up -d evolution-api 2>/dev/null || true
 if ! curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/ready; then
   exit 1
 fi

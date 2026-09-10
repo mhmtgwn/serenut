@@ -52,7 +52,7 @@ class DbGatewayImpl implements DbGateway {
     int attempts = 0;
     final bool isTest =
         !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-    final int maxAttempts = isTest ? 2 : 40;
+    final int maxAttempts = isTest ? 2 : 200;
     while (DatabaseManager.isWriteLocked) {
       if (!isWrite) {
         break;
