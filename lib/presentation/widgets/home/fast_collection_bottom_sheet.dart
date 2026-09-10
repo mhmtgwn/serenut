@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/config/utils.dart';
 
 class FastCollectionBottomSheet extends ConsumerStatefulWidget {
   const FastCollectionBottomSheet({super.key});
@@ -125,7 +126,7 @@ class _FastCollectionBottomSheetState
 
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      title: Text(customer.name,
+                      title: Text(customer.name.toTurkishUpperCase,
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 13)),
                       subtitle: Text(

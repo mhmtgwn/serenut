@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -149,7 +150,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   fontWeight: FontWeight.bold, color: _kText, fontSize: 16),
             ),
             Text(
-              customer.name,
+              customer.name.toTurkishUpperCase,
               style: const TextStyle(color: _kTextSecondary, fontSize: 12),
             ),
           ],
@@ -192,9 +193,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                       children: [
                         Text(
-                          customer.name,
+                          customer.name.toTurkishUpperCase,
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

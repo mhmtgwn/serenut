@@ -17,6 +17,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/sms_message_analyzer.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
+import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_sub_widgets.dart';
 import 'package:serenutos/presentation/widgets/whatsapp/evolution_qr_dialog.dart';
 
@@ -810,7 +811,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         return CheckboxListTile(
                           value: selected.contains(customer.id),
                           activeColor: POSColors.green,
-                          title: Text(customer.name),
+                          title: Text(customer.name.toTurkishUpperCase),
                           subtitle: Text(
                             '${customer.phone} • ${customer.balance.abs().toStringAsFixed(2).replaceAll('.', ',')} ₺',
                           ),

@@ -12,6 +12,7 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/schema/db_schema.dart';
 import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
 import 'package:serenutos/infrastructure/database/schema/db_migrations.dart';
+import 'package:serenutos/config/utils.dart';
 
 /// ════════════════════════════════════════════════════════════
 /// Database Manager
@@ -69,6 +70,7 @@ class DatabaseManager {
     await _verifyDatabaseSchemaInvariants(_database!);
     await DatabaseTriggers.verifyAndRepairTriggers(_database!);
     await _reconcileAllCustomerBalances(_database!);
+    await _standardizeCustomerNamesToTurkishUppercase(_database!);
     return _database!;
   }
 
@@ -104,6 +106,38 @@ class DatabaseManager {
       ''');
     } catch (e) {
       debugPrint('[DatabaseManager] Customer balance reconciliation error: $e');
+    }
+  }
+
+  /// Standardizes all existing customer names to Turkish uppercase on database startup.
+  Future<void> _standardizeCustomerNamesToTurkishUppercase(Database db) async {
+    try {
+      final rows = await db.rawQuery(
+          "SELECT id, name FROM customers WHERE id != '' AND name != ''");
+      final batch = db.batch();
+      int updatedCount = 0;
+      for (final row in rows) {
+        final id = row['id'] as String?;
+        final currentName = row['name'] as String?;
+        if (id != null && currentName != null && currentName.isNotEmpty) {
+          final upperName = currentName.toTurkishUpperCase;
+          if (upperName != currentName) {
+            batch.rawUpdate(
+              'UPDATE customers SET name = ?, normalized_name = ? WHERE id = ?',
+              [upperName, upperName.normalizeTurkish, id],
+            );
+            updatedCount++;
+          }
+        }
+      }
+      if (updatedCount > 0) {
+        await batch.commit(noResult: true);
+        debugPrint(
+            '[DatabaseManager] 🔠 Standardized $updatedCount customer names to Turkish uppercase.');
+      }
+    } catch (e) {
+      debugPrint(
+          '[DatabaseManager] Customer name uppercase standardization error: $e');
     }
   }
 

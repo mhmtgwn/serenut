@@ -460,7 +460,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                   fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
-          title: Text(c.name,
+          title: Text(c.name.toTurkishUpperCase,
               style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   color: _kText,

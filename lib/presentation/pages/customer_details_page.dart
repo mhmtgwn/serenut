@@ -13,6 +13,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _kGreen = POSColors.green;
@@ -298,7 +299,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        customer.name,
+                        customer.name.toTurkishUpperCase,
                         style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

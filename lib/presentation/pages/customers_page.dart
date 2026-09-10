@@ -11,6 +11,7 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
@@ -744,7 +745,7 @@ class _CustomerCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        customer.name,
+                        customer.name.toTurkishUpperCase,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
