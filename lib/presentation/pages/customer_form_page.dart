@@ -11,6 +11,7 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -77,7 +78,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
 
       final customer = CustomerEntity(
         id: id,
-        name: _nameController.text.trim(),
+        name: _nameController.text.toTurkishUpperCase,
         phone: _phoneController.text.trim(),
         email: _emailController.text.trim(),
         balance: widget.isEditing ? widget.existingCustomer!.balance : 0.0,
@@ -220,7 +221,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       focusNode: _nameFocus,
                       label: 'Müşteri / Firma Adı *',
                       icon: Icons.person_rounded,
-                      textCapitalization: TextCapitalization.words,
+                      textCapitalization: TextCapitalization.characters,
                       nextFocus: _phoneFocus,
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,

@@ -553,7 +553,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         // Payment Button Grid
         _buildMethodsGrid(remaining),
         const SizedBox(height: 16),
-        // Receipt & Label Printer Controls
+        // Receipt Printer Controls (Sadece Fiş Yazdırma — Teslimat Aşamasında Etikete Gerek Yok)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           decoration: BoxDecoration(
@@ -590,7 +590,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               _InlineCopyCountField(
                 value: _printCopies,
                 isEnabled: _printReceipt,
@@ -598,44 +598,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   setState(() => _printCopies = val);
                 },
               ),
-              const SizedBox(width: 24),
-              IconButton(
-                onPressed: () {
-                  setState(() => _printLabel = !_printLabel);
-                  _saveLabelPrinterSettings();
-                },
-                icon: Icon(
-                  _printLabel
-                      ? Icons.label_rounded
-                      : Icons.label_outline_rounded,
-                  color: _printLabel ? _kGreen : _kTextSecondary,
-                  size: 20,
+              const SizedBox(width: 8),
+              Text(
+                _printReceipt ? 'Fiş Yazdırılacak' : 'Fiş Yazdırma Kapalı',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _printReceipt ? _kGreenDark : _kTextSecondary,
                 ),
-                tooltip:
-                    _printLabel ? 'Etiket Yazıcı Açık' : 'Etiket Yazıcı Kapalı',
-                style: IconButton.styleFrom(
-                  backgroundColor: _printLabel ? _kGreenLight : Colors.white,
-                  padding: const EdgeInsets.all(8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: _printLabel
-                          ? _kGreen.withValues(alpha: 0.3)
-                          : _kBorder,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              _InlineCopyCountField(
-                value: _labelCopies,
-                isEnabled: _printLabel,
-                onChanged: (val) {
-                  setState(() => _labelCopies = val);
-                  _saveLabelPrinterSettings();
-                },
               ),
             ],
           ),

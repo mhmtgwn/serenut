@@ -419,12 +419,29 @@ class CustomerEntity {
 
   CustomerEntity({
     required this.id,
-    required this.name,
+    required String name,
     required this.email,
     required this.phone,
     required this.balance,
     required this.createdAt,
-  });
+  }) : name = name.toTurkishUpperCase;
+
+  CustomerEntity copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    double? balance,
+    DateTime? createdAt,
+  }) =>
+      CustomerEntity(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        email: email ?? this.email,
+        phone: phone ?? this.phone,
+        balance: balance ?? this.balance,
+        createdAt: createdAt ?? this.createdAt,
+      );
 
   Map<String, dynamic> toMap() => {
         'id': id,

@@ -33,6 +33,14 @@ extension IdShortener on String {
 }
 
 extension TurkishNormalization on String {
+  /// Converts string to standard Turkish uppercase (e.g. i -> İ, ı -> I)
+  String get toTurkishUpperCase {
+    return replaceAll('i', 'İ')
+        .replaceAll('ı', 'I')
+        .toUpperCase()
+        .trim();
+  }
+
   String get normalizeTurkish {
     return replaceAll('İ', 'i')
         .replaceAll('I', 'i')

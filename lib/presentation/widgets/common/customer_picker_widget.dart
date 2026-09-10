@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 
 // ─── Renk sabitleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
@@ -181,7 +182,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     try {
       final newCustomer = CustomerEntity(
         id: const Uuid().v4(),
-        name: _nameController.text.trim(),
+        name: _nameController.text.toTurkishUpperCase,
         phone: _phoneController.text.trim(),
         email: '',
         balance: 0.0,
@@ -596,7 +597,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _nameController,
-                  textCapitalization: TextCapitalization.words,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
                     labelText: 'Müşteri / Firma Adı *',
                     hintText: 'Ad Soyad veya Firma Ünvanı',
