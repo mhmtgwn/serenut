@@ -1,4 +1,4 @@
-﻿part of '../order_details_page.dart';
+part of '../order_details_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Order Status Stepper (Durum akışı, aksiyon satırı, iptal/silme diyalogları)
@@ -499,7 +499,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
       };
     }).toList();
 
-    String refundMethod = 'balance';
+    final hasCustomer = order.customerId.trim().isNotEmpty;
+    String refundMethod = 'cash';
     String reason = '';
 
     showDialog(
@@ -622,15 +623,14 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       children: [
                         const Text(
                           'Toplam İade Tutarı:',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
                           '₺${refundTotal.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: _kOrange,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.orange[800],
                           ),
                         ),
                       ],
@@ -638,7 +638,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     const SizedBox(height: 12),
                     TextFormField(
                       decoration: InputDecoration(
-                        labelText: 'İade Gerekçesi',
+                        labelText: 'İade Gerekçesi (zorunlu)',
                         hintText: 'Örn: Müşteri vazgeçti / Kusurlu ürün',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -649,31 +649,63 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       onChanged: (val) =>
                           setDialog(() => reason = val.trim()),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: refundMethod,
+                      isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: 'İade Yöntemi',
+                        labelText: 'İade Ödeme Yolu',
+                        helperText: refundMethod == 'cash'
+                            ? 'Müşteriye elden nakit verildi (Cari bakiye değişmez)'
+                            : 'Müşteriye para verilmedi, cari hesabına artı/alacak yazılır',
+                        helperMaxLines: 2,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'balance',
-                          child: Text(
-                              'Müşteri Bakiyesine Alacak Yaz (Borçtan Düş)'),
-                        ),
-                        DropdownMenuItem(
+                      items: [
+                        const DropdownMenuItem(
                           value: 'cash',
-                          child: Text('Kasadan Nakit Olarak İade Et'),
+                          child: Text('💵 Kasadan Nakit İade (Elden Para Verildi)'),
                         ),
+                        if (hasCustomer)
+                          const DropdownMenuItem(
+                            value: 'balance',
+                            child: Text(
+                                '📋 Cari Hesaba Yaz (Borçtan Düş / Alacak Bırak)'),
+                          ),
                       ],
                       onChanged: (v) =>
-                          setDialog(() => refundMethod = v ?? 'balance'),
+                          setDialog(() => refundMethod = v ?? 'cash'),
                     ),
+                    if (refundMethod == 'balance' && hasCustomer) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFCD34D)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 18, color: Color(0xFFB45309)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Dikkat: Müşterinin borcu yoksa bu tutar müşteriyi alacaklı yapacaktır.',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF92400E),
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
