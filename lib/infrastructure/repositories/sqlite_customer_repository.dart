@@ -48,13 +48,11 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<int> create(CustomerEntity entity) async {
-    final upperName = entity.name.toTurkishUpperCase;
     return _gateway.transaction(() async {
       final payload = {
         ...entity.toMap(),
-        'name': upperName,
         'is_synced': 0,
-        'normalized_name': upperName.normalizeTurkish,
+        'normalized_name': entity.name.normalizeTurkish,
         'normalized_email': entity.email.toLowerCase(),
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -71,13 +69,11 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<int> update(CustomerEntity entity) async {
-    final upperName = entity.name.toTurkishUpperCase;
     return _gateway.transaction(() async {
       final payload = {
         ...entity.toMap(),
-        'name': upperName,
         'is_synced': 0,
-        'normalized_name': upperName.normalizeTurkish,
+        'normalized_name': entity.name.normalizeTurkish,
         'normalized_email': entity.email.toLowerCase(),
         'updated_at': DateTime.now().toIso8601String(),
       };
