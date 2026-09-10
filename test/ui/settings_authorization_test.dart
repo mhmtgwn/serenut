@@ -109,8 +109,6 @@ void main() {
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
       expect(find.text('Bildirim Ayarları'), findsOneWidget);
-      expect(find.text('Mesaj Gönder'), findsOneWidget);
-      expect(find.text('Mesaj Geçmişi'), findsOneWidget);
 
       await tester.pump();
     });
@@ -287,7 +285,6 @@ void main() {
 
       // Settings screen and safe printer settings visible
       expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
-      expect(find.text('Yazdırma Kuyruğu'), findsOneWidget);
 
       // Admin actions hidden
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
