@@ -103,7 +103,8 @@ class _HeroExecutiveMetrics extends StatelessWidget {
       _SerenutMetricCard(
         title: 'TAHSİLAT & VADELİ',
         amount: currency.format(summary.todayCollected),
-        subtitle: 'Vadeli Alacak: ₺${summary.todayDebt.toStringAsFixed(2)}',
+        subtitle:
+            'Toplam Alacak: ₺${summary.totalReceivables.toStringAsFixed(2)}',
         icon: Icons.payments_rounded,
         accentColor: const Color(0xFF0284C7),
       ),

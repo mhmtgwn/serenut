@@ -149,21 +149,25 @@ class SqliteDashboardRepository implements IDashboardRepository {
   @override
   Future<DashboardSummary> getTodaySummary() async {
     final now = DateTime.now();
+    final todayDate =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
     final todayEnd =
         DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
 
-    // 1. Query pending orders count
+    // 1. Query pending orders count (bekleyen / hazırlanan aktif siparişler)
     final orderResult = await _gateway.rawQuery('''
       SELECT COUNT(*) as count 
       FROM orders 
-      WHERE status IN ('created', 'preparing', 'ready')
+      WHERE (is_deleted = 0 OR is_deleted IS NULL)
+        AND status IN ('created', 'pending', 'preparing', 'ready', 'hazirlaniyor', 'yeni')
     ''');
     final pendingOrders = Sqflite.firstIntValue(orderResult) ?? 0;
 
-    // Query total receivables (Toplam Alacak)
+    // 2. Query total receivables from customers (İşletmenin piyasadaki toplam vadeli alacağı)
+    // Serenut'ta customer.balance < 0 müşterinin borçlu (işletmenin alacaklı) olduğunu belirtir
     final receivablesResult = await _gateway.rawQuery('''
-      SELECT COALESCE(ABS(SUM(balance)), 0) as total_receivables 
+      SELECT COALESCE(SUM(-balance), 0) as total_receivables 
       FROM customers 
       WHERE balance < 0
     ''');
@@ -171,54 +175,67 @@ class SqliteDashboardRepository implements IDashboardRepository {
         (receivablesResult.first['total_receivables'] as num?)?.toDouble() ??
             0.0;
 
-    // 2. Query today's sales from v_financial_ledger first (as primary financial ledger)
-    final ftSummary = await _gateway.rawQuery('''
-      SELECT 
-        COALESCE(SUM(debit), 0) AS total_revenue,
-        COALESCE(SUM(credit), 0) AS total_collected,
-        COALESCE(SUM(debit - credit), 0) AS total_debt,
-        COALESCE(SUM(CASE WHEN type = 'sale' THEN 1 ELSE -1 END), 0) AS total_sales
-      FROM v_financial_ledger
-      WHERE type IN ('sale', 'cancellation')
-        AND created_at >= ?
-        AND created_at <= ?
-    ''', [todayStart, todayEnd]);
-
-    final ftData = ftSummary.first;
-    final ftSalesCount = (ftData['total_sales'] as num?)?.toInt() ?? 0;
-
-    if (ftSalesCount > 0) {
-      return DashboardSummary(
-        totalSalesToday: ftSalesCount,
-        todayRevenue: (ftData['total_revenue'] as num?)?.toDouble() ?? 0.0,
-        todayDebt: (ftData['total_debt'] as num?)?.toDouble() ?? 0.0,
-        todayCollected: (ftData['total_collected'] as num?)?.toDouble() ?? 0.0,
-        pendingOrdersCount: pendingOrders,
-        totalReceivables: totalReceivables,
-      );
-    }
-
-    // 3. Fallback: Query today's sales from the sales table directly
+    // 3. Query direct POS sales today (Kasa Satışları)
+    // Sadece kasadan doğrudan yapılan ve iptal edilmemiş fiş/satış kayıtları
     final salesSummary = await _gateway.rawQuery('''
       SELECT 
+        COUNT(*) AS total_sales,
         COALESCE(SUM(total_amount), 0) AS total_revenue,
         COALESCE(SUM(paid_amount), 0) AS total_collected,
-        COALESCE(SUM(total_amount - paid_amount), 0) AS total_debt,
-        COUNT(*) AS total_sales
+        COALESCE(SUM(total_amount - paid_amount), 0) AS total_debt
       FROM sales
       WHERE status != 'cancelled'
-        AND created_at >= ?
-        AND created_at <= ?
-    ''', [todayStart, todayEnd]);
+        AND (
+          substr(created_at, 1, 10) = ?
+          OR DATE(created_at, 'localtime') = ?
+          OR (created_at >= ? AND created_at <= ?)
+        )
+    ''', [todayDate, todayDate, todayStart, todayEnd]);
 
     final salesData = salesSummary.first;
-    final salesCount = (salesData['total_sales'] as num?)?.toInt() ?? 0;
+    final posSalesCount = (salesData['total_sales'] as num?)?.toInt() ?? 0;
+    final posRevenue = (salesData['total_revenue'] as num?)?.toDouble() ?? 0.0;
+    final posPaid = (salesData['total_collected'] as num?)?.toDouble() ?? 0.0;
+    final posDebt = (salesData['total_debt'] as num?)?.toDouble() ?? 0.0;
+
+    // 4. Query total actual collections today (Bugün kasaya fiilen giren tüm tahsilat parası)
+    // Satış anında ödenen peşinatlar + Müşteri cari/borç tahsilatları (type IN ('collection', 'payment'))
+    double totalCollected = posPaid;
+    try {
+      final ftCollectionResult = await _gateway.rawQuery('''
+        SELECT 
+          COALESCE(SUM(
+            CASE 
+              WHEN type = 'sale' THEN paid_amount
+              WHEN type IN ('collection', 'payment') THEN amount
+              WHEN type = 'cancellation' THEN -paid_amount
+              WHEN type = 'refund' THEN -paid_amount
+              ELSE 0
+            END
+          ), 0) AS total_collected
+        FROM financial_transactions
+        WHERE (
+          substr(created_at, 1, 10) = ?
+          OR DATE(created_at, 'localtime') = ?
+          OR (created_at >= ? AND created_at <= ?)
+        )
+      ''', [todayDate, todayDate, todayStart, todayEnd]);
+
+      final ftCollected =
+          (ftCollectionResult.first['total_collected'] as num?)?.toDouble() ??
+              0.0;
+      if (ftCollected > 0) {
+        totalCollected = ftCollected;
+      }
+    } catch (_) {
+      // Fallback to posPaid
+    }
 
     return DashboardSummary(
-      totalSalesToday: salesCount,
-      todayRevenue: (salesData['total_revenue'] as num?)?.toDouble() ?? 0.0,
-      todayDebt: (salesData['total_debt'] as num?)?.toDouble() ?? 0.0,
-      todayCollected: (salesData['total_collected'] as num?)?.toDouble() ?? 0.0,
+      totalSalesToday: posSalesCount,
+      todayRevenue: posRevenue,
+      todayDebt: posDebt,
+      todayCollected: totalCollected,
       pendingOrdersCount: pendingOrders,
       totalReceivables: totalReceivables,
     );
@@ -396,6 +413,8 @@ class SqliteDashboardRepository implements IDashboardRepository {
   @override
   Future<DashboardOrderSummary> getOrderSummary() async {
     final now = DateTime.now();
+    final todayDate =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final todayStart =
         DateTime(now.year, now.month, now.day).toIso8601String();
 
@@ -404,12 +423,14 @@ class SqliteDashboardRepository implements IDashboardRepository {
         SELECT 
           status,
           COUNT(*) AS cnt,
-          SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS today_cnt,
-          SUM(CASE WHEN created_at >= ? THEN COALESCE(total_amount, 0) ELSE 0 END) AS today_rev
+          SUM(CASE WHEN (substr(created_at, 1, 10) = ? OR DATE(created_at, 'localtime') = ? OR created_at >= ?) THEN 1 ELSE 0 END) AS today_cnt,
+          SUM(CASE WHEN (substr(created_at, 1, 10) = ? OR DATE(created_at, 'localtime') = ? OR created_at >= ?) 
+              THEN COALESCE(total_amount, (SELECT SUM(quantity * unit_price) FROM order_items WHERE order_id = orders.id), 0) 
+              ELSE 0 END) AS today_rev
         FROM orders
-        WHERE is_deleted = 0
+        WHERE (is_deleted = 0 OR is_deleted IS NULL)
         GROUP BY status
-      ''', [todayStart, todayStart]);
+      ''', [todayDate, todayDate, todayStart, todayDate, todayDate, todayStart]);
 
       int todayCount = 0;
       double todayRevenue = 0.0;
@@ -424,8 +445,11 @@ class SqliteDashboardRepository implements IDashboardRepository {
         final tCount = (r['today_cnt'] as num?)?.toInt() ?? 0;
         final tRev = (r['today_rev'] as num?)?.toDouble() ?? 0.0;
 
-        todayCount += tCount;
-        todayRevenue += tRev;
+        // İptal edilmiş siparişler ciroya ve geçerli işlem adedine dahil edilmez
+        if (status != 'cancelled' && status != 'iptal') {
+          todayCount += tCount;
+          todayRevenue += tRev;
+        }
 
         switch (status) {
           case 'created':
@@ -469,7 +493,7 @@ class SqliteDashboardRepository implements IDashboardRepository {
       final rows = await _gateway.rawQuery('''
         SELECT 
           o.id,
-          o.order_number,
+          COALESCE(o.order_number, o.id) AS order_number,
           COALESCE(c.name, 'Müşteri') AS customer_name,
           COALESCE(c.phone, '') AS customer_phone,
           o.status,
@@ -478,7 +502,7 @@ class SqliteDashboardRepository implements IDashboardRepository {
           o.created_at
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.id
-        WHERE o.is_deleted = 0
+        WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
         ORDER BY o.created_at DESC
         LIMIT ?
       ''', [limit]);
