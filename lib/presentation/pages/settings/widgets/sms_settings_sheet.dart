@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/settings/widgets/sms_settings_sheet.dart
+// lib/presentation/pages/settings/widgets/sms_settings_sheet.dart
 // Redesigned SMS Settings Sheet with Premium UI/UX & theme tokens (Sprint 10)
 
 import 'dart:convert';
@@ -972,7 +972,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     final approved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Başarısız SMS'leri Yeniden Gönder'),
+        title: const Text("Başarısız SMS'leri Yeniden Gönder"),
         content: Text(
           '${failed.length} mesaj sırayla yeniden gönderilecek.',
         ),
@@ -1203,7 +1203,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   whatsappStatusLoading
                       ? 'Bağlantı durumu kontrol ediliyor…'
                       : whatsappConnected
-                          ? '${whatsappPhone ?? 'İşletme numarası'} bağlı. Aşağıdaki olaylar için WhatsApp'ı ayrı ayrı açabilirsiniz.'
+                          ? "${whatsappPhone ?? 'İşletme numarası'} bağlı. Aşağıdaki olaylar için WhatsApp'ı ayrı ayrı açabilirsiniz."
                           : 'Bağlantı kurulmadı. Firma sahibi müşteri portalındaki Bildirim Kanalları bölümünden hesabını bağlamalıdır.',
                   style: const TextStyle(
                     color: POSColors.textSecondary,

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/models/settings.dart';
@@ -49,102 +51,119 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
     }
   }
 
+  Future<String?> _encodePortableLogo(String? value) async {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('data:image/')) {
+      return trimmed;
+    }
+    try {
+      final file = File(trimmed);
+      if (!await file.exists()) return null;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return null;
+      final lower = trimmed.toLowerCase();
+      final mime = (lower.endsWith('.png'))
+          ? 'image/png'
+          : (lower.endsWith('.webp'))
+              ? 'image/webp'
+              : 'image/jpeg';
+      return 'data:$mime;base64,${base64Encode(bytes)}';
+    } catch (e) {
+      debugPrint('[SettingsNotifier] Logo encode failed: $e');
+      return null;
+    }
+  }
+
   Future<void> syncCompanyFromServer() async {
     try {
+      final repo = await ref.read(settingsRepositoryProvider.future);
+      final current = await repo.getSettings();
+      final prefs = await SharedPreferences.getInstance();
+      final isDirty = prefs.getBool('sync_v4_company_dirty') ?? false;
+
+      // If user has unpushed local changes, push them to server instead of pulling!
+      if (isDirty) {
+        debugPrint('[SettingsNotifier] Local changes are dirty. Pushing to server instead of pulling.');
+        await updateSettings(current);
+        return;
+      }
+
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/api/v1/company');
       if (response.isSuccess && response.json != null) {
         final map = response.json as Map<String, dynamic>;
         final companyName = map['name'] as String? ?? '';
-        if (companyName.trim().isNotEmpty) {
-          final gateway = ref.read(dbGatewayProvider);
-          final repo = await ref.read(settingsRepositoryProvider.future);
-          final current = await repo.getSettings();
+        final knownVersion = prefs.getInt('sync_v4_company_version') ?? 0;
+        final remoteVersion = map['version'] is int
+            ? map['version'] as int
+            : int.tryParse(map['version']?.toString() ?? '') ?? 0;
 
-          final prefs = await SharedPreferences.getInstance();
-          final knownVersion = prefs.getInt('sync_v4_company_version') ?? 0;
-          final remoteVersion = map['version'] is int
-              ? map['version'] as int
-              : int.tryParse(map['version']?.toString() ?? '') ?? 0;
-
-          // Prevent server from reverting user's local edits if local is customized
-          if (current.businessName.isNotEmpty &&
-              current.businessName != 'Serenut OS' &&
-              (companyName.isEmpty ||
-                  companyName == 'Serenut OS' ||
-                  remoteVersion <= knownVersion ||
-                  current.businessName != companyName)) {
-            debugPrint(
-                '[SettingsNotifier] Preserving local company profile: "${current.businessName}" (server: "$companyName", v$remoteVersion <= v$knownVersion)');
-            if (current.businessName != companyName &&
-                companyName.isNotEmpty &&
-                remoteVersion <= knownVersion) {
-              // Remote has older name; push local to server
-              updateSettings(current);
-            }
-            return;
-          }
-
-          final updated = current.copyWith(
-            businessName: companyName,
-            businessPhone: (map['phone'] as String?)?.isNotEmpty == true
-                ? map['phone'] as String
-                : current.businessPhone,
-            businessAddress: (map['address'] as String?)?.isNotEmpty == true
-                ? map['address'] as String
-                : current.businessAddress,
-            businessTaxId: (map['tax_number'] as String?)?.isNotEmpty == true
-                ? map['tax_number'] as String
-                : current.businessTaxId,
-            ownerName: (map['owner_name'] as String?)?.isNotEmpty == true
-                ? map['owner_name'] as String
-                : current.ownerName,
-            businessEmail: (map['email'] as String?)?.isNotEmpty == true
-                ? map['email'] as String
-                : current.businessEmail,
-            businessCity: (map['city'] as String?)?.isNotEmpty == true
-                ? map['city'] as String
-                : current.businessCity,
-            businessDistrict: (map['district'] as String?)?.isNotEmpty == true
-                ? map['district'] as String
-                : current.businessDistrict,
-            businessType: (map['type'] as String?)?.isNotEmpty == true
-                ? map['type'] as String
-                : current.businessType,
-            businessLogo: (map['logo_url'] as String?)?.isNotEmpty == true
-                ? map['logo_url'] as String
-                : current.businessLogo,
-          );
-
-          await repo.updateSettings(updated);
-
-          await gateway.insert(
-            'business_profile',
-            {
-              'id': 1,
-              'name': companyName,
-              'owner_name': map['owner_name'] ?? '',
-              'type': map['type'] ?? '',
-              'phone': map['phone'] ?? '',
-              'email': map['email'] ?? '',
-              'tax_number': map['tax_number'] ?? '',
-              'city': map['city'] ?? '',
-              'district': map['district'] ?? '',
-              'currency': map['currency'] ?? '₺',
-              'logo_path': map['logo_url'],
-              'tax_included': 1,
-              'version': remoteVersion,
-              'created_at': DateTime.now().toIso8601String(),
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-
-          if (remoteVersion > 0) {
-            await prefs.setInt('sync_v4_company_version', remoteVersion);
-          }
-          state = AsyncValue.data(updated);
+        // If remote version is not newer than local version, do not overwrite
+        if (remoteVersion <= knownVersion && knownVersion > 0) {
+          return;
         }
+
+        // Helper to pick remote if non-empty string, else preserve local
+        String pick(dynamic remoteVal, String localVal) {
+          final r = remoteVal?.toString().trim();
+          if (r != null && r.isNotEmpty) return r;
+          return localVal;
+        }
+
+        // Prevent server from reverting user's local edits if local is customized
+        final resolvedName = (companyName.isEmpty || companyName == 'Serenut OS') &&
+                current.businessName.isNotEmpty &&
+                current.businessName != 'Serenut OS'
+            ? current.businessName
+            : (companyName.isNotEmpty ? companyName : current.businessName);
+
+        final updated = current.copyWith(
+          businessName: resolvedName,
+          businessPhone: pick(map['phone'], current.businessPhone),
+          businessAddress: pick(map['address'], current.businessAddress),
+          businessTaxId: pick(map['tax_number'], current.businessTaxId ?? ''),
+          ownerName: pick(map['owner_name'], current.ownerName),
+          businessEmail: pick(map['email'], current.businessEmail ?? ''),
+          businessCity: pick(map['city'], current.businessCity),
+          businessDistrict: pick(map['district'], current.businessDistrict),
+          businessType: pick(map['type'], current.businessType),
+          businessLogo: pick(map['logo_url'], current.businessLogo ?? ''),
+        );
+
+        await repo.updateSettings(updated);
+
+        final gateway = ref.read(dbGatewayProvider);
+        await gateway.insert(
+          'business_profile',
+          {
+            'id': 1,
+            'name': updated.businessName,
+            'owner_name': updated.ownerName,
+            'type': updated.businessType,
+            'phone': updated.businessPhone,
+            'email': updated.businessEmail ?? '',
+            'tax_number': updated.businessTaxId ?? '',
+            'city': updated.businessCity,
+            'district': updated.businessDistrict,
+            'currency': map['currency'] ?? updated.currency,
+            'logo_path': updated.businessLogo,
+            'tax_included': 1,
+            'version': remoteVersion,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        if (remoteVersion > 0) {
+          await prefs.setInt('sync_v4_company_version', remoteVersion);
+        }
+        await prefs.setBool('sync_v4_company_dirty', false);
+        state = AsyncValue.data(updated);
       }
     } catch (e) {
       debugPrint('[SettingsNotifier] ⚠️ Company sync from server skipped: $e');
@@ -172,8 +191,11 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       // 1. Local SQLite settings update
       await repo.updateSettings(settings);
 
-      // 2. Local SQLite business_profile update
+      // 2. Local SQLite business_profile update & dirty flag
       if (companyProfileChanged) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('sync_v4_company_dirty', true);
+
         try {
           final gateway = ref.read(dbGatewayProvider);
           await gateway.insert(
@@ -210,6 +232,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
                 ? remote['version'] as int
                 : int.tryParse(remote['version']?.toString() ?? '1') ?? 1;
 
+            final portableLogo = await _encodePortableLogo(settings.businessLogo);
+
             var patch = await apiClient.send('PATCH', '/api/v1/company', body: {
               'expected_version': remoteVersion,
               'force': true,
@@ -223,7 +247,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               'city': settings.businessCity,
               'district': settings.businessDistrict,
               'currency': settings.currency,
-              'logo_url': settings.businessLogo,
+              'logo_url': portableLogo,
             });
 
             // If 409 conflict, retry once with fresh version
@@ -247,7 +271,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
                   'city': settings.businessCity,
                   'district': settings.businessDistrict,
                   'currency': settings.currency,
-                  'logo_url': settings.businessLogo,
+                  'logo_url': portableLogo,
                 });
               }
             }
@@ -257,9 +281,9 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               final newVer = patched['version'] is int
                   ? patched['version'] as int
                   : int.tryParse(patched['version']?.toString() ?? '') ?? (remoteVersion + 1);
-              final prefs = await SharedPreferences.getInstance();
               await prefs.setInt('sync_v4_company_version', newVer);
               await prefs.setString('sync_v4_company_synced_at', DateTime.now().toUtc().toIso8601String());
+              await prefs.setBool('sync_v4_company_dirty', false);
               debugPrint('[SettingsNotifier] Successfully synced company info to server v$newVer.');
             } else {
               debugPrint('[SettingsNotifier] Company profile patch response: ${patch.statusCode} ${patch.body}');

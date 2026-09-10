@@ -351,7 +351,9 @@ class SyncV4Service {
         DateTime.tryParse(remote['updated_at']?.toString() ?? '');
     final remoteVersion = _syncInt(remote['version']);
 
-    final localChanged = (knownVersion != null &&
+    final isDirty = prefs.getBool('sync_v4_company_dirty') ?? false;
+    final localChanged = isDirty ||
+        (knownVersion != null &&
             localUpdatedAt != null &&
             lastSyncedAt != null &&
             localUpdatedAt.isAfter(lastSyncedAt)) ||
@@ -411,6 +413,7 @@ class SyncV4Service {
       }
       if (patch.isSuccess && patch.json != null) {
         canonical = Map<String, dynamic>.from(patch.json as Map);
+        await prefs.setBool('sync_v4_company_dirty', false);
       } else {
         // If remote patch failed, do NOT overwrite local settings with old remote data!
         return false;
@@ -426,21 +429,29 @@ class SyncV4Service {
         ? localName
         : (canonicalName.isNotEmpty ? canonicalName : localName);
 
+    String pick(dynamic remoteVal, dynamic localVal, [String fallback = '']) {
+      final r = remoteVal?.toString().trim();
+      if (r != null && r.isNotEmpty) return r;
+      final l = localVal?.toString().trim();
+      if (l != null && l.isNotEmpty) return l;
+      return fallback;
+    }
+
     final now = DateTime.now().toUtc().toIso8601String();
     await db.update(
       'settings',
       {
         'business_name': resolvedName,
-        'business_phone': canonical['phone'] ?? rows.first['business_phone'] ?? '',
-        'business_address': canonical['address'] ?? rows.first['business_address'] ?? '',
-        'business_tax_id': canonical['tax_number'] ?? rows.first['business_tax_id'],
-        'business_logo': canonical['logo_url'] ?? rows.first['business_logo'],
-        'owner_name': canonical['owner_name'] ?? rows.first['owner_name'] ?? '',
-        'business_email': canonical['email'] ?? rows.first['business_email'],
-        'business_city': canonical['city'] ?? rows.first['business_city'] ?? '',
-        'business_district': canonical['district'] ?? rows.first['business_district'] ?? '',
-        'business_type': canonical['type'] ?? rows.first['business_type'] ?? '',
-        'currency': canonical['currency'] ?? rows.first['currency'] ?? '₺',
+        'business_phone': pick(canonical['phone'], rows.first['business_phone']),
+        'business_address': pick(canonical['address'], rows.first['business_address']),
+        'business_tax_id': pick(canonical['tax_number'], rows.first['business_tax_id']),
+        'business_logo': pick(canonical['logo_url'], rows.first['business_logo']),
+        'owner_name': pick(canonical['owner_name'], rows.first['owner_name']),
+        'business_email': pick(canonical['email'], rows.first['business_email']),
+        'business_city': pick(canonical['city'], rows.first['business_city']),
+        'business_district': pick(canonical['district'], rows.first['business_district']),
+        'business_type': pick(canonical['type'], rows.first['business_type']),
+        'currency': pick(canonical['currency'], rows.first['currency'], '₺'),
         'updated_at': canonical['updated_at']?.toString() ?? now,
       },
       where: 'id = ?',
@@ -449,6 +460,7 @@ class SyncV4Service {
     await prefs.setInt(_companyVersionKey, _syncInt(canonical['version']));
     await prefs.setString(
         _companySyncedAtKey, canonical['updated_at']?.toString() ?? now);
+    await prefs.setBool('sync_v4_company_dirty', false);
     return localChanged || remoteChanged || knownVersion == null;
   }
 

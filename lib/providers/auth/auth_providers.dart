@@ -13,6 +13,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ════════════════════════════════════════════════════════════
 // Core Providers
@@ -28,12 +29,13 @@ import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository
 final authServiceProvider = Provider<AuthService>((ref) {
   final userRepo = ref.watch(userRepositoryProvider);
   final hashService = ref.watch(hashServiceProvider);
-  final apiClient = ref.watch(apiClientProvider);
   final deviceManager = ref.watch(deviceManagerProvider);
   final licenseService = ref.watch(licenseServiceProvider);
   final fingerprintService = ref.watch(deviceFingerprintServiceProvider);
-  final settingsRepository =
-      SqliteSettingsRepository(ref.watch(dbGatewayProvider));
+  final gateway = ref.watch(dbGatewayProvider);
+  final settingsRepository = SqliteSettingsRepository(gateway);
+  final apiClient = ref.watch(apiClientProvider);
+
   return AuthService(
     userRepository: userRepo,
     hashService: hashService,
@@ -41,19 +43,23 @@ final authServiceProvider = Provider<AuthService>((ref) {
     licenseService: licenseService,
     deviceFingerprintService: fingerprintService,
     cacheCompanyProfile: (company) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('sync_v4_company_dirty') == true) {
+        return;
+      }
       final current = await settingsRepository.getSettings();
       final rawName = company['name']?.toString().trim();
       final remoteName = (rawName != null && rawName.isNotEmpty) ? rawName : '';
       final shouldKeepLocal = current.businessName.isNotEmpty &&
           current.businessName != 'Serenut OS' &&
           (remoteName.isEmpty || remoteName == 'Serenut OS');
-      final phone = company['phone']?.toString();
-      final address = company['address']?.toString();
-      final taxNum = company['tax_number']?.toString();
-      final owner = company['owner_name']?.toString();
-      final email = company['email']?.toString();
-      final city = company['city']?.toString();
-      final district = company['district']?.toString();
+      final phone = company['phone']?.toString().trim();
+      final address = company['address']?.toString().trim();
+      final taxNum = company['tax_number']?.toString().trim();
+      final owner = company['owner_name']?.toString().trim();
+      final email = company['email']?.toString().trim();
+      final city = company['city']?.toString().trim();
+      final district = company['district']?.toString().trim();
       await settingsRepository.updateSettings(current.copyWith(
         businessName: shouldKeepLocal
             ? current.businessName

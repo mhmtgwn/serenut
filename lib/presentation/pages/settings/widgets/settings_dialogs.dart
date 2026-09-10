@@ -303,6 +303,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             businessDistrict: localDistrict ?? '',
                             businessType: settings.businessType,
                             receiptFooterText: receiptFooterCtrl.text.trim(),
+                            updatedAt: DateTime.now().toUtc(),
                           );
                           await _updateSettingField(updated);
                           if (context.mounted) {
