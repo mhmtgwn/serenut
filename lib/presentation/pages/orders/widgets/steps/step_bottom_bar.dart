@@ -1,8 +1,8 @@
 part of '../order_creation_dialog.dart';
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Bottom Action Bar + Validation + Order Submit Logic
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 extension OrderCreationBottomBar on OrderCreationDialogState {
   Widget buildBottomActionBar() {
@@ -11,11 +11,11 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
 
     String nextButtonLabel = 'Devam Et';
     if (_activeStep == 0) {
-      nextButtonLabel = 'ÃœrÃ¼n SeÃ§imine GeÃ§';
+      nextButtonLabel = 'Ürün Seçimine Geç';
     } else if (_activeStep == 1) {
-      nextButtonLabel = 'Sepete GeÃ§ (${_formatQuantity(totalQty)} Birim)';
+      nextButtonLabel = 'Sepete Geç (${_formatQuantity(totalQty)} Birim)';
     } else if (_activeStep == 2) {
-      nextButtonLabel = 'Ã–demeye GeÃ§ (â‚º${_totalAmount.toStringAsFixed(2)})';
+      nextButtonLabel = 'Ödemeye Geç (₺${_totalAmount.toStringAsFixed(2)})';
     }
 
     return Container(
@@ -86,8 +86,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
                       : const Icon(Icons.check_circle_rounded, size: 16),
                   label: Text(
                       widget.existingOrder != null
-                          ? 'SipariÅŸi GÃ¼ncelle'
-                          : 'SipariÅŸi Onayla',
+                          ? 'Siparişi Güncelle'
+                          : 'Siparişi Onayla',
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
         ],
@@ -135,7 +135,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           .toList();
 
       final isEdit = widget.existingOrder != null;
-      // Use uuid v4 for new orders â€” consistent & collision-free
+      // Use uuid v4 for new orders — consistent & collision-free
       final String orderId =
           isEdit ? widget.existingOrder!.id : 'ord-${const Uuid().v4()}';
 
@@ -295,12 +295,12 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
                 labelPaymentStatus = 'Vadeli';
               } else {
                 labelPaymentStatus =
-                    'KÄ±smi Ã–deme (BorÃ§: â‚º${_karmaDebt.toStringAsFixed(2)})';
+                    'Kısmi Ödeme (Borç: ₺${_karmaDebt.toStringAsFixed(2)})';
               }
             } else if (finalPaid >= _totalAmount - 0.01) {
-              labelPaymentStatus = 'Ã–dendi';
+              labelPaymentStatus = 'Ödendi';
             } else {
-              labelPaymentStatus = 'KÄ±smi Ã–deme';
+              labelPaymentStatus = 'Kısmi Ödeme';
             }
 
             await ref
@@ -319,7 +319,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
         }
       } catch (printError) {
         debugPrint(
-            '[OrderCreationDialog] YazÄ±cÄ± hatasÄ± (sipariÅŸ baÅŸarÄ±yla kaydedildi): $printError');
+            '[OrderCreationDialog] Yazıcı hatası (sipariş başarıyla kaydedildi): $printError');
       }
 
       ref.invalidate(dashboardProvider);
@@ -330,8 +330,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isEdit
-                ? 'SipariÅŸ baÅŸarÄ±yla gÃ¼ncellendi.'
-                : 'SipariÅŸ baÅŸarÄ±yla oluÅŸturuldu.'),
+                ? 'Sipariş başarıyla güncellendi.'
+                : 'Sipariş başarıyla oluşturuldu.'),
             backgroundColor: _kGreen,
           ),
         );
@@ -346,7 +346,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('SipariÅŸ kaydedilirken hata: $e'),
+              content: Text('Sipariş kaydedilirken hata: $e'),
               backgroundColor: _kRed),
         );
       }

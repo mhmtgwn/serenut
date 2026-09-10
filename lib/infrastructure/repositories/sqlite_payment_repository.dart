@@ -410,7 +410,7 @@ class SqliteFinancialTransactionRepository
     return FinancialTransactionEntity.fromMap(rows.first);
   }
 
-  /// YÃœKSEK A DÃœZELTMESÄ°: Tek bir MAX() sorgusu â€” tÃ¼m listeyi RAM'e Ã§ekmez.
+  /// YÜKSEK A DÜZELTMESİ: Tek bir MAX() sorgusu — tüm listeyi RAM'e çekmez.
   @override
   Future<int> getMaxLogicalClock() async {
     final result = await _executor.rawQuery(
@@ -419,8 +419,8 @@ class SqliteFinancialTransactionRepository
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  /// Ä°STEK 3 DÃœZELTMESÄ°: findAll().any() Dart filtresi yerine COUNT(*) SQL sorgusu.
-  /// payment_service.dart duplicate check'i iÃ§in O(n) RAM â†’ O(1) SQL EXISTS.
+  /// İSTEK 3 DÜZELTMESİ: findAll().any() Dart filtresi yerine COUNT(*) SQL sorgusu.
+  /// payment_service.dart duplicate check'i için O(n) RAM â†’ O(1) SQL EXISTS.
   @override
   Future<bool> existsByReferenceId(String referenceId, String type) async {
     if (referenceId.isEmpty) return false;

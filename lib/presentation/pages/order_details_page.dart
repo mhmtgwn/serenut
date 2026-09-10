@@ -33,7 +33,7 @@ part 'order_details/order_status_stepper.dart';
 part 'order_details/order_info_card.dart';
 part 'order_details/order_items_card.dart';
 
-// â”€â”€ POS Tema Renkleri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
@@ -47,7 +47,7 @@ const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
 
-/// Provider â€” build() dÄ±ÅŸÄ±nda tanÄ±mlanÄ±yor (kritik bug dÃ¼zeltmesi)
+/// Provider — build() dışında tanımlanıyor (kritik bug düzeltmesi)
 final _orderDetailProvider = FutureProvider.autoDispose
     .family<OrderEntity?, String>((ref, orderId) async {
   final repo = await ref.watch(orderRepositoryProvider.future);
@@ -103,10 +103,10 @@ class OrderDetailsPage extends ConsumerWidget {
   static const _statusFlow = ['created', 'preparing', 'ready', 'delivered'];
   static const _statusLabels = {
     'created': 'Beklemede',
-    'preparing': 'HazÄ±rlanÄ±yor',
-    'ready': 'HazÄ±r',
+    'preparing': 'Hazırlanıyor',
+    'ready': 'Hazır',
     'delivered': 'Teslim Edildi',
-    'cancelled': 'Ä°ptal Edildi',
+    'cancelled': 'İptal Edildi',
   };
   static const _statusIcons = {
     'created': Icons.hourglass_empty,
@@ -118,7 +118,7 @@ class OrderDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // â”€â”€ Provider artÄ±k build() dÄ±ÅŸÄ±nda â”€â”€
+    // ── Provider artık build() dışında ──
     final orderVal = ref.watch(_orderDetailProvider(orderId));
     final order = orderVal.valueOrNull;
     final customerId = order?.customerId ?? '';
@@ -132,7 +132,7 @@ class OrderDetailsPage extends ConsumerWidget {
             ? customerLookupMap[customerId]
             : null;
     final settingsAsync = ref.watch(settingsNotifierProvider);
-    // UUID â†’ Ã¼rÃ¼n adÄ± haritasÄ±
+    // UUID â†’ ürün adı haritası
     final productsVal = ref.watch(productsControllerProvider);
     final productNameMap = productsVal.maybeWhen(
       data: (list) => {for (final p in list) p.id: p.name},
@@ -150,7 +150,7 @@ class OrderDetailsPage extends ConsumerWidget {
               )
             : null,
         title: Text(
-            'SipariÅŸ DetayÄ± #${orderVal.valueOrNull?.displayNumber ?? orderId.toShortId}'),
+            'Sipariş Detayı #${orderVal.valueOrNull?.displayNumber ?? orderId.toShortId}'),
         backgroundColor: Colors.white,
         foregroundColor: _kText,
         elevation: 0,
@@ -165,12 +165,12 @@ class OrderDetailsPage extends ConsumerWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.print, color: _kGreen),
-                    tooltip: 'SipariÅŸ FiÅŸi YazdÄ±r',
+                    tooltip: 'Sipariş Fişi Yazdır',
                     onPressed: () async {
                       final settings = settingsAsync.value;
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Ayarlar yÃ¼klenemedi.')),
+                          const SnackBar(content: Text('Ayarlar yüklenemedi.')),
                         );
                         return;
                       }
@@ -183,7 +183,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'LÃ¼tfen Ayarlar sayfasÄ±ndan bir yazÄ±cÄ± tanÄ±mlayÄ±n.'),
+                                'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
                             backgroundColor: Colors.orange,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -245,7 +245,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('YazdÄ±rma iÅŸlemi sÄ±raya eklendi.'),
+                            content: Text('Yazdırma işlemi sıraya eklendi.'),
                             backgroundColor: POSColors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -255,7 +255,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Yazdirma hatasÄ±: $e'),
+                            content: Text('Yazdirma hatası: $e'),
                             backgroundColor: Colors.red,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -266,12 +266,12 @@ class OrderDetailsPage extends ConsumerWidget {
                   IconButton(
                     icon:
                         const Icon(Icons.local_offer_outlined, color: _kGreen),
-                    tooltip: 'SipariÅŸ Etiketi YazdÄ±r',
+                    tooltip: 'Sipariş Etiketi Yazdır',
                     onPressed: () async {
                       final settings = settingsAsync.valueOrNull;
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Ayarlar yÃ¼klenemedi.')),
+                          const SnackBar(content: Text('Ayarlar yüklenemedi.')),
                         );
                         return;
                       }
@@ -283,7 +283,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'SipariÅŸ etiketi iÃ§in aktif yazÄ±cÄ± rotasÄ± seÃ§ilmedi.',
+                              'Sipariş etiketi için aktif yazıcı rotası seçilmedi.',
                             ),
                             backgroundColor: Colors.orange,
                           ),
@@ -336,7 +336,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'SipariÅŸ etiketi yazdÄ±rma kuyruÄŸuna alÄ±ndÄ±.',
+                              'Sipariş etiketi yazdırma kuyruğuna alındı.',
                             ),
                             backgroundColor: POSColors.green,
                           ),
@@ -345,7 +345,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('SipariÅŸ etiketi hatasÄ±: $error'),
+                            content: Text('Sipariş etiketi hatası: $error'),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -354,7 +354,7 @@ class OrderDetailsPage extends ConsumerWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, color: Colors.blue),
-                    tooltip: 'SipariÅŸi DÃ¼zenle',
+                    tooltip: 'Siparişi Düzenle',
                     onPressed: () {
                       OrderCreationDialog.show(
                         context,

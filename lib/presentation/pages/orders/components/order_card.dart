@@ -47,7 +47,7 @@ class _OrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cardBorder,
-          width: isSelected ? 2 : 1.0,
+          width: isSelected ? 2.5 : 1.5,
         ),
         boxShadow: [
           BoxShadow(
@@ -114,11 +114,11 @@ class _OrderCard extends StatelessWidget {
 
                 // ── Sol Dikey Renk Vurgusu ──────────────────────────────────
                 Container(
-                  width: 4,
-                  height: 44,
+                  width: 5,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: meta.color,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -236,15 +236,19 @@ class _OrderCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _kGreenLight,
+                        color: meta.amountBg,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: meta.borderColor.withValues(alpha: 0.6),
+                          width: 1,
+                        ),
                       ),
                       child: Text(
                         '₺${totalAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
-                          color: _kGreenDark,
+                          color: meta.amountColor,
                         ),
                       ),
                     ),

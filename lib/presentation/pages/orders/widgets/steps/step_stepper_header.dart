@@ -1,18 +1,18 @@
 ﻿part of '../order_creation_dialog.dart';
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Stepper Header + Step Body Router
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 extension OrderCreationStepperHeader on OrderCreationDialogState {
   Widget buildStepperHeader() {
     final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
 
     final steps = [
-      {'icon': Icons.person_rounded, 'label': 'MÃ¼ÅŸteri'},
-      {'icon': Icons.inventory_2_rounded, 'label': 'ÃœrÃ¼nler'},
+      {'icon': Icons.person_rounded, 'label': 'Müşteri'},
+      {'icon': Icons.inventory_2_rounded, 'label': 'Ürünler'},
       {'icon': Icons.shopping_cart_rounded, 'label': 'Sepet'},
-      {'icon': Icons.payments_rounded, 'label': 'Ã–deme'},
+      {'icon': Icons.payments_rounded, 'label': 'Ödeme'},
     ];
 
     return Container(

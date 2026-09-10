@@ -1,8 +1,8 @@
 ﻿part of '../order_details_page.dart';
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Order Status Stepper (Durum akÄ±ÅŸÄ±, aksiyon satÄ±rÄ±, iptal/silme diyaloglarÄ±)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
+// Order Status Stepper (Durum akışı, aksiyon satırı, iptal/silme diyalogları)
+// ─────────────────────────────────────────────────────────────────────────────
 
 extension _StatusStepperMixin on OrderDetailsPage {
   Widget buildStatusStepper(
@@ -47,7 +47,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
               ),
             ),
             const SizedBox(width: 8),
-            const Text('Durum AkÄ±ÅŸÄ±',
+            const Text('Durum Akışı',
                 style: TextStyle(
                     fontWeight: FontWeight.w800, fontSize: 14, color: _kText)),
           ]),
@@ -62,7 +62,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 Icon(Icons.cancel_rounded, color: _kRed),
                 SizedBox(width: 10),
                 Expanded(
-                    child: Text('Bu sipariÅŸ iptal edildi.',
+                    child: Text('Bu sipariş iptal edildi.',
                         style: TextStyle(
                             color: _kRed, fontWeight: FontWeight.bold))),
               ]),
@@ -72,7 +72,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
             const SizedBox(height: 16)
           ],
 
-          // â”€â”€ Aksiyon ButonlarÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── Aksiyon Butonları ──────────────────────────────────────────
           if (!isCancelled && order.status != 'delivered')
             ..._buildActionRow(context, ref, order),
         ],
@@ -118,7 +118,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                              'ğŸ“± Durum gÃ¼ncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
+                              'ğŸ“± Durum güncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
                           backgroundColor: _kGreenDark,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -184,7 +184,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
     final isDeliveryStep = order.status == 'ready';
 
     return [
-      // VADELÄ° uyarÄ±sÄ± â€” teslim adÄ±mÄ±nda borÃ§lu mÃ¼ÅŸteriler iÃ§in
+      // VADELİ uyarısı — teslim adımında borçlu müşteriler için
       if (isDeliveryStep &&
           order.items.any((item) =>
               item['payment_method']?.toString() == 'vadeli' ||
@@ -202,7 +202,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                'VADELÄ° sipariÅŸ â€” Teslimata izin verilir, borÃ§ cari hesapta kalÄ±r.',
+                'VADELİ sipariş — Teslimata izin verilir, borç cari hesapta kalır.',
                 style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF92400E),
@@ -222,7 +222,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Durumu deÄŸiÅŸtirmek iÃ§in yukarÄ±daki adÄ±mlara dokunabilirsiniz.',
+                    'Durumu değiştirmek için yukarıdaki adımlara dokunabilirsiniz.',
                     style: TextStyle(
                         color: Colors.grey[500],
                         fontSize: 11,
@@ -243,7 +243,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
             icon: const Icon(Icons.cancel_rounded, size: 16),
-            label: const Text('Ä°ptal Et',
+            label: const Text('İptal Et',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
@@ -257,13 +257,13 @@ extension _StatusStepperMixin on OrderDetailsPage {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('SipariÅŸi Ä°ptal Et'),
+        title: const Text('Siparişi İptal Et'),
         content:
-            const Text('Bu sipariÅŸi iptal etmek istediÄŸinize emin misiniz?'),
+            const Text('Bu siparişi iptal etmek istediğinize emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('VazgeÃ§'),
+            child: const Text('Vazgeç'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -273,13 +273,13 @@ extension _StatusStepperMixin on OrderDetailsPage {
                   .updateStatus(order.id, 'cancelled');
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                    content: Text('SipariÅŸ iptal edildi.'),
+                    content: Text('Sipariş iptal edildi.'),
                     backgroundColor: Colors.red),
               );
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('Ä°ptal Et'),
+            child: const Text('İptal Et'),
           ),
         ],
       ),
@@ -299,16 +299,16 @@ extension _StatusStepperMixin on OrderDetailsPage {
               Icon(Icons.warning_amber_rounded,
                   color: Colors.orange, size: 28),
               SizedBox(width: 8),
-              Text('Teslim EdilmiÅŸ SipariÅŸ'),
+              Text('Teslim Edilmiş Sipariş'),
             ],
           ),
           content: const Text(
-            'Bu sipariÅŸ teslim edilmiÅŸtir. Teslim edilmiÅŸ sipariÅŸler doÄŸrudan silinemez; stok ve finansal kayÄ±tlarÄ±n tutarlÄ±lÄ±ÄŸÄ± iÃ§in iade alÄ±nmalÄ±dÄ±r.\n\nÄ°ade iÅŸlemi baÅŸlatmak ister misiniz?',
+            'Bu sipariş teslim edilmiştir. Teslim edilmiş siparişler doğrudan silinemez; stok ve finansal kayıtların tutarlılığı için iade alınmalıdır.\n\nİade işlemi başlatmak ister misiniz?',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('VazgeÃ§'),
+              child: const Text('Vazgeç'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -321,7 +321,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 Navigator.pop(context);
                 _showOrderRefundDialog(context, ref, order);
               },
-              child: const Text('Ä°ade Ä°ÅŸlemi BaÅŸlat'),
+              child: const Text('İade İşlemi Başlat'),
             ),
           ],
         ),
@@ -333,13 +333,13 @@ extension _StatusStepperMixin on OrderDetailsPage {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('SipariÅŸi Sil'),
+        title: const Text('Siparişi Sil'),
         content: const Text(
-            'Bu sipariÅŸ kaydÄ±nÄ± tamamen silmek istediÄŸinize emin misiniz?'),
+            'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Ä°ptal')),
+              child: const Text('İptal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
                 backgroundColor: _kRed,
@@ -357,7 +357,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
 
               rootScaffoldMessengerKey.currentState?.showSnackBar(
                 const SnackBar(
-                  content: Text('SipariÅŸ siliniyor...'),
+                  content: Text('Sipariş siliniyor...'),
                   duration: Duration(milliseconds: 1500),
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -388,7 +388,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
 
                 rootScaffoldMessengerKey.currentState?.showSnackBar(
                   const SnackBar(
-                    content: Text('SipariÅŸ baÅŸarÄ±yla silindi.'),
+                    content: Text('Sipariş başarıyla silindi.'),
                     backgroundColor: Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -398,7 +398,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     .logError(e, st, context: 'order_delete'));
                 rootScaffoldMessengerKey.currentState?.showSnackBar(
                   SnackBar(
-                    content: Text('SipariÅŸ silinemedi: $e'),
+                    content: Text('Sipariş silinemedi: $e'),
                     backgroundColor: Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -440,7 +440,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'SipariÅŸ Teslim Edildi',
+                    'Sipariş Teslim Edildi',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -448,7 +448,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     ),
                   ),
                   Text(
-                    'MÃ¼ÅŸteri iade talebinde bulunduysa iade alabilirsiniz.',
+                    'Müşteri iade talebinde bulunduysa iade alabilirsiniz.',
                     style: TextStyle(
                       fontSize: 11,
                       color: _kTextSecondary,
@@ -470,7 +470,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
             ),
             icon: const Icon(Icons.undo_rounded, size: 16),
             label: const Text(
-              'Ä°ade Al',
+              'İade Al',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
@@ -521,7 +521,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
               children: [
                 Icon(Icons.undo_rounded, color: _kOrange),
                 SizedBox(width: 8),
-                Text('SipariÅŸ Ä°adesi'),
+                Text('Sipariş İadesi'),
               ],
             ),
             content: SizedBox(
@@ -532,7 +532,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Ä°ade edilecek Ã¼rÃ¼n ve miktarlarÄ± belirleyin:',
+                      'İade edilecek ürün ve miktarları belirleyin:',
                       style: TextStyle(fontSize: 12, color: _kTextSecondary),
                     ),
                     const SizedBox(height: 10),
@@ -568,7 +568,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                                     ),
                                   ),
                                   Text(
-                                    'â‚º${price.toStringAsFixed(2)}',
+                                    '₺${price.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: _kTextSecondary,
@@ -621,12 +621,12 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Toplam Ä°ade TutarÄ±:',
+                          'Toplam İade Tutarı:',
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
-                          'â‚º${refundTotal.toStringAsFixed(2)}',
+                          '₺${refundTotal.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
@@ -638,8 +638,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     const SizedBox(height: 12),
                     TextFormField(
                       decoration: InputDecoration(
-                        labelText: 'Ä°ade GerekÃ§esi',
-                        hintText: 'Ã–rn: MÃ¼ÅŸteri vazgeÃ§ti / Kusurlu Ã¼rÃ¼n',
+                        labelText: 'İade Gerekçesi',
+                        hintText: 'Örn: Müşteri vazgeçti / Kusurlu ürün',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -653,7 +653,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     DropdownButtonFormField<String>(
                       value: refundMethod,
                       decoration: InputDecoration(
-                        labelText: 'Ä°ade YÃ¶ntemi',
+                        labelText: 'İade Yöntemi',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -664,11 +664,11 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         DropdownMenuItem(
                           value: 'balance',
                           child: Text(
-                              'MÃ¼ÅŸteri Bakiyesine Alacak Yaz (BorÃ§tan DÃ¼ÅŸ)'),
+                              'Müşteri Bakiyesine Alacak Yaz (Borçtan Düş)'),
                         ),
                         DropdownMenuItem(
                           value: 'cash',
-                          child: Text('Kasadan Nakit Olarak Ä°ade Et'),
+                          child: Text('Kasadan Nakit Olarak İade Et'),
                         ),
                       ],
                       onChanged: (v) =>
@@ -681,7 +681,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Ä°ptal'),
+                child: const Text('İptal'),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -697,7 +697,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Ä°ade iÅŸlemi yapÄ±lÄ±yor...'),
+                              content: Text('İade işlemi yapılıyor...'),
                               duration: Duration(milliseconds: 1500),
                             ),
                           );
@@ -733,7 +733,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'SipariÅŸ baÅŸarÄ±yla iade alÄ±ndÄ±. â‚º${refundTotal.toStringAsFixed(2)} iade edildi.',
+                                  'Sipariş başarıyla iade alındı. ₺${refundTotal.toStringAsFixed(2)} iade edildi.',
                                 ),
                                 backgroundColor: _kOrange,
                               ),
@@ -746,7 +746,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content:
-                                    Text('Ä°ade iÅŸlemi baÅŸarÄ±sÄ±z oldu: $e'),
+                                    Text('İade işlemi başarısız oldu: $e'),
                                 backgroundColor: Colors.red,
                               ),
                             );
@@ -754,7 +754,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         }
                       }
                     : null,
-                child: const Text('Ä°adeyi Onayla'),
+                child: const Text('İadeyi Onayla'),
               ),
             ],
           );

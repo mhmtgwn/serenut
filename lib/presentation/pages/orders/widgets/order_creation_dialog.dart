@@ -356,9 +356,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
       initialDate: _expectedDelivery,
       firstDate: now.subtract(const Duration(days: 30)),
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Teslimat Tarihi SeÃ§in',
-      confirmText: 'SeÃ§',
-      cancelText: 'Ä°ptal',
+      helpText: 'Teslimat Tarihi Seçin',
+      confirmText: 'Seç',
+      cancelText: 'İptal',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -469,9 +469,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
       });
       _barcodeController.clear();
       _barcodeFocusNode.requestFocus();
-      _showNotification('${matched.name} sipariÅŸe eklendi.');
+      _showNotification('${matched.name} siparişe eklendi.');
     } else {
-      _showNotification('Barkod ile eÅŸleÅŸen Ã¼rÃ¼n bulunamadÄ±: $barcode',
+      _showNotification('Barkod ile eşleşen ürün bulunamadı: $barcode',
           isError: true);
       _barcodeFocusNode.requestFocus();
     }
