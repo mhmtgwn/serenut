@@ -202,9 +202,11 @@ services:
   # Ancak Serenut sunucusu kendi kendine webhook gönderdiği için
   # evolution-api → backend yönünde erişime izin vermek için serenut-external ağında.
   evolution-api:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.2.3
     container_name: serenut-evolution-api
     restart: unless-stopped
+    profiles:
+      - evolution
     environment:
       SERVER_URL: ${EVOLUTION_API_URL:-http://evolution-api:8080}
       AUTHENTICATION_TYPE: apikey
