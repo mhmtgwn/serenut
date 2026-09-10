@@ -403,7 +403,7 @@ void main() {
       test('should search customers by name', () async {
         final results = await customerRepository.search('Ahmet');
         expect(results, isNotEmpty);
-        expect(results.first.name.contains('AHMET'), isTrue);
+        expect(results.first.name.contains('Ahmet'), isTrue);
       });
 
       test('should get customers with debt', () async {

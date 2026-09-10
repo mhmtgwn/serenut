@@ -419,12 +419,12 @@ class CustomerEntity {
 
   CustomerEntity({
     required this.id,
-    required String name,
+    required this.name,
     required this.email,
     required this.phone,
     required this.balance,
     required this.createdAt,
-  }) : name = name.toTurkishUpperCase;
+  });
 
   CustomerEntity copyWith({
     String? id,
