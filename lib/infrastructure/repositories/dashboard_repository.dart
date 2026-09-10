@@ -320,21 +320,38 @@ class SqliteDashboardRepository implements IDashboardRepository {
         .toIso8601String();
 
     final rows = await _gateway.rawQuery('''
+      WITH combined_items AS (
+        SELECT 
+          si.product_id AS product_id,
+          si.quantity AS quantity,
+          si.subtotal AS subtotal
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE s.status != 'cancelled'
+          AND s.created_at >= ?
+        UNION ALL
+        SELECT 
+          oi.product_id AS product_id,
+          oi.quantity AS quantity,
+          (oi.quantity * oi.unit_price) AS subtotal
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
+          AND o.status != 'cancelled'
+          AND o.created_at >= ?
+      )
       SELECT 
-        si.product_id AS pid,
+        ci.product_id AS pid,
         COALESCE(p.name, 'Bilinmeyen Ürün') AS pname,
         COALESCE(p.category, 'Genel') AS category,
-        SUM(si.quantity) AS sold,
-        SUM(si.subtotal) AS revenue
-      FROM sale_items si
-      JOIN products p ON si.product_id = p.id
-      JOIN sales s ON si.sale_id = s.id
-      WHERE s.status != 'cancelled'
-        AND s.created_at >= ?
-      GROUP BY si.product_id
+        SUM(ci.quantity) AS sold,
+        SUM(ci.subtotal) AS revenue
+      FROM combined_items ci
+      JOIN products p ON ci.product_id = p.id
+      GROUP BY ci.product_id
       ORDER BY revenue DESC
       LIMIT ?
-    ''', [thirtyDaysAgo, limit]);
+    ''', [thirtyDaysAgo, thirtyDaysAgo, limit]);
 
     return rows.asMap().entries.map((entry) {
       final idx = entry.key;

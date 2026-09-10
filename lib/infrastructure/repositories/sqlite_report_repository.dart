@@ -162,23 +162,49 @@ class SqliteReportRepository implements IReportRepository {
   Future<List<ProductPerformance>> getTopProducts(DateRange range,
       {int limit = 10}) async {
     final rows = await _gateway.rawQuery('''
+      WITH combined_items AS (
+        SELECT 
+          si.product_id AS product_id,
+          si.quantity AS quantity,
+          si.subtotal AS subtotal,
+          si.unit_price AS unit_price
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE s.status != 'cancelled'
+          AND s.created_at >= ?
+          AND s.created_at <= ?
+        UNION ALL
+        SELECT 
+          oi.product_id AS product_id,
+          oi.quantity AS quantity,
+          (oi.quantity * oi.unit_price) AS subtotal,
+          oi.unit_price AS unit_price
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
+          AND o.status != 'cancelled'
+          AND o.created_at >= ?
+          AND o.created_at <= ?
+      )
       SELECT 
-        CAST(si.product_id AS TEXT) AS pid,
+        CAST(ci.product_id AS TEXT) AS pid,
         COALESCE(p.name, 'Bilinmeyen Ürün') AS pname,
         COALESCE(CAST(p.category AS TEXT), '') AS cat_id,
-        SUM(si.quantity) AS sold,
-        SUM(si.subtotal) AS revenue,
-        AVG(si.unit_price) AS avg_price
-      FROM sale_items si
-      LEFT JOIN products p ON si.product_id = p.id
-      JOIN sales s ON si.sale_id = s.id
-      WHERE s.status != 'cancelled'
-        AND s.created_at >= ?
-        AND s.created_at <= ?
-      GROUP BY si.product_id
+        SUM(ci.quantity) AS sold,
+        SUM(ci.subtotal) AS revenue,
+        AVG(ci.unit_price) AS avg_price
+      FROM combined_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      GROUP BY ci.product_id
       ORDER BY revenue DESC
       LIMIT ?
-    ''', [range.toIsoFrom(), range.toIsoTo(), limit]);
+    ''', [
+      range.toIsoFrom(),
+      range.toIsoTo(),
+      range.toIsoFrom(),
+      range.toIsoTo(),
+      limit,
+    ]);
 
     // Resolve category names
     final categoryNames = <String, String>{};

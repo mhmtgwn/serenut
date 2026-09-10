@@ -672,9 +672,12 @@ class SqliteProductRepository implements IProductRepository {
       'name_desc' => 'name DESC',
       'name_asc' => 'name ASC',
       'best_selling' =>
-        '(SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si '
+        '((SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si '
             'JOIN sales s ON s.id = si.sale_id '
-            "WHERE si.product_id = products.id AND s.status != 'cancelled') DESC, name ASC",
+            "WHERE si.product_id = products.id AND s.status != 'cancelled') + "
+        '(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi '
+            'JOIN orders o ON o.id = oi.order_id '
+            "WHERE oi.product_id = products.id AND (o.is_deleted = 0 OR o.is_deleted IS NULL) AND o.status != 'cancelled')) DESC, name ASC",
       _ => 'name ASC',
     };
     final rows = await _executor.query(
