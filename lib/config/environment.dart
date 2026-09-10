@@ -46,7 +46,7 @@ class EnvironmentConfig {
   }
 
   static const String defaultSentryDsn =
-      'https://6305cfc5adf64ef655e3485c6b13f998@o4512061575397376.ingest.de.sentry.io/4512061581819984';
+      'https://d2541070c48eb5db7625bdeca6b59288@o4512061575397376.ingest.de.sentry.io/4512061589422161';
 
   /// Factory configuration mapping based on active environment parameter.
   factory EnvironmentConfig.fromEnv(AppEnvironment env) {
