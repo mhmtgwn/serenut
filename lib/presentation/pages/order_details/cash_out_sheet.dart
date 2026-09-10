@@ -91,7 +91,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
   bool _printReceipt = true;
   int _printCopies = 1;
   bool _printLabel = false;
-  int _labelCopies = 1;
+  final int _labelCopies = 1;
 
   @override
   void initState() {
@@ -106,17 +106,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         setState(() {
           _printLabel = settings.labelPrinterEnabled;
         });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveLabelPrinterSettings() async {
-    try {
-      final current = ref.read(settingsNotifierProvider).valueOrNull;
-      if (current != null) {
-        await ref
-            .read(settingsNotifierProvider.notifier)
-            .updateSettings(current.copyWith(labelPrinterEnabled: _printLabel));
       }
     } catch (_) {}
   }

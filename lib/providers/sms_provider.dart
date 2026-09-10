@@ -117,6 +117,11 @@ final smsNotificationHandlerProvider =
       required fallbackBody,
       required variables,
     }) async {
+      // NOT: Evolution API modunda sunucu WhatsApp'ı BullMQ worker üzerinden gönderir.
+      // Bu outbox yalnızca Meta Cloud API modunda (WHATSAPP_GATEWAY=meta) aktiftir.
+      // Evolution modunda /api/v1/whatsapp/events endpoint'i 404 döner ve
+      // outbox sessizce durur (catch(_ ) { break; } ile).
+
       final parameters = switch (eventType) {
         'sale_created' => [
             variables['customer'] ?? '',

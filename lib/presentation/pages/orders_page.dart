@@ -26,7 +26,6 @@ part 'orders/components/orders_views.dart';
 
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
-const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
 const _kAmberLight = POSColors.amberLight;
 const _kAmberDark = POSColors.amberDark;
