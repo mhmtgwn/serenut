@@ -35,6 +35,7 @@ import 'package:serenutos/providers/printing_providers.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
+part 'settings/widgets/user_form_dialogs.dart';
 part 'settings/widgets/system_config_section.dart';
 
 // ─── Design Theme Sabitleri ───────────────────────────────────────────────────
