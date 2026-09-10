@@ -196,6 +196,65 @@ services:
         max-size: "5m"
         max-file: "3"
 
+  # ── Evolution API (WhatsApp QR Gateway) ──────────────────────────────────────
+  # Belgeleri: https://doc.evolution-api.com
+  # Nginx üzerinden dışarıya açılması GEREKMİYOR — sadece backend internal erişir.
+  # Ancak Serenut sunucusu kendi kendine webhook gönderdiği için
+  # evolution-api → backend yönünde erişime izin vermek için serenut-external ağında.
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    container_name: serenut-evolution-api
+    restart: unless-stopped
+    environment:
+      SERVER_URL: ${EVOLUTION_API_URL:-http://evolution-api:8080}
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      # Oturum verisini PostgreSQL'de sakla (mevcut DB'yi yeniden kullanır)
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DB_URL:-${DATABASE_URL}}
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      # Redis önbellek (mevcut Redis'i yeniden kullanır)
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: ${REDIS_URL:-redis://redis:6379}
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      # QR oturumu süresi (saniye) — 7 gün
+      INSTANCE_EXPIRATION_TIME: "604800"
+      # Log
+      LOG_LEVEL: "ERROR,WARN,INFO"
+      LOG_COLOR: "true"
+      LOG_BAILEYS: "error"
+      # Webhook
+      WEBHOOK_GLOBAL_ENABLED: "false"
+    volumes:
+      - evolution-data:/evolution/instances
+    networks:
+      - serenut-external
+      - serenut-db-redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Evolution API dahili portu — Nginx'e açılmaz, sadece backend erişir
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
 # ── Ağ Tanımı ─────────────────────────────────────────────────────────────────
 networks:
   serenut-db-redis:
@@ -212,4 +271,6 @@ volumes:
   db-data:
     driver: local
   redis-data:
+    driver: local
+  evolution-data:
     driver: local

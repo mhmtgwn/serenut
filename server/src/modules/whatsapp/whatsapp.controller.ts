@@ -453,4 +453,202 @@ router.post('/test', requireWhatsAppManager, async (req: AuthenticatedRequest, r
   }
 });
 
+// ── EVOLUTION API ROUTE'LARI ──────────────────────────────────────────────────
+// QR tabanlı WhatsApp gateway. Meta onayı gerektirmez.
+// Her şirket Evolution API'de kendi instance'ına sahip olur.
+
+import {
+  deleteInstance as evolutionDeleteInstance,
+  getConnectionStatus as evolutionGetStatus,
+  getQRCode as evolutionGetQR,
+  EvolutionApiError,
+} from './evolution.service';
+
+/**
+ * GET /api/v1/whatsapp/evolution/qr
+ * QR kodu döndürür. İlk çağrıda instance otomatik oluşturulur.
+ * Flutter'da ~5 sn polling ile kullanılır.
+ */
+router.get(
+  '/evolution/qr',
+  authenticateUser,
+  requireActiveEntitlementForMutations,
+  requireWhatsAppManager,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const companyId = req.user!.company_id;
+    try {
+      // Instance yoksa oluştur, QR al
+      const qr = await evolutionGetQR(companyId);
+
+      // DB'ye qr_pending durumu yaz
+      await runBypassingRls(
+        `INSERT INTO company_whatsapp_connections
+           (company_id, gateway_type, evolution_instance_id, evolution_status, status,
+            waba_id, phone_number_id, encrypted_access_token)
+         VALUES ($1, 'evolution', $2, 'connecting', 'qr_pending', NULL, NULL, NULL)
+         ON CONFLICT (company_id) DO UPDATE
+           SET gateway_type='evolution',
+               evolution_instance_id=$2,
+               evolution_status='connecting',
+               status='qr_pending',
+               updated_at=NOW()`,
+        [companyId, `serenut_${companyId.replace(/[^a-zA-Z0-9]/g, '_')}`],
+      );
+
+      return res.json({
+        qrcode: qr.qrcode,
+        expiresInMs: qr.expiresInMs ?? 60000,
+      });
+    } catch (error) {
+      if (error instanceof EvolutionApiError) {
+        return res.status(error.status || 503).json({
+          error: 'evolution_qr_failed',
+          message: error.message,
+        });
+      }
+      logger.error('[Evolution] QR alma hatası', { error: String(error), companyId });
+      return res.status(500).json({ error: 'server_error', message: 'QR kodu alınamadı.' });
+    }
+  },
+);
+
+/**
+ * GET /api/v1/whatsapp/evolution/status
+ * Anlık bağlantı durumu: { status, phone, name }
+ * status: 'open' | 'connecting' | 'close'
+ */
+router.get(
+  '/evolution/status',
+  authenticateUser,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const companyId = req.user!.company_id;
+    try {
+      const status = await evolutionGetStatus(companyId);
+
+      // Bağlantı kuruldu → DB'yi güncelle
+      if (status.status === 'open') {
+        await runBypassingRls(
+          `UPDATE company_whatsapp_connections
+           SET evolution_status='open', status='active',
+               display_phone_number=$2, business_display_name=$3,
+               last_verified_at=NOW(), updated_at=NOW()
+           WHERE company_id=$1 AND gateway_type='evolution'`,
+          [companyId, status.phone ?? null, status.name ?? null],
+        );
+      }
+
+      return res.json(status);
+    } catch (error) {
+      if (error instanceof EvolutionApiError) {
+        return res.status(error.status || 503).json({
+          error: 'evolution_status_failed',
+          message: error.message,
+        });
+      }
+      logger.error('[Evolution] Durum sorgulama hatası', { error: String(error), companyId });
+      return res.status(500).json({ error: 'server_error', message: 'Durum alınamadı.' });
+    }
+  },
+);
+
+/**
+ * POST /api/v1/whatsapp/evolution/disconnect
+ * WhatsApp oturumunu kapatır ve instance'ı siler.
+ */
+router.post(
+  '/evolution/disconnect',
+  authenticateUser,
+  requireWhatsAppManager,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const companyId = req.user!.company_id;
+    try {
+      await evolutionDeleteInstance(companyId);
+
+      await runBypassingRls(
+        `UPDATE company_whatsapp_connections
+         SET evolution_status='close', status='disconnected',
+             disconnected_at=NOW(), updated_at=NOW()
+         WHERE company_id=$1 AND gateway_type='evolution'`,
+        [companyId],
+      );
+
+      logger.info(`[Evolution] Bağlantı kesildi: ${companyId}`);
+      return res.json({ success: true });
+    } catch (error) {
+      if (error instanceof EvolutionApiError) {
+        return res.status(error.status || 503).json({
+          error: 'evolution_disconnect_failed',
+          message: error.message,
+        });
+      }
+      logger.error('[Evolution] Bağlantı kesme hatası', { error: String(error), companyId });
+      return res.status(500).json({ error: 'server_error', message: 'Bağlantı kesilemedi.' });
+    }
+  },
+);
+
+/**
+ * POST /api/v1/whatsapp/evolution/webhook
+ * Evolution API'den gelen durum olayları (CONNECTION_UPDATE, QRCODE_UPDATED vb.)
+ * Kimlik doğrulama: apikey header kontrolü.
+ */
+router.post('/evolution/webhook', async (req: Request, res: Response) => {
+  // Evolution API webhook doğrulaması
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const incomingKey = req.headers['apikey'] as string | undefined;
+
+  if (!apiKey || incomingKey !== apiKey) {
+    logger.warn('[Evolution] Webhook yetkisiz istek', { ip: req.ip });
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  const body = req.body as {
+    event?: string;
+    instance?: string;
+    data?: { state?: string; qrcode?: string };
+  };
+
+  logger.info('[Evolution] Webhook alındı', { event: body.event, instance: body.instance });
+
+  // Instance adından company ID çıkar: "serenut_companyId" → "companyId"
+  const instanceName = body.instance ?? '';
+  const companyId = instanceName.replace(/^serenut_/, '').replace(/_/g, '');
+
+  if (!companyId) {
+    return res.status(200).json({ received: true }); // Bilinmeyen instance → yoksay
+  }
+
+  try {
+    if (body.event === 'CONNECTION_UPDATE') {
+      const state = body.data?.state;
+      let dbStatus = 'qr_pending';
+      let evolutionStatus = 'connecting';
+
+      if (state === 'open') {
+        dbStatus = 'active';
+        evolutionStatus = 'open';
+      } else if (state === 'close') {
+        dbStatus = 'disconnected';
+        evolutionStatus = 'close';
+      }
+
+      await runBypassingRls(
+        `UPDATE company_whatsapp_connections
+         SET evolution_status=$2, status=$3,
+             disconnected_at=CASE WHEN $3='disconnected' THEN NOW() ELSE disconnected_at END,
+             last_verified_at=CASE WHEN $3='active' THEN NOW() ELSE last_verified_at END,
+             updated_at=NOW()
+         WHERE company_id=$1 AND gateway_type='evolution'`,
+        [companyId, evolutionStatus, dbStatus],
+      );
+    }
+  } catch (error) {
+    logger.error('[Evolution] Webhook DB güncelleme hatası', { error: String(error), companyId });
+    // Webhook hatası 200 döner (Evolution tekrar denemesin)
+  }
+
+  return res.status(200).json({ received: true });
+});
+
 export default router;
+

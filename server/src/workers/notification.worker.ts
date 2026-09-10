@@ -214,9 +214,53 @@ async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
   );
   if (existing.rows[0]?.provider_message_id) return true;
 
+  const gateway = process.env.WHATSAPP_GATEWAY ?? 'meta';
+
+  if (gateway === 'evolution') {
+    return dispatchWhatsAppEvolution(data);
+  }
+  return dispatchWhatsAppMeta(data);
+}
+
+/** Evolution API (QR tabanlı) ile WhatsApp mesajı gönderir. Şablon gerektirmez. */
+async function dispatchWhatsAppEvolution(data: NotificationJobData): Promise<boolean> {
+  const { sendTextMessage: evolutionSend } = await import('../modules/whatsapp/evolution.service');
+
+  const connection = await runBypassingRLS(
+    `SELECT evolution_instance_id, evolution_status, status
+     FROM company_whatsapp_connections
+     WHERE company_id=$1 AND gateway_type='evolution'`,
+    [data.company_id],
+  );
+  const row = connection.rows[0];
+  if (!row || row.status !== 'active' || row.evolution_status !== 'open') {
+    throw new Error('evolution_whatsapp_not_connected');
+  }
+
+  const messageId = await evolutionSend(data.company_id, data.recipient, data.body);
+
+  await runBypassingRLS(
+    `UPDATE notification_queue
+     SET provider_message_id=$1, provider_status='accepted', provider_error_code=NULL, updated_at=NOW()
+     WHERE id=$2 AND company_id=$3 AND channel='whatsapp'`,
+    [messageId, data.notification_id, data.company_id],
+  );
+
+  await runBypassingRLS(
+    `UPDATE company_whatsapp_connections
+     SET last_verified_at=NOW(), last_error_code=NULL, last_error_message=NULL, updated_at=NOW()
+     WHERE company_id=$1 AND gateway_type='evolution'`,
+    [data.company_id],
+  );
+
+  return true;
+}
+
+/** Meta Cloud API (şablon tabanlı) ile WhatsApp mesajı gönderir. */
+async function dispatchWhatsAppMeta(data: NotificationJobData): Promise<boolean> {
   const connection = await runBypassingRLS(
     `SELECT phone_number_id,encrypted_access_token,status
-     FROM company_whatsapp_connections WHERE company_id=$1`,
+     FROM company_whatsapp_connections WHERE company_id=$1 AND gateway_type='meta'`,
     [data.company_id],
   );
   const row = connection.rows[0];
@@ -258,6 +302,7 @@ async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
   );
   return true;
 }
+
 
 async function dispatchPush(deviceToken: string, title?: string, body?: string): Promise<boolean> {
   throw new Error('notification_channel_not_enabled:push');

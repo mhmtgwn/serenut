@@ -18,13 +18,14 @@ import 'package:serenutos/domain/services/sms_message_analyzer.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
 import 'package:serenutos/presentation/pages/settings/widgets/sms_sub_widgets.dart';
+import 'package:serenutos/presentation/widgets/whatsapp/evolution_qr_dialog.dart';
 
 
 // ─── WhatsApp Feature Flag ────────────────────────────────────────────────────
-// WhatsApp Business (Meta Cloud API) entegrasyonu şu an devre dışıdır.
-// Hazır olmadığı için UI'dan gizlendi; arka plan servisleri korunmaktadır.
-// Etkinleştirmek için: `false` → `true` yapın.
-const bool _kWhatsAppEnabled = false;
+// Evolution API (QR tabanlı WhatsApp gateway) etkin.
+// Meta onayı GEREKMEZ. Her esnaflık kendi numarasını bağlar.
+// Devre dışı bırakmak için: `true` → `false`
+const bool _kWhatsAppEnabled = true;
 
 class SmsSettingsSheet extends ConsumerStatefulWidget {
   final Settings settings;
@@ -96,31 +97,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   Future<void> _loadWhatsAppStatus() async {
     try {
       final api = ref.read(apiClientProvider);
-      final results = await Future.wait([
-        api.get('/api/v1/whatsapp/connection'),
-        api.get('/api/v1/whatsapp/templates'),
-      ]);
-      final body = Map<String, dynamic>.from(results[0].json as Map);
-      final connection = body['connection'] is Map
-          ? Map<String, dynamic>.from(body['connection'] as Map)
-          : <String, dynamic>{};
-      final templates =
-          results[1].json is List ? results[1].json as List : const <dynamic>[];
+      final res = await api.get('/api/v1/whatsapp/evolution/status');
+      final body = Map<String, dynamic>.from(res.json as Map);
       if (!mounted) return;
       setState(() {
-        whatsappConnected = connection['status'] == 'active';
-        whatsappPhone = connection['display_phone_number']?.toString();
-        whatsappTemplates
-          ..clear()
-          ..addEntries(
-            templates.whereType<Map>().map((item) {
-              final row = Map<String, dynamic>.from(item);
-              return MapEntry(row['event_key']?.toString() ?? '', {
-                'status': row['status']?.toString() ?? 'pending',
-                'name': row['meta_template_name']?.toString() ?? '',
-              });
-            }),
-          );
+        whatsappConnected = body['status'] == 'open';
+        whatsappPhone = body['phone']?.toString() ??
+            body['name']?.toString();
         whatsappStatusLoading = false;
       });
     } catch (_) {
@@ -1183,57 +1166,185 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   }
 
   Widget _buildWhatsAppConnectionCard() {
-    final color = whatsappStatusLoading
+    // Evolution API tabanlı QR bağlantı kartı
+    final isConnected = !whatsappStatusLoading && whatsappConnected;
+    final isLoading = whatsappStatusLoading;
+
+    final Color cardColor = isLoading
         ? POSColors.textSecondary
-        : whatsappConnected
-            ? POSColors.green
-            : POSColors.amber;
+        : isConnected
+            ? const Color(0xFF16A34A) // yeşil
+            : const Color(0xFFF59E0B); // amber
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: cardColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardColor.withValues(alpha: 0.28)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(Icons.chat_rounded, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
               children: [
-                const Text(
-                  'WhatsApp Business',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                // WhatsApp ikonu
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: cardColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: isLoading
+                      ? const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Icon(Icons.chat_rounded, color: cardColor, size: 22),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  whatsappStatusLoading
-                      ? 'Bağlantı durumu kontrol ediliyor…'
-                      : whatsappConnected
-                          ? "${whatsappPhone ?? 'İşletme numarası'} bağlı. Aşağıdaki olaylar için WhatsApp'ı ayrı ayrı açabilirsiniz."
-                          : 'Bağlantı kurulmadı. Firma sahibi müşteri portalındaki Bildirim Kanalları bölümünden hesabını bağlamalıdır.',
-                  style: const TextStyle(
-                    color: POSColors.textSecondary,
-                    fontSize: 12,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'WhatsApp Bildirimleri',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isLoading
+                            ? 'Bağlantı durumu kontrol ediliyor…'
+                            : isConnected
+                                ? '${whatsappPhone ?? 'Numara'} bağlı ✓'
+                                : 'Bağlı değil — QR ile bağlayın',
+                        style: TextStyle(
+                          color: isConnected
+                              ? const Color(0xFF16A34A)
+                              : POSColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: isConnected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (!isLoading)
+                  Icon(
+                    isConnected
+                        ? Icons.check_circle_rounded
+                        : Icons.qr_code_scanner_rounded,
+                    color: cardColor,
+                    size: 22,
+                  ),
               ],
             ),
           ),
-          if (!whatsappStatusLoading)
-            Icon(
-              whatsappConnected
-                  ? Icons.check_circle_rounded
-                  : Icons.info_outline_rounded,
-              color: color,
+          // Aksiyon butonu
+          if (!isLoading) ...[
+            Divider(
+              height: 1,
+              color: cardColor.withValues(alpha: 0.18),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: isConnected
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () async {
+                            // Bağlantıyı yeniden kontrol et
+                            setState(() => whatsappStatusLoading = true);
+                            await _loadWhatsAppStatus();
+                          },
+                          icon: const Icon(
+                            Icons.refresh_rounded,
+                            size: 15,
+                            color: POSColors.textSecondary,
+                          ),
+                          label: const Text(
+                            'Yenile',
+                            style: TextStyle(
+                              color: POSColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final result = await showDialog<bool>(
+                              context: context,
+                              builder: (_) => const EvolutionQRDialog(),
+                            );
+                            if (result == false && mounted) {
+                              // Bağlantı kesildi
+                              setState(() {
+                                whatsappConnected = false;
+                                whatsappPhone = null;
+                              });
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.link_off_rounded,
+                            size: 15,
+                            color: POSColors.red,
+                          ),
+                          label: const Text(
+                            'Bağlantıyı Kes',
+                            style: TextStyle(
+                              color: POSColors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final connected = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => const EvolutionQRDialog(),
+                          );
+                          if (connected == true && mounted) {
+                            setState(() => whatsappStatusLoading = true);
+                            await _loadWhatsAppStatus();
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.qr_code_scanner_rounded,
+                          size: 18,
+                          color: Color(0xFF25D366),
+                        ),
+                        label: const Text(
+                          'QR Kod ile Bağlan',
+                          style: TextStyle(
+                            color: Color(0xFF25D366),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ],
       ),
     );
   }
+
 
   Widget _buildProviderCard({
     required String providerId,
