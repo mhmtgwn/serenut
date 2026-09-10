@@ -129,16 +129,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   }
 
   String _normalizeTurkish(String text) {
-    return text
-        .replaceAll('İ', 'i')
-        .replaceAll('I', 'i')
-        .toLowerCase()
-        .replaceAll('ı', 'i')
-        .replaceAll('ş', 's')
-        .replaceAll('ç', 'c')
-        .replaceAll('ğ', 'g')
-        .replaceAll('ü', 'u')
-        .replaceAll('ö', 'o');
+    return text.normalizeTurkish;
   }
 
   @override

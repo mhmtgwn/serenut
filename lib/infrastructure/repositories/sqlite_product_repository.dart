@@ -44,6 +44,7 @@ class SqliteProductRepository implements IProductRepository {
             .replaceAll('id IN', 'p.barcode IN')
             .replaceAll('id = ?', 'p.barcode = ?')
             .replaceAll('category = ?', 'p.category = ?')
+            .replaceAll(sqliteTurkishFold('name'), sqliteTurkishFold('p.name'))
             .replaceAll('name LIKE ?', 'p.name LIKE ?');
         sql += ' WHERE $rewrittenWhere';
       }
@@ -473,8 +474,12 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<List<ProductEntity>> searchByName(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+    final normalized = trimmed.normalizeTurkish;
     return await _queryProducts(
-        where: 'name LIKE ? AND is_active = 1', whereArgs: ['%$query%']);
+        where: '${sqliteTurkishFold('name')} LIKE ? AND is_active = 1',
+        whereArgs: ['%$normalized%']);
   }
 
   @override
