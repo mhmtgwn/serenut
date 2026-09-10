@@ -45,6 +45,9 @@ class EnvironmentConfig {
     ).toString();
   }
 
+  static const String defaultSentryDsn =
+      'https://6305cfc5adf64ef655e3485c6b13f998@o4512061575397376.ingest.de.sentry.io/4512061581819984';
+
   /// Factory configuration mapping based on active environment parameter.
   factory EnvironmentConfig.fromEnv(AppEnvironment env) {
     switch (env) {
@@ -57,7 +60,8 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
-          sentryDsn: null,
+          sentryDsn: String.fromEnvironment('SENTRY_DSN',
+              defaultValue: defaultSentryDsn),
         );
       case AppEnvironment.test:
         return const EnvironmentConfig(
@@ -68,7 +72,8 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'beta',
-          sentryDsn: String.fromEnvironment('SENTRY_DSN'),
+          sentryDsn: String.fromEnvironment('SENTRY_DSN',
+              defaultValue: defaultSentryDsn),
         );
       case AppEnvironment.prod:
         return const EnvironmentConfig(
@@ -79,7 +84,8 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
-          sentryDsn: String.fromEnvironment('SENTRY_DSN'),
+          sentryDsn: String.fromEnvironment('SENTRY_DSN',
+              defaultValue: defaultSentryDsn),
         );
     }
   }

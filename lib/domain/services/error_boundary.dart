@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
@@ -49,6 +50,53 @@ class ErrorBoundary {
       if (kDebugMode && !isMissingPlugin) {
         FlutterError.presentError(details);
       }
+    };
+
+    // User-friendly fallback widget when a widget build fails (replaces default red/grey box)
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      return Material(
+        color: Colors.transparent,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFF59E0B), size: 40),
+                SizedBox(height: 8),
+                Text(
+                  'Arayüz Yüklenirken Bir Aksaklık Oluştu',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Color(0xFF1E293B)),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Hata kaydı otomatik olarak geliştirici ekibe iletildi.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     };
 
     // ── 2. Platform-level / unhandled async errors ────────────────────────────

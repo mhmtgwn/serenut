@@ -13,6 +13,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
@@ -23,6 +24,7 @@ class AboutPage extends ConsumerStatefulWidget {
 
 class _AboutPageState extends ConsumerState<AboutPage> {
   bool _checking = false;
+  bool _sendingDiagnostics = false;
   String? _lastResult;
 
   @override
@@ -162,9 +164,75 @@ class _AboutPageState extends ConsumerState<AboutPage> {
               onTap: _checking ? null : _checkForUpdate,
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
+          SerenutSurface(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(AppSpacing.md),
+              leading: const Icon(
+                Icons.bug_report_outlined,
+                color: POSColors.blue,
+              ),
+              title: const Text(
+                'Sistem Teşhis Raporu Gönder',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text(
+                'Karşılaştığınız teknik sorunları ve sistem loglarını teknik ekibe iletir.',
+              ),
+              trailing: _sendingDiagnostics
+                  ? const SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded,
+                      size: 20, color: POSColors.blue),
+              onTap: _sendingDiagnostics ? null : _sendDiagnosticReport,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _sendDiagnosticReport() async {
+    setState(() => _sendingDiagnostics = true);
+    try {
+      final lic = ref.read(licenseServiceProvider).getLicenseInfo();
+      await Sentry.captureMessage(
+        'Kullanıcı Manuel Sistem Teşhis Raporu Gönderdi',
+        level: SentryLevel.info,
+        withScope: (scope) {
+          scope.setTag('report_type', 'manual_user_feedback');
+          if (lic != null) {
+            scope.setTag('merchant_id', lic.merchantId);
+            scope.setTag('license_tier', lic.tier.name);
+          }
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Teşhis raporu ve hata kayıtları teknik ekibe başarıyla iletildi.'),
+            backgroundColor: POSColors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rapor iletilemedi: $e'),
+            backgroundColor: POSColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingDiagnostics = false);
+    }
   }
 
   String _licenseLabel(String status) => switch (status) {

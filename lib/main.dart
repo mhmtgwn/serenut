@@ -66,8 +66,10 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = envConfig.sentryDsn ?? '';
-      options.tracesSampleRate = 0.1;
+      options.tracesSampleRate = 1.0;
       options.environment = kReleaseMode ? 'production' : 'development';
+      options.attachStacktrace = true;
+      options.enableAutoSessionTracking = true;
     },
     appRunner: () async {
       ErrorBoundary.install();
@@ -99,6 +101,22 @@ void main() async {
       final deviceManager = DeviceManager(prefs);
       final fingerprintService = DeviceFingerprintService(prefs, deviceManager);
       final settingsRepository = SqliteSettingsRepository(gateway);
+
+      // Attach device and license metadata to Sentry scope for remote diagnostics
+      try {
+        final deviceId = deviceManager.getDeviceId();
+        final license = licenseService.getLicenseInfo();
+        Sentry.configureScope((scope) {
+          scope.setTag('device_id', deviceId);
+          if (license != null) {
+            scope.setTag('merchant_id', license.merchantId);
+            scope.setTag('license_tier', license.tier.name);
+            if (license.activationId != null) {
+              scope.setTag('activation_id', license.activationId!);
+            }
+          }
+        });
+      } catch (_) {}
 
       final authService = AuthService(
         userRepository: userRepository,

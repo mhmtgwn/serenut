@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_wizard_page.dart';
 import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.dart';
@@ -91,6 +92,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    observers: [
+      SentryNavigatorObserver(),
+    ],
     initialLocation: isAuthenticated ? AppRoutes.home : AppRoutes.login,
     redirect: (context, state) {
       final loggedIn = isAuthenticated;
