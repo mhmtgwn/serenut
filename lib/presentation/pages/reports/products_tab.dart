@@ -27,6 +27,7 @@ class _ProductsTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         products.when(
+          skipLoadingOnReload: true,
           data: (items) => items.isEmpty
               ? const ReportEmptyState(
                   icon: Icons.inventory_2_outlined,

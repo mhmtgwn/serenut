@@ -145,6 +145,7 @@ class CustomerDetailsPage extends ConsumerWidget {
     final balanceVal = ref.watch(customerBalanceDetailsProvider(customerId));
 
     return customerAsync.when(
+      skipLoadingOnReload: true,
       loading: () => Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -326,6 +327,7 @@ class CustomerDetailsPage extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: balanceVal.when(
+                skipLoadingOnReload: true,
                 loading: () => const SizedBox(
                     height: 80,
                     child: Center(
@@ -399,6 +401,7 @@ class CustomerDetailsPage extends ConsumerWidget {
           ),
 
           transactionsVal.when(
+            skipLoadingOnReload: true,
             loading: () => const SliverToBoxAdapter(
               child: Center(
                   child: Padding(

@@ -85,6 +85,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         ref.watch(collectionCustomerDetailProvider(widget.customerId));
 
     return customerAsync.when(
+      skipLoadingOnReload: true,
       loading: () => const Scaffold(
         body: Center(
           child: CircularProgressIndicator(

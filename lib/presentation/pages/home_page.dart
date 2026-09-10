@@ -45,6 +45,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       showStatusIndicator: true,
       showSettings: true,
       body: dashboard.when(
+        skipLoadingOnReload: true,
         loading: () => const Center(
           child: CircularProgressIndicator(color: POSColors.green),
         ),

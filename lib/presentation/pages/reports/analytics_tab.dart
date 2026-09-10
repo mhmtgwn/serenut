@@ -23,6 +23,7 @@ class _AnalyticsTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         daily.when(
+          skipLoadingOnReload: true,
           data: (data) => data.isEmpty
               ? const ReportEmptyState(
                   icon: Icons.show_chart_rounded,
@@ -45,6 +46,7 @@ class _AnalyticsTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         categories.when(
+          skipLoadingOnReload: true,
           data: (data) => data.isEmpty
               ? const ReportEmptyState(
                   icon: Icons.category_outlined,

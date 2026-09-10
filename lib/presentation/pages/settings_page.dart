@@ -286,6 +286,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         centerTitle: false,
       ),
       body: settingsAsyncValue.when(
+        skipLoadingOnReload: true,
         data: (settings) => _buildBody(settings, currentUser),
         loading: () => const Center(
           child: CircularProgressIndicator(

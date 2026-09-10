@@ -48,6 +48,7 @@ class SaleDetailsPage extends ConsumerWidget {
         iconTheme: const IconThemeData(color: Color(0xFF16A34A)),
       ),
       body: saleVal.when(
+        skipLoadingOnReload: true,
         data: (sale) {
           if (sale == null) {
             return const Center(child: Text('Satış bulunamadı.'));
@@ -510,9 +511,7 @@ class SaleDetailsPage extends ConsumerWidget {
         returnQty: 0,
       );
     }).toList();
-    final hasCustomer = sale.customerId.trim().isNotEmpty;
-    // Varsayılan: Eğer müşteri yoksa veya peşin ödendiyse doğrudan kasadan nakit iade
-    String refundMethod = 'cash';
+    String refundMethod = 'balance';
     String reason = '';
 
     showDialog(
@@ -536,7 +535,6 @@ class SaleDetailsPage extends ConsumerWidget {
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ...returnItems.map((ri) {
                       final name = productNameMap[ri.productId] ?? ri.productId;
@@ -584,64 +582,30 @@ class SaleDetailsPage extends ConsumerWidget {
                     const SizedBox(height: 12),
                     TextFormField(
                       decoration: const InputDecoration(
-                        labelText: 'İade gerekçesi (zorunlu)',
-                        hintText: 'Örn: Ürün değişimi / Hatalı alım',
+                        labelText: 'İade gerekçesi',
                         border: OutlineInputBorder(),
                       ),
                       onChanged: (value) =>
                           setDialog(() => reason = value.trim()),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: refundMethod,
-                      isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: 'İade Ödeme Yolu',
-                        helperText: refundMethod == 'cash'
-                            ? 'Müşteriye elden nakit verildi (Cari bakiye değişmez)'
-                            : 'Müşteriye para verilmedi, cari hesabına artı/alacak yazılır',
-                        helperMaxLines: 2,
+                        labelText: 'İade Yöntemi',
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8)),
                       ),
-                      items: [
-                        const DropdownMenuItem(
-                            value: 'cash',
-                            child: Text('💵 Kasadan Nakit İade (Elden Para Verildi)')),
-                        if (hasCustomer)
-                          const DropdownMenuItem(
-                              value: 'balance',
-                              child: Text('📋 Cari Hesaba Yaz (Borçtan Düş / Alacak Bırak)')),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'balance',
+                            child: Text('Müşteri Bakiyesine Ekle')),
+                        DropdownMenuItem(
+                            value: 'cash', child: Text('Nakit İade')),
                       ],
                       onChanged: (v) =>
-                          setDialog(() => refundMethod = v ?? 'cash'),
+                          setDialog(() => refundMethod = v ?? 'balance'),
                     ),
-                    if (refundMethod == 'balance' && hasCustomer) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFCD34D)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 18, color: Color(0xFFB45309)),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Dikkat: Müşterinin borcu yoksa bu tutar müşteriyi alacaklı yapacaktır.',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF92400E),
-                                    fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

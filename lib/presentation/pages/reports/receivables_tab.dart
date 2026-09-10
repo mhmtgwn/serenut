@@ -21,6 +21,7 @@ class _ReceivablesTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         summary.when(
+          skipLoadingOnReload: true,
           data: (data) => _AgingOverview(summary: data),
           loading: () => const ReportLoadingCard(height: 170),
           error: (error, _) => ReportErrorCard(
@@ -37,6 +38,7 @@ class _ReceivablesTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         rows.when(
+          skipLoadingOnReload: true,
           data: (items) => items.isEmpty
               ? const ReportEmptyState(
                   icon: Icons.task_alt_rounded,
