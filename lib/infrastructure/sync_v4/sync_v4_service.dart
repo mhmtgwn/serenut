@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image/image.dart' as img;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/domain/services/barcode_standard.dart';
@@ -336,96 +336,111 @@ class SyncV4Service {
   }
 
   Future<bool> _syncCompanyProfile(Database db) async {
-    final response = await _api.get('/api/v1/company');
-    final remote = Map<String, dynamic>.from(response.json as Map);
     final rows = await db.query('settings', limit: 1);
     if (rows.isEmpty) return false;
 
     final prefs = await SharedPreferences.getInstance();
-    final knownVersion = prefs.getInt(_companyVersionKey);
-    final lastSyncedAt =
-        DateTime.tryParse(prefs.getString(_companySyncedAtKey) ?? '');
-    final localUpdatedAt =
-        DateTime.tryParse(rows.first['updated_at']?.toString() ?? '');
-    final remoteUpdatedAt =
-        DateTime.tryParse(remote['updated_at']?.toString() ?? '');
-    final remoteVersion = _syncInt(remote['version']);
-
     final isDirty = prefs.getBool('sync_v4_company_dirty') ?? false;
-    final localChanged = isDirty ||
-        (knownVersion != null &&
-            localUpdatedAt != null &&
-            lastSyncedAt != null &&
-            localUpdatedAt.isAfter(lastSyncedAt)) ||
-        (localUpdatedAt != null &&
-            remoteUpdatedAt != null &&
-            localUpdatedAt.isAfter(remoteUpdatedAt)) ||
-        (knownVersion == null &&
-            rows.first['business_name'] != null &&
-            rows.first['business_name'].toString().trim().isNotEmpty &&
-            rows.first['business_name'] != 'Serenut OS' &&
-            rows.first['business_name'] != remote['name']);
-    final remoteChanged = knownVersion != null && remoteVersion > knownVersion;
 
-    Map<String, dynamic> canonical = remote;
-    if (localChanged &&
-        (!remoteChanged ||
-            remoteUpdatedAt == null ||
-            (localUpdatedAt != null && localUpdatedAt.isAfter(remoteUpdatedAt)))) {
-      final local = rows.first;
-      final logo = await _portableLogo(local['business_logo']?.toString());
-      var patch = await _api.send('PATCH', '/api/v1/company', body: {
-        'expected_version': remoteVersion,
-        'force': true,
-        'name': local['business_name'],
-        'address': local['business_address'],
-        'phone': local['business_phone'],
-        'email': local['business_email'],
-        'tax_number': local['business_tax_id'],
-        'owner_name': local['owner_name'],
-        'type': local['business_type'],
-        'city': local['business_city'],
-        'district': local['business_district'],
-        'currency': local['currency'],
-        'logo_url': logo,
-      });
-      if (patch.statusCode == 409) {
-        final freshRes = await _api.get('/api/v1/company');
-        if (freshRes.isSuccess && freshRes.json != null) {
-          final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
-          final freshVer = _syncInt(freshRemote['version']);
-          patch = await _api.send('PATCH', '/api/v1/company', body: {
-            'expected_version': freshVer,
-            'force': true,
-            'name': local['business_name'],
-            'address': local['business_address'],
-            'phone': local['business_phone'],
-            'email': local['business_email'],
-            'tax_number': local['business_tax_id'],
-            'owner_name': local['owner_name'],
-            'type': local['business_type'],
-            'city': local['business_city'],
-            'district': local['business_district'],
-            'currency': local['currency'],
-            'logo_url': logo,
-          });
+    // 1. If local is dirty, we MUST push local changes to the server.
+    // Local user edits take absolute priority over server snapshot.
+    if (isDirty) {
+      try {
+        final response = await _api.get('/api/v1/company');
+        if (!response.isSuccess || response.json == null) {
+          debugPrint('[SyncV4] Server unreachable for company sync. Preserving local dirty state.');
+          return false;
         }
-      }
-      if (patch.isSuccess && patch.json != null) {
-        canonical = Map<String, dynamic>.from(patch.json as Map);
-        await prefs.setBool('sync_v4_company_dirty', false);
-      } else {
-        // If remote patch failed, do NOT overwrite local settings with old remote data!
+        final remote = Map<String, dynamic>.from(response.json as Map);
+        final remoteVersion = _syncInt(remote['version']);
+
+        final local = rows.first;
+        final logo = await _portableLogo(local['business_logo']?.toString());
+        var patch = await _api.send('PATCH', '/api/v1/company', body: {
+          'expected_version': remoteVersion,
+          'force': true,
+          'name': local['business_name'],
+          'address': local['business_address'],
+          'phone': local['business_phone'],
+          'email': local['business_email'],
+          'tax_number': local['business_tax_id'],
+          'owner_name': local['owner_name'],
+          'type': local['business_type'],
+          'city': local['business_city'],
+          'district': local['business_district'],
+          'currency': local['currency'],
+          'logo_url': logo,
+        });
+        if (patch.statusCode == 409) {
+          final freshRes = await _api.get('/api/v1/company');
+          if (freshRes.isSuccess && freshRes.json != null) {
+            final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
+            final freshVer = _syncInt(freshRemote['version']);
+            patch = await _api.send('PATCH', '/api/v1/company', body: {
+              'expected_version': freshVer,
+              'force': true,
+              'name': local['business_name'],
+              'address': local['business_address'],
+              'phone': local['business_phone'],
+              'email': local['business_email'],
+              'tax_number': local['business_tax_id'],
+              'owner_name': local['owner_name'],
+              'type': local['business_type'],
+              'city': local['business_city'],
+              'district': local['business_district'],
+              'currency': local['currency'],
+              'logo_url': logo,
+            });
+          }
+        }
+        if (patch.isSuccess && patch.json != null) {
+          final canonical = Map<String, dynamic>.from(patch.json as Map);
+          final newVer = _syncInt(canonical['version']);
+          await prefs.setInt(_companyVersionKey, newVer);
+          await prefs.setString(_companySyncedAtKey,
+              canonical['updated_at']?.toString() ?? DateTime.now().toUtc().toIso8601String());
+          await prefs.setBool('sync_v4_company_dirty', false);
+          return true;
+        } else {
+          // If remote patch failed, do NOT overwrite local settings!
+          return false;
+        }
+      } catch (e) {
+        debugPrint('[SyncV4] Error pushing dirty company profile: $e');
+        // Offline or server error: preserve local settings and dirty state!
         return false;
       }
     }
 
-    // Safety guard: If local has a customized business name, never overwrite it with empty or default 'Serenut OS'
+    // 2. If NOT dirty, check if remote has updates
+    final response = await _api.get('/api/v1/company');
+    if (!response.isSuccess || response.json == null) return false;
+    final remote = Map<String, dynamic>.from(response.json as Map);
+    final remoteVersion = _syncInt(remote['version']);
+    final knownVersion = prefs.getInt(_companyVersionKey);
+
     final localName = rows.first['business_name']?.toString() ?? '';
-    final canonicalName = canonical['name']?.toString() ?? '';
+    final localIsDefault = (localName.isEmpty || localName == 'Serenut OS');
+
+    // Only pull from remote if remote version is strictly newer than known version,
+    // OR if local is default/unconfigured
+    if (!localIsDefault) {
+      if (knownVersion != null && remoteVersion <= knownVersion) {
+        return false;
+      }
+      if (knownVersion == null) {
+        // Record remote version so we track future changes without clobbering existing local customization
+        if (remoteVersion > 0) {
+          await prefs.setInt(_companyVersionKey, remoteVersion);
+        }
+        return false;
+      }
+    }
+
+    // Remote has newer changes or local was unconfigured default
+    final canonicalName = remote['name']?.toString() ?? '';
     final resolvedName = (canonicalName.isEmpty || canonicalName == 'Serenut OS') &&
-            localName.isNotEmpty &&
-            localName != 'Serenut OS'
+            !localIsDefault
         ? localName
         : (canonicalName.isNotEmpty ? canonicalName : localName);
 
@@ -442,26 +457,26 @@ class SyncV4Service {
       'settings',
       {
         'business_name': resolvedName,
-        'business_phone': pick(canonical['phone'], rows.first['business_phone']),
-        'business_address': pick(canonical['address'], rows.first['business_address']),
-        'business_tax_id': pick(canonical['tax_number'], rows.first['business_tax_id']),
-        'business_logo': pick(canonical['logo_url'], rows.first['business_logo']),
-        'owner_name': pick(canonical['owner_name'], rows.first['owner_name']),
-        'business_email': pick(canonical['email'], rows.first['business_email']),
-        'business_city': pick(canonical['city'], rows.first['business_city']),
-        'business_district': pick(canonical['district'], rows.first['business_district']),
-        'business_type': pick(canonical['type'], rows.first['business_type']),
-        'currency': pick(canonical['currency'], rows.first['currency'], '₺'),
-        'updated_at': canonical['updated_at']?.toString() ?? now,
+        'business_phone': pick(remote['phone'], rows.first['business_phone']),
+        'business_address': pick(remote['address'], rows.first['business_address']),
+        'business_tax_id': pick(remote['tax_number'], rows.first['business_tax_id']),
+        'business_logo': pick(remote['logo_url'], rows.first['business_logo']),
+        'owner_name': pick(remote['owner_name'], rows.first['owner_name']),
+        'business_email': pick(remote['email'], rows.first['business_email']),
+        'business_city': pick(remote['city'], rows.first['business_city']),
+        'business_district': pick(remote['district'], rows.first['business_district']),
+        'business_type': pick(remote['type'], rows.first['business_type']),
+        'currency': pick(remote['currency'], rows.first['currency'], '₺'),
+        'updated_at': remote['updated_at']?.toString() ?? now,
       },
       where: 'id = ?',
       whereArgs: [rows.first['id']],
     );
-    await prefs.setInt(_companyVersionKey, _syncInt(canonical['version']));
+    await prefs.setInt(_companyVersionKey, remoteVersion);
     await prefs.setString(
-        _companySyncedAtKey, canonical['updated_at']?.toString() ?? now);
+        _companySyncedAtKey, remote['updated_at']?.toString() ?? now);
     await prefs.setBool('sync_v4_company_dirty', false);
-    return localChanged || remoteChanged || knownVersion == null;
+    return true;
   }
 
   Future<String?> _portableLogo(String? value) async {

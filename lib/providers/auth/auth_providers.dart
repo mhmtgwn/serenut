@@ -3,6 +3,7 @@
 // Auth-related providers for Riverpod dependency injection
 // Generated: 20 Jun 2026
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
@@ -45,33 +46,38 @@ final authServiceProvider = Provider<AuthService>((ref) {
     cacheCompanyProfile: (company) async {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('sync_v4_company_dirty') == true) {
+        debugPrint('[Auth] Local company changes are dirty; preserving local profile.');
         return;
       }
       final current = await settingsRepository.getSettings();
+      final localIsCustomized = current.businessName.isNotEmpty &&
+          current.businessName != 'Serenut OS';
+      if (localIsCustomized) {
+        debugPrint('[Auth] Local business profile is customized ("${current.businessName}"); preserving against unversioned bootstrap.');
+        return;
+      }
+
       final rawName = company['name']?.toString().trim();
       final remoteName = (rawName != null && rawName.isNotEmpty) ? rawName : '';
-      final shouldKeepLocal = current.businessName.isNotEmpty &&
-          current.businessName != 'Serenut OS' &&
-          (remoteName.isEmpty || remoteName == 'Serenut OS');
-      final phone = company['phone']?.toString().trim();
-      final address = company['address']?.toString().trim();
-      final taxNum = company['tax_number']?.toString().trim();
-      final owner = company['owner_name']?.toString().trim();
-      final email = company['email']?.toString().trim();
-      final city = company['city']?.toString().trim();
-      final district = company['district']?.toString().trim();
-      await settingsRepository.updateSettings(current.copyWith(
-        businessName: shouldKeepLocal
-            ? current.businessName
-            : (remoteName.isNotEmpty ? remoteName : current.businessName),
-        businessPhone: (phone != null && phone.isNotEmpty) ? phone : current.businessPhone,
-        businessAddress: (address != null && address.isNotEmpty) ? address : current.businessAddress,
-        businessTaxId: (taxNum != null && taxNum.isNotEmpty) ? taxNum : current.businessTaxId,
-        ownerName: (owner != null && owner.isNotEmpty) ? owner : current.ownerName,
-        businessEmail: (email != null && email.isNotEmpty) ? email : current.businessEmail,
-        businessCity: (city != null && city.isNotEmpty) ? city : current.businessCity,
-        businessDistrict: (district != null && district.isNotEmpty) ? district : current.businessDistrict,
-      ));
+      if (remoteName.isNotEmpty && remoteName != 'Serenut OS') {
+        final phone = company['phone']?.toString().trim();
+        final address = company['address']?.toString().trim();
+        final taxNum = company['tax_number']?.toString().trim();
+        final owner = company['owner_name']?.toString().trim();
+        final email = company['email']?.toString().trim();
+        final city = company['city']?.toString().trim();
+        final district = company['district']?.toString().trim();
+        await settingsRepository.updateSettings(current.copyWith(
+          businessName: remoteName,
+          businessPhone: (phone != null && phone.isNotEmpty) ? phone : current.businessPhone,
+          businessAddress: (address != null && address.isNotEmpty) ? address : current.businessAddress,
+          businessTaxId: (taxNum != null && taxNum.isNotEmpty) ? taxNum : current.businessTaxId,
+          ownerName: (owner != null && owner.isNotEmpty) ? owner : current.ownerName,
+          businessEmail: (email != null && email.isNotEmpty) ? email : current.businessEmail,
+          businessCity: (city != null && city.isNotEmpty) ? city : current.businessCity,
+          businessDistrict: (district != null && district.isNotEmpty) ? district : current.businessDistrict,
+        ));
+      }
     },
     apiClient: apiClient,
   );

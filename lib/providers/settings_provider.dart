@@ -11,6 +11,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart'
     show sharedPreferencesProvider;
 
+import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Riverpod provider for Settings Repository
@@ -78,6 +79,88 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
     }
   }
 
+  /// Explicitly pushes the local company settings to the server via PATCH /api/v1/company.
+  /// Handles 409 conflict retry and updates version/dirty flags upon success.
+  Future<bool> pushCompanyToServer(Settings settings, {bool force = true}) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      if (apiClient.jwtToken == null || apiClient.jwtToken!.isEmpty) {
+        debugPrint('[SettingsNotifier] No active session token to push company profile.');
+        return false;
+      }
+
+      final res = await apiClient.get('/api/v1/company');
+      if (!res.isSuccess || res.json == null) {
+        debugPrint('[SettingsNotifier] Cannot reach server company endpoint (${res.statusCode}). Keeping local dirty state.');
+        return false;
+      }
+
+      final remote = Map<String, dynamic>.from(res.json as Map);
+      final remoteVersion = remote['version'] is int
+          ? remote['version'] as int
+          : int.tryParse(remote['version']?.toString() ?? '1') ?? 1;
+
+      final portableLogo = await _encodePortableLogo(settings.businessLogo);
+
+      final body = <String, dynamic>{
+        'expected_version': remoteVersion,
+        'force': force,
+        'name': settings.businessName,
+        'address': settings.businessAddress,
+        'phone': settings.businessPhone,
+        'email': settings.businessEmail,
+        'tax_number': settings.businessTaxId,
+        'owner_name': settings.ownerName,
+        'type': settings.businessType,
+        'city': settings.businessCity,
+        'district': settings.businessDistrict,
+        'currency': settings.currency,
+        'logo_url': portableLogo,
+      };
+
+      ApiResponse? patch;
+      try {
+        patch = await apiClient.send('PATCH', '/api/v1/company', body: body);
+      } on ApiException catch (e) {
+        if (e.statusCode == 409) {
+          debugPrint('[SettingsNotifier] 409 conflict during company PATCH; retrying with fresh version...');
+          final retryRes = await apiClient.get('/api/v1/company');
+          if (retryRes.isSuccess && retryRes.json != null) {
+            final retryRemote = Map<String, dynamic>.from(retryRes.json as Map);
+            final retryVer = retryRemote['version'] is int
+                ? retryRemote['version'] as int
+                : int.tryParse(retryRemote['version']?.toString() ?? '') ?? (remoteVersion + 1);
+            body['expected_version'] = retryVer;
+            try {
+              patch = await apiClient.send('PATCH', '/api/v1/company', body: body);
+            } catch (retryErr) {
+              debugPrint('[SettingsNotifier] Retry PATCH failed: $retryErr');
+            }
+          }
+        } else {
+          debugPrint('[SettingsNotifier] Company PATCH failed with status ${e.statusCode}: ${e.message}');
+          return false;
+        }
+      }
+
+      if (patch != null && patch.isSuccess && patch.json != null) {
+        final patched = Map<String, dynamic>.from(patch.json as Map);
+        final newVer = patched['version'] is int
+            ? patched['version'] as int
+            : int.tryParse(patched['version']?.toString() ?? '') ?? (remoteVersion + 1);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('sync_v4_company_version', newVer);
+        await prefs.setString('sync_v4_company_synced_at', DateTime.now().toUtc().toIso8601String());
+        await prefs.setBool('sync_v4_company_dirty', false);
+        debugPrint('[SettingsNotifier] Successfully synced company info to server v$newVer.');
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[SettingsNotifier] Remote company update network error: $e');
+    }
+    return false;
+  }
+
   Future<void> syncCompanyFromServer() async {
     try {
       final repo = await ref.read(settingsRepositoryProvider.future);
@@ -88,23 +171,33 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       // If user has unpushed local changes, push them to server instead of pulling!
       if (isDirty) {
         debugPrint('[SettingsNotifier] Local changes are dirty. Pushing to server instead of pulling.');
-        await updateSettings(current);
+        await pushCompanyToServer(current, force: true);
         return;
       }
 
       final apiClient = ref.read(apiClientProvider);
+      if (apiClient.jwtToken == null || apiClient.jwtToken!.isEmpty) return;
+
       final response = await apiClient.get('/api/v1/company');
       if (response.isSuccess && response.json != null) {
         final map = response.json as Map<String, dynamic>;
-        final companyName = map['name'] as String? ?? '';
+        final companyName = (map['name'] as String? ?? '').trim();
         final knownVersion = prefs.getInt('sync_v4_company_version') ?? 0;
         final remoteVersion = map['version'] is int
             ? map['version'] as int
             : int.tryParse(map['version']?.toString() ?? '') ?? 0;
 
-        // If remote version is not newer than local version, do not overwrite
-        if (remoteVersion <= knownVersion && knownVersion > 0) {
-          return;
+        final localIsDefault = (current.businessName.isEmpty || current.businessName == 'Serenut OS');
+
+        // If local is customized, DO NOT overwrite unless remote is strictly newer AND knownVersion > 0
+        if (!localIsDefault) {
+          if (remoteVersion <= knownVersion || knownVersion == 0) {
+            // Keep local customized values
+            if (remoteVersion > 0 && knownVersion == 0) {
+              await prefs.setInt('sync_v4_company_version', remoteVersion);
+            }
+            return;
+          }
         }
 
         // Helper to pick remote if non-empty string, else preserve local
@@ -116,8 +209,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
 
         // Prevent server from reverting user's local edits if local is customized
         final resolvedName = (companyName.isEmpty || companyName == 'Serenut OS') &&
-                current.businessName.isNotEmpty &&
-                current.businessName != 'Serenut OS'
+                !localIsDefault
             ? current.businessName
             : (companyName.isNotEmpty ? companyName : current.businessName);
 
@@ -188,7 +280,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               previous.businessType != settings.businessType ||
               previous.currency != settings.currency;
 
-      // 1. Local SQLite settings update
+      // 1. Local SQLite settings update (offline-first: local always wins immediately)
       await repo.updateSettings(settings);
 
       // 2. Local SQLite business_profile update & dirty flag
@@ -223,75 +315,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
         }
 
         // 3. Immediate remote API update if server is reachable
-        try {
-          final apiClient = ref.read(apiClientProvider);
-          final res = await apiClient.get('/api/v1/company');
-          if (res.isSuccess && res.json != null) {
-            final remote = Map<String, dynamic>.from(res.json as Map);
-            final remoteVersion = remote['version'] is int
-                ? remote['version'] as int
-                : int.tryParse(remote['version']?.toString() ?? '1') ?? 1;
-
-            final portableLogo = await _encodePortableLogo(settings.businessLogo);
-
-            var patch = await apiClient.send('PATCH', '/api/v1/company', body: {
-              'expected_version': remoteVersion,
-              'force': true,
-              'name': settings.businessName,
-              'address': settings.businessAddress,
-              'phone': settings.businessPhone,
-              'email': settings.businessEmail,
-              'tax_number': settings.businessTaxId,
-              'owner_name': settings.ownerName,
-              'type': settings.businessType,
-              'city': settings.businessCity,
-              'district': settings.businessDistrict,
-              'currency': settings.currency,
-              'logo_url': portableLogo,
-            });
-
-            // If 409 conflict, retry once with fresh version
-            if (patch.statusCode == 409) {
-              final retryRes = await apiClient.get('/api/v1/company');
-              if (retryRes.isSuccess && retryRes.json != null) {
-                final retryRemote = Map<String, dynamic>.from(retryRes.json as Map);
-                final retryVer = retryRemote['version'] is int
-                    ? retryRemote['version'] as int
-                    : int.tryParse(retryRemote['version']?.toString() ?? '') ?? (remoteVersion + 1);
-                patch = await apiClient.send('PATCH', '/api/v1/company', body: {
-                  'expected_version': retryVer,
-                  'force': true,
-                  'name': settings.businessName,
-                  'address': settings.businessAddress,
-                  'phone': settings.businessPhone,
-                  'email': settings.businessEmail,
-                  'tax_number': settings.businessTaxId,
-                  'owner_name': settings.ownerName,
-                  'type': settings.businessType,
-                  'city': settings.businessCity,
-                  'district': settings.businessDistrict,
-                  'currency': settings.currency,
-                  'logo_url': portableLogo,
-                });
-              }
-            }
-
-            if (patch.isSuccess && patch.json != null) {
-              final patched = Map<String, dynamic>.from(patch.json as Map);
-              final newVer = patched['version'] is int
-                  ? patched['version'] as int
-                  : int.tryParse(patched['version']?.toString() ?? '') ?? (remoteVersion + 1);
-              await prefs.setInt('sync_v4_company_version', newVer);
-              await prefs.setString('sync_v4_company_synced_at', DateTime.now().toUtc().toIso8601String());
-              await prefs.setBool('sync_v4_company_dirty', false);
-              debugPrint('[SettingsNotifier] Successfully synced company info to server v$newVer.');
-            } else {
-              debugPrint('[SettingsNotifier] Company profile patch response: ${patch.statusCode} ${patch.body}');
-            }
-          }
-        } catch (e) {
-          debugPrint('[SettingsNotifier] Remote company update network error: $e');
-        }
+        await pushCompanyToServer(settings, force: true);
       }
 
       // Reload settings to update state
