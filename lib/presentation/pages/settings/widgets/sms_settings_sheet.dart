@@ -20,6 +20,7 @@ import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_sub_widgets.dart';
 import 'package:serenutos/presentation/widgets/whatsapp/evolution_qr_dialog.dart';
+import 'package:serenutos/domain/notifications/template_resolver.dart';
 
 
 // ─── WhatsApp Feature Flag ────────────────────────────────────────────────────
@@ -263,8 +264,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
-        'whatsapp_template':
-            '🧾 *Alışveriş Fişi*\n\nSayın *{customer}*,\nAlışverişiniz başarıyla tamamlanmıştır.\n\n▫️ *Fiş No:* #{id}\n▫️ *Tarih:* {date}\n\n🛍️ *Satın Alınan Ürünler:*\n{items}\n\n▫️ *Ödenen:* *{paid}*\n▫️ *Toplam Tutar:* *{amount}*\n\nBizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventSaleCreated],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -276,8 +276,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
-        'whatsapp_template':
-            '📋 *Cari Hesap Bilgilendirmesi*\n\nSayın *{customer}*,\n#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.\n\n▫️ *İşlem Tutarı:* {amount}\n▫️ *Eklenen Borç:* *{debt}*\n▫️ *Güncel Toplam Bakiyeniz:* *{balance}*\n\nDetaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventDebtCreated],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -290,7 +289,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {amount} tutarındaki ödemeniz alındı. Kalan bakiyeniz {debt}. {business}',
         'whatsapp_template':
-            '✅ *Tahsilat Makbuzu*\n\nSayın *{customer}*,\nYapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.\n\n▫️ *Makbuz No:* #{id}\n▫️ *Tahsil Edilen:* *{amount}*\n▫️ *Kalan Bakiyeniz:* *{debt}*\n📅 *Tarih:* {date}\n\nÖdemeniz için teşekkür ederiz.\n*{business}*',
+            kDefaultWhatsAppTemplates[kSmsEventCollectionRecorded],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -302,8 +301,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
-        'whatsapp_template':
-            '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.\n\n📦 *Sipariş İçeriği:*\n{items}\n\n▫️ *Sipariş Tutarı:* *{amount}*\n📅 *Tarih:* {date}\n\nSiparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.\nBizi tercih ettiğiniz için teşekkür ederiz!\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventOrderCreated],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -315,8 +313,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
-        'whatsapp_template':
-            '👨‍🍳 *Siparişiniz Hazırlanıyor*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.\n\nEn kısa sürede tamamlanıp hazır hale getirilecektir.\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventOrderPreparing],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -328,8 +325,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
-        'whatsapp_template':
-            '🎉 *Siparişiniz Hazır!*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz hazır durumdadır.\n\n▫️ *Sipariş No:* #{id}\n▫️ *Toplam Tutar:* *{amount}*\n\nİşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventOrderReady],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -341,8 +337,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
-        'whatsapp_template':
-            '✨ *Sipariş Teslim Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz. Tekrar görüşmek dileğiyle!\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventOrderDelivered],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -354,8 +349,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
-        'whatsapp_template':
-            '❌ *Sipariş İptal Bildirimi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz iptal edilmiştir.\n\nHerhangi bir sorunuz veya ayrıntılı bilgi için bizimle iletişime geçebilirsiniz.\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventOrderCancelled],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -367,8 +361,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
         'sms_template':
             'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
-        'whatsapp_template':
-            '🔔 *Bakiye Hatırlatması*\n\nSayın *{customer}*,\nİşletmemizdeki cari hesabınızın güncel durum özeti aşağıdadır:\n\n▫️ *Güncel Vadeli Bakiye:* *{balance}*\n📅 *Tarih:* {date}\n\nÖdeme ve mutabakat işlemleriniz için işletmemizle iletişime geçebilirsiniz.\nSağlıklı ve bereketli günler dileriz.\n*{business}*',
+        'whatsapp_template': kDefaultWhatsAppTemplates['balance_reminder'],
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -396,13 +389,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           item['enabled'] = item['sms_enabled'] == true;
           item['sms_template'] ??= item['template'];
           final currentWa = item['whatsapp_template']?.toString().trim();
+          final smsTpl =
+              (item['sms_template'] ?? item['template'])?.toString().trim();
           final def = defaultTemplates.firstWhere(
             (t) => t['id'] == item['id'],
             orElse: () => <String, dynamic>{},
           );
           if (currentWa == null ||
               currentWa.isEmpty ||
-              currentWa == item['template']?.toString().trim() ||
+              currentWa == smsTpl ||
+              currentWa.startsWith('Merhaba ') ||
+              currentWa.startsWith('Merhaba {customer}') ||
               currentWa.startsWith('🧾 *Satış Bilgilendirmesi*') ||
               currentWa.startsWith(
                   '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz onaylanmış')) {

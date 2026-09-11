@@ -37,6 +37,158 @@ const _legacyAliases = <String, String>{
   kSmsEventOrderCreated: _kLegacyOrder,
 };
 
+/// Canonical, rich default templates for WhatsApp (zero Meta dependency, formatted for Evolution API)
+const kDefaultWhatsAppTemplates = <String, String>{
+  kSmsEventOrderCreated: '''🛎️ *Siparişiniz Alındı*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.
+
+📦 *Sipariş İçeriği:*
+{items}
+
+▫️ *Sipariş Tutarı:* *{amount}*
+📅 *Tarih:* {date}
+
+Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
+Bizi tercih ettiğiniz için teşekkür ederiz!
+*{business}*''',
+  _kLegacyOrder: '''🛎️ *Siparişiniz Alındı*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.
+
+📦 *Sipariş İçeriği:*
+{items}
+
+▫️ *Sipariş Tutarı:* *{amount}*
+📅 *Tarih:* {date}
+
+Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
+Bizi tercih ettiğiniz için teşekkür ederiz!
+*{business}*''',
+  kSmsEventOrderPreparing: '''👨‍🍳 *Siparişiniz Hazırlanıyor*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.
+
+En kısa sürede tamamlanıp hazır hale getirilecektir.
+*{business}*''',
+  kSmsEventOrderReady: '''🎉 *Siparişiniz Hazır!*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz hazır durumdadır.
+
+▫️ *Sipariş No:* #{id}
+▫️ *Toplam Tutar:* *{amount}*
+
+İşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!
+*{business}*''',
+  kSmsEventOrderDelivered: '''✨ *Sipariş Teslim Edildi*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz teslim edilmiştir.
+
+Bizi tercih ettiğiniz için teşekkür ederiz. Tekrar görüşmek dileğiyle!
+*{business}*''',
+  kSmsEventOrderCancelled: '''❌ *Sipariş İptal Bildirimi*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz iptal edilmiştir.
+
+Herhangi bir sorunuz veya ayrıntılı bilgi için bizimle iletişime geçebilirsiniz.
+*{business}*''',
+  kSmsEventSaleCreated: '''🧾 *Alışveriş Fişi*
+
+Sayın *{customer}*,
+Alışverişiniz başarıyla tamamlanmıştır.
+
+▫️ *Fiş No:* #{id}
+▫️ *Tarih:* {date}
+
+🛍️ *Satın Alınan Ürünler:*
+{items}
+
+▫️ *Ödenen:* *{paid}*
+▫️ *Toplam Tutar:* *{amount}*
+
+Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
+*{business}*''',
+  _kLegacySale: '''🧾 *Alışveriş Fişi*
+
+Sayın *{customer}*,
+Alışverişiniz başarıyla tamamlanmıştır.
+
+▫️ *Fiş No:* #{id}
+▫️ *Tarih:* {date}
+
+🛍️ *Satın Alınan Ürünler:*
+{items}
+
+▫️ *Ödenen:* *{paid}*
+▫️ *Toplam Tutar:* *{amount}*
+
+Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
+*{business}*''',
+  kSmsEventDebtCreated: '''📋 *Cari Hesap Bilgilendirmesi*
+
+Sayın *{customer}*,
+#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.
+
+▫️ *İşlem Tutarı:* {amount}
+▫️ *Eklenen Borç:* *{debt}*
+▫️ *Güncel Toplam Bakiyeniz:* *{balance}*
+
+Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
+*{business}*''',
+  _kLegacyDebt: '''📋 *Cari Hesap Bilgilendirmesi*
+
+Sayın *{customer}*,
+#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.
+
+▫️ *İşlem Tutarı:* {amount}
+▫️ *Eklenen Borç:* *{debt}*
+▫️ *Güncel Toplam Bakiyeniz:* *{balance}*
+
+Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
+*{business}*''',
+  kSmsEventCollectionRecorded: '''✅ *Tahsilat Makbuzu*
+
+Sayın *{customer}*,
+Yapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.
+
+▫️ *Makbuz No:* #{id}
+▫️ *Tahsil Edilen:* *{amount}*
+▫️ *Kalan Bakiyeniz:* *{debt}*
+📅 *Tarih:* {date}
+
+Ödemeniz için teşekkür ederiz.
+*{business}*''',
+  _kLegacyCollection: '''✅ *Tahsilat Makbuzu*
+
+Sayın *{customer}*,
+Yapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.
+
+▫️ *Makbuz No:* #{id}
+▫️ *Tahsil Edilen:* *{amount}*
+▫️ *Kalan Bakiyeniz:* *{debt}*
+📅 *Tarih:* {date}
+
+Ödemeniz için teşekkür ederiz.
+*{business}*''',
+  'balance_reminder': '''🔔 *Bakiye Hatırlatması*
+
+Sayın *{customer}*,
+İşletmemizdeki cari hesabınızın güncel durum özeti aşağıdadır:
+
+▫️ *Güncel Vadeli Bakiye:* *{balance}*
+📅 *Tarih:* {date}
+
+Ödeme ve mutabakat işlemleriniz için işletmemizle iletişime geçebilirsiniz.
+Sağlıklı ve bereketli günler dileriz.
+*{business}*''',
+};
+
 // ── Template Variables Reference ──────────────────────────────────────────────
 // {customer}  → müşteri adı
 // {amount}    → toplam tutar
@@ -99,12 +251,18 @@ class TemplateResolver {
     required Map<String, String> vars,
   }) {
     final templateStr = settings.smsTemplate;
-    if (templateStr == null || templateStr.trim().isEmpty) return null;
-    final templateText = _findTemplate(
-      eventType,
-      templateStr,
-      channel: NotificationTemplateChannel.whatsapp,
-    );
+    String? templateText;
+    if (templateStr != null && templateStr.trim().isNotEmpty) {
+      templateText = _findTemplate(
+        eventType,
+        templateStr,
+        channel: NotificationTemplateChannel.whatsapp,
+      );
+    } else {
+      templateText = kDefaultWhatsAppTemplates[eventType] ??
+          kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
+    }
+
     return templateText == null
         ? null
         : _fillTokens(templateText, vars, isWhatsApp: true);
@@ -131,26 +289,52 @@ class TemplateResolver {
       for (final item in decoded) {
         if (item is! Map) continue;
         final id = item['id']?.toString();
-        final enabled = switch (channel) {
-          NotificationTemplateChannel.sms =>
-            item['sms_enabled'] ?? item['enabled'],
-          NotificationTemplateChannel.whatsapp => item['whatsapp_enabled'],
-        };
-        final template = switch (channel) {
-          NotificationTemplateChannel.sms =>
-            item['sms_template']?.toString() ?? item['template']?.toString(),
-          NotificationTemplateChannel.whatsapp =>
-            item['whatsapp_template']?.toString() ??
-                item['template']?.toString(),
-        };
+        if (id == null || !candidateIds.contains(id)) continue;
 
-        if (id == null || template == null || template.trim().isEmpty) continue;
-        if (enabled != true) continue;
-        if (candidateIds.contains(id)) return template;
+        if (channel == NotificationTemplateChannel.whatsapp) {
+          // Explicitly disabled by user
+          if (item['whatsapp_enabled'] == false) return null;
+
+          final customWa = item['whatsapp_template']?.toString().trim();
+          final smsTpl =
+              (item['sms_template'] ?? item['template'])?.toString().trim();
+
+          // Reject empty, copy of SMS, or legacy Turkish SMS prefix ("Merhaba ...")
+          final isSmsCopy = customWa == null ||
+              customWa.isEmpty ||
+              customWa == smsTpl ||
+              customWa.startsWith('Merhaba ') ||
+              customWa.startsWith('Merhaba {customer}');
+
+          if (!isSmsCopy) {
+            return customWa;
+          }
+
+          // Fallback to rich WhatsApp template (NEVER fall back to SMS text)
+          return kDefaultWhatsAppTemplates[id] ??
+              kDefaultWhatsAppTemplates[eventType] ??
+              kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
+        } else {
+          // SMS channel
+          final enabled = item['sms_enabled'] ?? item['enabled'];
+          if (enabled != true) return null;
+          final template =
+              item['sms_template']?.toString() ?? item['template']?.toString();
+          if (template != null && template.trim().isNotEmpty) {
+            return template;
+          }
+        }
       }
     } catch (_) {
       // Malformed JSON — silent
     }
+
+    // If channel is WhatsApp and not explicitly disabled, provide default
+    if (channel == NotificationTemplateChannel.whatsapp) {
+      return kDefaultWhatsAppTemplates[eventType] ??
+          kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
+    }
+
     return null;
   }
 
