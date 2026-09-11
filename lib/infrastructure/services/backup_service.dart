@@ -82,6 +82,9 @@ class BackupService implements IBackupService {
         await prefs.setString('max_timestamp_seen', now.toIso8601String());
       }
 
+      // Release write lock as snapshot file is safely created; audit logging can now write safely.
+      DatabaseManager.isWriteLocked = false;
+
       try {
         final auditRepo = SqliteAuditRepository(DatabaseManager());
         await auditRepo.logEvent(AuditEvent(

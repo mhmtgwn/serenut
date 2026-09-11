@@ -92,7 +92,7 @@ void main() {
         }),
       );
       client.setJwtToken('expired-token');
-      client.onSessionExpired = () => expirationCallbacks += 1;
+      client.onSessionExpired = (_) => expirationCallbacks += 1;
 
       await expectLater(client.get('/api/v4/sync/hardware-jobs/claim'),
           throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));

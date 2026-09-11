@@ -1,24 +1,9 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'database_executor.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 Future<void> _checkLock() async {
-  int attempts = 0;
-  final bool isTest =
-      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-  final int maxAttempts = isTest
-      ? 2
-      : 40; // Fail fast in tests (100ms), wait 2 seconds in production
-  while (DatabaseManager.isWriteLocked) {
-    attempts++;
-    if (attempts >= maxAttempts) {
-      throw DatabaseLockedException(
-          'Database is temporarily locked for backup');
-    }
-    await Future.delayed(const Duration(milliseconds: 50));
-  }
+  await DatabaseManager.waitForWriteLock();
 }
 
 /// Implementation of DbExecutor wrapping sqflite's Database

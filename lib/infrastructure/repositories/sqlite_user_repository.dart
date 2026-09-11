@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -106,22 +107,26 @@ class SqliteUserRepository implements IUserRepository {
     String? businessCode,
     int? deviceTokenVersion,
   }) async {
-    await _executor.insert('users', {
-      'id': user.id,
-      'name': user.name,
-      'email': user.email,
-      'password_hash': passwordHash,
-      'role': user.role.name,
-      'is_active': 1,
-      'created_at': user.createdAt.toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-      if (username != null) 'username': username,
-      if (pinHash != null) 'pin_hash': pinHash,
-      if (businessCode != null) 'business_code': businessCode,
-      if (deviceTokenVersion != null)
-        'device_token_version': deviceTokenVersion,
-      'permissions': jsonEncode(user.permissions),
-    });
+    await _executor.insert(
+      'users',
+      {
+        'id': user.id,
+        'name': user.name,
+        'email': user.email,
+        'password_hash': passwordHash,
+        'role': user.role.name,
+        'is_active': 1,
+        'created_at': user.createdAt.toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        if (username != null) 'username': username,
+        if (pinHash != null) 'pin_hash': pinHash,
+        if (businessCode != null) 'business_code': businessCode,
+        if (deviceTokenVersion != null)
+          'device_token_version': deviceTokenVersion,
+        'permissions': jsonEncode(user.permissions),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   @override
@@ -159,8 +164,12 @@ class SqliteUserRepository implements IUserRepository {
     if (deviceTokenVersion != null) {
       values['device_token_version'] = deviceTokenVersion;
     }
-    await _executor
-        .update('users', values, where: 'id = ?', whereArgs: [user.id]);
+    await _executor.update(
+      'users',
+      values,
+      where: user.email.isNotEmpty ? 'id = ? OR email = ?' : 'id = ?',
+      whereArgs: user.email.isNotEmpty ? [user.id, user.email] : [user.id],
+    );
   }
 
   @override

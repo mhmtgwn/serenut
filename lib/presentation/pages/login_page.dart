@@ -25,6 +25,9 @@ class LoginPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
+    final authService = ref.watch(authServiceProvider);
+    final lastLogoutReason = authService.getLastLogoutReason();
+    final lastLogoutCode = authService.getLastLogoutCode();
 
     return Scaffold(
       backgroundColor: POSColors.surface, // Açık gri-mavi zemin (0xFFF8FAFC)
@@ -86,7 +89,53 @@ class LoginPage extends ConsumerWidget {
                   ),
                 ),
 
-                const SizedBox(height: 48),
+                if (lastLogoutReason != null &&
+                    lastLogoutReason.isNotEmpty &&
+                    lastLogoutCode != 'MANUAL_LOGOUT') ...[
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            color: Color(0xFFEA580C), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Önceki Oturum Kapanma Nedeni',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF9A3412),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                lastLogoutReason,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFFC2410C),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 36),
 
                 // ── Hesap Oluştur (Birincil) ──
                 _PrimaryButton(
@@ -193,6 +242,45 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
   bool _obscure = true;
   String? _errorMessage;
 
+  bool _rememberMe = true;
+  String? _lastLogoutReason;
+  DateTime? _lastLogoutTime;
+  String? _lastLogoutCode;
+  String? _lastLogoutDetails;
+  bool _showLogoutNotice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadSavedCredentialsAndLogoutInfo();
+    });
+  }
+
+  void _loadSavedCredentialsAndLogoutInfo() {
+    final authService = ref.read(authServiceProvider);
+    _rememberMe = authService.isRememberMeEnabled();
+    final savedUser = authService.getRememberedUsername();
+    final savedPass = authService.getRememberedPassword();
+    if (savedUser != null && savedUser.isNotEmpty) {
+      _usernameCtrl.text = savedUser;
+    }
+    if (savedPass != null && savedPass.isNotEmpty) {
+      _passwordCtrl.text = savedPass;
+    }
+
+    _lastLogoutReason = authService.getLastLogoutReason();
+    _lastLogoutTime = authService.getLastLogoutTime();
+    _lastLogoutCode = authService.getLastLogoutCode();
+    _lastLogoutDetails = authService.getLastLogoutDetails();
+    if (_lastLogoutReason != null &&
+        _lastLogoutReason!.isNotEmpty &&
+        _lastLogoutCode != 'MANUAL_LOGOUT') {
+      _showLogoutNotice = true;
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _usernameCtrl.dispose();
@@ -213,7 +301,167 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
       _isLoading = true;
       _errorMessage = null;
     });
-    ref.read(authNotifierProvider.notifier).login(username, password);
+    ref.read(authNotifierProvider.notifier).login(
+          username,
+          password,
+          rememberMe: _rememberMe,
+        );
+  }
+
+  void _showLogoutDetailsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.history_rounded, color: POSColors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Oturum Kapanma Detayları',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _detailRow('Neden', _lastLogoutReason ?? '-'),
+              const SizedBox(height: 10),
+              _detailRow('Hata / Durum Kodu', _lastLogoutCode ?? 'UNKNOWN'),
+              if (_lastLogoutTime != null) ...[
+                const SizedBox(height: 10),
+                _detailRow(
+                  'Zaman',
+                  _lastLogoutTime!.toLocal().toString().split('.').first,
+                ),
+              ],
+              if (_lastLogoutDetails != null &&
+                  _lastLogoutDetails!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _detailRow('Açıklama / Parametreler', _lastLogoutDetails!),
+              ],
+              const SizedBox(height: 18),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text(
+                'Geçmiş Çıkış Kayıtları (Son Oturumlar):',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: POSColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...ref.read(authServiceProvider).getLogoutHistory().take(5).map(
+                    (h) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: POSColors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: POSColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                h['code']?.toString() ?? 'LOGOUT',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: POSColors.text,
+                                ),
+                              ),
+                              Text(
+                                h['time'] != null
+                                    ? DateTime.tryParse(h['time'])
+                                            ?.toLocal()
+                                            .toString()
+                                            .split('.')
+                                            .first ??
+                                        ''
+                                    : '',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: POSColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            h['reason']?.toString() ?? '',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: POSColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Kapat',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: POSColors.green,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: POSColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        SelectableText(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: POSColors.text,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatLogoutTime(DateTime dt) {
+    final local = dt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$hour:$min ($day.$month.${local.year})';
   }
 
   @override
@@ -271,7 +519,105 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+
+                // ── Son Çıkış Nedeni Bilgilendirme Kartı ──
+                if (_showLogoutNotice && _lastLogoutReason != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline_rounded,
+                                color: Color(0xFFEA580C), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Önceki Oturum Kapanma Nedeni',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF9A3412),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _lastLogoutReason!,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFFC2410C),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  if (_lastLogoutTime != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Zaman: ${_formatLogoutTime(_lastLogoutTime!)}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        color: const Color(0xFF9A3412)
+                                            .withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded,
+                                  size: 18, color: Color(0xFF9A3412)),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              tooltip: 'Kapat',
+                              onPressed: () {
+                                ref
+                                    .read(authServiceProvider)
+                                    .clearLastLogoutReason();
+                                setState(() => _showLogoutNotice = false);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => _showLogoutDetailsDialog(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.analytics_outlined,
+                                size: 14, color: Color(0xFFEA580C)),
+                            label: Text(
+                              'Ayrıntılar & Geçmiş',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFEA580C),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // ── Hata mesajı ──
                 if (_errorMessage != null) ...[
@@ -341,7 +687,67 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                   onSubmitted: (_) => _handleLogin(),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 12),
+
+                // ── Beni Hatırla & Şifremi Unuttum ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _rememberMe = !_rememberMe),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 4, horizontal: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                activeColor: POSColors.green,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                onChanged: (v) =>
+                                    setState(() => _rememberMe = v ?? true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Beni Hatırla',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: POSColors.text,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/forgot-password'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Şifremi unuttum?',
+                        style: GoogleFonts.inter(
+                          color: POSColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
 
                 // ── Giriş Butonu ──
                 SizedBox(
@@ -373,29 +779,6 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // ── Şifremi unuttum linki ──
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => context.push('/forgot-password'),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Şifremi unuttum?',
-                      style: GoogleFonts.inter(
-                        color: POSColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ),
                 ),
 

@@ -27,6 +27,15 @@ class AuthException implements Exception {
 
 class AuthService {
   static const String _userStorageKey = 'auth_user_json';
+  static const String _lastLogoutReasonKey = 'auth_last_logout_reason';
+  static const String _lastLogoutCodeKey = 'auth_last_logout_code';
+  static const String _lastLogoutTimeKey = 'auth_last_logout_time';
+  static const String _lastLogoutDetailsKey = 'auth_last_logout_details';
+  static const String _logoutHistoryKey = 'auth_logout_history';
+
+  static const String _rememberMeKey = 'auth_remember_me';
+  static const String _rememberedUsernameKey = 'auth_remembered_username';
+  static const String _rememberedPasswordKey = 'auth_remembered_password';
 
   final IUserRepository _userRepository;
   final IHashService _hashService;
@@ -38,6 +47,7 @@ class AuthService {
       _cacheCompanyProfile;
   late SharedPreferences _prefs;
   AuthUser? _currentUser;
+  Future<bool>? _activeRefreshFuture;
 
   AuthService({
     required IUserRepository userRepository,
@@ -58,6 +68,13 @@ class AuthService {
   /// Initialize service (call once on app startup)
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    _lastLogoutReason = _prefs.getString(_lastLogoutReasonKey);
+    _lastLogoutCode = _prefs.getString(_lastLogoutCodeKey);
+    _lastLogoutDetails = _prefs.getString(_lastLogoutDetailsKey);
+    final lastTimeStr = _prefs.getString(_lastLogoutTimeKey);
+    _lastLogoutTime =
+        lastTimeStr != null ? DateTime.tryParse(lastTimeStr) : null;
+
     await _loadStoredUser();
 
     // Restore JWT token to ApiClient if exists
@@ -68,8 +85,11 @@ class AuthService {
       _apiClient!.onTokenExpired = () async {
         return await refreshToken();
       };
-      _apiClient!.onSessionExpired = () {
-        triggerSessionExpired();
+      _apiClient!.onSessionExpired = (reason) {
+        triggerSessionExpired(
+          reason,
+          code: 'API_SESSION_EXPIRED',
+        );
       };
     }
   }
@@ -93,6 +113,12 @@ class AuthService {
             // offline lease expires, access must be re-established online.
             debugPrint(
                 '[AuthService] ⚠️ Offline auth lease expired for user ${user.id}');
+            await recordLogoutReason(
+              '7 günlük çevrimdışı kullanım süresi doldu. Güvenlik gereği yeniden giriş yapılması gerekmektedir.',
+              code: 'OFFLINE_LEASE_EXPIRED',
+              details:
+                  'Son çevrimiçi doğrulama: ${lastVerified.toLocal()}, İzin verilen süre: $leaseDays gün',
+            );
             await _clearStoredSession();
             return;
           }
@@ -433,8 +459,20 @@ class AuthService {
     return _prefs.getString('auth_refresh_token');
   }
 
-  /// Refresh the access token using the saved refresh token
+  /// Refresh the access token using the saved refresh token (Mutex guarded against RTR replay races)
   Future<bool> refreshToken() async {
+    if (_activeRefreshFuture != null) {
+      return _activeRefreshFuture!;
+    }
+    _activeRefreshFuture = _performRefreshToken();
+    try {
+      return await _activeRefreshFuture!;
+    } finally {
+      _activeRefreshFuture = null;
+    }
+  }
+
+  Future<bool> _performRefreshToken() async {
     final rToken = getRefreshToken();
     if (rToken == null || _apiClient == null) return false;
 
@@ -458,15 +496,24 @@ class AuthService {
       if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
         return false;
       }
-      rethrow;
-    } catch (_) {
-      rethrow;
+      return false;
+    } catch (e, st) {
+      // Network timeout / SocketException — do not treat as permanent authentication revocation!
+      TelemetryService().logError(e, st,
+          context: 'AuthService.refreshToken (offline/network)',
+          level: LogLevel.warning);
+      return false;
     }
     return false;
   }
 
-  /// Logout — clears session
-  Future<void> logout() async {
+  /// Logout — clears session and records reason
+  Future<void> logout({
+    String reason = 'Kullanıcı isteğiyle çıkış yapıldı.',
+    String code = 'MANUAL_LOGOUT',
+    String? details,
+  }) async {
+    await recordLogoutReason(reason, code: code, details: details);
     final refreshToken = _prefs.getString('auth_refresh_token');
     final api = _apiClient;
     // Revoke local authority synchronously before any network wait. Session
@@ -485,13 +532,18 @@ class AuthService {
     await _clearStoredSession();
   }
 
-  void Function()? onSessionExpiredCallback;
+  void Function(String reason)? onSessionExpiredCallback;
   void Function(AuthUser user)? onUserUpdatedCallback;
 
-  void triggerSessionExpired() {
-    logout();
+  Future<void> triggerSessionExpired(
+    String reason, {
+    String code = 'SESSION_EXPIRED',
+    String? details,
+  }) async {
+    await recordLogoutReason(reason, code: code, details: details);
+    await logout(reason: reason, code: code, details: details);
     if (onSessionExpiredCallback != null) {
-      onSessionExpiredCallback!();
+      onSessionExpiredCallback!(reason);
     }
   }
 
@@ -511,7 +563,10 @@ class AuthService {
 
         final isActive = userMap['is_active'] as bool? ?? true;
         if (!isActive) {
-          triggerSessionExpired();
+          await triggerSessionExpired(
+            'Kullanıcı hesabı yönetici tarafından devre dışı bırakıldı.',
+            code: 'USER_DEACTIVATED',
+          );
           return;
         }
 
@@ -540,11 +595,144 @@ class AuthService {
           }
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
-        triggerSessionExpired();
+        await triggerSessionExpired(
+          'Sunucu oturumu yetkilendirilemedi (HTTP ${response.statusCode}). Lütfen tekrar giriş yapın.',
+          code: 'SERVER_REJECTED_${response.statusCode}',
+        );
       }
     } catch (_) {
       // Offline fallback: keep cached credentials
     }
+  }
+
+  // ── LOGOUT REASON & HISTORY TRACKING ──────────────────────────────────────
+
+  String? _lastLogoutReason;
+  String? _lastLogoutCode;
+  String? _lastLogoutDetails;
+  DateTime? _lastLogoutTime;
+
+  String? getLastLogoutReason() =>
+      _lastLogoutReason ?? _prefs.getString(_lastLogoutReasonKey);
+  String? getLastLogoutCode() =>
+      _lastLogoutCode ?? _prefs.getString(_lastLogoutCodeKey);
+  String? getLastLogoutDetails() =>
+      _lastLogoutDetails ?? _prefs.getString(_lastLogoutDetailsKey);
+  DateTime? getLastLogoutTime() {
+    if (_lastLogoutTime != null) return _lastLogoutTime;
+    final str = _prefs.getString(_lastLogoutTimeKey);
+    return str != null ? DateTime.tryParse(str) : null;
+  }
+
+  Future<void> clearLastLogoutReason() async {
+    _lastLogoutReason = null;
+    _lastLogoutCode = null;
+    _lastLogoutDetails = null;
+    _lastLogoutTime = null;
+    await _prefs.remove(_lastLogoutReasonKey);
+    await _prefs.remove(_lastLogoutCodeKey);
+    await _prefs.remove(_lastLogoutTimeKey);
+    await _prefs.remove(_lastLogoutDetailsKey);
+  }
+
+  List<Map<String, dynamic>> getLogoutHistory() {
+    final raw = _prefs.getString(_logoutHistoryKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> recordLogoutReason(
+    String reason, {
+    String? code,
+    String? details,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final iso = now.toIso8601String();
+    _lastLogoutReason = reason;
+    _lastLogoutCode = code ?? 'UNKNOWN';
+    _lastLogoutDetails = details;
+    _lastLogoutTime = now;
+
+    await _prefs.setString(_lastLogoutReasonKey, reason);
+    await _prefs.setString(_lastLogoutCodeKey, _lastLogoutCode!);
+    await _prefs.setString(_lastLogoutTimeKey, iso);
+    if (details != null) {
+      await _prefs.setString(_lastLogoutDetailsKey, details);
+    } else {
+      await _prefs.remove(_lastLogoutDetailsKey);
+    }
+
+    // Append to logout history (keep last 10 entries)
+    try {
+      final history = getLogoutHistory();
+      history.insert(0, {
+        'reason': reason,
+        'code': code ?? 'UNKNOWN',
+        'time': iso,
+        'details': details,
+        'userId': _currentUser?.id,
+        'userName': _currentUser?.name,
+      });
+      if (history.length > 10) history.removeRange(10, history.length);
+      await _prefs.setString(_logoutHistoryKey, jsonEncode(history));
+    } catch (_) {}
+
+    // Log to telemetry
+    try {
+      await TelemetryService().logStructured(
+        event: 'auth_logout_recorded',
+        level: code == 'MANUAL_LOGOUT' ? LogLevel.info : LogLevel.warning,
+        metadata: {
+          'reason': reason,
+          'code': code ?? 'UNKNOWN',
+          'details': details,
+          'user_id': _currentUser?.id,
+        },
+      );
+    } catch (_) {}
+  }
+
+  // ── REMEMBER ME CREDENTIALS ───────────────────────────────────────────────
+
+  bool isRememberMeEnabled() => _prefs.getBool(_rememberMeKey) ?? true;
+
+  String? getRememberedUsername() => _prefs.getString(_rememberedUsernameKey);
+
+  String? getRememberedPassword() {
+    final encoded = _prefs.getString(_rememberedPasswordKey);
+    if (encoded == null || encoded.isEmpty) return null;
+    try {
+      return utf8.decode(base64Decode(encoded));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveRememberedCredentials({
+    required String username,
+    required String password,
+    required bool rememberMe,
+  }) async {
+    await _prefs.setBool(_rememberMeKey, rememberMe);
+    if (rememberMe) {
+      await _prefs.setString(_rememberedUsernameKey, username.trim());
+      final encodedPassword = base64Encode(utf8.encode(password));
+      await _prefs.setString(_rememberedPasswordKey, encodedPassword);
+    } else {
+      await _prefs.remove(_rememberedUsernameKey);
+      await _prefs.remove(_rememberedPasswordKey);
+    }
+  }
+
+  Future<void> clearRememberedCredentials() async {
+    await _prefs.setBool(_rememberMeKey, false);
+    await _prefs.remove(_rememberedUsernameKey);
+    await _prefs.remove(_rememberedPasswordKey);
   }
 
   /// Offline login başarısında çağrılır.

@@ -3,7 +3,8 @@
 // SQLite database initialization and management
 // Updated: SQLCipher removed — using standard sqflite
 
-import 'dart:io' show Platform, File, Directory;
+import 'dart:io' show Platform, File, Directory, FileMode;
+import 'dart:typed_data' show ByteData, Endian;
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -51,6 +52,59 @@ class DatabaseManager {
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
 
+  /// Waits until [isWriteLocked] is cleared.
+  /// Throws [DatabaseLockedException] if timeout is exceeded.
+  static Future<void> waitForWriteLock({int timeoutSeconds = 30}) async {
+    final bool isTest =
+        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    final int maxAttempts = isTest ? 2 : (timeoutSeconds * 20); // 50ms intervals
+    int attempts = 0;
+    while (isWriteLocked) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw DatabaseLockedException('Database is temporarily locked for backup');
+      }
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+  }
+
+  /// Determines if an error is an SQLite locked/busy error.
+  static bool isDatabaseLocked(dynamic error) {
+    if (error == null) return false;
+    if (error is DatabaseLockedException) return true;
+    final str = error.toString().toLowerCase();
+    return str.contains('database is locked') ||
+        str.contains('sqlite_error: 5') ||
+        str.contains('sqlite_error: 261') ||
+        str.contains('code 5') ||
+        str.contains('code 261') ||
+        str.contains('sqlite_busy');
+  }
+
+  /// Retries an asynchronous database operation if a database lock or busy error is encountered.
+  static Future<T> retryOnLock<T>(
+    Future<T> Function() operation, {
+    int maxRetries = 5,
+    Duration initialDelay = const Duration(milliseconds: 100),
+  }) async {
+    int attempt = 0;
+    var delay = initialDelay;
+    while (true) {
+      try {
+        return await operation();
+      } catch (e) {
+        attempt++;
+        if (attempt > maxRetries || !isDatabaseLocked(e)) {
+          rethrow;
+        }
+        await Future.delayed(delay);
+        delay = Duration(
+          milliseconds: (delay.inMilliseconds * 1.5).round().clamp(100, 2000),
+        );
+      }
+    }
+  }
+
   Database? _database;
   Future<Database>? _databaseFuture;
 
@@ -67,6 +121,9 @@ class DatabaseManager {
     }
     _databaseFuture ??= _initializeDatabase();
     _database = await _databaseFuture;
+    try {
+      await _database!.execute('PRAGMA busy_timeout = 30000');
+    } catch (_) {}
     await _verifyDatabaseSchemaInvariants(_database!);
     await DatabaseTriggers.verifyAndRepairTriggers(_database!);
     await _reconcileAllCustomerBalances(_database!);
@@ -211,6 +268,27 @@ class DatabaseManager {
     }
   }
 
+  /// Reads the 4-byte user version at offset 60 of an SQLite file without opening an active DB connection.
+  Future<int> _readDatabaseUserVersion(String path) async {
+    final file = File(path);
+    if (!await file.exists()) return 0;
+    try {
+      final raf = await file.open(mode: FileMode.read);
+      try {
+        if (await raf.length() >= 64) {
+          await raf.setPosition(60);
+          final bytes = await raf.read(4);
+          if (bytes.length == 4) {
+            return ByteData.sublistView(bytes).getUint32(0, Endian.big);
+          }
+        }
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {}
+    return 0;
+  }
+
   /// Initialize database and create schema
   Future<Database> _initializeDatabase() async {
     final String path = overrideDatabasePath ??
@@ -320,10 +398,7 @@ class DatabaseManager {
       if (await dbFile.exists() && await _isDatabaseFile(path)) {
         int currentVersion = 0;
         try {
-          final tempDb =
-              await openDatabase(path, readOnly: true, singleInstance: false);
-          currentVersion = await tempDb.getVersion();
-          await tempDb.close();
+          currentVersion = await _readDatabaseUserVersion(path);
         } catch (e, st) {
           debugPrint(
               '[DatabaseManager] ⚠️ Pre-upgrade version check failed: $e');
@@ -353,6 +428,7 @@ class DatabaseManager {
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
         onConfigure: (db) async {
+          await db.execute('PRAGMA busy_timeout = 30000');
           await db.execute('PRAGMA foreign_keys = ON');
           try {
             await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -483,6 +559,7 @@ class DatabaseManager {
             onCreate: _onCreate,
             onUpgrade: _onUpgrade,
             onConfigure: (db) async {
+              await db.execute('PRAGMA busy_timeout = 30000');
               await db.execute('PRAGMA foreign_keys = ON');
               try {
                 await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -536,7 +613,10 @@ class DatabaseManager {
     return openDatabase(
       path,
       version: version,
-      onConfigure: onConfigure,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA busy_timeout = 30000');
+        if (onConfigure != null) await onConfigure(db);
+      },
       onCreate: onCreate,
       onUpgrade: onUpgrade,
       readOnly: readOnly,

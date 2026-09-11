@@ -118,14 +118,17 @@ class SyncV4Service {
     if (revision <= 0) throw StateError('invalid_catalog_reset_revision');
 
     if (!kIsWeb) {
+      await DatabaseManager.waitForWriteLock();
       final db = await DatabaseManager().getDatabase();
-      await db.transaction((txn) async {
-        await DataResetService.clearProductCatalog(txn);
-        await txn.insert(
-          'sync_cursor_v4',
-          {'key': 'global', 'cursor': revision},
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+      await DatabaseManager.retryOnLock(() async {
+        await db.transaction((txn) async {
+          await DataResetService.clearProductCatalog(txn);
+          await txn.insert(
+            'sync_cursor_v4',
+            {'key': 'global', 'cursor': revision},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        });
       });
       await _catalogSourceResetter();
       await _productImageCleaner();
@@ -134,6 +137,7 @@ class SyncV4Service {
   }
 
   Future<SyncV4Result> sync() async {
+    await DatabaseManager.waitForWriteLock();
     final db = await DatabaseManager().getDatabase();
     var companyChanged = false;
     try {
@@ -156,18 +160,24 @@ class SyncV4Service {
     await _snapshotPreV4DataOnce(db);
     await _recoverUnsyncedImportedProductsOnce(db);
     await _recoverRejectedFinancialTransactions(db);
-    await db.rawUpdate(
-        "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
-    var pending = await db.query('sync_outbox_v4',
-        where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
+    await DatabaseManager.retryOnLock(() async {
+      await db.rawUpdate(
+          "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
+    });
+    var pending = await DatabaseManager.retryOnLock(() async {
+      return await db.query('sync_outbox_v4',
+          where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
+    });
     var pushed = 0;
     var failed = 0;
     final errors = <String>[];
     while (pending.isNotEmpty) {
       final orderedPending = _dependencyOrder(pending);
-      await db.update('sync_outbox_v4', {'state': 'SENDING'},
-          where: 'id IN (${List.filled(orderedPending.length, '?').join(',')})',
-          whereArgs: orderedPending.map((r) => r['id']).toList());
+      await DatabaseManager.retryOnLock(() async {
+        await db.update('sync_outbox_v4', {'state': 'SENDING'},
+            where: 'id IN (${List.filled(orderedPending.length, '?').join(',')})',
+            whereArgs: orderedPending.map((r) => r['id']).toList());
+      });
       try {
         final response = await _api.send('POST', '/api/v4/sync/push',
             body: {
@@ -199,54 +209,60 @@ class SyncV4Service {
             .toList();
         final rejectedIds =
             rejected.map((r) => r['mutation_id']).whereType<String>().toList();
-        await db.transaction((txn) async {
-          if (acknowledged.isNotEmpty) {
-            await txn.delete('sync_outbox_v4',
-                where:
-                    'mutation_id IN (${List.filled(acknowledged.length, '?').join(',')})',
-                whereArgs: acknowledged);
-          }
-          if (conflicted.isNotEmpty) {
-            await txn.update('sync_outbox_v4', {'state': 'CONFLICT'},
-                where:
-                    'mutation_id IN (${List.filled(conflicted.length, '?').join(',')})',
-                whereArgs: conflicted);
-            for (final conflict in conflicts) {
-              await txn.insert(
-                  'sync_conflicts_v4',
-                  {
-                    'mutation_id': conflict['mutation_id'],
-                    'entity_type': conflict['entity_type'],
-                    'entity_id': conflict['entity_id'],
-                    'server_revision': conflict['server_revision'],
-                    'detected_at': DateTime.now().toUtc().toIso8601String(),
-                  },
-                  conflictAlgorithm: ConflictAlgorithm.replace);
+        await DatabaseManager.retryOnLock(() async {
+          await db.transaction((txn) async {
+            if (acknowledged.isNotEmpty) {
+              await txn.delete('sync_outbox_v4',
+                  where:
+                      'mutation_id IN (${List.filled(acknowledged.length, '?').join(',')})',
+                  whereArgs: acknowledged);
             }
-            failed += conflicted.length;
-            errors.add(
-                '${conflicted.length} kayıt başka bir aygıttaki daha yeni değişiklikle çakıştı.');
-          }
-          if (rejectedIds.isNotEmpty) {
-            await txn.update('sync_outbox_v4', {'state': 'REJECTED'},
-                where:
-                    'mutation_id IN (${List.filled(rejectedIds.length, '?').join(',')})',
-                whereArgs: rejectedIds);
-            failed += rejectedIds.length;
-            for (final rejection in rejected) {
+            if (conflicted.isNotEmpty) {
+              await txn.update('sync_outbox_v4', {'state': 'CONFLICT'},
+                  where:
+                      'mutation_id IN (${List.filled(conflicted.length, '?').join(',')})',
+                  whereArgs: conflicted);
+              for (final conflict in conflicts) {
+                await txn.insert(
+                    'sync_conflicts_v4',
+                    {
+                      'mutation_id': conflict['mutation_id'],
+                      'entity_type': conflict['entity_type'],
+                      'entity_id': conflict['entity_id'],
+                      'server_revision': conflict['server_revision'],
+                      'detected_at': DateTime.now().toUtc().toIso8601String(),
+                    },
+                    conflictAlgorithm: ConflictAlgorithm.replace);
+              }
+              failed += conflicted.length;
               errors.add(
-                  '${rejection['mutation_id']}: ${rejection['error'] ?? 'mutation_failed'}');
+                  '${conflicted.length} kayıt başka bir aygıttaki daha yeni değişiklikle çakıştı.');
             }
-          }
+            if (rejectedIds.isNotEmpty) {
+              await txn.update('sync_outbox_v4', {'state': 'REJECTED'},
+                  where:
+                      'mutation_id IN (${List.filled(rejectedIds.length, '?').join(',')})',
+                  whereArgs: rejectedIds);
+              failed += rejectedIds.length;
+              for (final rejection in rejected) {
+                errors.add(
+                    '${rejection['mutation_id']}: ${rejection['error'] ?? 'mutation_failed'}');
+              }
+            }
+          });
         });
         pushed += acknowledged.length;
       } catch (_) {
-        await db.rawUpdate(
-            "UPDATE sync_outbox_v4 SET state = 'PENDING', attempts = attempts + 1 WHERE state = 'SENDING'");
+        await DatabaseManager.retryOnLock(() async {
+          await db.rawUpdate(
+              "UPDATE sync_outbox_v4 SET state = 'PENDING', attempts = attempts + 1 WHERE state = 'SENDING'");
+        });
         rethrow;
       }
-      pending = await db.query('sync_outbox_v4',
-          where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
+      pending = await DatabaseManager.retryOnLock(() async {
+        return await db.query('sync_outbox_v4',
+            where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
+      });
     }
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
@@ -271,14 +287,16 @@ class SyncV4Service {
       );
       productImagesNeedCleanup = snapshot.any(_isProductImageReset);
       catalogSourceNeedsReset = snapshot.any(_isCatalogReset);
-      await db.transaction((txn) async {
-        for (final raw in snapshot) {
-          await _apply(txn, raw);
-        }
-        reconciled += await _reconcileCustomerBalances(txn);
-        cursor = _syncInt(bootstrapBody['next_cursor']);
-        await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
-            conflictAlgorithm: ConflictAlgorithm.replace);
+      await DatabaseManager.retryOnLock(() async {
+        await db.transaction((txn) async {
+          for (final raw in snapshot) {
+            await _apply(txn, raw);
+          }
+          reconciled += await _reconcileCustomerBalances(txn);
+          cursor = _syncInt(bootstrapBody['next_cursor']);
+          await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        });
       });
       // Bootstrap rows are remote changes too. Counting them ensures consumers
       // invalidate their in-memory lists immediately after first hydration.
@@ -299,15 +317,17 @@ class SyncV4Service {
       catalogSourceNeedsReset =
           catalogSourceNeedsReset || changes.any(_isCatalogReset);
       final next = _syncInt(pullBody['next_cursor'], cursor);
-      await db.transaction((txn) async {
-        for (final raw in changes.cast<Map>()) {
-          await _apply(txn, Map<String, dynamic>.from(raw));
-        }
-        if (changes.isNotEmpty) {
-          reconciled += await _reconcileCustomerBalances(txn);
-        }
-        await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
-            conflictAlgorithm: ConflictAlgorithm.replace);
+      await DatabaseManager.retryOnLock(() async {
+        await db.transaction((txn) async {
+          for (final raw in changes.cast<Map>()) {
+            await _apply(txn, Map<String, dynamic>.from(raw));
+          }
+          if (changes.isNotEmpty) {
+            reconciled += await _reconcileCustomerBalances(txn);
+          }
+          await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        });
       });
       pulled += changes.length;
       if (changes.length < 200 || next <= cursor) break;
@@ -626,34 +646,36 @@ class SyncV4Service {
   /// Retries previously rejected financial transactions and enqueues any unsynced
   /// ledger rows so order-backed or transiently failed transactions converge.
   Future<void> _recoverRejectedFinancialTransactions(Database db) async {
-    await db.rawUpdate('''
-      UPDATE sync_outbox_v4
-         SET state = 'PENDING', attempts = 0
-       WHERE state = 'REJECTED'
-         AND entity_type = 'financial_transaction'
-    ''');
-
-    await db.transaction((txn) async {
-      final unsynced = await txn.rawQuery('''
-        SELECT ft.* FROM financial_transactions ft
-        WHERE COALESCE(ft.is_synced, 0) = 0
-          AND NOT EXISTS (
-            SELECT 1 FROM sync_outbox_v4 o
-            WHERE o.entity_type = 'financial_transaction'
-              AND o.entity_id = ft.id
-          )
+    await DatabaseManager.retryOnLock(() async {
+      await db.rawUpdate('''
+        UPDATE sync_outbox_v4
+           SET state = 'PENDING', attempts = 0
+         WHERE state = 'REJECTED'
+           AND entity_type = 'financial_transaction'
       ''');
-      for (final row in unsynced) {
-        final id = row['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        await SyncOutboxV4.enqueue(
-          txn,
-          entityType: 'financial_transaction',
-          entityId: id,
-          operation: 'UPSERT',
-          payload: Map<String, dynamic>.from(row),
-        );
-      }
+
+      await db.transaction((txn) async {
+        final unsynced = await txn.rawQuery('''
+          SELECT ft.* FROM financial_transactions ft
+          WHERE COALESCE(ft.is_synced, 0) = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM sync_outbox_v4 o
+              WHERE o.entity_type = 'financial_transaction'
+                AND o.entity_id = ft.id
+            )
+        ''');
+        for (final row in unsynced) {
+          final id = row['id']?.toString();
+          if (id == null || id.isEmpty) continue;
+          await SyncOutboxV4.enqueue(
+            txn,
+            entityType: 'financial_transaction',
+            entityId: id,
+            operation: 'UPSERT',
+            payload: Map<String, dynamic>.from(row),
+          );
+        }
+      });
     });
   }
 

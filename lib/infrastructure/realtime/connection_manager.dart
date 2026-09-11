@@ -100,14 +100,14 @@ class ConnectionManager {
       }
 
       if (authService.getJwtToken() == null) {
-        _record('ws_auth_token_unavailable', level: LogLevel.error);
-        final refreshed = await authService.refreshToken();
-        if (!refreshed) authService.triggerSessionExpired();
+        _record('ws_auth_token_unavailable', level: LogLevel.info);
+        await authService.refreshToken();
       }
 
       if (authService.getJwtToken() == null) {
+        _record('ws_token_unavailable_deferring', level: LogLevel.info);
         _setStatus(RealtimeStatus.disconnected);
-        authService.triggerSessionExpired();
+        _scheduleReconnect();
         return;
       }
 
@@ -125,14 +125,9 @@ class ConnectionManager {
 
       wsManager.connect(wsUrlWithParams);
     } catch (e) {
-      _record('ws_connect_exception', level: LogLevel.error, error: e);
+      _record('ws_connect_exception', level: LogLevel.warning, error: e);
       _setStatus(RealtimeStatus.disconnected);
-      if (e is ApiException &&
-          (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
-        authService.triggerSessionExpired();
-      } else {
-        _scheduleReconnect();
-      }
+      _scheduleReconnect();
     }
   }
 
@@ -227,9 +222,9 @@ class ConnectionManager {
         }
 
         if (token == null) {
-          _record('ws_refresh_rejected', level: LogLevel.warning);
+          _record('ws_refresh_rejected_deferring', level: LogLevel.info);
           _setStatus(RealtimeStatus.disconnected);
-          authService.triggerSessionExpired();
+          _scheduleReconnect();
           return;
         }
 
@@ -240,18 +235,16 @@ class ConnectionManager {
         connect();
       } catch (e) {
         _record('ws_refresh_exception', level: LogLevel.warning, error: e);
-        if (e is ApiException &&
-            (e.statusCode == 400 ||
-                e.statusCode == 401 ||
-                e.statusCode == 403)) {
-          _setStatus(RealtimeStatus.disconnected);
-          authService.triggerSessionExpired();
-        } else {
-          // Temporary network / connection error (timeout, SocketException, offline)
-          // Keep attempting reconnection. We do not abort the reconnect loop.
-          _setStatus(RealtimeStatus.disconnected);
-          _scheduleReconnect();
+        _setStatus(RealtimeStatus.disconnected);
+        if (e is ApiException && e.statusCode == 401) {
+          _record('ws_refresh_rejected_permanent', level: LogLevel.warning);
+          authService.triggerSessionExpired(
+            'WebSocket oturumu kalıcı olarak yetkilendirilemedi (401 Unauthorized)',
+            code: 'ws_auth_unauthorized',
+          );
+          return;
         }
+        _scheduleReconnect();
       }
     });
   }

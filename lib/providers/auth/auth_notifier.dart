@@ -32,10 +32,10 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
 
   AppAuthNotifier(this._authService) : super(AppState.loading()) {
     // Bind session expiration to trigger state updates & routing redirects
-    _authService.onSessionExpiredCallback = () {
+    _authService.onSessionExpiredCallback = (reason) {
       state = AppState.error(
         AuthException(
-            message: 'Oturum süresi doldu. Lütfen tekrar giriş yapın.',
+            message: reason,
             code: 'AUTH_003'),
       );
     };
@@ -79,17 +79,23 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   /// Flow:
   /// 1. Set state to loading
   /// 2. Call AuthService.login() — backend-first, local SQLite fallback
-  /// 3. Trial sync: AuthService.login() backend'den trial_started_at okur (tek yer)
-  /// 4. On success: set state to success(user)
-  /// 5. On error: set state to error(exception)
+  /// 3. Save or clear remembered credentials based on rememberMe flag
+  /// 4. Clear any previous logout reason
+  /// 5. On success: set state to success(user)
+  /// 6. On error: set state to error(exception)
   ///
   /// Throws: Never (errors go to state.error)
-  Future<void> login(String username, String password) async {
+  Future<void> login(String username, String password,
+      {bool rememberMe = true}) async {
     try {
       state = AppState.loading();
       final user = await _authService.login(username, password);
-      // Trial sync: AuthService.login() içinde backend'den halloluyor
-      // Burada çift tetiklemeye gerek yok
+      await _authService.saveRememberedCredentials(
+        username: username,
+        password: password,
+        rememberMe: rememberMe,
+      );
+      await _authService.clearLastLogoutReason();
       state = AppState.success(user);
     } catch (e) {
       state = AppState.error(AppException.from(e));
@@ -99,15 +105,15 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   /// Perform logout
   ///
   /// Flow:
-  /// 1. Call AuthService.logout() (clears storage)
+  /// 1. Call AuthService.logout() (clears storage & records reason)
   /// 2. Set state to error (no user)
   ///
   /// Throws: Never
-  Future<void> logout() async {
+  Future<void> logout([String reason = 'Kullanıcı isteğiyle çıkış yapıldı.']) async {
     try {
-      await _authService.logout();
+      await _authService.logout(reason: reason, code: 'MANUAL_LOGOUT');
       state = AppState.error(
-        AuthException(message: 'User logged out', code: 'AUTH_002'),
+        AuthException(message: reason, code: 'AUTH_002'),
       );
     } catch (e) {
       state = AppState.error(AppException.from(e));

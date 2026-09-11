@@ -3,8 +3,6 @@
 // DbGateway handles safe, lock-aware, transaction-routed database execution.
 
 import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
@@ -47,23 +45,10 @@ class DbGatewayImpl implements DbGateway {
     if (Zone.current[#sqlite_txn] != null) {
       return;
     }
-    // Write verification block removed (SQLCipher removed)
-
-    int attempts = 0;
-    final bool isTest =
-        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-    final int maxAttempts = isTest ? 2 : 200;
-    while (DatabaseManager.isWriteLocked) {
-      if (!isWrite) {
-        break;
-      }
-      attempts++;
-      if (attempts >= maxAttempts) {
-        throw DatabaseLockedException(
-            'Database is temporarily locked for backup');
-      }
-      await Future.delayed(const Duration(milliseconds: 50));
+    if (!isWrite) {
+      return;
     }
+    await DatabaseManager.waitForWriteLock();
   }
 
   /// Serialize write operations to guarantee FIFO single-writer safety.
@@ -92,7 +77,7 @@ class DbGatewayImpl implements DbGateway {
       } catch (_) {}
 
       try {
-        final result = await action();
+        final result = await DatabaseManager.retryOnLock(action);
         completer.complete(result);
       } catch (e, stack) {
         TelemetryService().logError(
@@ -288,6 +273,9 @@ class DbGatewayImpl implements DbGateway {
 
       final db = await _db;
       final result = await db.transaction((txn) async {
+        if (isRootTransaction) {
+          deferredEvents.clear();
+        }
         return await runZoned(
           action,
           zoneValues: {

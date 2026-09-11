@@ -81,9 +81,15 @@ class AccountPage extends ConsumerWidget {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
-              await ref.read(authNotifierProvider.notifier).logout();
+              await ref.read(authNotifierProvider.notifier).logout('Kullanıcı değiştirildi.');
               if (context.mounted) context.go(AppRoutes.login);
             },
+          ),
+          _AccountAction(
+            icon: Icons.history_rounded,
+            title: 'Oturum & Çıkış Geçmişi',
+            subtitle: 'Son oturum sonlandırma ve otomatik çıkış nedenlerini inceleyin',
+            onTap: () => _showLogoutHistoryDialog(context, ref),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -95,7 +101,7 @@ class AccountPage extends ConsumerWidget {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
-              await ref.read(authNotifierProvider.notifier).logout();
+              await ref.read(authNotifierProvider.notifier).logout('Kullanıcı oturumu kapattı.');
               if (context.mounted) context.go(AppRoutes.login);
             },
             icon: const Icon(Icons.logout_rounded),
@@ -157,6 +163,176 @@ class AccountPage extends ConsumerWidget {
               }
             },
             child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutHistoryDialog(BuildContext context, WidgetRef ref) {
+    final authService = ref.read(authServiceProvider);
+    final history = authService.getLogoutHistory();
+    final lastReason = authService.getLastLogoutReason();
+    final lastCode = authService.getLastLogoutCode();
+    final lastTime = authService.getLastLogoutTime();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.history_rounded, color: POSColors.green),
+            SizedBox(width: 8),
+            Text(
+              'Oturum & Çıkış Geçmişi',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (lastReason != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: POSColors.card,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: POSColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Son Kaydedilen Çıkış Bilgisi:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: POSColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          lastReason,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: POSColors.text,
+                          ),
+                        ),
+                        if (lastTime != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Zaman: ${lastTime.toLocal().toString().split('.').first} (${lastCode ?? ''})',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: POSColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                const Text(
+                  'Geçmiş Oturum Kapanma Olayları:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: POSColors.text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (history.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text(
+                        'Henüz kayıtlı çıkış geçmişi bulunmuyor.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: POSColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ...history.map(
+                    (item) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: POSColors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: POSColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                item['code']?.toString() ?? 'LOGOUT',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: POSColors.green,
+                                ),
+                              ),
+                              Text(
+                                item['time'] != null
+                                    ? DateTime.tryParse(item['time'])
+                                            ?.toLocal()
+                                            .toString()
+                                            .split('.')
+                                            .first ??
+                                        ''
+                                    : '',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: POSColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item['reason']?.toString() ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: POSColors.text,
+                            ),
+                          ),
+                          if (item['details'] != null &&
+                              item['details'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              item['details'].toString(),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: POSColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Kapat'),
           ),
         ],
       ),

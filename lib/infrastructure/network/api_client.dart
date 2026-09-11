@@ -48,15 +48,15 @@ class ApiClient {
 
   // Callbacks for dynamic token refresh and session expiration
   Future<bool> Function()? onTokenExpired;
-  void Function()? onSessionExpired;
+  void Function(String reason)? onSessionExpired;
   void Function(String dateHeader)? onDateHeaderReceived;
   Future<bool>? _refreshFuture;
 
-  void _invalidateSession() {
+  void _invalidateSession([String reason = 'Oturum süresi doldu.']) {
     if (_sessionInvalidated) return;
     _sessionInvalidated = true;
     _jwtToken = null;
-    onSessionExpired?.call();
+    onSessionExpired?.call(reason);
   }
 
   // Custom mock handler function for testing/development
@@ -183,8 +183,14 @@ class ApiClient {
           !path.startsWith('/auth/') &&
           onTokenExpired != null) {
         _refreshFuture ??= onTokenExpired!();
-        final success = await _refreshFuture!;
-        _refreshFuture = null; // reset for next time
+        bool success = false;
+        try {
+          success = await _refreshFuture!;
+        } catch (_) {
+          success = false;
+        } finally {
+          _refreshFuture = null; // reset for next time
+        }
 
         if (success) {
           final newHeaders =
@@ -212,7 +218,8 @@ class ApiClient {
             }
           } else {
             if (retryResponse.statusCode == 401) {
-              _invalidateSession();
+              _invalidateSession(
+                  'Yenilenen oturum anahtarı sunucu tarafından reddedildi (HTTP 401).');
               throw const ApiException('Session expired', statusCode: 401);
             }
             throw ApiException(
@@ -223,7 +230,8 @@ class ApiClient {
           }
           return retryApiResponse;
         } else {
-          _invalidateSession();
+          _invalidateSession(
+              'Oturum yenilenemedi: Sunucudaki oturum süresi doldu veya oturum kapatıldı.');
           throw const ApiException('Session expired', statusCode: 401);
         }
       }
@@ -232,7 +240,8 @@ class ApiClient {
       // refresh callback. A rejected token must still stop that client's
       // polling loop instead of sending the same invalid JWT indefinitely.
       if (response.statusCode == 401 && !path.startsWith('/auth/')) {
-        _invalidateSession();
+        _invalidateSession(
+            'Yetkilendirme hatası (HTTP 401). Lütfen tekrar giriş yapın.');
         throw const ApiException('Session expired', statusCode: 401);
       }
 

@@ -90,11 +90,11 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       await tester.pump(const Duration(seconds: 1));
 
-      // Verify that initial state loads A-Customer etc.
-      expect(find.textContaining('Customer'), findsWidgets);
+      // Verify that initial state loads A-CUSTOMER etc.
+      expect(find.textContaining('CUSTOMER'), findsWidgets);
 
       // Verify Mehmet is NOT in the initial view (due to 50-limit pagination and alphabetical ordering A..L)
-      expect(find.text('Mehmet Yılmaz'), findsNothing);
+      expect(find.text('MEHMET YILMAZ'), findsNothing);
 
       // Find the Customer Search TextField
       final searchFieldFinder = find.byType(TextField);
@@ -111,9 +111,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Mehmet should now be visible!
-      expect(find.text('Mehmet Yılmaz'), findsOneWidget);
+      expect(find.text('MEHMET YILMAZ'), findsOneWidget);
       // Alphabetical 'A' customers should be filtered out
-      expect(find.textContaining('A-Customer'), findsNothing);
+      expect(find.textContaining('A-CUSTOMER'), findsNothing);
 
       // Enter Mehmet's phone number
       await tester.enterText(searchFieldFinder, '5551234567');
@@ -121,7 +121,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
-      expect(find.text('Mehmet Yılmaz'), findsOneWidget);
+      expect(find.text('MEHMET YILMAZ'), findsOneWidget);
 
       // Enter Müşerref's phone number
       await tester.enterText(searchFieldFinder, '5559998888');
@@ -130,8 +130,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Müşerref should be visible!
-      expect(find.text('Müşerref Aksoy'), findsOneWidget);
-      expect(find.text('Mehmet Yılmaz'), findsNothing);
+      expect(find.text('MÜŞERREF AKSOY'), findsOneWidget);
+      expect(find.text('MEHMET YILMAZ'), findsNothing);
 
       // Clear with the actual UI action. The field is rebuilt after each
       // provider result, so enterText('') may target an already-empty visual
@@ -140,8 +140,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Reset to original paginated list
-      expect(find.textContaining('Customer'), findsWidgets);
-      expect(find.text('Müşerref Aksoy'), findsNothing);
+      expect(find.textContaining('CUSTOMER'), findsWidgets);
+      expect(find.text('MÜŞERREF AKSOY'), findsNothing);
     });
   });
 }

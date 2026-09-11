@@ -116,7 +116,7 @@ void main() {
       };
 
       bool sessionExpiredTriggered = false;
-      authService.onSessionExpiredCallback = () {
+      authService.onSessionExpiredCallback = (_) {
         sessionExpiredTriggered = true;
       };
 

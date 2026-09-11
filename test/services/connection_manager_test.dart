@@ -97,12 +97,20 @@ class MockAuthService implements AuthService {
   }
 
   @override
-  void triggerSessionExpired() {
+  Future<void> triggerSessionExpired(
+    String reason, {
+    String code = 'session_expired',
+    String? details,
+  }) async {
     sessionExpiredTriggered = true;
   }
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({
+    String reason = 'Kullanıcı isteğiyle oturum kapatıldı',
+    String code = 'user_action',
+    String? details,
+  }) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
