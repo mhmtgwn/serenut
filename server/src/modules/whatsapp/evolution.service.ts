@@ -121,22 +121,33 @@ async function evolutionFetch<T = unknown>(
 /**
  * Evolution API'de yeni bir instance oluşturur.
  * Zaten varsa hata VERMEZ (idempotent).
+ * Yanıtta QR kodu dönebilir (Evolution v2 create yanıtı).
  */
-export async function createInstance(companyId: string): Promise<void> {
+export async function createInstance(companyId: string): Promise<any> {
   const name = instanceId(companyId);
   logger.info(`[Evolution] createInstance: ${name}`);
 
   try {
-    await evolutionFetch('POST', '/instance/create', {
+    const res = await evolutionFetch<any>('POST', '/instance/create', {
       instanceName: name,
       integration: 'WHATSAPP-BAILEYS',
       qrcode: true,
     });
+    return res;
   } catch (error) {
-    // 409 = zaten var → sorun değil
-    if (error instanceof EvolutionApiError && error.status === 409) {
-      logger.info(`[Evolution] Instance zaten mevcut: ${name}`);
-      return;
+    // 409 veya 400 (already exists) → sorun değil
+    if (error instanceof EvolutionApiError) {
+      const msg = error.message.toLowerCase();
+      if (
+        error.status === 409 ||
+        (error.status === 400 &&
+          (msg.includes('already') ||
+            msg.includes('exists') ||
+            msg.includes('zaten')))
+      ) {
+        logger.info(`[Evolution] Instance zaten mevcut: ${name}`);
+        return null;
+      }
     }
     throw error;
   }
@@ -150,62 +161,147 @@ export async function getQRCode(companyId: string): Promise<EvolutionQRResponse>
   const name = instanceId(companyId);
   logger.info(`[Evolution] getQRCode: ${name}`);
 
+  // 1. Önce bağlantı durumunu kontrol et — zaten bağlıysa QR üretmeye gerek yok
   try {
-    const response = await evolutionFetch<{ qrcode?: { base64?: string; code?: string } }>(
-      'GET',
-      `/instance/connect/${name}`,
-    );
-
-    const base64 = response?.qrcode?.base64;
-    if (!base64) {
-      throw new EvolutionApiError('QR kodu henüz oluşturulmadı. Lütfen birkaç saniye bekleyip tekrar deneyin.', 202);
+    const status = await getConnectionStatus(companyId);
+    if (status.status === 'open') {
+      return {
+        qrcode: 'already_connected',
+        expiresInMs: 0,
+      };
     }
-
-    return {
-      qrcode: base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`,
-      expiresInMs: 60_000, // Evolution QR'ı ~60s geçerli
-    };
-  } catch (error) {
-    // Instance yok → oluştur ve tekrar dene
-    if (error instanceof EvolutionApiError && error.status === 404) {
-      await createInstance(companyId);
-      return getQRCode(companyId);
-    }
-    throw error;
+  } catch (err) {
+    logger.warn(`[Evolution] getConnectionStatus ön kontrol uyarısı: ${(err as Error).message}`);
   }
+
+  // 2. Instance oluşturmayı dene (zaten varsa createInstance null döner)
+  let createRes: any = null;
+  try {
+    createRes = await createInstance(companyId);
+  } catch (err) {
+    logger.warn(`[Evolution] createInstance deneme uyarısı: ${(err as Error).message}`);
+  }
+
+  // Evolution v2 create yanıtında doğrudan QR dönebilir
+  let rawBase64 =
+    createRes?.qrcode?.base64 ||
+    createRes?.base64 ||
+    createRes?.qrcode?.code ||
+    createRes?.code;
+
+  // 3. Eğer create yanıtında QR yoksa /instance/connect/${name} çağır (ve gerekirse retry et)
+  if (!rawBase64) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await evolutionFetch<any>(
+          'GET',
+          `/instance/connect/${name}`,
+        );
+
+        rawBase64 =
+          response?.base64 ||
+          response?.qrcode?.base64 ||
+          response?.code ||
+          response?.qrcode?.code;
+
+        if (rawBase64) break;
+
+        // Instance bağlı olabilir
+        const countOrState = response?.count ?? response?.state;
+        if (countOrState === 'open' || response?.state === 'open') {
+          return {
+            qrcode: 'already_connected',
+            expiresInMs: 0,
+          };
+        }
+      } catch (error) {
+        if (error instanceof EvolutionApiError) {
+          const msg = error.message.toLowerCase();
+          // Instance henüz yoksa (404 veya 400 not exist) oluşturup tekrar dene
+          if (
+            error.status === 404 ||
+            (error.status === 400 &&
+              (msg.includes('not exist') || msg.includes('bulunamadı')))
+          ) {
+            await createInstance(companyId);
+          } else if (msg.includes('already connected') || msg.includes('open')) {
+            return {
+              qrcode: 'already_connected',
+              expiresInMs: 0,
+            };
+          } else if (attempt === maxAttempts) {
+            throw error;
+          }
+        } else if (attempt === maxAttempts) {
+          throw error;
+        }
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+    }
+  }
+
+  if (!rawBase64) {
+    throw new EvolutionApiError(
+      'QR kodu henüz oluşturulmadı. Lütfen birkaç saniye bekleyip tekrar deneyin.',
+      202,
+    );
+  }
+
+  return {
+    qrcode: rawBase64.startsWith('data:')
+      ? rawBase64
+      : `data:image/png;base64,${rawBase64}`,
+    expiresInMs: 60_000,
+  };
 }
 
 /**
  * Instance'ın bağlantı durumunu döndürür.
- * 404 (instance yok) → { status: 'close' } döndürür.
+ * 404 veya 400 (instance yok) → { status: 'close' } döndürür.
  */
 export async function getConnectionStatus(companyId: string): Promise<EvolutionStatusResponse> {
   const name = instanceId(companyId);
 
   try {
-    const response = await evolutionFetch<{
-      instance?: { state?: string; profileName?: string; ownerJid?: string };
-    }>('GET', `/instance/fetchInstances?instanceName=${name}`);
+    const response = await evolutionFetch<any>(
+      'GET',
+      `/instance/fetchInstances?instanceName=${name}`,
+    );
 
-    const instance = Array.isArray(response) ? (response as any[])[0]?.instance : response?.instance;
-    const rawStatus = instance?.state ?? 'close';
+    const instances = Array.isArray(response)
+      ? response
+      : response ? [response] : [];
+    const found =
+      instances.find((i: any) => i?.name === name || i?.instance?.instanceName === name) ||
+      instances[0];
+    const instance = found?.instance || found;
+    const rawStatus = instance?.state ?? instance?.status ?? 'close';
 
     const status: EvolutionConnectionStatus =
-      rawStatus === 'open' ? 'open'
-      : rawStatus === 'connecting' ? 'connecting'
-      : 'close';
+      rawStatus === 'open'
+        ? 'open'
+        : rawStatus === 'connecting'
+          ? 'connecting'
+          : 'close';
 
     // JID formatı: 905xxxxxxxxx@s.whatsapp.net
-    const jid = instance?.ownerJid ?? '';
+    const jid = instance?.ownerJid ?? instance?.owner ?? '';
     const phone = jid.split('@')[0] || undefined;
 
     return {
       status,
       phone: status === 'open' ? phone : undefined,
-      name: status === 'open' ? instance?.profileName : undefined,
+      name: status === 'open' ? (instance?.profileName ?? instance?.name) : undefined,
     };
   } catch (error) {
-    if (error instanceof EvolutionApiError && error.status === 404) {
+    if (
+      error instanceof EvolutionApiError &&
+      (error.status === 404 || error.status === 400)
+    ) {
       return { status: 'close' };
     }
     throw error;
@@ -222,8 +318,13 @@ export async function deleteInstance(companyId: string): Promise<void> {
   try {
     await evolutionFetch('DELETE', `/instance/delete/${name}`);
   } catch (error) {
-    // 404 = zaten yok → sorun değil
-    if (error instanceof EvolutionApiError && error.status === 404) return;
+    // 404 veya 400 = zaten yok → sorun değil
+    if (
+      error instanceof EvolutionApiError &&
+      (error.status === 404 || error.status === 400)
+    ) {
+      return;
+    }
     throw error;
   }
 }

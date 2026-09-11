@@ -509,6 +509,13 @@ router.get(
       // Instance yoksa oluştur, QR al
       const qr = await evolutionGetQR(companyId);
 
+      if (qr.qrcode === 'already_connected') {
+        return res.json({
+          already_connected: true,
+          status: 'open',
+        });
+      }
+
       // DB'ye qr_pending durumu yaz
       await runBypassingRls(
         `INSERT INTO company_whatsapp_connections
@@ -530,8 +537,12 @@ router.get(
       });
     } catch (error) {
       if (error instanceof EvolutionApiError) {
-        return res.status(error.status || 503).json({
-          error: 'evolution_qr_failed',
+        const httpStatus =
+          error.status && error.status >= 200 && error.status < 600
+            ? error.status
+            : 503;
+        return res.status(httpStatus).json({
+          error: error.status === 202 ? 'qr_pending' : 'evolution_qr_failed',
           message: error.message,
         });
       }

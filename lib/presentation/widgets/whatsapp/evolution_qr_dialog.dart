@@ -61,36 +61,71 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
       _errorMessage = null;
     });
 
-    try {
-      final api = ref.read(apiClientProvider);
-      final res = await api.get('/api/v1/whatsapp/evolution/qr');
-      final body = Map<String, dynamic>.from(res.json as Map);
+    int attempt = 0;
+    const maxAttempts = 4;
 
-      final qrDataUrl = body['qrcode'] as String?;
-      if (qrDataUrl == null || qrDataUrl.isEmpty) {
+    while (attempt < maxAttempts) {
+      attempt++;
+      try {
+        final api = ref.read(apiClientProvider);
+        final res = await api.get('/api/v1/whatsapp/evolution/qr');
+        final body = Map<String, dynamic>.from(res.json as Map);
+
+        if (body['already_connected'] == true) {
+          if (!mounted) return;
+          setState(() {
+            _state = _QRState.connected;
+            _connectedPhone = body['phone'] as String?;
+            _connectedName = body['name'] as String?;
+          });
+          ref.invalidate(settingsNotifierProvider);
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) Navigator.of(context).pop(true);
+          return;
+        }
+
+        final qrDataUrl = body['qrcode'] as String?;
+        if (qrDataUrl != null && qrDataUrl.isNotEmpty) {
+          final base64Part = qrDataUrl.contains(',')
+              ? qrDataUrl.split(',').last
+              : qrDataUrl;
+          final imageBytes = base64Decode(base64Part);
+
+          if (!mounted) return;
+          setState(() {
+            _qrImageBytes = imageBytes;
+            _state = _QRState.waitingForScan;
+          });
+
+          // Polling başlat
+          _startStatusPolling();
+          return;
+        }
+
+        // QR henüz hazır değilse
+        if (attempt < maxAttempts) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
         throw Exception('Sunucudan QR verisi gelmedi');
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        if ((msg.contains('202') ||
+                msg.contains('pending') ||
+                msg.contains('hazırlanıyor') ||
+                msg.contains('bekleyin')) &&
+            attempt < maxAttempts) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _state = _QRState.error;
+          _errorMessage = _friendlyError(e);
+        });
+        return;
       }
-
-      // data:image/png;base64,... → Uint8List
-      final base64Part = qrDataUrl.contains(',')
-          ? qrDataUrl.split(',').last
-          : qrDataUrl;
-      final imageBytes = base64Decode(base64Part);
-
-      if (!mounted) return;
-      setState(() {
-        _qrImageBytes = imageBytes;
-        _state = _QRState.waitingForScan;
-      });
-
-      // Polling başlat
-      _startStatusPolling();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _state = _QRState.error;
-        _errorMessage = _friendlyError(e);
-      });
     }
   }
 
@@ -176,13 +211,16 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
     if (msg.contains('timeout') || msg.contains('zaman aşımı')) {
       return 'Sunucu yanıt vermedi. İnternet bağlantınızı kontrol edin.';
     }
-    if (msg.contains('202')) {
+    if (msg.contains('202') || msg.contains('hazırlanıyor')) {
       return 'QR kodu hazırlanıyor, lütfen birkaç saniye bekleyin…';
     }
-    if (msg.contains('503') || msg.contains('evolution')) {
+    if (msg.contains('503') || msg.contains('bağlantı hatası')) {
       return 'WhatsApp sunucusuna bağlanılamadı. Sunucu durumunu kontrol edin.';
     }
-    return 'Bir hata oluştu. Tekrar deneyin.';
+    if (msg.contains('401') || msg.contains('unauthorized')) {
+      return 'Oturum süresi doldu. Lütfen tekrar giriş yapın.';
+    }
+    return 'QR kodu yüklenemedi. Lütfen tekrar deneyin.';
   }
 
   // ── BUILD ────────────────────────────────────────────────────────────────────
