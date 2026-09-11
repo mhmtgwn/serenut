@@ -90,25 +90,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
   bool _isSubmitting = false;
   bool _printReceipt = true;
   int _printCopies = 1;
-  bool _printLabel = false;
-  final int _labelCopies = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLabelPrinterSettings();
-  }
-
-  Future<void> _loadLabelPrinterSettings() async {
-    try {
-      final settings = ref.read(settingsNotifierProvider).valueOrNull;
-      if (settings != null && mounted) {
-        setState(() {
-          _printLabel = settings.labelPrinterEnabled;
-        });
-      }
-    } catch (_) {}
-  }
 
   @override
   void dispose() {
@@ -322,78 +303,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         }
       }
 
-      // Print Label stickers
-      if (_printLabel) {
-        final settingsAsync = ref.read(settingsNotifierProvider);
-        final settings = settingsAsync.value;
-        if (settings != null) {
-          CustomerEntity? customer;
-          if (widget.order.customerId.isNotEmpty) {
-            try {
-              final custRepo =
-                  await ref.read(customerRepositoryProvider.future);
-              customer = await custRepo.findById(widget.order.customerId);
-            } catch (_) {}
-          }
-
-          final products = ref.read(productsControllerProvider).value ?? [];
-          final receiptItems = widget.order.items.map((item) {
-            final prod = products.firstWhere(
-              (p) => p.id == item['product_id'],
-              orElse: () => ProductEntity(
-                id: item['product_id'] ?? '',
-                name: item['product_id'] ?? 'Urun',
-                description: '',
-                price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-                quantity: 0,
-                category: '',
-              ),
-            );
-            return {
-              'product_id': item['product_id'],
-              'product_name': item['product_name'] ?? prod.name,
-              'barcode': prod.id,
-              'quantity': item['quantity'],
-              'unit_price': item['unit_price'],
-            };
-          }).toList();
-
-          final double finalPaidForLabel = widget.totalPaid +
-              (_selectedMethod == 'cash'
-                  ? remaining
-                  : (_selectedMethod == 'card'
-                      ? remaining
-                      : (_selectedMethod == 'karma'
-                          ? _karmaResult.paidAmount
-                          : 0.0)));
-          final double orderRemainingDebt =
-              (widget.order.totalAmount - finalPaidForLabel).clamp(0.0, double.infinity);
-          final String labelPaymentStatus;
-          if (_selectedMethod == 'debt' ||
-              (_selectedMethod == 'karma' && _karmaDebt > 0.009)) {
-            if (finalPaidForLabel <= 0.01) {
-              labelPaymentStatus = 'Vadeli';
-            } else {
-              labelPaymentStatus =
-                  'Kısmi Ödeme (Borç: ₺${orderRemainingDebt.toStringAsFixed(2)})';
-            }
-          } else if (orderRemainingDebt <= 0.01) {
-            labelPaymentStatus = 'Ödendi';
-          } else {
-            labelPaymentStatus = 'Kısmi Ödeme';
-          }
-
-          await ref.read(printingApplicationServiceProvider).queueOrderLabel(
-                widget.order,
-                receiptItems,
-                settings,
-                customer: customer,
-                paidAmount: finalPaidForLabel,
-                paymentStatusOverride: labelPaymentStatus,
-                copies: _labelCopies,
-              );
-        }
-      }
 
       if (mounted) {
         Navigator.pop(context);
