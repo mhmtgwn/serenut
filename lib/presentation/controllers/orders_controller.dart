@@ -199,6 +199,28 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     // Calculate total amount from items
     final total = MathEngine.calculateMappedItemsTotal(order.items);
 
+    final itemLines = <String>[];
+    for (final item in order.items) {
+      final name =
+          (item['product_name'] ?? item['name'] ?? 'Ürün').toString().trim();
+      final rawQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+      final qtyStr = (rawQty % 1 == 0)
+          ? rawQty.toInt().toString()
+          : rawQty.toStringAsFixed(1);
+      final unitPrice =
+          ((item['unit_price'] ?? item['unitPrice'] ?? item['price']) as num?)
+              ?.toDouble();
+      final lineTotal =
+          ((item['total_price'] ?? item['total']) as num?)?.toDouble() ??
+              (unitPrice != null ? unitPrice * rawQty : null);
+      if (lineTotal != null && lineTotal > 0) {
+        final totalStr = lineTotal.toStringAsFixed(2).replaceAll('.', ',');
+        itemLines.add('$qtyStr x $name — $totalStr ₺');
+      } else {
+        itemLines.add('$qtyStr x $name');
+      }
+    }
+
     // Publish OrderCreatedEvent
     try {
       final publisher = ref.read(eventPublisherProvider);
@@ -209,6 +231,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         expectedDeliveryDate: order.expectedDeliveryDate ?? DateTime.now(),
         orderIdStr: persistedOrder.orderNumber,
         customerIdStr: order.customerId,
+        itemNames: itemLines,
       ));
     } catch (e, st) {
       TelemetryService().logError(e, st,
@@ -389,11 +412,13 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           customerIdStr: order.customerId,
         ));
       } else if (status == 'ready') {
+        final total = MathEngine.calculateMappedItemsTotal(order.items);
         publisher.publish(OrderReadyEvent(
           orderId: 0,
           customerId: 0,
           orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
+          totalAmount: total,
         ));
       }
     }
@@ -580,11 +605,13 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           customerIdStr: order.customerId,
         ));
       } else if (targetStatus == 'ready') {
+        final total = MathEngine.calculateMappedItemsTotal(order.items);
         publisher.publish(OrderReadyEvent(
           orderId: 0,
           customerId: 0,
           orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
+          totalAmount: total,
         ));
       }
 

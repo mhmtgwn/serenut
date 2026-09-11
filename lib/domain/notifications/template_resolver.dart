@@ -74,7 +74,7 @@ class TemplateResolver {
     );
     if (templateText == null) return null;
 
-    return _fillTokens(templateText, vars);
+    return _fillTokens(templateText, vars, isWhatsApp: false);
   }
 
   /// Check if [eventType] template exists and is enabled.
@@ -105,8 +105,13 @@ class TemplateResolver {
       templateStr,
       channel: NotificationTemplateChannel.whatsapp,
     );
-    return templateText == null ? null : _fillTokens(templateText, vars);
+    return templateText == null
+        ? null
+        : _fillTokens(templateText, vars, isWhatsApp: true);
   }
+
+  static String formatCurrency(double amount, String currency) =>
+      SmsTemplateVars._fmt(amount, currency);
 
   // ── Private ────────────────────────────────────────────────────────────────
 
@@ -149,10 +154,21 @@ class TemplateResolver {
     return null;
   }
 
-  String _fillTokens(String template, Map<String, String> vars) {
+  String _fillTokens(
+    String template,
+    Map<String, String> vars, {
+    bool isWhatsApp = false,
+  }) {
     var result = template;
     vars.forEach((key, value) {
-      result = result.replaceAll('{$key}', value);
+      if (key == 'items') {
+        final replacement = isWhatsApp
+            ? (vars['whatsapp_items'] ?? value)
+            : (vars['sms_items'] ?? value);
+        result = result.replaceAll('{$key}', replacement);
+      } else if (key != 'whatsapp_items' && key != 'sms_items') {
+        result = result.replaceAll('{$key}', value);
+      }
     });
     return result;
   }
@@ -175,6 +191,7 @@ class SmsTemplateVars {
     String currency = '₺',
     List<String>? itemNames,
   }) {
+    final (smsItems, whatsappItems) = _formatItems(itemNames);
     return {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
@@ -186,7 +203,9 @@ class SmsTemplateVars {
       'id': saleId.toShortId,
       'business': businessName,
       'date': _today(),
-      'items': itemNames?.join(', ') ?? '',
+      'items': smsItems,
+      'sms_items': smsItems,
+      'whatsapp_items': whatsappItems,
       'discount': _fmt(0, currency),
     };
   }
@@ -248,6 +267,7 @@ class SmsTemplateVars {
     String currency = '₺',
     List<String>? itemNames,
   }) {
+    final (smsItems, whatsappItems) = _formatItems(itemNames);
     return {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
@@ -256,9 +276,22 @@ class SmsTemplateVars {
       'id': orderId.toShortId,
       'business': businessName,
       'date': _today(),
-      'items': itemNames?.join(', ') ?? '',
+      'items': smsItems,
+      'sms_items': smsItems,
+      'whatsapp_items': whatsappItems,
       'discount': _fmt(0, currency),
     };
+  }
+
+  static (String, String) _formatItems(List<String>? itemNames) {
+    if (itemNames == null || itemNames.isEmpty) {
+      return ('', '');
+    }
+    // SMS: comma-separated without prices (to conserve SMS character limits)
+    final sms = itemNames.map((line) => line.split(' — ').first.trim()).join(', ');
+    // WhatsApp: bulleted items with full details and price
+    final whatsapp = itemNames.map((line) => '▫️ $line').join('\n');
+    return (sms, whatsapp);
   }
 
   static String _fmt(double amount, String currency) {

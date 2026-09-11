@@ -52,6 +52,7 @@ class SaleCreatedEvent extends DomainEvent {
   final String customerIdStr; // actual UUID e.g. 'cust-yyy'
   final double paidAmount; // used to detect debt (totalAmount - paidAmount > 0)
   final String paymentMethod; // 'cash' | 'card' | 'debt' | 'karma'
+  final List<String> itemNames; // formatted item breakdown
 
   SaleCreatedEvent({
     required this.saleId,
@@ -63,6 +64,7 @@ class SaleCreatedEvent extends DomainEvent {
     this.customerIdStr = '',
     this.paidAmount = 0,
     this.paymentMethod = 'cash',
+    this.itemNames = const [],
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -84,6 +86,7 @@ class OrderCreatedEvent extends DomainEvent {
   // String UUID fields
   final String orderIdStr;
   final String customerIdStr;
+  final List<String> itemNames; // formatted item breakdown
 
   OrderCreatedEvent({
     required this.orderId,
@@ -92,6 +95,7 @@ class OrderCreatedEvent extends DomainEvent {
     required this.expectedDeliveryDate,
     this.orderIdStr = '',
     this.customerIdStr = '',
+    this.itemNames = const [],
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -283,12 +287,14 @@ class OrderReadyEvent extends DomainEvent {
   final int customerId;
   final String orderIdStr;
   final String customerIdStr;
+  final double totalAmount;
 
   OrderReadyEvent({
     required this.orderId,
     required this.customerId,
     this.orderIdStr = '',
     this.customerIdStr = '',
+    this.totalAmount = 0.0,
     super.occurredAt,
     super.metadata,
   }) : super(

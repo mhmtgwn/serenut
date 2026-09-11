@@ -215,6 +215,17 @@ class SalesService {
         );
         await _saleRepository.update(completedSale);
 
+        final itemLines = items.map((i) {
+          final name = (i.productName ?? 'Ürün').trim();
+          final rawQty = i.saleQuantity;
+          final qtyStr = (rawQty % 1 == 0)
+              ? rawQty.toInt().toString()
+              : rawQty.toStringAsFixed(1);
+          final total = rawQty * i.unitPrice;
+          final totalStr = total.toStringAsFixed(2).replaceAll('.', ',');
+          return '$qtyStr x $name — $totalStr ₺';
+        }).toList();
+
         final parsedSaleId = sale.id.hashCode.abs();
 
         _eventPublisher.publish(SaleCreatedEvent(
@@ -225,6 +236,7 @@ class SalesService {
           customerIdStr: customerId,
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
+          itemNames: itemLines,
           occurredAt: DateTime.now(),
         ));
 
@@ -305,6 +317,17 @@ class SalesService {
         );
         await _saleRepository.update(completedSale);
 
+        final itemLines = items.map((i) {
+          final name = (i.productName ?? 'Ürün').trim();
+          final rawQty = i.saleQuantity;
+          final qtyStr = (rawQty % 1 == 0)
+              ? rawQty.toInt().toString()
+              : rawQty.toStringAsFixed(1);
+          final total = rawQty * i.unitPrice;
+          final totalStr = total.toStringAsFixed(2).replaceAll('.', ',');
+          return '$qtyStr x $name — $totalStr ₺';
+        }).toList();
+
         final parsedSaleId = sale.id.hashCode.abs();
 
         _eventPublisher.publish(SaleCreatedEvent(
@@ -315,6 +338,7 @@ class SalesService {
           customerIdStr: customerId,
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
+          itemNames: itemLines,
           occurredAt: DateTime.now(),
         ));
 

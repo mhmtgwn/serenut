@@ -264,7 +264,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
         'whatsapp_template':
-            '🧾 *Satış Bilgilendirmesi*\n\nSayın *{customer}*,\nAlışverişiniz başarıyla tamamlanmıştır.\n\n▫️ *İşlem No:* {id}\n▫️ *Toplam Tutar:* *{amount}*\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{business}*',
+            '🧾 *Alışveriş Fişi*\n\nSayın *{customer}*,\nAlışverişiniz başarıyla tamamlanmıştır.\n\n▫️ *Fiş No:* #{id}\n▫️ *Tarih:* {date}\n\n🛍️ *Satın Alınan Ürünler:*\n{items}\n\n▫️ *Ödenen:* *{paid}*\n▫️ *Toplam Tutar:* *{amount}*\n\nBizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -277,7 +277,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
         'whatsapp_template':
-            '📋 *Cari Hesap Bilgilendirmesi*\n\nSayın *{customer}*,\n{id} numaralı işleminiz cari hesabınıza kaydedilmiştir.\n\n▫️ *Güncel Bakiyeniz:* *{balance}*\n\nDetaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
+            '📋 *Cari Hesap Bilgilendirmesi*\n\nSayın *{customer}*,\n#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.\n\n▫️ *İşlem Tutarı:* {amount}\n▫️ *Eklenen Borç:* *{debt}*\n▫️ *Güncel Toplam Bakiyeniz:* *{balance}*\n\nDetaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -290,7 +290,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {amount} tutarındaki ödemeniz alındı. Kalan bakiyeniz {debt}. {business}',
         'whatsapp_template':
-            '✅ *Tahsilat Makbuzu*\n\nSayın *{customer}*,\n{amount} tutarındaki ödemeniz başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.\n\n▫️ *Kalan Bakiye:* *{debt}*\n\nÖdemeniz için teşekkür ederiz.\n*{business}*',
+            '✅ *Tahsilat Makbuzu*\n\nSayın *{customer}*,\nYapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.\n\n▫️ *Makbuz No:* #{id}\n▫️ *Tahsil Edilen:* *{amount}*\n▫️ *Kalan Bakiyeniz:* *{debt}*\n📅 *Tarih:* {date}\n\nÖdemeniz için teşekkür ederiz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -303,7 +303,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
         'whatsapp_template':
-            '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz onaylanmış ve sıraya alınmıştır.\n\n▫️ *Sipariş Tutarı:* *{amount}*\n\nSiparişiniz hazırlandığında bilgilendirileceksiniz.\n*{business}*',
+            '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.\n\n📦 *Sipariş İçeriği:*\n{items}\n\n▫️ *Sipariş Tutarı:* *{amount}*\n📅 *Tarih:* {date}\n\nSiparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.\nBizi tercih ettiğiniz için teşekkür ederiz!\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -316,7 +316,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
         'whatsapp_template':
-            '👨‍🍳 *Siparişiniz Hazırlanıyor*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.\n\nEn kısa sürede hazır olacaktır.\n*{business}*',
+            '👨‍🍳 *Siparişiniz Hazırlanıyor*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.\n\nEn kısa sürede tamamlanıp hazır hale getirilecektir.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -329,7 +329,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
         'whatsapp_template':
-            '🎉 *Siparişiniz Hazır!*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz hazır durumdadır.\n\nTeslim alabilirsiniz. Afiyet olsun!\n*{business}*',
+            '🎉 *Siparişiniz Hazır!*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz hazır durumdadır.\n\n▫️ *Sipariş No:* #{id}\n▫️ *Toplam Tutar:* *{amount}*\n\nİşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -342,7 +342,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
         'whatsapp_template':
-            '✨ *Sipariş Teslim Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{business}*',
+            '✨ *Sipariş Teslim Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz. Tekrar görüşmek dileğiyle!\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -355,7 +355,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
         'whatsapp_template':
-            '❌ *Sipariş İptal Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz iptal edilmiştir.\n\nAyrıntılı bilgi için bizimle iletişime geçebilirsiniz.\n*{business}*',
+            '❌ *Sipariş İptal Bildirimi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz iptal edilmiştir.\n\nHerhangi bir sorunuz veya ayrıntılı bilgi için bizimle iletişime geçebilirsiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -368,7 +368,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'sms_template':
             'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
         'whatsapp_template':
-            '🔔 *Bakiye Hatırlatması*\n\nSayın *{customer}*,\nHesabınızdaki güncel vadeli bakiye tutarı: *{balance}*.\n\nÖdeme bilgisi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
+            '🔔 *Bakiye Hatırlatması*\n\nSayın *{customer}*,\nİşletmemizdeki cari hesabınızın güncel durum özeti aşağıdadır:\n\n▫️ *Güncel Vadeli Bakiye:* *{balance}*\n📅 *Tarih:* {date}\n\nÖdeme ve mutabakat işlemleriniz için işletmemizle iletişime geçebilirsiniz.\nSağlıklı ve bereketli günler dileriz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
         'whatsapp_enabled': true,
@@ -395,12 +395,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           item['whatsapp_enabled'] ??= false;
           item['enabled'] = item['sms_enabled'] == true;
           item['sms_template'] ??= item['template'];
-          if (item['whatsapp_template'] == null ||
-              item['whatsapp_template'].toString().trim().isEmpty) {
-            final def = defaultTemplates.firstWhere(
-              (t) => t['id'] == item['id'],
-              orElse: () => <String, dynamic>{},
-            );
+          final currentWa = item['whatsapp_template']?.toString().trim();
+          final def = defaultTemplates.firstWhere(
+            (t) => t['id'] == item['id'],
+            orElse: () => <String, dynamic>{},
+          );
+          if (currentWa == null ||
+              currentWa.isEmpty ||
+              currentWa == item['template']?.toString().trim() ||
+              currentWa.startsWith('🧾 *Satış Bilgilendirmesi*') ||
+              currentWa.startsWith(
+                  '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz onaylanmış')) {
             item['whatsapp_template'] =
                 def['whatsapp_template'] ?? item['template'];
           }

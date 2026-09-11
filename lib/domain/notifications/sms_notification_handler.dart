@@ -145,6 +145,7 @@ class SmsNotificationHandler {
               event.saleIdStr.isNotEmpty ? event.saleIdStr : '${event.saleId}',
           businessName: business,
           currency: currency,
+          itemNames: event.itemNames,
         ),
       );
 
@@ -219,6 +220,7 @@ class SmsNotificationHandler {
               : '${event.orderId}',
           businessName: settings.businessName,
           currency: settings.currency,
+          itemNames: event.itemNames,
         ),
       );
     } catch (e) {
@@ -289,6 +291,10 @@ class SmsNotificationHandler {
         vars: {
           'customer': customer.name,
           'id': _shortOrderId(event.orderIdStr, event.orderId),
+          'amount': TemplateResolver.formatCurrency(
+            event.totalAmount,
+            settings.currency,
+          ),
           'business': settings.businessName,
           'date': _todayStr(),
         },
