@@ -510,9 +510,29 @@ router.get(
       const qr = await evolutionGetQR(companyId);
 
       if (qr.qrcode === 'already_connected') {
+        const status = await evolutionGetStatus(companyId);
+        await runBypassingRls(
+          `INSERT INTO company_whatsapp_connections
+             (company_id, gateway_type, evolution_instance_id, evolution_status, status,
+              display_phone_number, business_display_name, last_verified_at, updated_at)
+           VALUES ($1, 'evolution', $2, 'open', 'active', $3, $4, NOW(), NOW())
+           ON CONFLICT (company_id) DO UPDATE
+             SET gateway_type='evolution',
+                 evolution_instance_id=$2,
+                 evolution_status='open',
+                 status='active',
+                 display_phone_number=COALESCE(EXCLUDED.display_phone_number, company_whatsapp_connections.display_phone_number),
+                 business_display_name=COALESCE(EXCLUDED.business_display_name, company_whatsapp_connections.business_display_name),
+                 last_verified_at=NOW(),
+                 updated_at=NOW()`,
+          [companyId, `serenut_${companyId.replace(/[^a-zA-Z0-9]/g, '_')}`, status.phone ?? null, status.name ?? null],
+        );
+
         return res.json({
           already_connected: true,
           status: 'open',
+          phone: status.phone,
+          name: status.name,
         });
       }
 
@@ -568,12 +588,20 @@ router.get(
       // Bağlantı kuruldu → DB'yi güncelle
       if (status.status === 'open') {
         await runBypassingRls(
-          `UPDATE company_whatsapp_connections
-           SET evolution_status='open', status='active',
-               display_phone_number=$2, business_display_name=$3,
-               last_verified_at=NOW(), updated_at=NOW()
-           WHERE company_id=$1 AND gateway_type='evolution'`,
-          [companyId, status.phone ?? null, status.name ?? null],
+          `INSERT INTO company_whatsapp_connections
+             (company_id, gateway_type, evolution_instance_id, evolution_status, status,
+              display_phone_number, business_display_name, last_verified_at, updated_at)
+           VALUES ($1, 'evolution', $2, 'open', 'active', $3, $4, NOW(), NOW())
+           ON CONFLICT (company_id) DO UPDATE
+             SET gateway_type='evolution',
+                 evolution_instance_id=$2,
+                 evolution_status='open',
+                 status='active',
+                 display_phone_number=COALESCE(EXCLUDED.display_phone_number, company_whatsapp_connections.display_phone_number),
+                 business_display_name=COALESCE(EXCLUDED.business_display_name, company_whatsapp_connections.business_display_name),
+                 last_verified_at=NOW(),
+                 updated_at=NOW()`,
+          [companyId, `serenut_${companyId.replace(/[^a-zA-Z0-9]/g, '_')}`, status.phone ?? null, status.name ?? null],
         );
       }
 

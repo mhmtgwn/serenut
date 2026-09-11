@@ -267,19 +267,60 @@ export async function getConnectionStatus(companyId: string): Promise<EvolutionS
   const name = instanceId(companyId);
 
   try {
-    const response = await evolutionFetch<any>(
-      'GET',
-      `/instance/fetchInstances?instanceName=${name}`,
-    );
+    let rawStatus = 'close';
+    let phone: string | undefined;
+    let profileName: string | undefined;
 
-    const instances = Array.isArray(response)
-      ? response
-      : response ? [response] : [];
-    const found =
-      instances.find((i: any) => i?.name === name || i?.instance?.instanceName === name) ||
-      instances[0];
-    const instance = found?.instance || found;
-    const rawStatus = instance?.state ?? instance?.status ?? 'close';
+    // 1. fetchInstances üzerinden bağlantı durumunu, JID'i ve profil adını al
+    try {
+      const response = await evolutionFetch<any>(
+        'GET',
+        `/instance/fetchInstances?instanceName=${name}`,
+      );
+
+      const instances = Array.isArray(response)
+        ? response
+        : response ? [response] : [];
+      const found =
+        instances.find((i: any) => i?.name === name || i?.instance?.instanceName === name) ||
+        instances[0];
+
+      if (found) {
+        const inst = found.instance || found;
+        rawStatus =
+          inst.connectionStatus ||
+          found.connectionStatus ||
+          inst.state ||
+          found.state ||
+          inst.status ||
+          found.status ||
+          'close';
+
+        const jid = inst.ownerJid || found.ownerJid || inst.owner || found.owner || '';
+        if (jid) {
+          phone = jid.split('@')[0];
+        }
+        profileName = inst.profileName || found.profileName || inst.name || found.name;
+      }
+    } catch (fetchErr) {
+      logger.warn(`[Evolution] fetchInstances sorgu uyarısı: ${(fetchErr as Error).message}`);
+    }
+
+    // 2. Eğer rawStatus 'open' değilse connectionState ile anlık durumu da doğrula
+    if (rawStatus !== 'open') {
+      try {
+        const stateRes = await evolutionFetch<any>(
+          'GET',
+          `/instance/connectionState/${name}`,
+        );
+        const stateVal = stateRes?.instance?.state || stateRes?.state;
+        if (stateVal) {
+          rawStatus = stateVal;
+        }
+      } catch (_) {
+        // Yoksa veya kapalıysa sessizce devam et
+      }
+    }
 
     const status: EvolutionConnectionStatus =
       rawStatus === 'open'
@@ -288,14 +329,10 @@ export async function getConnectionStatus(companyId: string): Promise<EvolutionS
           ? 'connecting'
           : 'close';
 
-    // JID formatı: 905xxxxxxxxx@s.whatsapp.net
-    const jid = instance?.ownerJid ?? instance?.owner ?? '';
-    const phone = jid.split('@')[0] || undefined;
-
     return {
       status,
       phone: status === 'open' ? phone : undefined,
-      name: status === 'open' ? (instance?.profileName ?? instance?.name) : undefined,
+      name: status === 'open' ? profileName : undefined,
     };
   } catch (error) {
     if (
