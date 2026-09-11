@@ -57,7 +57,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   bool whatsappConnected = false;
   String? whatsappPhone;
   String selectedChannel = 'sms';
-  final Map<String, Map<String, String>> whatsappTemplates = {};
+
 
   // SIM SMS Specific States
   List<Map<String, dynamic>> simCards = [];
@@ -1038,14 +1038,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'balance_reminder': 'Bakiye hatırlatması gönderildiğinde',
       }[eventId] ??
       'İşlem gerçekleştiğinde';
-
-  String _whatsappStatusLabel(String status) => switch (status.toLowerCase()) {
-        'approved' || 'active' => 'Meta onaylı',
-        'pending' || 'in_review' => 'Meta incelemesinde',
-        'rejected' => 'Meta tarafından reddedildi',
-        'paused' || 'disabled' => 'Meta tarafından durduruldu',
-        _ => 'Åablon durumu: $status',
-      };
 
   Widget _buildChannelSelector() {
     // WhatsApp sekmesi _kWhatsAppEnabled = false iken gizlidir.
@@ -2210,11 +2202,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                 'order_delivered',
                                 'order_cancelled',
                               }.contains(eventId);
-                          final whatsappTemplate =
-                              _kWhatsAppEnabled ? whatsappTemplates[eventId] : null;
-                          final whatsappStatus = whatsappTemplate?['status'];
-                          // ignore: unused_local_variable — kullanılıyor (_kWhatsAppEnabled=true iken)
-                          final whatsappReady = whatsappConnected;
                           final isEnabled = smsTemplateEnabled;
                           return Container(
                             padding: const EdgeInsets.all(12),
