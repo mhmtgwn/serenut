@@ -261,81 +261,117 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'name': 'Satış Onayı',
         'template':
             'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
+        'whatsapp_template':
+            '🧾 *Satış Bilgilendirmesi*\n\nSayın *{customer}*,\nAlışverişiniz başarıyla tamamlanmıştır.\n\n▫️ *İşlem No:* {id}\n▫️ *Toplam Tutar:* *{amount}*\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'debt',
         'name': 'Vadeli Bakiye Kaydı',
         'template':
             'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
+        'whatsapp_template':
+            '📋 *Cari Hesap Bilgilendirmesi*\n\nSayın *{customer}*,\n{id} numaralı işleminiz cari hesabınıza kaydedilmiştir.\n\n▫️ *Güncel Bakiyeniz:* *{balance}*\n\nDetaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'collection',
         'name': 'Ödeme Alındı',
         'template':
             'Merhaba {customer}, {amount} tutarındaki ödemeniz alındı. Kalan bakiyeniz {debt}. {business}',
+        'sms_template':
+            'Merhaba {customer}, {amount} tutarındaki ödemeniz alındı. Kalan bakiyeniz {debt}. {business}',
+        'whatsapp_template':
+            '✅ *Tahsilat Makbuzu*\n\nSayın *{customer}*,\n{amount} tutarındaki ödemeniz başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.\n\n▫️ *Kalan Bakiye:* *{debt}*\n\nÖdemeniz için teşekkür ederiz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'order',
         'name': 'Sipariş Alındı',
         'template':
             'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
+        'whatsapp_template':
+            '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz onaylanmış ve sıraya alınmıştır.\n\n▫️ *Sipariş Tutarı:* *{amount}*\n\nSiparişiniz hazırlandığında bilgilendirileceksiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'order_preparing',
         'name': 'Sipariş Hazırlanıyor',
         'template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
+        'whatsapp_template':
+            '👨‍🍳 *Siparişiniz Hazırlanıyor*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.\n\nEn kısa sürede hazır olacaktır.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'order_ready',
         'name': 'Sipariş Hazır',
         'template':
             'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
+        'whatsapp_template':
+            '🎉 *Siparişiniz Hazır!*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz hazır durumdadır.\n\nTeslim alabilirsiniz. Afiyet olsun!\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'order_delivered',
         'name': 'Sipariş Teslim Edildi',
         'template':
             'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
+        'whatsapp_template':
+            '✨ *Sipariş Teslim Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'order_cancelled',
         'name': 'Sipariş İptal Edildi',
         'template':
             'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
+        'whatsapp_template':
+            '❌ *Sipariş İptal Edildi*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz iptal edilmiştir.\n\nAyrıntılı bilgi için bizimle iletişime geçebilirsiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
       {
         'id': 'balance_reminder',
         'name': 'Bakiye Hatırlatması',
         'template':
             'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
+        'sms_template':
+            'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
+        'whatsapp_template':
+            '🔔 *Bakiye Hatırlatması*\n\nSayın *{customer}*,\nHesabınızdaki güncel vadeli bakiye tutarı: *{balance}*.\n\nÖdeme bilgisi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{business}*',
         'enabled': true,
         'sms_enabled': true,
-        'whatsapp_enabled': false,
+        'whatsapp_enabled': true,
       },
     ];
 
@@ -358,6 +394,16 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           item['sms_enabled'] ??= item['enabled'] == true;
           item['whatsapp_enabled'] ??= false;
           item['enabled'] = item['sms_enabled'] == true;
+          item['sms_template'] ??= item['template'];
+          if (item['whatsapp_template'] == null ||
+              item['whatsapp_template'].toString().trim().isEmpty) {
+            final def = defaultTemplates.firstWhere(
+              (t) => t['id'] == item['id'],
+              orElse: () => <String, dynamic>{},
+            );
+            item['whatsapp_template'] =
+                def['whatsapp_template'] ?? item['template'];
+          }
         }
         for (final def in defaultTemplates) {
           if (!list.any((t) => t['id'] == def['id'])) {
@@ -1007,12 +1053,16 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   void _showEditTemplateDialog(
     Map<String, dynamic>? existingTpl,
-    ValueChanged<Map<String, dynamic>> onSave,
-  ) {
+    ValueChanged<Map<String, dynamic>> onSave, {
+    String channel = 'sms',
+  }) {
     showDialog(
       context: context,
-      builder: (ctx) =>
-          SmsEditTemplateDialog(existingTpl: existingTpl, onSave: onSave),
+      builder: (ctx) => SmsEditTemplateDialog(
+        existingTpl: existingTpl,
+        onSave: onSave,
+        channel: channel,
+      ),
     );
   }
 
@@ -2121,46 +2171,82 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
 
               // Flexible Templates Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'SMS Otomasyonları',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: POSColors.text,
-                    ),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 18,
-                      color: POSColors.green,
-                    ),
-                    label: const Text(
-                      'Şablon Ekle',
-                      style: TextStyle(
-                        color: POSColors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+              Builder(
+                builder: (context) {
+                  final isWhatsAppTab = selectedChannel == 'whatsapp';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isWhatsAppTab
+                                    ? Icons.chat_rounded
+                                    : Icons.sms_rounded,
+                                size: 20,
+                                color: isWhatsAppTab
+                                    ? const Color(0xFF16A34A)
+                                    : POSColors.blue,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isWhatsAppTab
+                                    ? 'WhatsApp Otomasyonları'
+                                    : 'SMS Otomasyonları',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: POSColors.text,
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton.icon(
+                            icon: Icon(
+                              Icons.add_circle_outline_rounded,
+                              size: 18,
+                              color: isWhatsAppTab
+                                  ? const Color(0xFF16A34A)
+                                  : POSColors.green,
+                            ),
+                            label: Text(
+                              'Şablon Ekle',
+                              style: TextStyle(
+                                color: isWhatsAppTab
+                                    ? const Color(0xFF16A34A)
+                                    : POSColors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            onPressed: () => _showEditTemplateDialog(
+                              null,
+                              (newTpl) {
+                                setState(() {
+                                  listTemplates.add(newTpl);
+                                });
+                              },
+                              channel: selectedChannel,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    onPressed: () => _showEditTemplateDialog(null, (newTpl) {
-                      setState(() {
-                        listTemplates.add(newTpl);
-                      });
-                    }),
-                  ),
-                ],
-              ),
-              const Divider(color: POSColors.border),
-              const Text(
-                'Hangi işlemlerde otomatik SMS gönderileceğini seçin ve müşteriye gidecek metni düzenleyin.',
-                style: TextStyle(
-                  color: POSColors.textSecondary,
-                  fontSize: 12,
-                ),
+                      const Divider(color: POSColors.border),
+                      Text(
+                        isWhatsAppTab
+                            ? 'Hangi işlemlerde WhatsApp bildirimi gideceğini seçin ve mesajınızı serbestçe (karakter sınırı olmadan, emoji ve zengin metin desteğiyle) düzenleyin.'
+                            : 'Hangi işlemlerde otomatik SMS gönderileceğini seçin ve müşteriye gidecek metni düzenleyin (SMS karakter sınırına dikkat ediniz).',
+                        style: const TextStyle(
+                          color: POSColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 10),
 
@@ -2183,6 +2269,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                       Builder(
                         builder: (context) {
                           final tpl = listTemplates[i];
+                          final isWhatsAppTab = selectedChannel == 'whatsapp';
                           final smsTemplateEnabled =
                               tpl['sms_enabled'] ?? tpl['enabled'] == true;
                           final whatsappTemplateEnabled =
@@ -2190,7 +2277,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           final eventId = _canonicalEventId(
                             tpl['id']?.toString() ?? '',
                           );
-                          // WhatsApp değişkenleri _kWhatsAppEnabled true olduğunda kullanılır
                           final whatsappSupported = _kWhatsAppEnabled &&
                               const {
                                 'sale_created',
@@ -2202,18 +2288,34 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                 'order_delivered',
                                 'order_cancelled',
                               }.contains(eventId);
-                          final isEnabled = smsTemplateEnabled;
+
+                          final isEnabled = isWhatsAppTab
+                              ? (whatsappConnected && whatsappTemplateEnabled)
+                              : smsTemplateEnabled;
+
+                          final displayedTemplate = isWhatsAppTab
+                              ? (tpl['whatsapp_template'] ??
+                                  tpl['template'] ??
+                                  '')
+                              : (tpl['sms_template'] ??
+                                  tpl['template'] ??
+                                  '');
+
                           return Container(
                             padding: const EdgeInsets.all(12),
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
                               color: isEnabled
-                                  ? POSColors.surface
+                                  ? (isWhatsAppTab
+                                      ? const Color(0xFFF0FDF4)
+                                      : POSColors.surface)
                                   : Colors.grey[50]!,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isEnabled
-                                    ? POSColors.border
+                                    ? (isWhatsAppTab
+                                        ? const Color(0xFF86EFAC)
+                                        : POSColors.border)
                                     : Colors.grey[200]!,
                               ),
                             ),
@@ -2224,140 +2326,172 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      tpl['name'] ?? '',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: isEnabled
-                                            ? POSColors.text
-                                            : POSColors.textDisabled,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          tpl['name'] ?? '',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: isEnabled
+                                                ? POSColors.text
+                                                : POSColors.textDisabled,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isWhatsAppTab
+                                                ? const Color(0xFFDCFCE7)
+                                                : const Color(0xFFDBEAFE),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            isWhatsAppTab ? 'WhatsApp' : 'SMS',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: isWhatsAppTab
+                                                  ? const Color(0xFF15803D)
+                                                  : const Color(0xFF1D4ED8),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     IconButton(
-                                      tooltip: 'Mesaj metnini düzenle',
-                                      icon: const Icon(
+                                      tooltip: isWhatsAppTab
+                                          ? 'WhatsApp mesaj metnini düzenle'
+                                          : 'SMS metnini düzenle',
+                                      icon: Icon(
                                         Icons.edit_rounded,
                                         size: 18,
-                                        color: POSColors.blue,
+                                        color: isWhatsAppTab
+                                            ? const Color(0xFF16A34A)
+                                            : POSColors.blue,
                                       ),
                                       onPressed: () {
-                                        _showEditTemplateDialog(tpl, (
-                                          updatedTpl,
-                                        ) {
-                                          setState(() {
-                                            updatedTpl['sms_enabled'] =
-                                                smsTemplateEnabled;
-                                            updatedTpl['whatsapp_enabled'] =
-                                                whatsappTemplateEnabled;
-                                            updatedTpl['enabled'] =
-                                                smsTemplateEnabled;
-                                            listTemplates[i] = updatedTpl;
-                                          });
-                                        });
+                                        _showEditTemplateDialog(
+                                          tpl,
+                                          (updatedTpl) {
+                                            setState(() {
+                                              listTemplates[i] = updatedTpl;
+                                            });
+                                          },
+                                          channel: selectedChannel,
+                                        );
                                       },
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  tpl['template'] ?? '',
+                                  displayedTemplate,
                                   style: TextStyle(
                                     fontSize: 13,
+                                    height: 1.35,
                                     color: isEnabled
                                         ? POSColors.textSecondary
                                         : POSColors.textDisabled,
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                Wrap(
-                                  spacing: 16,
-                                  runSpacing: 6,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Switch.adaptive(
-                                          value: smsTemplateEnabled,
-                                          activeColor: POSColors.green,
-                                          onChanged: smsEnabled
-                                              ? (val) => setState(() {
-                                                    tpl['sms_enabled'] = val;
-                                                    tpl['enabled'] = val;
-                                                  })
-                                              : null,
-                                        ),
-                                        const Text(
-                                          'SMS',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
+                                if (isWhatsAppTab) ...[
+                                  Row(
+                                    children: [
+                                      Switch.adaptive(
+                                        value: whatsappTemplateEnabled,
+                                        activeColor: const Color(0xFF16A34A),
+                                        onChanged: whatsappConnected &&
+                                                whatsappSupported
+                                            ? (val) => setState(
+                                                  () => tpl['whatsapp_enabled'] =
+                                                      val,
+                                                )
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      InkWell(
+                                        onTap: !whatsappConnected
+                                            ? () async {
+                                                await showDialog<bool>(
+                                                  context: context,
+                                                  builder: (ctx) =>
+                                                      const EvolutionQRDialog(),
+                                                );
+                                                _loadWhatsAppStatus();
+                                              }
+                                            : null,
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 2,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    // WhatsApp switch'i _kWhatsAppEnabled = true yapılınca görünür
-                                    if (_kWhatsAppEnabled)
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Switch.adaptive(
-                                            value: whatsappTemplateEnabled,
-                                            activeColor:
-                                                const Color(0xFF16A34A),
-                                            onChanged: whatsappConnected &&
-                                                    whatsappSupported
-                                                ? (val) => setState(
-                                                      () => tpl[
-                                                              'whatsapp_enabled'] =
-                                                          val,
-                                                    )
-                                                : null,
-                                          ),
-                                          InkWell(
-                                            onTap: !whatsappConnected
-                                                ? () async {
-                                                    await showDialog<bool>(
-                                                      context: context,
-                                                      builder: (ctx) =>
-                                                          const EvolutionQRDialog(),
-                                                    );
-                                                    _loadWhatsAppStatus();
-                                                  }
-                                                : null,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2),
-                                              child: Text(
-                                                !whatsappSupported
-                                                    ? 'Kullanılamıyor'
-                                                    : whatsappConnected
-                                                        ? 'WhatsApp'
-                                                        : 'WhatsApp (Bağla)',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  color: !whatsappSupported
-                                                      ? POSColors.textDisabled
-                                                      : whatsappConnected
-                                                          ? POSColors.text
-                                                          : const Color(
-                                                              0xFFD97706),
-                                                  decoration: !whatsappConnected &&
-                                                          whatsappSupported
-                                                      ? TextDecoration.underline
-                                                      : null,
-                                                ),
-                                              ),
+                                          child: Text(
+                                            !whatsappSupported
+                                                ? 'Bu işlem için desteklenmiyor'
+                                                : whatsappConnected
+                                                    ? (whatsappTemplateEnabled
+                                                        ? 'WhatsApp Bildirimi Açık'
+                                                        : 'WhatsApp Bildirimi Kapalı')
+                                                    : 'WhatsApp Bağlantısı Gerekli (Bağla)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                              color: !whatsappSupported
+                                                  ? POSColors.textDisabled
+                                                  : whatsappConnected
+                                                      ? (whatsappTemplateEnabled
+                                                          ? const Color(
+                                                              0xFF15803D)
+                                                          : POSColors
+                                                              .textSecondary)
+                                                      : const Color(0xFFD97706),
+                                              decoration: !whatsappConnected &&
+                                                      whatsappSupported
+                                                  ? TextDecoration.underline
+                                                  : null,
                                             ),
                                           ),
-                                        ],
+                                        ),
                                       ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                                ] else ...[
+                                  Row(
+                                    children: [
+                                      Switch.adaptive(
+                                        value: smsTemplateEnabled,
+                                        activeColor: POSColors.green,
+                                        onChanged: smsEnabled
+                                            ? (val) => setState(() {
+                                                  tpl['sms_enabled'] = val;
+                                                  tpl['enabled'] = val;
+                                                })
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        smsTemplateEnabled
+                                            ? 'SMS Gönderimi Açık'
+                                            : 'SMS Gönderimi Kapalı',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: smsTemplateEnabled
+                                              ? POSColors.text
+                                              : POSColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                                 const SizedBox(height: 6),
                                 Row(
                                   mainAxisAlignment:

@@ -9,8 +9,13 @@ import 'package:serenutos/config/theme.dart';
 class SmsEditTemplateDialog extends StatefulWidget {
   final Map<String, dynamic>? existingTpl;
   final ValueChanged<Map<String, dynamic>> onSave;
+  final String channel;
 
-  const SmsEditTemplateDialog({required this.existingTpl, required this.onSave});
+  const SmsEditTemplateDialog({
+    required this.existingTpl,
+    required this.onSave,
+    this.channel = 'sms',
+  });
 
   @override
   State<SmsEditTemplateDialog> createState() => SmsEditTemplateDialogState();
@@ -26,9 +31,17 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
   void initState() {
     super.initState();
     nameCtrl = TextEditingController(text: widget.existingTpl?['name'] ?? '');
-    templateCtrl = TextEditingController(
-      text: widget.existingTpl?['template'] ?? '',
-    );
+    final initialTemplate = widget.channel == 'whatsapp'
+        ? (widget.existingTpl?['whatsapp_template'] ??
+            widget.existingTpl?['template'] ??
+            '')
+        : (widget.existingTpl?['sms_template'] ??
+            widget.existingTpl?['template'] ??
+            '');
+    templateCtrl = TextEditingController(text: initialTemplate);
+    templateCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     selectedEvent = widget.existingTpl?['id'] ?? 'sale_created';
     if (selectedEvent == 'sale') selectedEvent = 'sale_created';
@@ -96,18 +109,82 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
       selectedEvent = 'sale_created';
     }
 
+    final isWhatsApp = widget.channel == 'whatsapp';
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(
-        isNew ? 'Yeni Şablon Ekle' : 'Şablonu Düzenle',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isWhatsApp
+                  ? const Color(0xFF16A34A).withValues(alpha: 0.12)
+                  : POSColors.blue.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isWhatsApp ? Icons.chat_rounded : Icons.sms_rounded,
+              color: isWhatsApp ? const Color(0xFF16A34A) : POSColors.blue,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isWhatsApp
+                  ? (isNew ? 'Yeni WhatsApp Şablonu' : 'WhatsApp Şablonunu Düzenle')
+                  : (isNew ? 'Yeni SMS Şablonu' : 'SMS Şablonunu Düzenle'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ),
+        ],
       ),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isWhatsApp
+                      ? const Color(0xFFF0FDF4)
+                      : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isWhatsApp
+                        ? const Color(0xFFBBF7D0)
+                        : const Color(0xFFBFDBFE),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      isWhatsApp ? Icons.info_outline_rounded : Icons.speed_rounded,
+                      size: 16,
+                      color: isWhatsApp ? const Color(0xFF15803D) : const Color(0xFF1D4ED8),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isWhatsApp
+                            ? 'WhatsApp mesajlarında karakter sınırı yoktur. Emojiler, satır başları, *kalın* ve _italik_ metin serbestçe kullanılabilir.'
+                            : 'Standart SMS sınırı 160 karakterdir. Fazla karakterler ek SMS olarak ücretlendirilebilir.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isWhatsApp ? const Color(0xFF15803D) : const Color(0xFF1D4ED8),
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: nameCtrl,
                 style: const TextStyle(fontSize: 14),
@@ -181,12 +258,19 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: templateCtrl,
-                maxLines: 3,
+                maxLines: isWhatsApp ? 6 : 3,
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'Mesaj Şablonu',
-                  hintText: 'örn: Sn. {customer}, {amount} TL ödemeniz alındı.',
-                  prefixIcon: const Icon(Icons.text_snippet_rounded, size: 18),
+                  labelText: isWhatsApp
+                      ? 'WhatsApp Mesaj Şablonu (Karakter Sınırı Yok)'
+                      : 'SMS Mesaj Şablonu',
+                  hintText: isWhatsApp
+                      ? 'örn:\n🧾 *Sipariş Bilgisi*\nSayın *{customer}*,\n{id} numaralı siparişiniz alındı.\n*{business}*'
+                      : 'örn: Sn. {customer}, {amount} TL ödemeniz alındı.',
+                  prefixIcon: Icon(
+                    isWhatsApp ? Icons.chat_bubble_outline_rounded : Icons.text_snippet_rounded,
+                    size: 18,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -194,6 +278,22 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
                 validator: (v) =>
                     v!.trim().isEmpty ? 'Şablon içeriği gerekli' : null,
               ),
+              if (!isWhatsApp) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${templateCtrl.text.length} / 160 karakter (1 SMS)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: templateCtrl.text.length > 160
+                          ? Colors.red[700]
+                          : POSColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               const Align(
                 alignment: Alignment.centerLeft,
@@ -236,25 +336,33 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
         ElevatedButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              final result = {
-                'id': selectedEvent,
-                'name': nameCtrl.text.trim(),
-                'template': templateCtrl.text.trim(),
-                'enabled': widget.existingTpl?['sms_enabled'] ??
+              final result = Map<String, dynamic>.from(widget.existingTpl ?? {});
+              result['id'] = selectedEvent;
+              result['name'] = nameCtrl.text.trim();
+              if (isWhatsApp) {
+                result['whatsapp_template'] = templateCtrl.text.trim();
+                result['whatsapp_enabled'] =
+                    widget.existingTpl?['whatsapp_enabled'] ?? true;
+                result['sms_template'] ??= widget.existingTpl?['sms_template'] ??
+                    widget.existingTpl?['template'] ??
+                    '';
+                result['template'] = result['sms_template'];
+              } else {
+                result['sms_template'] = templateCtrl.text.trim();
+                result['template'] = templateCtrl.text.trim();
+                result['sms_enabled'] = widget.existingTpl?['sms_enabled'] ??
                     widget.existingTpl?['enabled'] ??
-                    true,
-                'sms_enabled': widget.existingTpl?['sms_enabled'] ??
-                    widget.existingTpl?['enabled'] ??
-                    true,
-                'whatsapp_enabled':
-                    widget.existingTpl?['whatsapp_enabled'] ?? false,
-              };
+                    true;
+                result['enabled'] = result['sms_enabled'];
+                result['whatsapp_template'] ??=
+                    widget.existingTpl?['whatsapp_template'] ?? '';
+              }
               widget.onSave(result);
               Navigator.pop(context);
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: POSColors.green,
+            backgroundColor: isWhatsApp ? const Color(0xFF16A34A) : POSColors.green,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),

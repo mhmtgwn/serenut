@@ -131,7 +131,13 @@ class TemplateResolver {
             item['sms_enabled'] ?? item['enabled'],
           NotificationTemplateChannel.whatsapp => item['whatsapp_enabled'],
         };
-        final template = item['template']?.toString();
+        final template = switch (channel) {
+          NotificationTemplateChannel.sms =>
+            item['sms_template']?.toString() ?? item['template']?.toString(),
+          NotificationTemplateChannel.whatsapp =>
+            item['whatsapp_template']?.toString() ??
+                item['template']?.toString(),
+        };
 
         if (id == null || template == null || template.trim().isEmpty) continue;
         if (enabled != true) continue;
