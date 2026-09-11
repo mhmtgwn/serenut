@@ -390,9 +390,23 @@ export async function setWebhook(companyId: string, webhookUrl: string): Promise
 // ── MESAJ GÖNDERİMİ ──────────────────────────────────────────────────────────
 
 /**
- * Belirtilen telefon numarasına WhatsApp metin mesajı gönderir.
- * @param companyId - Gönderici şirket ID'si (bağlı instance için)
- * @param phone - Alıcı telefon numarası (örn: "905551234567", + işareti olmadan)
+ * Belirtilen telefon numarasına ülkeye özel normalizasyon uygular.
+ */
+export function normalizeEvolutionPhone(phone: string): string {
+  let digits = String(phone || '').replace(/\D/g, '');
+  const defaultCountryCode = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '90').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = `${defaultCountryCode}${digits.slice(1)}`;
+  if (digits.length === 10) digits = `${defaultCountryCode}${digits}`;
+  return digits;
+}
+
+/**
+ * Evolution API üzerinden metin mesajı gönderir.
+ * Şablon onayı gerektirmez. Müşteri serbest metin alır.
+ *
+ * @param companyId - Şirket ID'si (tenant)
+ * @param phone - Alıcı telefon numarası (örn: "05551234567", "5551234567" veya "905551234567")
  * @param text - Gönderilecek mesaj metni
  * @returns Evolution API mesaj ID'si
  */
@@ -403,8 +417,8 @@ export async function sendTextMessage(
 ): Promise<string> {
   const name = instanceId(companyId);
 
-  // Numara normalizasyonu: +, boşluk, tire temizlenir
-  const normalizedPhone = phone.replace(/[^\d]/g, '');
+  // Numara normalizasyonu: Ülke kodu ile E.164 standardına getirilir (örn: 0542... -> 90542...)
+  const normalizedPhone = normalizeEvolutionPhone(phone);
   // JID formatı: 905xxxxxxxxx@s.whatsapp.net
   const jid = `${normalizedPhone}@s.whatsapp.net`;
 

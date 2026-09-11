@@ -431,7 +431,7 @@ async function markFailed(notificationId: string, companyId: string, channel: st
 }
 
 export async function reserveNotificationCredit(notificationId: string, companyId: string, channel: string): Promise<boolean> {
-  if (channel === 'push') return true;
+  if (channel === 'push' || (channel === 'whatsapp' && process.env.WHATSAPP_GATEWAY === 'evolution')) return true;
   const creditCol = creditColumn(channel);
   const client = await pgPool.connect();
   let allowed = false;

@@ -275,14 +275,20 @@ router.post('/templates/sync', requireWhatsAppManager, async (req: Authenticated
 
 router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
   const eventKey = String(req.body?.event_key || '');
-  const recipient = String(req.body?.recipient || '');
+  const rawRecipient = String(req.body?.recipient || '');
   const clientEventId = String(req.body?.client_event_id || '');
   const parameters = Array.isArray(req.body?.parameters) ? req.body.parameters.map((item: unknown) => String(item)) : [];
   const fallbackBody = String(req.body?.fallback_body || '').slice(0, 4096);
   const knownEvent = STANDARD_WHATSAPP_TEMPLATES.some((definition) => definition.eventKey === eventKey);
-  if (!knownEvent || !recipient || !clientEventId || clientEventId.length > 100) {
+  if (!knownEvent || !rawRecipient || !clientEventId || clientEventId.length > 100) {
     return res.status(400).json({ error: 'invalid_whatsapp_event', message: 'WhatsApp bildirim olayı geçersiz.' });
   }
+
+  let recipient = rawRecipient.replace(/\D/g, '');
+  const defaultCountryCode = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '90').replace(/\D/g, '');
+  if (recipient.startsWith('00')) recipient = recipient.slice(2);
+  if (recipient.startsWith('0')) recipient = `${defaultCountryCode}${recipient.slice(1)}`;
+  if (recipient.length === 10) recipient = `${defaultCountryCode}${recipient}`;
   if (!isNotificationChannelEnabled('whatsapp')) {
     return res.status(202).json({ queued: false, reason: 'channel_disabled' });
   }
