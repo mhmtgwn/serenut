@@ -42,14 +42,21 @@ if ! grep -q "^EVOLUTION_API_URL=" "$ENV_FILE"; then
   upsert EVOLUTION_API_URL "http://evolution-api:8080"
 fi
 
-# EVOLUTION_DB_URL: Docker içinden 'db' servisine doğrudan erişecek PostgreSQL URL'si
+# EVOLUTION_DB_URL: Docker içinden 'db' servisine doğrudan erişecek PostgreSQL URL'si (izole schema=evolution)
 if ! grep -q "^EVOLUTION_DB_URL=" "$ENV_FILE"; then
   pg_user="$(sed -n "s/^POSTGRES_USER=//p" "$ENV_FILE" | tail -n 1)"
   pg_pass="$(sed -n "s/^POSTGRES_PASSWORD=//p" "$ENV_FILE" | tail -n 1)"
   pg_db="$(sed -n "s/^POSTGRES_DB=//p" "$ENV_FILE" | tail -n 1)"
   if [ -n "$pg_user" ] && [ -n "$pg_pass" ] && [ -n "$pg_db" ]; then
-    upsert EVOLUTION_DB_URL "postgresql://${pg_user}:${pg_pass}@db:5432/${pg_db}"
+    upsert EVOLUTION_DB_URL "postgresql://${pg_user}:${pg_pass}@db:5432/${pg_db}?schema=evolution"
   fi
+else
+  # Mevcut URL'de ?schema= yoksa evolution şemasını ekle
+  current_db_url="$(sed -n "s/^EVOLUTION_DB_URL=//p" "$ENV_FILE" | tail -n 1)"
+  case "$current_db_url" in
+    *schema=*) ;;
+    *) upsert EVOLUTION_DB_URL "${current_db_url}?schema=evolution" ;;
+  esac
 fi
 
 # EVOLUTION_REDIS_URL: Docker içinden 'redis' servisine doğrudan erişecek Redis URL'si
