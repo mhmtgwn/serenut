@@ -58,6 +58,9 @@ class SharedHardwareWorker {
         if (job == null) return;
         await _execute(job);
       }
+    } catch (_) {
+      // Offline status, network handshake resets, or server restarts during deployment
+      // are normal during periodic background polling; retried on the next cycle.
     } finally {
       _busy = false;
     }

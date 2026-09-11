@@ -2214,9 +2214,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                               _kWhatsAppEnabled ? whatsappTemplates[eventId] : null;
                           final whatsappStatus = whatsappTemplate?['status'];
                           // ignore: unused_local_variable — kullanılıyor (_kWhatsAppEnabled=true iken)
-                          final whatsappTemplateName = whatsappTemplate?['name'];
-                          final whatsappReady = whatsappStatus == 'approved' ||
-                              whatsappStatus == 'active';
+                          final whatsappReady = whatsappConnected;
                           final isEnabled = smsTemplateEnabled;
                           return Container(
                             padding: const EdgeInsets.all(12),
@@ -2321,8 +2319,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                             activeColor:
                                                 const Color(0xFF16A34A),
                                             onChanged: whatsappConnected &&
-                                                    whatsappSupported &&
-                                                    whatsappReady
+                                                    whatsappSupported
                                                 ? (val) => setState(
                                                       () => tpl[
                                                               'whatsapp_enabled'] =
@@ -2330,19 +2327,44 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                                     )
                                                 : null,
                                           ),
-                                          Text(
-                                            !whatsappSupported
-                                                ? 'Kullanılamıyor'
-                                                : whatsappStatus == null
-                                                    ? 'Meta onayı bekleniyor'
-                                                    : _whatsappStatusLabel(
-                                                        whatsappStatus),
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              color: whatsappConnected &&
-                                                      whatsappSupported
-                                                  ? POSColors.text
-                                                  : POSColors.textDisabled,
+                                          InkWell(
+                                            onTap: !whatsappConnected
+                                                ? () async {
+                                                    await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (ctx) =>
+                                                          const EvolutionQRDialog(),
+                                                    );
+                                                    _loadWhatsAppStatus();
+                                                  }
+                                                : null,
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 2),
+                                              child: Text(
+                                                !whatsappSupported
+                                                    ? 'Kullanılamıyor'
+                                                    : whatsappConnected
+                                                        ? 'WhatsApp'
+                                                        : 'WhatsApp (Bağla)',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: !whatsappSupported
+                                                      ? POSColors.textDisabled
+                                                      : whatsappConnected
+                                                          ? POSColors.text
+                                                          : const Color(
+                                                              0xFFD97706),
+                                                  decoration: !whatsappConnected &&
+                                                          whatsappSupported
+                                                      ? TextDecoration.underline
+                                                      : null,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ],

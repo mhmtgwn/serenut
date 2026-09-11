@@ -287,6 +287,35 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(202).json({ queued: false, reason: 'channel_disabled' });
   }
   try {
+    const connectionRes = await runWithTenantContext(
+      req.user!.company_id,
+      `SELECT gateway_type, status, evolution_status
+       FROM company_whatsapp_connections
+       WHERE company_id=$1`,
+      [req.user!.company_id],
+    );
+    const conn = connectionRes.rows[0];
+    if (!conn) {
+      return res.status(202).json({ queued: false, reason: 'not_configured' });
+    }
+
+    if (conn.gateway_type === 'evolution') {
+      if (conn.status !== 'active' || conn.evolution_status !== 'open') {
+        return res.status(202).json({ queued: false, reason: 'evolution_not_connected' });
+      }
+      const id = `notif-wa-${crypto.randomUUID()}`;
+      const inserted = await runWithTenantContext(
+        req.user!.company_id,
+        `INSERT INTO notification_queue
+           (id,company_id,channel,recipient,body,status,scheduled_at,provider_payload,client_message_id,created_by_user_id)
+         VALUES($1,$2,'whatsapp',$3,$4,'pending',NOW(),'{}'::jsonb,$5,$6)
+         ON CONFLICT(company_id,client_message_id) WHERE client_message_id IS NOT NULL DO NOTHING
+         RETURNING id`,
+        [id, req.user!.company_id, recipient, fallbackBody || eventKey, clientEventId, req.user!.id],
+      );
+      return res.status(202).json({ queued: inserted.rows.length > 0, duplicate: inserted.rows.length === 0, queue_id: inserted.rows[0]?.id || null });
+    }
+
     const template = await runWithTenantContext(
       req.user!.company_id,
       `SELECT t.meta_template_name,t.language_code,t.status,c.status AS connection_status

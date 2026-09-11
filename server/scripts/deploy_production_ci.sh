@@ -62,7 +62,7 @@ $COMPOSE build backend maintenance-agent
 # before migrations, container replacement, or release metadata changes.
 $COMPOSE run --rm backend node dist/scripts/publish-release.js verify-policy
 docker ps -a -q --filter "name=serenut-maintenance-agent" | xargs -r docker rm -f 2>/dev/null || true
-$COMPOSE up -d --force-recreate --remove-orphans maintenance-agent
+$COMPOSE --profile evolution up -d --force-recreate maintenance-agent
 $COMPOSE run --rm backend node dist/scripts/run-migrations.js
 
 # SCP writes incoming artifacts as the SSH user while the API runs as the
@@ -70,8 +70,9 @@ $COMPOSE run --rm backend node dist/scripts/run-migrations.js
 $COMPOSE run --rm --user root backend sh -c \
   "mkdir -p '$INCOMING_DIR/android' '$INCOMING_DIR/windows' /var/www/serenut-api/releases/android/stable /var/www/serenut-api/releases/windows/stable && chown -R node:node /var/www/serenut-api/releases"
 
-$COMPOSE up -d --remove-orphans
-$COMPOSE --profile evolution up -d evolution-api 2>/dev/null || true
+$COMPOSE --profile evolution pull evolution-api || true
+$COMPOSE --profile evolution up -d --remove-orphans
+$COMPOSE --profile evolution up -d evolution-api
 if ! curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/ready; then
   exit 1
 fi
