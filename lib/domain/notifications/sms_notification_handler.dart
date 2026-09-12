@@ -146,6 +146,8 @@ class SmsNotificationHandler {
           businessName: business,
           currency: currency,
           itemNames: event.itemNames,
+          discountAmount: event.discountAmount,
+          note: event.note,
         ),
       );
 
@@ -165,6 +167,8 @@ class SmsNotificationHandler {
             businessName: business,
             currentBalance: customer.balance,
             currency: currency,
+            discountAmount: event.discountAmount,
+            note: event.note,
           ),
         );
       }
@@ -221,6 +225,8 @@ class SmsNotificationHandler {
           businessName: settings.businessName,
           currency: settings.currency,
           itemNames: event.itemNames,
+          discountAmount: event.discountAmount,
+          note: event.note,
         ),
       );
     } catch (e) {
@@ -236,6 +242,7 @@ class SmsNotificationHandler {
       final customer = await _customerRepository.findById(event.customerIdStr);
       if (customer == null || customer.phone.isEmpty) return;
 
+      final cleanNote = (event.note ?? '').trim();
       _sendIfEnabled(
         eventType: kSmsEventOrderDelivered,
         settings: settings,
@@ -245,6 +252,12 @@ class SmsNotificationHandler {
           'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
+          'note': cleanNote,
+          'order_note': cleanNote,
+          'note_line': cleanNote.isNotEmpty
+              ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+              : '',
+          'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
         },
       );
     } catch (e) {
@@ -260,6 +273,7 @@ class SmsNotificationHandler {
       final customer = await _customerRepository.findById(event.customerIdStr);
       if (customer == null || customer.phone.isEmpty) return;
 
+      final cleanNote = (event.note ?? '').trim();
       _sendIfEnabled(
         eventType: kSmsEventOrderPreparing,
         settings: settings,
@@ -269,6 +283,12 @@ class SmsNotificationHandler {
           'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
+          'note': cleanNote,
+          'order_note': cleanNote,
+          'note_line': cleanNote.isNotEmpty
+              ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+              : '',
+          'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
         },
       );
     } catch (e) {
@@ -284,6 +304,11 @@ class SmsNotificationHandler {
       final customer = await _customerRepository.findById(event.customerIdStr);
       if (customer == null || customer.phone.isEmpty) return;
 
+      final cleanNote = (event.note ?? '').trim();
+      final discountStr = TemplateResolver.formatCurrency(
+        event.discountAmount,
+        settings.currency,
+      );
       _sendIfEnabled(
         eventType: kSmsEventOrderReady,
         settings: settings,
@@ -295,6 +320,14 @@ class SmsNotificationHandler {
             event.totalAmount,
             settings.currency,
           ),
+          'discount': discountStr,
+          'discount_amount': discountStr,
+          'note': cleanNote,
+          'order_note': cleanNote,
+          'note_line': cleanNote.isNotEmpty
+              ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+              : '',
+          'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -312,6 +345,7 @@ class SmsNotificationHandler {
       final customer = await _customerRepository.findById(event.customerIdStr);
       if (customer == null || customer.phone.isEmpty) return;
 
+      final cleanNote = (event.note ?? '').trim();
       _sendIfEnabled(
         eventType: kSmsEventOrderCancelled,
         settings: settings,
@@ -321,6 +355,12 @@ class SmsNotificationHandler {
           'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
+          'note': cleanNote,
+          'order_note': cleanNote,
+          'note_line': cleanNote.isNotEmpty
+              ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+              : '',
+          'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
         },
       );
     } catch (e) {

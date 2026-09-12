@@ -237,6 +237,7 @@ class SalesService {
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
           itemNames: itemLines,
+          discountAmount: discount,
           occurredAt: DateTime.now(),
         ));
 
@@ -339,6 +340,7 @@ class SalesService {
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
           itemNames: itemLines,
+          discountAmount: discount,
           occurredAt: DateTime.now(),
         ));
 

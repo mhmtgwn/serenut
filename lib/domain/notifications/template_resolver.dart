@@ -45,9 +45,9 @@ Sayın *{customer}*,
 #{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.
 
 📦 *Sipariş İçeriği:*
-{items}
+{items}{discount_line}
 
-▫️ *Sipariş Tutarı:* *{amount}*
+▫️ *Sipariş Tutarı:* *{amount}*{note_line}
 📅 *Tarih:* {date}
 
 Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
@@ -59,9 +59,9 @@ Sayın *{customer}*,
 #{id} numaralı siparişiniz başarıyla alınmış ve sıraya eklenmiştir.
 
 📦 *Sipariş İçeriği:*
-{items}
+{items}{discount_line}
 
-▫️ *Sipariş Tutarı:* *{amount}*
+▫️ *Sipariş Tutarı:* *{amount}*{note_line}
 📅 *Tarih:* {date}
 
 Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
@@ -70,7 +70,7 @@ Bizi tercih ettiğiniz için teşekkür ederiz!
   kSmsEventOrderPreparing: '''👨‍🍳 *Siparişiniz Hazırlanıyor*
 
 Sayın *{customer}*,
-#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.
+#{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.{note_line}
 
 En kısa sürede tamamlanıp hazır hale getirilecektir.
 *{business}*''',
@@ -80,21 +80,21 @@ Sayın *{customer}*,
 #{id} numaralı siparişiniz hazır durumdadır.
 
 ▫️ *Sipariş No:* #{id}
-▫️ *Toplam Tutar:* *{amount}*
+▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 İşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!
 *{business}*''',
   kSmsEventOrderDelivered: '''✨ *Sipariş Teslim Edildi*
 
 Sayın *{customer}*,
-#{id} numaralı siparişiniz teslim edilmiştir.
+#{id} numaralı siparişiniz teslim edilmiştir.{note_line}
 
 Bizi tercih ettiğiniz için teşekkür ederiz. Tekrar görüşmek dileğiyle!
 *{business}*''',
   kSmsEventOrderCancelled: '''❌ *Sipariş İptal Bildirimi*
 
 Sayın *{customer}*,
-#{id} numaralı siparişiniz iptal edilmiştir.
+#{id} numaralı siparişiniz iptal edilmiştir.{note_line}
 
 Herhangi bir sorunuz veya ayrıntılı bilgi için bizimle iletişime geçebilirsiniz.
 *{business}*''',
@@ -107,10 +107,10 @@ Alışverişiniz başarıyla tamamlanmıştır.
 ▫️ *Tarih:* {date}
 
 🛍️ *Satın Alınan Ürünler:*
-{items}
+{items}{discount_line}
 
 ▫️ *Ödenen:* *{paid}*
-▫️ *Toplam Tutar:* *{amount}*
+▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
 *{business}*''',
@@ -123,10 +123,10 @@ Alışverişiniz başarıyla tamamlanmıştır.
 ▫️ *Tarih:* {date}
 
 🛍️ *Satın Alınan Ürünler:*
-{items}
+{items}{discount_line}
 
 ▫️ *Ödenen:* *{paid}*
-▫️ *Toplam Tutar:* *{amount}*
+▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
 *{business}*''',
@@ -338,10 +338,23 @@ class TemplateResolver {
             ? (vars['whatsapp_items'] ?? value)
             : (vars['sms_items'] ?? value);
         result = result.replaceAll('{$key}', replacement);
-      } else if (key != 'whatsapp_items' && key != 'sms_items') {
+      } else if (key == 'discount_line') {
+        final replacement = isWhatsApp
+            ? value
+            : (vars['sms_discount_line'] ?? '');
+        result = result.replaceAll('{$key}', replacement);
+      } else if (key == 'note_line') {
+        final replacement = isWhatsApp
+            ? value
+            : (vars['sms_note_line'] ?? '');
+        result = result.replaceAll('{$key}', replacement);
+      } else if (!key.startsWith('whatsapp_') && !key.startsWith('sms_')) {
         result = result.replaceAll('{$key}', value);
       }
     });
+    while (result.contains('\n\n\n')) {
+      result = result.replaceAll('\n\n\n', '\n\n');
+    }
     return result;
   }
 }
@@ -362,11 +375,34 @@ class SmsTemplateVars {
     required String businessName,
     String currency = '₺',
     List<String>? itemNames,
+    double discountAmount = 0.0,
+    String? note,
   }) {
     final (smsItems, whatsappItems) = _formatItems(itemNames);
+    final discountStr = _fmt(discountAmount, currency);
+    final subtotalStr = _fmt(totalAmount + discountAmount, currency);
+    final cleanNote = (note ?? '').trim();
     return {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
+      'subtotal': subtotalStr,
+      'discount': discountStr,
+      'discount_amount': discountStr,
+      'has_discount': discountAmount > 0.001 ? 'true' : 'false',
+      'discount_line': discountAmount > 0.001
+          ? '\n▫️ *İndirim:* -$discountStr'
+          : '',
+      'sms_discount_line': discountAmount > 0.001
+          ? ' (İndirim: -$discountStr)'
+          : '',
+      'note': cleanNote,
+      'order_note': cleanNote,
+      'note_line': cleanNote.isNotEmpty
+          ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+          : '',
+      'sms_note_line': cleanNote.isNotEmpty
+          ? ' (Not: $cleanNote)'
+          : '',
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(
         (totalAmount - paidAmount).clamp(0, double.maxFinite),
@@ -378,7 +414,6 @@ class SmsTemplateVars {
       'items': smsItems,
       'sms_items': smsItems,
       'whatsapp_items': whatsappItems,
-      'discount': _fmt(0, currency),
     };
   }
 
@@ -390,12 +425,21 @@ class SmsTemplateVars {
     required String businessName,
     required double currentBalance,
     String currency = '₺',
+    double discountAmount = 0.0,
+    String? note,
   }) {
     final debtAmount = (totalAmount - paidAmount).clamp(0.0, double.maxFinite);
     final newBalance = currentBalance - debtAmount;
+    final discountStr = _fmt(discountAmount, currency);
+    final cleanNote = (note ?? '').trim();
     return {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
+      'subtotal': _fmt(totalAmount + discountAmount, currency),
+      'discount': discountStr,
+      'discount_amount': discountStr,
+      'note': cleanNote,
+      'order_note': cleanNote,
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(debtAmount, currency),
       'balance': _fmt(newBalance.abs(), currency),
@@ -403,7 +447,6 @@ class SmsTemplateVars {
       'business': businessName,
       'date': _today(),
       'items': '',
-      'discount': _fmt(0, currency),
     };
   }
 
@@ -438,11 +481,34 @@ class SmsTemplateVars {
     required String businessName,
     String currency = '₺',
     List<String>? itemNames,
+    double discountAmount = 0.0,
+    String? note,
   }) {
     final (smsItems, whatsappItems) = _formatItems(itemNames);
+    final discountStr = _fmt(discountAmount, currency);
+    final subtotalStr = _fmt(totalAmount + discountAmount, currency);
+    final cleanNote = (note ?? '').trim();
     return {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
+      'subtotal': subtotalStr,
+      'discount': discountStr,
+      'discount_amount': discountStr,
+      'has_discount': discountAmount > 0.001 ? 'true' : 'false',
+      'discount_line': discountAmount > 0.001
+          ? '\n▫️ *İndirim:* -$discountStr'
+          : '',
+      'sms_discount_line': discountAmount > 0.001
+          ? ' (İndirim: -$discountStr)'
+          : '',
+      'note': cleanNote,
+      'order_note': cleanNote,
+      'note_line': cleanNote.isNotEmpty
+          ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+          : '',
+      'sms_note_line': cleanNote.isNotEmpty
+          ? ' (Not: $cleanNote)'
+          : '',
       'paid': _fmt(0, currency),
       'debt': '0,00 $currency',
       'id': orderId.toShortId,
@@ -451,7 +517,6 @@ class SmsTemplateVars {
       'items': smsItems,
       'sms_items': smsItems,
       'whatsapp_items': whatsappItems,
-      'discount': _fmt(0, currency),
     };
   }
 

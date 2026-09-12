@@ -53,6 +53,8 @@ class SaleCreatedEvent extends DomainEvent {
   final double paidAmount; // used to detect debt (totalAmount - paidAmount > 0)
   final String paymentMethod; // 'cash' | 'card' | 'debt' | 'karma'
   final List<String> itemNames; // formatted item breakdown
+  final double discountAmount;
+  final String? note;
 
   SaleCreatedEvent({
     required this.saleId,
@@ -65,6 +67,8 @@ class SaleCreatedEvent extends DomainEvent {
     this.paidAmount = 0,
     this.paymentMethod = 'cash',
     this.itemNames = const [],
+    this.discountAmount = 0.0,
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -87,6 +91,8 @@ class OrderCreatedEvent extends DomainEvent {
   final String orderIdStr;
   final String customerIdStr;
   final List<String> itemNames; // formatted item breakdown
+  final double discountAmount;
+  final String? note;
 
   OrderCreatedEvent({
     required this.orderId,
@@ -96,6 +102,8 @@ class OrderCreatedEvent extends DomainEvent {
     this.orderIdStr = '',
     this.customerIdStr = '',
     this.itemNames = const [],
+    this.discountAmount = 0.0,
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -187,6 +195,7 @@ class OrderDeliveredEvent extends DomainEvent {
   // String UUID fields
   final String orderIdStr;
   final String customerIdStr;
+  final String? note;
 
   OrderDeliveredEvent({
     required this.orderId,
@@ -194,6 +203,7 @@ class OrderDeliveredEvent extends DomainEvent {
     this.stockChanges,
     this.orderIdStr = '',
     this.customerIdStr = '',
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -267,12 +277,14 @@ class OrderPreparingEvent extends DomainEvent {
   final int customerId;
   final String orderIdStr;
   final String customerIdStr;
+  final String? note;
 
   OrderPreparingEvent({
     required this.orderId,
     required this.customerId,
     this.orderIdStr = '',
     this.customerIdStr = '',
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -288,6 +300,8 @@ class OrderReadyEvent extends DomainEvent {
   final String orderIdStr;
   final String customerIdStr;
   final double totalAmount;
+  final double discountAmount;
+  final String? note;
 
   OrderReadyEvent({
     required this.orderId,
@@ -295,6 +309,8 @@ class OrderReadyEvent extends DomainEvent {
     this.orderIdStr = '',
     this.customerIdStr = '',
     this.totalAmount = 0.0,
+    this.discountAmount = 0.0,
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(
@@ -309,12 +325,14 @@ class OrderCancelledEvent extends DomainEvent {
   final int customerId;
   final String orderIdStr;
   final String customerIdStr;
+  final String? note;
 
   OrderCancelledEvent({
     required this.orderId,
     required this.customerId,
     this.orderIdStr = '',
     this.customerIdStr = '',
+    this.note,
     super.occurredAt,
     super.metadata,
   }) : super(

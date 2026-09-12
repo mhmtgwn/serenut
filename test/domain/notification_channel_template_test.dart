@@ -159,4 +159,100 @@ void main() {
     expect(wa, contains('🧾 *Alışveriş Fişi*'));
     expect(wa, isNot(contains('Merhaba Ayşe')));
   });
+
+  test('Order WhatsApp template includes discount and note when present', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'order_created',
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    final vars = SmsTemplateVars.forOrder(
+      customerName: 'Mehmet Kaya',
+      totalAmount: 310.0,
+      orderId: 'ORD-555',
+      businessName: 'Lezzet Dünyası',
+      itemNames: ['2 x Karışık Pizza — 360,00 ₺'],
+      discountAmount: 50.0,
+      note: 'Kapıda teslim ediniz, acısız olsun.',
+    );
+
+    final wa = resolver.resolveWhatsApp(
+      eventType: kSmsEventOrderCreated,
+      settings: settings,
+      vars: vars,
+    );
+
+    expect(wa, isNotNull);
+    expect(wa, contains('🛎️ *Siparişiniz Alındı*'));
+    expect(wa, contains('Mehmet Kaya'));
+    expect(wa, contains('▫️ *İndirim:* -50,00 ₺'));
+    expect(wa, contains('▫️ *Sipariş Tutarı:* *310,00 ₺*'));
+    expect(wa, contains('📝 *Sipariş Notu:*'));
+    expect(wa, contains('Kapıda teslim ediniz, acısız olsun.'));
+  });
+
+  test('Order WhatsApp template omits discount and note cleanly when absent', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'order_created',
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    final vars = SmsTemplateVars.forOrder(
+      customerName: 'Fatma Demir',
+      totalAmount: 200.0,
+      orderId: 'ORD-777',
+      businessName: 'Lezzet Dünyası',
+      itemNames: ['1 x Burger Menü — 200,00 ₺'],
+      discountAmount: 0.0,
+      note: null,
+    );
+
+    final wa = resolver.resolveWhatsApp(
+      eventType: kSmsEventOrderCreated,
+      settings: settings,
+      vars: vars,
+    );
+
+    expect(wa, isNotNull);
+    expect(wa, contains('🛎️ *Siparişiniz Alındı*'));
+    expect(wa, isNot(contains('İndirim')));
+    expect(wa, isNot(contains('Sipariş Notu')));
+    expect(wa, contains('▫️ *Sipariş Tutarı:* *200,00 ₺*'));
+  });
+
+  test('Sale WhatsApp template includes discount when present', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'sale_created',
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    final vars = SmsTemplateVars.forSale(
+      customerName: 'Ali Veli',
+      totalAmount: 180.0,
+      paidAmount: 180.0,
+      saleId: 'sale-999',
+      businessName: 'Serenut POS',
+      itemNames: ['1 x Pantolon — 200,00 ₺'],
+      discountAmount: 20.0,
+      note: 'Müşteri kartı indirimi uygulandı',
+    );
+
+    final wa = resolver.resolveWhatsApp(
+      eventType: kSmsEventSaleCreated,
+      settings: settings,
+      vars: vars,
+    );
+
+    expect(wa, isNotNull);
+    expect(wa, contains('🧾 *Alışveriş Fişi*'));
+    expect(wa, contains('▫️ *İndirim:* -20,00 ₺'));
+    expect(wa, contains('▫️ *Toplam Tutar:* *180,00 ₺*'));
+    expect(wa, contains('Müşteri kartı indirimi uygulandı'));
+  });
 }

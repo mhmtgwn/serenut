@@ -227,11 +227,13 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       publisher.publish(OrderCreatedEvent(
         orderId: 0,
         customerId: 0,
-        totalAmount: total,
+        totalAmount: order.totalAmount,
         expectedDeliveryDate: order.expectedDeliveryDate ?? DateTime.now(),
         orderIdStr: persistedOrder.orderNumber,
         customerIdStr: order.customerId,
         itemNames: itemLines,
+        discountAmount: order.discountAmount,
+        note: order.notes,
       ));
     } catch (e, st) {
       TelemetryService().logError(e, st,
@@ -388,6 +390,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         customerId: 0,
         orderIdStr: order.orderNumber,
         customerIdStr: order.customerId,
+        note: order.notes,
       ));
 
       // Invalidate balance/transaction providers to refresh UI state immediately
@@ -403,6 +406,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           customerId: 0,
           orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
+          note: order.notes,
         ));
       } else if (status == 'preparing') {
         publisher.publish(OrderPreparingEvent(
@@ -410,15 +414,17 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           customerId: 0,
           orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
+          note: order.notes,
         ));
       } else if (status == 'ready') {
-        final total = MathEngine.calculateMappedItemsTotal(order.items);
         publisher.publish(OrderReadyEvent(
           orderId: 0,
           customerId: 0,
           orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
-          totalAmount: total,
+          totalAmount: order.totalAmount,
+          discountAmount: order.discountAmount,
+          note: order.notes,
         ));
       }
     }
