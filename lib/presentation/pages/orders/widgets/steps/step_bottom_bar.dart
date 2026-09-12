@@ -247,6 +247,10 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
         ref.invalidate(
             customerDetailProvider(widget.existingOrder!.customerId));
       }
+      ref.invalidate(productsControllerProvider);
+      ref.invalidate(salesProductsControllerProvider);
+      ref.invalidate(ordersProductsControllerProvider);
+      ref.invalidate(dashboardProvider);
 
       // Print order receipt & labels
       // Isolated in try/catch to prevent printer errors from aborting the saved order

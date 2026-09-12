@@ -277,7 +277,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         cartProducts: cached['cartProducts'] as Map<String, ProductEntity>,
         selectedCustomer: cached['selectedCustomer'] as CustomerEntity?,
         paymentMethod: cached['paymentMethod'] as String,
-        paidAmount: cached['paidAmount'] as double,
+        paidAmount: (cached['paidAmount'] as num?)?.toDouble() ?? 0.0,
         discountAmount: (cached['discountAmount'] as num?)?.toDouble() ?? 0.0,
         isSubmitting: false,
         idempotencyKey: cached['idempotencyKey'] as String? ?? '',

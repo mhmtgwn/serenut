@@ -76,6 +76,43 @@ class _CashOutSheet extends ConsumerStatefulWidget {
     required this.totalPaid,
   });
 
+  static Future<T?> show<T>(
+    BuildContext context, {
+    required OrderEntity order,
+    required FinancialTransactionEntity saleTx,
+    required double totalPaid,
+  }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isDesktop = screenWidth >= 900;
+
+    return showDialog<T>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 32 : 16,
+          vertical: isDesktop ? 24 : 16,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 820,
+            maxHeight: (screenHeight * 0.88).clamp(400.0, 750.0),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: _CashOutSheet(
+              order: order,
+              saleTx: saleTx,
+              totalPaid: totalPaid,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   ConsumerState<_CashOutSheet> createState() => _CashOutSheetState();
 }

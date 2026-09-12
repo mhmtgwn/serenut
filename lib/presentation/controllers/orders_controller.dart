@@ -10,6 +10,7 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/providers/database_provider.dart';
@@ -272,6 +273,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    ref.invalidate(productsControllerProvider);
+    ref.invalidate(dashboardProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
@@ -309,6 +312,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    ref.invalidate(productsControllerProvider);
+    ref.invalidate(dashboardProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
@@ -381,6 +386,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    ref.invalidate(productsControllerProvider);
+    ref.invalidate(dashboardProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
@@ -425,6 +432,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         ref.invalidate(customersControllerProvider);
         ref.invalidate(customerTransactionsProvider(order.customerId));
         ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+        ref.invalidate(productsControllerProvider);
       } else {
         await _repository.updateStatus(id, status);
 
@@ -456,6 +464,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           ));
         }
       }
+
+      ref.invalidate(dashboardProvider);
 
       // Non-blocking audit logging (fire-and-forget)
       unawaited(ref.read(auditServiceProvider.future).then((auditService) =>
@@ -531,6 +541,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     }
 
     if (deletedCount > 0) {
+      ref.invalidate(productsControllerProvider);
+      ref.invalidate(dashboardProvider);
       if (state.hasValue) {
         state = AsyncValue.data(
           state.requireValue.where((o) => !deletedIds.contains(o.id)).toList(),
@@ -591,6 +603,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     }
 
     if (cancelledCount > 0) {
+      ref.invalidate(productsControllerProvider);
+      ref.invalidate(dashboardProvider);
       ref.invalidate(customersControllerProvider);
       for (final custId in affectedCustomerIds) {
         ref.invalidate(customerTransactionsProvider(custId));
@@ -681,6 +695,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       }
 
       if (updatedCount > 0) {
+        ref.invalidate(dashboardProvider);
         unawaited(ref.read(syncProvider.notifier).triggerSync());
         if (_statusFilter != null && _statusFilter != targetStatus) {
           unawaited(refresh());
@@ -788,6 +803,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     ref.invalidate(customerTransactionsProvider(order.customerId));
     ref.invalidate(customerBalanceDetailsProvider(order.customerId));
     ref.invalidate(productsControllerProvider);
+    ref.invalidate(dashboardProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }

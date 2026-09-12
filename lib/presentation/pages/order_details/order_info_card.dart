@@ -108,7 +108,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
         }
         final data = snapshot.data;
         final saleTx = data?['saleTx'] as FinancialTransactionEntity?;
-        final totalPaid = data?['totalPaid'] as double? ?? 0.0;
+        final totalPaid = (data?['totalPaid'] as num?)?.toDouble() ?? 0.0;
 
         if (saleTx == null) {
           return _infoRow('Ödeme Yöntemi', 'Bilinmiyor', Icons.payment_rounded);
@@ -404,16 +404,11 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     FinancialTransactionEntity saleTx,
     double totalPaid,
   ) {
-    Navigator.push(
+    _CashOutSheet.show(
       context,
-      MaterialPageRoute(
-        builder: (context) => _CashOutSheet(
-          order: order,
-          saleTx: saleTx,
-          totalPaid: totalPaid,
-        ),
-        fullscreenDialog: true,
-      ),
+      order: order,
+      saleTx: saleTx,
+      totalPaid: totalPaid,
     );
   }
 }

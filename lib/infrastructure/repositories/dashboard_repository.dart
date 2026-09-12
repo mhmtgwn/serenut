@@ -375,17 +375,32 @@ class SqliteDashboardRepository implements IDashboardRepository {
         .toIso8601String();
 
     final rows = await _gateway.rawQuery('''
+      WITH combined_items AS (
+        SELECT 
+          si.product_id AS product_id,
+          si.subtotal AS subtotal
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE s.status != 'cancelled'
+          AND s.created_at >= ?
+        UNION ALL
+        SELECT 
+          oi.product_id AS product_id,
+          (oi.quantity * oi.unit_price) AS subtotal
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
+          AND o.status != 'cancelled'
+          AND o.created_at >= ?
+      )
       SELECT 
-        COALESCE(p.category, 'Diğer') AS category,
-        SUM(si.subtotal) AS total
-      FROM sale_items si
-      JOIN products p ON si.product_id = p.id
-      JOIN sales s ON si.sale_id = s.id
-      WHERE s.status != 'cancelled'
-        AND s.created_at >= ?
-      GROUP BY p.category
+        COALESCE(NULLIF(TRIM(p.category), ''), 'Genel') AS category,
+        SUM(ci.subtotal) AS total
+      FROM combined_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      GROUP BY COALESCE(NULLIF(TRIM(p.category), ''), 'Genel')
       ORDER BY total DESC
-    ''', [thirtyDaysAgo]);
+    ''', [thirtyDaysAgo, thirtyDaysAgo]);
 
     if (rows.isEmpty) return [];
 
@@ -393,7 +408,7 @@ class SqliteDashboardRepository implements IDashboardRepository {
         0.0, (sum, r) => sum + ((r['total'] as num?)?.toDouble() ?? 0.0));
 
     return rows.map((r) {
-      final category = r['category'] as String? ?? 'Diğer';
+      final category = r['category'] as String? ?? 'Genel';
       final total = (r['total'] as num?)?.toDouble() ?? 0.0;
       final percentage = grandTotal == 0 ? 0.0 : (total / grandTotal) * 100;
       return DashboardCategoryShare(

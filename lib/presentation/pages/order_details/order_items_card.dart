@@ -12,7 +12,7 @@ Widget _buildOrderItemsCard(
   double subtotal = 0;
   for (final item in items) {
     final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-    final price = item['unit_price'] as double? ?? 0.0;
+    final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
     subtotal += qty * price;
   }
   final discount = order.discountAmount;
@@ -32,7 +32,7 @@ Widget _buildOrderItemsCard(
             final i = entry.key;
             final item = entry.value;
             final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-            final price = item['unit_price'] as double? ?? 0.0;
+            final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
             final itemTotal = qty * price;
             final productId = item['product_id']?.toString() ?? '';
             final productName = productNameMap[productId] ??

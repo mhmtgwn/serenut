@@ -30,8 +30,6 @@ import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/domain/printing/printing_models.dart';
-import 'package:serenutos/providers/printing_providers.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
@@ -515,23 +513,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         )) {
       groupDevices.add(_buildHardwareCenterCard(settings));
     }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('fiş', 'tasarım', 'yazıcı', 'logo', 'çekmece')) {
-      if (groupDevices.isNotEmpty) groupDevices.add(const _IOSDivider());
-      groupDevices.add(
-        _buildCategoryRow(
-          title: 'Fiş Tasarımı',
-          subtitle: 'Kağıt, logo, QR kod ve kasa çekmecesi ayarları',
-          icon: Icons.receipt_long_rounded,
-          color: _kBlue,
-          onTap: () => _runGuardedAction(
-            Permission.settingsPrinter,
-            () => _showReceiptSettings(settings),
-            title: 'Fiş Tasarımı',
-          ),
-        ),
-      );
-    }
+
     if (_hasPermission(currentUser, Permission.settingsFinance) &&
         _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
       if (groupDevices.isNotEmpty) groupDevices.add(const _IOSDivider());

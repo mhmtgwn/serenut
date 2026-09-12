@@ -104,22 +104,39 @@ class SqliteReportRepository implements IReportRepository {
   // ──────────────────────────────────────────────────────────
   @override
   Future<List<CategoryRevenue>> getCategoryRevenue(DateRange range) async {
-    // Use sale_items → products → categories join via sales table
     final rows = await _gateway.rawQuery('''
+      WITH combined_items AS (
+        SELECT 
+          si.product_id AS product_id,
+          si.sale_id AS source_id,
+          si.subtotal AS subtotal
+        FROM sale_items si
+        JOIN sales s ON si.sale_id = s.id
+        WHERE s.status != 'cancelled'
+          AND s.created_at >= ?
+          AND s.created_at <= ?
+        UNION ALL
+        SELECT 
+          oi.product_id AS product_id,
+          oi.order_id AS source_id,
+          (oi.quantity * oi.unit_price) AS subtotal
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
+          AND o.status != 'cancelled'
+          AND o.created_at >= ?
+          AND o.created_at <= ?
+      )
       SELECT 
-        COALESCE(CAST(p.category AS TEXT), 'unknown') AS cat_id,
-        COALESCE(CAST(p.category AS TEXT), 'Diğer') AS cat_name,
-        SUM(si.subtotal) AS total,
-        COUNT(DISTINCT si.sale_id) AS cnt
-      FROM sale_items si
-      JOIN products p ON si.product_id = p.id
-      JOIN sales s ON si.sale_id = s.id
-      WHERE s.status != 'cancelled'
-        AND s.created_at >= ?
-        AND s.created_at <= ?
-      GROUP BY p.category
+        COALESCE(NULLIF(TRIM(p.category), ''), 'unknown') AS cat_id,
+        COALESCE(NULLIF(TRIM(p.category), ''), 'Genel') AS cat_name,
+        SUM(ci.subtotal) AS total,
+        COUNT(DISTINCT ci.source_id) AS cnt
+      FROM combined_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      GROUP BY COALESCE(NULLIF(TRIM(p.category), ''), 'Genel')
       ORDER BY total DESC
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+    ''', [range.toIsoFrom(), range.toIsoTo(), range.toIsoFrom(), range.toIsoTo()]);
 
     // Also try categories table for names
     final categoryNames = <String, String>{};

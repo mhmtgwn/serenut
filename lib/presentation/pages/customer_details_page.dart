@@ -884,9 +884,9 @@ class _TransactionRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     ...items.map((item) {
-                      final name = item['name'] as String;
+                      final name = (item['name'] ?? item['product_name'] ?? 'Ürün').toString();
                       final qty = item['quantity'];
-                      final price = item['unit_price'] as double;
+                      final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
                       final qtyStr = _formatQuantity(qty);
 
                       return Padding(

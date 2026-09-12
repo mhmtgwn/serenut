@@ -391,14 +391,14 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
     switch (type) {
       case 'product':
         final cat = item['category'] as String? ?? '-';
-        final price = item['price'] as double? ?? 0.0;
+        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
         return 'Kategori: $cat • Fiyat: ₺${price.toStringAsFixed(2)}';
       case 'customer':
         final phone = item['phone'] as String? ?? '-';
-        final bal = item['balance'] as double? ?? 0.0;
+        final bal = (item['balance'] as num?)?.toDouble() ?? 0.0;
         return 'Tel: $phone • Bakiye: ₺${bal.toStringAsFixed(2)}';
       case 'sale':
-        final amt = item['total_amount'] as double? ?? 0.0;
+        final amt = (item['total_amount'] as num?)?.toDouble() ?? 0.0;
         final method = item['payment_method'] as String? ?? '-';
         return 'Tutar: ₺${amt.toStringAsFixed(2)} • Yöntem: $method';
       case 'order':

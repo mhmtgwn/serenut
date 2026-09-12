@@ -538,8 +538,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
             0.0,
             (sum, item) =>
                 sum +
-                ((item['returnQty'] as double) *
-                    (item['unitPrice'] as double)),
+                (((item['returnQty'] as num?)?.toDouble() ?? 0.0) *
+                    ((item['unitPrice'] as num?)?.toDouble() ?? 0.0)),
           );
 
           return AlertDialog(
@@ -567,9 +567,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     ...returnItems.map((item) {
                       final pId = item['productId'] as String;
                       final name = productNameMap[pId] ?? pId;
-                      final maxQty = item['maxQty'] as double;
-                      final currentQty = item['returnQty'] as double;
-                      final price = item['unitPrice'] as double;
+                      final maxQty = (item['maxQty'] as num?)?.toDouble() ?? 0.0;
+                      final currentQty = (item['returnQty'] as num?)?.toDouble() ?? 0.0;
+                      final price = (item['unitPrice'] as num?)?.toDouble() ?? 0.0;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 6),
@@ -763,9 +763,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         }
                         try {
                           final itemsToRefund = returnItems
-                              .where((ri) => (ri['returnQty'] as double) > 0)
+                              .where((ri) => ((ri['returnQty'] as num?)?.toDouble() ?? 0.0) > 0)
                               .map((ri) {
-                            final qty = ri['returnQty'] as double;
+                            final qty = (ri['returnQty'] as num?)?.toDouble() ?? 0.0;
                             final intQty = qty < 1
                                 ? (qty * 1000).round()
                                 : qty.round();
@@ -773,7 +773,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                               productId: ri['productId'] as String,
                               quantity: intQty,
                               saleQuantity: qty,
-                              unitPrice: ri['unitPrice'] as double,
+                              unitPrice: (ri['unitPrice'] as num?)?.toDouble() ?? 0.0,
                             );
                           }).toList();
 

@@ -168,6 +168,8 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     }
     if (created != null) {
       ref.invalidate(salesHistoryControllerProvider);
+      ref.invalidate(productsControllerProvider);
+      ref.invalidate(dashboardProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
     return created;

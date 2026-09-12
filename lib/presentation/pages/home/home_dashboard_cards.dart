@@ -108,6 +108,7 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currency = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -148,7 +149,7 @@ class _CategoryCard extends StatelessWidget {
               ),
             )
           else
-            ...items.take(3).map(
+            ...items.take(4).map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Column(
@@ -158,6 +159,8 @@ class _CategoryCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 item.category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -166,14 +169,14 @@ class _CategoryCard extends StatelessWidget {
                                     ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
-                              '%${item.percentage.toStringAsFixed(0)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              '${currency.format(item.totalAmount)} (%${item.percentage.toStringAsFixed(0)})',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: POSColors.text,
+                              ),
                             ),
                           ],
                         ),

@@ -577,7 +577,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         {'label': '1.5 kg', 'kg': 1.5},
                         {'label': '2 kg', 'kg': 2.0},
                       ].map((preset) {
-                        final kg = preset['kg'] as double;
+                        final kg = (preset['kg'] as num).toDouble();
                         final isSel = (selectedKg - kg).abs() < 0.001;
                         return ChoiceChip(
                           label: Text(preset['label'] as String),

@@ -23,16 +23,55 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 part 'orders/components/orders_status_meta.dart';
 part 'orders/components/order_card.dart';
 part 'orders/components/orders_views.dart';
+part 'orders/components/order_date_group_header.dart';
 
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
-const _kGreenLight = POSColors.greenLight;
-const _kAmberLight = POSColors.amberLight;
-const _kAmberDark = POSColors.amberDark;
 const _kRed = POSColors.red;
 const _kSurface = POSColors.surface;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
+
+String _formatGroupTitle(DateTime date) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final target = DateTime(date.year, date.month, date.day);
+  final diff = today.difference(target).inDays;
+
+  const dayNames = ['Pzt', 'Sal', 'Çrş', 'Per', 'Cum', 'Cts', 'Paz'];
+  final dayName = dayNames[date.weekday - 1];
+  final dateFormatted =
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')} $dayName';
+
+  if (diff == 0) {
+    return 'Bugün • $dateFormatted';
+  } else if (diff == 1) {
+    return 'Dün • $dateFormatted';
+  } else {
+    return dateFormatted;
+  }
+}
+
+List<OrderDayGroup> _groupOrdersByDay(List<OrderEntity> orders) {
+  final Map<DateTime, List<OrderEntity>> grouped = {};
+  for (final order in orders) {
+    final d = order.createdAt;
+    final dayKey = DateTime(d.year, d.month, d.day);
+    grouped.putIfAbsent(dayKey, () => []).add(order);
+  }
+
+  final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+  return sortedKeys.map((k) {
+    final list = grouped[k]!;
+    final total = list.fold<double>(0.0, (sum, o) => sum + o.totalAmount);
+    return OrderDayGroup(
+      date: k,
+      title: _formatGroupTitle(k),
+      orders: list,
+      totalAmount: total,
+    );
+  }).toList();
+}
 
 
 
@@ -166,11 +205,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     final counts = _statusCounts;
 
     return PosPageLayout(
-          title: _isSelecting
-              ? (_selectedIds.isEmpty
-                  ? 'Sipariş Seçin'
-                  : '${_selectedIds.length} Sipariş Seçildi')
-              : 'Siparişler',
+          title: 'Siparişler',
           isSearching: _isSearching,
           onSearchToggled: (val) => setState(() => _isSearching = val),
           searchController: _searchController,
@@ -179,101 +214,86 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
             ref.read(ordersControllerProvider.notifier).applySearch(val);
             _refreshCounts();
           },
-          actions: [
-            if (_isSelecting) ...[
-              IconButton(
-                tooltip: 'Teslim hariç tümünü seç',
-                icon: const Icon(Icons.select_all_rounded),
-                onPressed: () {
-                  final selectableIds = filtered
-                      .where((o) => o.status.toLowerCase() != 'delivered')
-                      .map((o) => o.id)
-                      .toSet();
-                  setState(() {
-                    if (_selectedIds.containsAll(selectableIds) &&
-                        selectableIds.isNotEmpty) {
-                      _selectedIds.clear();
-                    } else {
-                      _selectedIds.addAll(selectableIds);
-                    }
-                  });
+          filterWidget: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWideScreen = constraints.maxWidth >= 960;
+              final filterBar = PosFilterBar(
+                padding: EdgeInsets.zero,
+                selectedId: _statusFilter,
+                onSelected: (newFilter) {
+                  setState(() => _statusFilter = newFilter);
+                  ref
+                      .read(ordersControllerProvider.notifier)
+                      .applyFilter(newFilter);
                 },
-              ),
-              IconButton(
-                tooltip: 'Seçimden Çık',
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () {
-                  setState(() {
-                    _isSelecting = false;
-                    _selectedIds.clear();
-                  });
-                },
-              ),
-            ] else ...[
-              IconButton(
-                tooltip: 'Toplu Seçim',
-                icon: const Icon(Icons.checklist_rounded),
-                onPressed: () {
-                  setState(() {
-                    _isSelecting = true;
-                  });
-                },
-              ),
-            ],
-          ],
-          filterWidget: PosFilterBar(
-            padding: EdgeInsets.zero,
-            selectedId: _statusFilter,
-            onSelected: (newFilter) {
-              setState(() => _statusFilter = newFilter);
-              ref
-                  .read(ordersControllerProvider.notifier)
-                  .applyFilter(newFilter);
+                items: [
+                  PosFilterChipData(
+                    id: 'all',
+                    label: 'Tümü',
+                    count: counts['all'] ?? 0,
+                    icon: Icons.grid_view_rounded,
+                    color: const Color(0xFF64748B),
+                  ),
+                  PosFilterChipData(
+                    id: 'created',
+                    label: 'Yeni',
+                    count: counts['created'] ?? 0,
+                    icon: Icons.fiber_new_rounded,
+                    color: const Color(0xFF3B82F6),
+                  ),
+                  PosFilterChipData(
+                    id: 'preparing',
+                    label: 'Hazırlanıyor',
+                    count: counts['preparing'] ?? 0,
+                    icon: Icons.soup_kitchen_rounded,
+                    color: const Color(0xFFFF9500),
+                  ),
+                  PosFilterChipData(
+                    id: 'ready',
+                    label: 'Hazır',
+                    count: counts['ready'] ?? 0,
+                    icon: Icons.check_circle_rounded,
+                    color: const Color(0xFF16A34A),
+                  ),
+                  PosFilterChipData(
+                    id: 'delivered',
+                    label: 'Teslim Edildi',
+                    count: counts['delivered'] ?? 0,
+                    icon: Icons.task_alt_rounded,
+                    color: const Color(0xFF475569),
+                  ),
+                  PosFilterChipData(
+                    id: 'cancelled',
+                    label: 'İptal',
+                    count: counts['cancelled'] ?? 0,
+                    icon: Icons.cancel_rounded,
+                    color: const Color(0xFFEF4444),
+                  ),
+                ],
+              );
+
+              if (_isSelecting && _selectedIds.isNotEmpty) {
+                if (isWideScreen) {
+                  return Row(
+                    children: [
+                      Expanded(child: filterBar),
+                      const SizedBox(width: 12),
+                      _buildQuickActionBar(),
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    filterBar,
+                    const SizedBox(height: 8),
+                    _buildQuickActionBar(),
+                  ],
+                );
+              }
+
+              return filterBar;
             },
-            items: [
-              PosFilterChipData(
-                id: 'all',
-                label: 'Tümü',
-                count: counts['all'] ?? 0,
-                icon: Icons.grid_view_rounded,
-                color: const Color(0xFF64748B),
-              ),
-              PosFilterChipData(
-                id: 'created',
-                label: 'Yeni',
-                count: counts['created'] ?? 0,
-                icon: Icons.fiber_new_rounded,
-                color: const Color(0xFF3B82F6),
-              ),
-              PosFilterChipData(
-                id: 'preparing',
-                label: 'Hazırlanıyor',
-                count: counts['preparing'] ?? 0,
-                icon: Icons.soup_kitchen_rounded,
-                color: const Color(0xFFFF9500),
-              ),
-              PosFilterChipData(
-                id: 'ready',
-                label: 'Hazır',
-                count: counts['ready'] ?? 0,
-                icon: Icons.check_circle_rounded,
-                color: const Color(0xFF16A34A),
-              ),
-              PosFilterChipData(
-                id: 'delivered',
-                label: 'Teslim Edildi',
-                count: counts['delivered'] ?? 0,
-                icon: Icons.task_alt_rounded,
-                color: const Color(0xFF475569),
-              ),
-              PosFilterChipData(
-                id: 'cancelled',
-                label: 'İptal',
-                count: counts['cancelled'] ?? 0,
-                icon: Icons.cancel_rounded,
-                color: const Color(0xFFEF4444),
-              ),
-            ],
           ),
           body: Stack(
             children: [
@@ -292,7 +312,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
                             child: _EmptyView(
                               icon: Icons.receipt_long_rounded,
                               message: _statusFilter == 'all'
-                                   ? 'Henüz sipariş oluşturulmamış.'
+                                  ? 'Henüz sipariş oluşturulmamış.'
                                   : 'Bu kategoride sipariş yok.',
                               action: TextButton.icon(
                                 onPressed: () => _showOrderForm(context),
@@ -320,159 +340,218 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
                           return false;
                         },
                         child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isWide = constraints.maxWidth >= 720;
-                          if (isWide) {
-                            return GridView.builder(
+                          builder: (context, constraints) {
+                            final isWide = constraints.maxWidth >= 720;
+                            final dayGroups = _groupOrdersByDay(filtered);
+
+                            return CustomScrollView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               controller: _scrollController,
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate:
-                                  const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 520,
-                                mainAxisExtent: 110,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              itemCount: filtered.length +
-                                  (isLoadingMore ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (index == filtered.length) {
-                                  return const Center(
+                              slivers: [
+                                for (final group in dayGroups) ...[
+                                  SliverToBoxAdapter(
                                     child: Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          valueColor:
-                                              AlwaysStoppedAnimation(_kGreen),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                final order = filtered[index];
-                                final customerName = (order.customerName != null &&
-                                        order.customerName!.trim().isNotEmpty)
-                                    ? order.customerName!.trim()
-                                    : (order.customerId.isEmpty
-                                        ? 'Genel Müşteri'
-                                        : (customerMapVal.valueOrNull?[order.customerId] ??
-                                            (customerMapVal.isLoading
-                                                ? '...'
-                                                : 'Bilinmeyen Müşteri')));
-                                final isDelivered = order.status.toLowerCase() == 'delivered';
-                                final isSelected = _selectedIds.contains(order.id);
-                                return _OrderCard(
-                                  order: order,
-                                  customerName: customerName,
-                                  isGrid: true,
-                                  isSelecting: _isSelecting,
-                                  isSelected: isSelected,
-                                  isSelectable: !isDelivered,
-                                  onSelectChanged: (val) {
-                                    setState(() {
-                                      if (val == true) {
-                                        _selectedIds.add(order.id);
-                                      } else {
-                                        _selectedIds.remove(order.id);
-                                      }
-                                    });
-                                  },
-                                  onLongPress: () {
-                                    if (!isDelivered) {
-                                      setState(() {
-                                        _isSelecting = true;
-                                        _selectedIds.add(order.id);
-                                      });
-                                    }
-                                  },
-                                  onDetail: () {
-                                    OrderDetailsPage.show(context,
-                                            orderId: order.id)
-                                        .then((_) {
-                                      if (mounted) _refreshCounts();
-                                    });
-                                  },
-                                );
-                              },
-                            );
-                          }
-
-                          return ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: filtered.length +
-                                (isLoadingMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == filtered.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation(_kGreen),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      child: _OrderDateGroupHeader(
+                                        group: group,
+                                        isSelecting: _isSelecting,
+                                        isAllSelected: group
+                                                .selectableIds.isNotEmpty &&
+                                            group.selectableIds.every((id) =>
+                                                _selectedIds.contains(id)),
+                                        onToggleSelectAll: () {
+                                          final selectable =
+                                              group.selectableIds;
+                                          final allSelected = selectable
+                                                  .isNotEmpty &&
+                                              selectable.every((id) =>
+                                                  _selectedIds.contains(id));
+                                          setState(() {
+                                            if (allSelected) {
+                                              _selectedIds
+                                                  .removeAll(selectable);
+                                              if (_selectedIds.isEmpty) {
+                                                _isSelecting = false;
+                                              }
+                                            } else {
+                                              _selectedIds.addAll(selectable);
+                                              _isSelecting = true;
+                                            }
+                                          });
+                                        },
                                       ),
                                     ),
                                   ),
-                                );
-                              }
-                              final order = filtered[index];
-                              final customerName = (order.customerName != null &&
-                                      order.customerName!.trim().isNotEmpty)
-                                  ? order.customerName!.trim()
-                                  : (order.customerId.isEmpty
-                                      ? 'Genel Müşteri'
-                                      : (customerMapVal.valueOrNull?[order.customerId] ??
-                                          (customerMapVal.isLoading
-                                              ? '...'
-                                              : 'Bilinmeyen Müşteri')));
-                              final isDelivered = order.status.toLowerCase() == 'delivered';
-                              final isSelected = _selectedIds.contains(order.id);
-                              return _OrderCard(
-                                order: order,
-                                customerName: customerName,
-                                isGrid: false,
-                                isSelecting: _isSelecting,
-                                isSelected: isSelected,
-                                isSelectable: !isDelivered,
-                                onSelectChanged: (val) {
-                                  setState(() {
-                                    if (val == true) {
-                                      _selectedIds.add(order.id);
-                                    } else {
-                                      _selectedIds.remove(order.id);
-                                    }
-                                  });
-                                },
-                                onLongPress: () {
-                                  if (!isDelivered) {
-                                    setState(() {
-                                      _isSelecting = true;
-                                      _selectedIds.add(order.id);
-                                    });
-                                  }
-                                },
-                                onDetail: () {
-                                  OrderDetailsPage.show(context,
-                                          orderId: order.id)
-                                      .then((_) {
-                                    if (mounted) _refreshCounts();
-                                  });
-                                },
-                              );
-                            },
-                          );
-                        },
+                                  if (isWide)
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 4, 16, 12),
+                                      sliver: SliverGrid(
+                                        gridDelegate:
+                                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                                          maxCrossAxisExtent: 520,
+                                          mainAxisExtent: 110,
+                                          crossAxisSpacing: 12,
+                                          mainAxisSpacing: 12,
+                                        ),
+                                        delegate:
+                                            SliverChildBuilderDelegate(
+                                          (context, index) {
+                                            final order =
+                                                group.orders[index];
+                                            final customerName =
+                                                (order.customerName != null &&
+                                                        order.customerName!
+                                                            .trim()
+                                                            .isNotEmpty)
+                                                    ? order.customerName!.trim()
+                                                    : (order.customerId.isEmpty
+                                                        ? 'Genel Müşteri'
+                                                        : (customerMapVal
+                                                                .valueOrNull?[
+                                                            order
+                                                                .customerId] ??
+                                                            (customerMapVal
+                                                                    .isLoading
+                                                                ? '...'
+                                                                : 'Bilinmeyen Müşteri')));
+                                            final isDelivered =
+                                                order.status.toLowerCase() ==
+                                                    'delivered';
+                                            final isSelected = _selectedIds
+                                                .contains(order.id);
+                                            return _OrderCard(
+                                              order: order,
+                                              customerName: customerName,
+                                              isGrid: true,
+                                              isSelecting: _isSelecting,
+                                              isSelected: isSelected,
+                                              isSelectable: !isDelivered,
+                                              onSelectChanged: (val) {
+                                                setState(() {
+                                                  if (val == true) {
+                                                    _selectedIds.add(order.id);
+                                                  } else {
+                                                    _selectedIds
+                                                        .remove(order.id);
+                                                  }
+                                                });
+                                              },
+                                              onLongPress: () {
+                                                if (!isDelivered) {
+                                                  setState(() {
+                                                    _isSelecting = true;
+                                                    _selectedIds.add(order.id);
+                                                  });
+                                                }
+                                              },
+                                              onDetail: () {
+                                                OrderDetailsPage.show(context,
+                                                        orderId: order.id)
+                                                    .then((_) {
+                                                  if (mounted) _refreshCounts();
+                                                });
+                                              },
+                                            );
+                                          },
+                                          childCount: group.orders.length,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 4, 16, 12),
+                                      sliver: SliverList(
+                                        delegate:
+                                            SliverChildBuilderDelegate(
+                                          (context, index) {
+                                            final order =
+                                                group.orders[index];
+                                            final customerName =
+                                                (order.customerName != null &&
+                                                        order.customerName!
+                                                            .trim()
+                                                            .isNotEmpty)
+                                                    ? order.customerName!.trim()
+                                                    : (order.customerId.isEmpty
+                                                        ? 'Genel Müşteri'
+                                                        : (customerMapVal
+                                                                .valueOrNull?[
+                                                            order
+                                                                .customerId] ??
+                                                            (customerMapVal
+                                                                    .isLoading
+                                                                ? '...'
+                                                                : 'Bilinmeyen Müşteri')));
+                                            final isDelivered =
+                                                order.status.toLowerCase() ==
+                                                    'delivered';
+                                            final isSelected = _selectedIds
+                                                .contains(order.id);
+                                            return _OrderCard(
+                                              order: order,
+                                              customerName: customerName,
+                                              isGrid: false,
+                                              isSelecting: _isSelecting,
+                                              isSelected: isSelected,
+                                              isSelectable: !isDelivered,
+                                              onSelectChanged: (val) {
+                                                setState(() {
+                                                  if (val == true) {
+                                                    _selectedIds.add(order.id);
+                                                  } else {
+                                                    _selectedIds
+                                                        .remove(order.id);
+                                                  }
+                                                });
+                                              },
+                                              onLongPress: () {
+                                                if (!isDelivered) {
+                                                  setState(() {
+                                                    _isSelecting = true;
+                                                    _selectedIds.add(order.id);
+                                                  });
+                                                }
+                                              },
+                                              onDetail: () {
+                                                OrderDetailsPage.show(context,
+                                                        orderId: order.id)
+                                                    .then((_) {
+                                                  if (mounted) _refreshCounts();
+                                                });
+                                              },
+                                            );
+                                          },
+                                          childCount: group.orders.length,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                                if (isLoadingMore)
+                                  const SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 16),
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            valueColor:
+                                                AlwaysStoppedAnimation(_kGreen),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
               ),
               if (ordersAsync.isLoading && filtered.isEmpty)
                 const Positioned(
@@ -485,87 +564,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
                     backgroundColor: Colors.transparent,
                   ),
                 ),
-              // ── Toplu İşlem Çubuğu (Floating Bar) ─────────────────────────
-              if (_isSelecting && _selectedIds.isNotEmpty)
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Center(
-                    child: Material(
-                      elevation: 8,
-                      borderRadius: BorderRadius.circular(30),
-                      color: const Color(0xFF1E293B),
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${_selectedIds.length} Seçili',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                ),
-                                icon: const Icon(Icons.swap_horiz_rounded,
-                                    size: 18),
-                                label: const Text('Durum Değiştir'),
-                                onPressed: _handleBulkStatusChange,
-                              ),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFCA5A5),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                ),
-                                icon: const Icon(Icons.cancel_outlined,
-                                    size: 18),
-                                label: const Text('İptal Et'),
-                                onPressed: _handleBulkCancel,
-                              ),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFFF87171),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
-                                ),
-                                icon: const Icon(Icons.delete_outline_rounded,
-                                    size: 18),
-                                label: const Text('Sil'),
-                                onPressed: _handleBulkDelete,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
-          floatingActionButton: _isSelecting
-              ? null
-              : LayoutBuilder(
+          floatingActionButton: LayoutBuilder(
                   builder: (context, constraints) {
                     final isDesktop = MediaQuery.of(context).size.width >= 900;
                     if (isDesktop) {
@@ -596,80 +597,159 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
         );
   }
 
-  // ── Toplu İşlem Yöneticileri ──────────────────────────────────────────────
-  Future<void> _handleBulkStatusChange() async {
-    if (_selectedIds.isEmpty) return;
-
-    final selectedTarget = await showDialog<String>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Toplu Durum Güncelle'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Seçilen ${_selectedIds.length} sipariş için yeni durumu belirleyin:',
-              style: const TextStyle(fontSize: 14),
+  Widget _buildQuickActionBar() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
             ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.shade200),
-              ),
-              child: const Text(
-                'Bilgi: Teslim edilmiş olan siparişler toplu işleme kapalıdır ve etkilenmez.',
-                style: TextStyle(fontSize: 12, color: Colors.brown),
+            child: Text(
+              '${_selectedIds.length} Seçildi',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _kText,
               ),
             ),
-            const SizedBox(height: 16),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              tileColor: _kAmberLight,
-              leading: const Icon(Icons.hourglass_top_rounded,
-                  color: _kAmberDark),
-              title: const Text('Hazırlanıyor',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              onTap: () => Navigator.pop(dialogCtx, 'preparing'),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              tileColor: _kGreenLight,
-              leading: const Icon(Icons.check_circle_outline_rounded,
-                  color: _kGreen),
-              title: const Text('Hazır',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              onTap: () => Navigator.pop(dialogCtx, 'ready'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Vazgeç'),
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'Tümünü Seç',
+            icon: Icons.select_all_rounded,
+            color: const Color(0xFF3B82F6),
+            onTap: () {
+              final orders =
+                  ref.read(ordersControllerProvider).valueOrNull ?? [];
+              final selectableIds = orders
+                  .where((o) => o.status.toLowerCase() != 'delivered')
+                  .map((o) => o.id)
+                  .toSet();
+              setState(() {
+                if (_selectedIds.containsAll(selectableIds) &&
+                    selectableIds.isNotEmpty) {
+                  _selectedIds.clear();
+                  _isSelecting = false;
+                } else {
+                  _selectedIds.addAll(selectableIds);
+                }
+              });
+            },
+          ),
+          const SizedBox(width: 8),
+          _buildBatchButton(
+            label: 'Hazırlanıyor',
+            icon: Icons.soup_kitchen_rounded,
+            color: const Color(0xFFFF9500),
+            onTap: () => _handleBulkDirectStatusChange('preparing'),
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'Hazır',
+            icon: Icons.check_circle_rounded,
+            color: const Color(0xFF16A34A),
+            onTap: () => _handleBulkDirectStatusChange('ready'),
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'Teslim Edildi',
+            icon: Icons.task_alt_rounded,
+            color: const Color(0xFF475569),
+            onTap: () => _handleBulkDirectStatusChange('delivered'),
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'İptal',
+            icon: Icons.cancel_rounded,
+            color: const Color(0xFFEF4444),
+            onTap: _handleBulkCancel,
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'Sil',
+            icon: Icons.delete_outline_rounded,
+            color: const Color(0xFFEF4444),
+            onTap: _handleBulkDelete,
+          ),
+          const SizedBox(width: 6),
+          _buildBatchButton(
+            label: 'Vazgeç',
+            icon: Icons.close_rounded,
+            color: const Color(0xFF64748B),
+            onTap: () {
+              setState(() {
+                _isSelecting = false;
+                _selectedIds.clear();
+              });
+            },
           ),
         ],
       ),
     );
+  }
 
-    if (selectedTarget == null || !mounted) return;
+  Widget _buildBatchButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color == const Color(0xFF64748B) ? _kText : color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleBulkDirectStatusChange(String targetStatus) async {
+    if (_selectedIds.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
 
     try {
       final count = await ref
           .read(ordersControllerProvider.notifier)
-          .bulkUpdateStatus(_selectedIds, selectedTarget);
+          .bulkUpdateStatus(_selectedIds, targetStatus);
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
           content: Text('$count sipariş durumu güncellendi.'),
           backgroundColor: _kGreen,
+          duration: const Duration(seconds: 2),
         ),
       );
       setState(() {
@@ -678,7 +758,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
       });
       await _refreshCounts();
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_page_bulk_status_update');
+      TelemetryService().logError(e, st, context: 'orders_page_bulk_direct_status');
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
@@ -688,6 +768,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
       );
     }
   }
+
+  // ── Toplu İşlem Yöneticileri ──────────────────────────────────────────────
 
   Future<void> _handleBulkCancel() async {
     if (_selectedIds.isEmpty) return;

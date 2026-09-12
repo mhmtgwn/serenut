@@ -211,7 +211,7 @@ class SaleDetailsPage extends ConsumerWidget {
     double subtotal = 0;
     for (final item in items) {
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0;
+      final price = ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0;
       subtotal += qty * price;
     }
     final discount = sale.discountAmount;
@@ -230,7 +230,7 @@ class SaleDetailsPage extends ConsumerWidget {
             final item = entry.value;
             final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
             final price =
-                (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0;
+                ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0;
             final productId = item['product_id']?.toString() ?? '';
             // UUID → gerçek ürün adına çevir
             final productName = productNameMap[productId] ??
@@ -507,7 +507,7 @@ class SaleDetailsPage extends ConsumerWidget {
         saleItemId: item['id']?.toString() ?? '',
         productId: item['product_id']?.toString() ?? '',
         maxQty: qty,
-        unitPrice: (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0,
+        unitPrice: ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0,
         returnQty: 0,
       );
     }).toList();

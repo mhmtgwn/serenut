@@ -13,6 +13,7 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 
 /// Reactive indicator for product pagination loading state
 final productLoadingMoreProvider = StateProvider<bool>((ref) => false);
@@ -115,6 +116,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
       ref.invalidate(productInventorySummaryProvider);
+      ref.invalidate(dashboardProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
@@ -185,6 +187,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       ref.invalidate(productInventorySummaryProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(ordersControllerProvider);
+      ref.invalidate(dashboardProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
@@ -221,6 +224,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
       ref.invalidate(productInventorySummaryProvider);
+      ref.invalidate(dashboardProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
