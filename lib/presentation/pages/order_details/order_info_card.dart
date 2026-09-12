@@ -368,6 +368,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');
+      ref.invalidate(_orderDetailProvider(order.id));
       _triggerPrint(ref, order);
       return;
     }
@@ -379,6 +380,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');
+      ref.invalidate(_orderDetailProvider(order.id));
       _triggerPrint(ref, order);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

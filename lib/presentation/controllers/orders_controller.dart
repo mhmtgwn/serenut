@@ -60,10 +60,24 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   // ── Filtering & Search ──────────────────────────────────────────────────────
 
   Future<void> applyFilter(String? status) async {
-    _statusFilter = (status == 'all' || status == null) ? null : status;
+    final normalized = (status == 'all' || status == null) ? null : status;
+    if (_statusFilter == normalized) return;
+    _statusFilter = normalized;
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
+
+    // Fast in-memory preview so tab transition is instantaneous
+    final current = state.valueOrNull;
+    if (current != null && _statusFilter != null) {
+      final fastFiltered = current
+          .where((o) => o.status.toLowerCase() == _statusFilter!.toLowerCase())
+          .toList();
+      if (fastFiltered.isNotEmpty) {
+        state = AsyncValue.data(fastFiltered);
+      }
+    }
+
     final result = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
@@ -372,88 +386,105 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   }
 
   Future<void> updateStatus(String id, String status) async {
-    await future;
-    final order = await _repository.findById(id);
-    if (order == null) throw StateError('Sipariş bulunamadı: $id');
-    final publisher = ref.read(eventPublisherProvider);
-
-    if (status == 'cancelled') {
-      final cancellationService =
-          await ref.read(orderCancellationServiceProvider.future);
-
-      await cancellationService.cancel(
-        id: order.id,
-      );
-
-      publisher.publish(OrderCancelledEvent(
-        orderId: 0,
-        customerId: 0,
-        orderIdStr: order.orderNumber,
-        customerIdStr: order.customerId,
-        note: order.notes,
-      ));
-
-      // Invalidate balance/transaction providers to refresh UI state immediately
-      ref.invalidate(customersControllerProvider);
-      ref.invalidate(customerTransactionsProvider(order.customerId));
-      ref.invalidate(customerBalanceDetailsProvider(order.customerId));
-    } else {
-      await _repository.updateStatus(id, status);
-
-      if (status == 'delivered') {
-        publisher.publish(OrderDeliveredEvent(
-          orderId: 0,
-          customerId: 0,
-          orderIdStr: order.orderNumber,
-          customerIdStr: order.customerId,
-          note: order.notes,
-        ));
-      } else if (status == 'preparing') {
-        publisher.publish(OrderPreparingEvent(
-          orderId: 0,
-          customerId: 0,
-          orderIdStr: order.orderNumber,
-          customerIdStr: order.customerId,
-          note: order.notes,
-        ));
-      } else if (status == 'ready') {
-        publisher.publish(OrderReadyEvent(
-          orderId: 0,
-          customerId: 0,
-          orderIdStr: order.orderNumber,
-          customerIdStr: order.customerId,
-          totalAmount: order.totalAmount,
-          discountAmount: order.discountAmount,
-          note: order.notes,
-        ));
+    // 1. Optimistic in-memory update for 0ms instantaneous UI response
+    final previousList = state.valueOrNull;
+    OrderEntity? targetOrder;
+    if (previousList != null) {
+      final idx = previousList.indexWhere((o) => o.id == id);
+      if (idx != -1) {
+        targetOrder = previousList[idx];
+        final updatedList = List<OrderEntity>.from(previousList);
+        updatedList[idx] = targetOrder.copyWith(status: status);
+        state = AsyncValue.data(updatedList);
       }
     }
 
-    // Audit failure must not hide or roll back a successful status mutation.
     try {
-      final auditService = await ref.read(auditServiceProvider.future);
-      await auditService.logEvent(
-        eventType: 'order_status_updated',
-        entityType: 'order',
-        entityId: id,
-        newValue: status,
-        notes: 'Sipariş durumu güncellendi: $id -> $status',
-      );
+      await future;
+      final order = targetOrder ?? await _repository.findById(id);
+      if (order == null) throw StateError('Sipariş bulunamadı: $id');
+      final publisher = ref.read(eventPublisherProvider);
+
+      if (status == 'cancelled') {
+        final cancellationService =
+            await ref.read(orderCancellationServiceProvider.future);
+
+        await cancellationService.cancel(
+          id: order.id,
+        );
+
+        publisher.publish(OrderCancelledEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.orderNumber,
+          customerIdStr: order.customerId,
+          note: order.notes,
+        ));
+
+        // Invalidate balance/transaction providers to refresh UI state immediately
+        ref.invalidate(customersControllerProvider);
+        ref.invalidate(customerTransactionsProvider(order.customerId));
+        ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+      } else {
+        await _repository.updateStatus(id, status);
+
+        if (status == 'delivered') {
+          publisher.publish(OrderDeliveredEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            note: order.notes,
+          ));
+        } else if (status == 'preparing') {
+          publisher.publish(OrderPreparingEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            note: order.notes,
+          ));
+        } else if (status == 'ready') {
+          publisher.publish(OrderReadyEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            totalAmount: order.totalAmount,
+            discountAmount: order.discountAmount,
+            note: order.notes,
+          ));
+        }
+      }
+
+      // Non-blocking audit logging (fire-and-forget)
+      unawaited(ref.read(auditServiceProvider.future).then((auditService) =>
+          auditService.logEvent(
+            eventType: 'order_status_updated',
+            entityType: 'order',
+            entityId: id,
+            newValue: status,
+            notes: 'Sipariş durumu güncellendi: $id -> $status',
+          )).catchError((e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller', level: LogLevel.warning);
+      }));
+
+      // Non-blocking background sync trigger
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+
+      // If active filter no longer matches new status, refresh in background
+      if (_statusFilter != null && _statusFilter != status) {
+        unawaited(refresh());
+      }
     } catch (e, st) {
+      if (previousList != null) {
+        state = AsyncValue.data(previousList);
+      }
       TelemetryService().logError(e, st,
-          context: 'orders_controller', level: LogLevel.warning);
+          context: 'orders_controller:updateStatus');
+      rethrow;
     }
-
-    if (state.hasValue) {
-      state = AsyncValue.data(
-        state.requireValue
-            .map((o) => o.id == id ? o.copyWith(status: status) : o)
-            .toList(),
-      );
-    }
-
-    unawaited(ref.read(syncProvider.notifier).triggerSync());
-    await refresh();
   }
 
   /// Toplu sipariş silme (teslim edilenler hariç).
@@ -589,56 +620,77 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     final idSet = ids.toSet();
     if (idSet.isEmpty) return 0;
 
-    int updatedCount = 0;
-    final publisher = ref.read(eventPublisherProvider);
-    final auditService = await ref.read(auditServiceProvider.future);
-
-    for (final id in idSet) {
-      final order = await _repository.findById(id);
-      if (order == null) continue;
-      // TESLİM EDİLMİŞ SİPARİŞLERİN DURUMU TOPLUCA DEĞİŞTİRİLEMEZ
-      if (order.status.toLowerCase() == 'delivered') continue;
-      if (order.status.toLowerCase() == targetStatus) continue;
-
-      await _repository.updateStatus(id, targetStatus);
-      updatedCount++;
-
-      if (targetStatus == 'preparing') {
-        publisher.publish(OrderPreparingEvent(
-          orderId: 0,
-          customerId: 0,
-          orderIdStr: order.orderNumber,
-          customerIdStr: order.customerId,
-        ));
-      } else if (targetStatus == 'ready') {
-        final total = MathEngine.calculateMappedItemsTotal(order.items);
-        publisher.publish(OrderReadyEvent(
-          orderId: 0,
-          customerId: 0,
-          orderIdStr: order.orderNumber,
-          customerIdStr: order.customerId,
-          totalAmount: total,
-        ));
-      }
-
-      try {
-        await auditService.logEvent(
-          eventType: 'order_status_updated',
-          entityType: 'order',
-          entityId: id,
-          newValue: targetStatus,
-          notes: 'Toplu Sipariş Durumu Güncellendi: $id -> $targetStatus',
-        );
-      } catch (e, st) {
-        TelemetryService().logError(e, st,
-            context: 'orders_controller:bulkUpdateStatus',
-            level: LogLevel.warning);
-      }
+    // 1. Optimistic in-memory update for instant card status changes
+    final previousList = state.valueOrNull;
+    if (previousList != null) {
+      state = AsyncValue.data(
+        previousList.map((o) {
+          if (idSet.contains(o.id) && o.status.toLowerCase() != 'delivered') {
+            return o.copyWith(status: targetStatus);
+          }
+          return o;
+        }).toList(),
+      );
     }
 
-    if (updatedCount > 0) {
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
-      await refresh();
+    int updatedCount = 0;
+    try {
+      final publisher = ref.read(eventPublisherProvider);
+
+      for (final id in idSet) {
+        final order = previousList?.where((o) => o.id == id).firstOrNull ??
+            await _repository.findById(id);
+        if (order == null) continue;
+        // TESLİM EDİLMİŞ SİPARİŞLERİN DURUMU TOPLUCA DEĞİŞTİRİLEMEZ
+        if (order.status.toLowerCase() == 'delivered') continue;
+        if (order.status.toLowerCase() == targetStatus) continue;
+
+        await _repository.updateStatus(id, targetStatus);
+        updatedCount++;
+
+        if (targetStatus == 'preparing') {
+          publisher.publish(OrderPreparingEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+          ));
+        } else if (targetStatus == 'ready') {
+          final total = MathEngine.calculateMappedItemsTotal(order.items);
+          publisher.publish(OrderReadyEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            totalAmount: total,
+          ));
+        }
+
+        unawaited(ref.read(auditServiceProvider.future).then((auditService) =>
+            auditService.logEvent(
+              eventType: 'order_status_updated',
+              entityType: 'order',
+              entityId: id,
+              newValue: targetStatus,
+              notes: 'Toplu Sipariş Durumu Güncellendi: $id -> $targetStatus',
+            )).catchError((e, st) {
+          TelemetryService().logError(e, st,
+              context: 'orders_controller:bulkUpdateStatus',
+              level: LogLevel.warning);
+        }));
+      }
+
+      if (updatedCount > 0) {
+        unawaited(ref.read(syncProvider.notifier).triggerSync());
+        if (_statusFilter != null && _statusFilter != targetStatus) {
+          unawaited(refresh());
+        }
+      }
+    } catch (e) {
+      if (previousList != null) {
+        state = AsyncValue.data(previousList);
+      }
+      rethrow;
     }
 
     return updatedCount;

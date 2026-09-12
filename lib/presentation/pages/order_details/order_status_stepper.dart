@@ -106,23 +106,37 @@ extension _StatusStepperMixin on OrderDetailsPage {
 
             return Expanded(
               child: InkWell(
-                onTap: () {
+                onTap: () async {
                   if (order.status != status) {
                     if (status == 'delivered') {
                       _handleDelivery(context, ref, order);
                     } else {
-                      ref
-                          .read(ordersControllerProvider.notifier)
-                          .updateStatus(order.id, status);
-                      ref.invalidate(_orderDetailProvider(order.id));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                              'ğŸ“± Durum güncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
-                          backgroundColor: _kGreenDark,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      try {
+                        await ref
+                            .read(ordersControllerProvider.notifier)
+                            .updateStatus(order.id, status);
+                        ref.invalidate(_orderDetailProvider(order.id));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  '📱 Durum güncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
+                              backgroundColor: _kGreenDark,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Durum güncellenemedi: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   }
                 },
@@ -266,16 +280,29 @@ extension _StatusStepperMixin on OrderDetailsPage {
             child: const Text('Vazgeç'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ref
-                  .read(ordersControllerProvider.notifier)
-                  .updateStatus(order.id, 'cancelled');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Sipariş iptal edildi.'),
-                    backgroundColor: Colors.red),
-              );
+              try {
+                await ref
+                    .read(ordersControllerProvider.notifier)
+                    .updateStatus(order.id, 'cancelled');
+                ref.invalidate(_orderDetailProvider(order.id));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Sipariş iptal edildi.'),
+                        backgroundColor: Colors.red),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text('Sipariş iptal edilemedi: $e'),
+                        backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red, foregroundColor: Colors.white),

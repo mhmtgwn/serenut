@@ -50,6 +50,12 @@ const _kBorder = Color(0xFFE2E8F0);
 /// Provider — build() dışında tanımlanıyor (kritik bug düzeltmesi)
 final _orderDetailProvider = FutureProvider.autoDispose
     .family<OrderEntity?, String>((ref, orderId) async {
+  // 1. Önce hafızadaki (OrdersController) güncel siparişi kontrol et (0ms tepki hızı)
+  final inMemoryList = ref.watch(ordersControllerProvider).valueOrNull;
+  final inMemory = inMemoryList?.where((o) => o.id == orderId).firstOrNull;
+  if (inMemory != null && inMemory.items.isNotEmpty) {
+    return inMemory;
+  }
   final repo = await ref.watch(orderRepositoryProvider.future);
   return repo.findById(orderId);
 });

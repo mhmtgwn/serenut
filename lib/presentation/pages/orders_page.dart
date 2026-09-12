@@ -229,7 +229,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
               ref
                   .read(ordersControllerProvider.notifier)
                   .applyFilter(newFilter);
-              _refreshCounts();
             },
             items: [
               PosFilterChipData(
