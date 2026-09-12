@@ -2297,7 +2297,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
                           final displayedTemplate = isWhatsAppTab
                               ? (tpl['whatsapp_template'] ??
-                                  tpl['template'] ??
+                                  kDefaultWhatsAppTemplates[tpl['id']] ??
+                                  kDefaultWhatsAppTemplates[_canonicalEventId(tpl['id'] ?? '')] ??
                                   '')
                               : (tpl['sms_template'] ??
                                   tpl['template'] ??

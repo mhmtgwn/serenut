@@ -289,16 +289,23 @@ class TemplateResolver {
           final enabled = item['whatsapp_enabled'];
           if (enabled != true) return null;
 
-          final customWa = item['whatsapp_template']?.toString();
-          if (customWa != null && customWa.trim().isNotEmpty) {
+          final customWa = item['whatsapp_template']?.toString().trim();
+          final smsTpl =
+              (item['sms_template'] ?? item['template'])?.toString().trim();
+
+          // Reject empty, copy of SMS, or legacy Turkish SMS prefix ("Merhaba ...")
+          final isLegacySmsCopy = customWa == null ||
+              customWa.isEmpty ||
+              customWa == smsTpl ||
+              customWa.startsWith('Merhaba ') ||
+              customWa.startsWith('Merhaba {customer}') ||
+              customWa.startsWith('Sayın {customer}, {id} numaralı');
+
+          if (!isLegacySmsCopy) {
             return customWa;
           }
 
-          final legacyTpl = item['template']?.toString();
-          if (legacyTpl != null && legacyTpl.trim().isNotEmpty) {
-            return legacyTpl;
-          }
-
+          // Fallback to rich WhatsApp template (NEVER fall back to SMS text)
           return kDefaultWhatsAppTemplates[id] ??
               kDefaultWhatsAppTemplates[eventType] ??
               kDefaultWhatsAppTemplates[_legacyAliases[eventType]];

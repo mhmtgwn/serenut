@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/notifications/template_resolver.dart';
 
 
 class SmsEditTemplateDialog extends StatefulWidget {
@@ -31,10 +32,31 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
   void initState() {
     super.initState();
     nameCtrl = TextEditingController(text: widget.existingTpl?['name'] ?? '');
+    selectedEvent = widget.existingTpl?['id'] ?? 'sale_created';
+    if (selectedEvent == 'sale') selectedEvent = 'sale_created';
+    if (selectedEvent == 'debt') selectedEvent = 'debt_created';
+    if (selectedEvent == 'collection') selectedEvent = 'collection_recorded';
+    if (selectedEvent == 'order') selectedEvent = 'order_created';
+
+    final existingWa =
+        widget.existingTpl?['whatsapp_template']?.toString().trim();
+    final smsTpl = (widget.existingTpl?['sms_template'] ??
+            widget.existingTpl?['template'])
+        ?.toString()
+        .trim();
+    final isLegacySms = existingWa == null ||
+        existingWa.isEmpty ||
+        existingWa == smsTpl ||
+        existingWa.startsWith('Merhaba ') ||
+        existingWa.startsWith('Merhaba {customer}') ||
+        existingWa.startsWith('Sayın {customer}, {id} numaralı');
+
     final initialTemplate = widget.channel == 'whatsapp'
-        ? (widget.existingTpl?['whatsapp_template'] ??
-            widget.existingTpl?['template'] ??
-            '')
+        ? (!isLegacySms
+            ? existingWa
+            : (kDefaultWhatsAppTemplates[widget.existingTpl?['id']] ??
+                kDefaultWhatsAppTemplates[selectedEvent] ??
+                ''))
         : (widget.existingTpl?['sms_template'] ??
             widget.existingTpl?['template'] ??
             '');
@@ -42,12 +64,6 @@ class SmsEditTemplateDialogState extends State<SmsEditTemplateDialog> {
     templateCtrl.addListener(() {
       if (mounted) setState(() {});
     });
-
-    selectedEvent = widget.existingTpl?['id'] ?? 'sale_created';
-    if (selectedEvent == 'sale') selectedEvent = 'sale_created';
-    if (selectedEvent == 'debt') selectedEvent = 'debt_created';
-    if (selectedEvent == 'collection') selectedEvent = 'collection_recorded';
-    if (selectedEvent == 'order') selectedEvent = 'order_created';
   }
 
   @override

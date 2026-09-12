@@ -23,7 +23,8 @@ void main() {
     final settings = _settings(smsEnabled: true, templates: [
       {
         'id': 'sale_created',
-        'template': 'Merhaba {customer}, toplam {amount}',
+        'sms_template': 'SMS: {customer}, toplam {amount}',
+        'whatsapp_template': 'WA: {customer}, toplam {amount}',
         'enabled': true,
         'sms_enabled': false,
         'whatsapp_enabled': true,
@@ -44,7 +45,7 @@ void main() {
         settings: settings,
         vars: variables,
       ),
-      'Merhaba Ayşe, toplam 250,00 ₺',
+      'WA: Ayşe, toplam 250,00 ₺',
     );
   });
 
@@ -79,7 +80,7 @@ void main() {
     final settings = _settings(smsEnabled: false, templates: [
       {
         'id': 'order_ready',
-        'template': '{customer}, siparişiniz hazır.',
+        'whatsapp_template': 'WA: {customer}, siparişiniz hazır.',
         'sms_enabled': true,
         'whatsapp_enabled': true,
       }
@@ -99,7 +100,7 @@ void main() {
         settings: settings,
         vars: variables,
       ),
-      'Ayşe, siparişiniz hazır.',
+      'WA: Ayşe, siparişiniz hazır.',
     );
   });
 
@@ -130,5 +131,32 @@ void main() {
       ),
       'WA: Ayşe, 250,00 ₺',
     );
+  });
+
+  test('WhatsApp rejects legacy SMS template and uses rich kDefaultWhatsAppTemplates', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'sale_created',
+        'template': 'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
+        'sms_template': 'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
+        'sms_enabled': true,
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    final wa = resolver.resolveWhatsApp(
+      eventType: kSmsEventSaleCreated,
+      settings: settings,
+      vars: {
+        'customer': 'Ayşe',
+        'amount': '250,00 ₺',
+        'paid': '250,00 ₺',
+        'id': '101',
+        'date': '12.09.2026',
+        'business': 'Test İşletme',
+      },
+    );
+    expect(wa, contains('🧾 *Alışveriş Fişi*'));
+    expect(wa, isNot(contains('Merhaba Ayşe')));
   });
 }
