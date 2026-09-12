@@ -121,6 +121,13 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(id);
+      if (original != null && original.balance.abs() > 0.01) {
+        final bal = original.balance;
+        final formattedBal = bal.abs().toStringAsFixed(2);
+        final direction = bal < 0 ? 'borcu' : 'alacağı';
+        throw StateError(
+            'Bakiyesi sıfır olmayan müşteri silinemez. Müşterinin ₺$formattedBal $direction bulunmaktadır. Lütfen önce bakiyeyi kapatınız.');
+      }
       await _repository.delete(id);
       try {
         final auditService = await ref.read(auditServiceProvider.future);

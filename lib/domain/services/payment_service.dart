@@ -351,8 +351,8 @@ class PaymentService {
     required double refundTotal,
     required String refundMethod,
   }) async {
-    if (await _isDuplicateTransaction(saleId, 'refund')) {
-      return; // Idempotency check: Already processed
+    if (refundTotal <= 0 || !refundTotal.isFinite) {
+      return;
     }
 
     await _transactionRepository.create(

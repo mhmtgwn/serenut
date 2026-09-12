@@ -636,10 +636,12 @@ class CustomerDetailsPage extends ConsumerWidget {
                   final state = ref.read(customersControllerProvider);
                   if (state.hasError) {
                     if (context.mounted) {
+                      final errorMsg = state.error != null
+                          ? state.error.toString().replaceFirst('Bad state: ', '')
+                          : 'Müşteri silinemedi: Bu müşteriye ait satış veya işlem kayıtları bulunmaktadır.';
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Müşteri silinemedi: Bu müşteriye ait satış veya işlem kayıtları bulunmaktadır.'),
+                        SnackBar(
+                          content: Text(errorMsg),
                           backgroundColor: _kRed,
                           behavior: SnackBarBehavior.floating,
                         ),

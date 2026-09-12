@@ -351,14 +351,15 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       throw StateError('Teslim edilmiş siparişler silinemez.');
     }
 
-    // Sipariş henüz iptal edilmemişse depoya stokları iade et
+    // Sipariş henüz iptal edilmemişse önce finansal hareketlerini ve stoklarını usulünce iptal et
     if (order.status.toLowerCase() != 'cancelled') {
       try {
-        final inventory = await ref.read(inventoryServiceProvider.future);
-        await inventory.increaseStock(_inventoryItems(order.items));
+        final cancellationService =
+            await ref.read(orderCancellationServiceProvider.future);
+        await cancellationService.cancel(id: order.id);
       } catch (e, st) {
         TelemetryService().logError(e, st,
-            context: 'orders_controller:deleteOrder:stockRestore', level: LogLevel.warning);
+            context: 'orders_controller:deleteOrder:cancelOrder', level: LogLevel.warning);
       }
     }
 
@@ -386,6 +387,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    ref.invalidate(customersControllerProvider);
+    ref.invalidate(customerTransactionsProvider(order.customerId));
+    ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+    ref.invalidate(customerDetailProvider(order.customerId));
     ref.invalidate(productsControllerProvider);
     ref.invalidate(dashboardProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
@@ -507,6 +512,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     int deletedCount = 0;
     final deletedIds = <String>{};
     final auditService = await ref.read(auditServiceProvider.future);
+    final affectedCustomerIds = <String>{};
 
     for (final id in idSet) {
       final order = await _repository.findById(id);
@@ -514,11 +520,13 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       // TESLİM EDİLMİŞ SİPARİŞLER SİLİNEMEZ (KORUMA KURALI)
       if (order.status.toLowerCase() == 'delivered') continue;
 
-      // Sipariş henüz iptal edilmemişse depoya stokları iade et
+      // Sipariş henüz iptal edilmemişse önce finansal hareketlerini ve stoklarını usulünce iptal et
       if (order.status.toLowerCase() != 'cancelled') {
         try {
-          final inventory = await ref.read(inventoryServiceProvider.future);
-          await inventory.increaseStock(_inventoryItems(order.items));
+          final cancellationService =
+              await ref.read(orderCancellationServiceProvider.future);
+          await cancellationService.cancel(id: order.id);
+          affectedCustomerIds.add(order.customerId);
         } catch (_) {}
       }
 
@@ -541,6 +549,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     }
 
     if (deletedCount > 0) {
+      ref.invalidate(customersControllerProvider);
+      for (final custId in affectedCustomerIds) {
+        ref.invalidate(customerTransactionsProvider(custId));
+        ref.invalidate(customerBalanceDetailsProvider(custId));
+        ref.invalidate(customerDetailProvider(custId));
+      }
       ref.invalidate(productsControllerProvider);
       ref.invalidate(dashboardProvider);
       if (state.hasValue) {

@@ -94,6 +94,16 @@ class OrderCancellationService {
         paidAmount: paidAmount,
       );
 
+      // 3.1 Sipariş için daha önce fiilen ödeme/tahsilat yapılmışsa, para müşterinin cari hesabına alacak olarak iade edilir
+      if (paidAmount > 0.009 && customerId.isNotEmpty) {
+        await _paymentService.processRefund(
+          saleId: id,
+          customerId: customerId,
+          refundTotal: paidAmount,
+          refundMethod: 'balance',
+        );
+      }
+
       // 4. Verify Ledger invariant
       if (_dataIntegrityService != null) {
         await _dataIntegrityService!.verifyLedgerInvariant(customerId);
