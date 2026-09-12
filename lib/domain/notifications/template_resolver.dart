@@ -251,18 +251,12 @@ class TemplateResolver {
     required Map<String, String> vars,
   }) {
     final templateStr = settings.smsTemplate;
-    String? templateText;
-    if (templateStr != null && templateStr.trim().isNotEmpty) {
-      templateText = _findTemplate(
-        eventType,
-        templateStr,
-        channel: NotificationTemplateChannel.whatsapp,
-      );
-    } else {
-      templateText = kDefaultWhatsAppTemplates[eventType] ??
-          kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
-    }
-
+    if (templateStr == null || templateStr.trim().isEmpty) return null;
+    final templateText = _findTemplate(
+      eventType,
+      templateStr,
+      channel: NotificationTemplateChannel.whatsapp,
+    );
     return templateText == null
         ? null
         : _fillTokens(templateText, vars, isWhatsApp: true);
@@ -292,25 +286,19 @@ class TemplateResolver {
         if (id == null || !candidateIds.contains(id)) continue;
 
         if (channel == NotificationTemplateChannel.whatsapp) {
-          // Explicitly disabled by user
-          if (item['whatsapp_enabled'] == false) return null;
+          final enabled = item['whatsapp_enabled'];
+          if (enabled != true) return null;
 
-          final customWa = item['whatsapp_template']?.toString().trim();
-          final smsTpl =
-              (item['sms_template'] ?? item['template'])?.toString().trim();
-
-          // Reject empty, copy of SMS, or legacy Turkish SMS prefix ("Merhaba ...")
-          final isSmsCopy = customWa == null ||
-              customWa.isEmpty ||
-              customWa == smsTpl ||
-              customWa.startsWith('Merhaba ') ||
-              customWa.startsWith('Merhaba {customer}');
-
-          if (!isSmsCopy) {
+          final customWa = item['whatsapp_template']?.toString();
+          if (customWa != null && customWa.trim().isNotEmpty) {
             return customWa;
           }
 
-          // Fallback to rich WhatsApp template (NEVER fall back to SMS text)
+          final legacyTpl = item['template']?.toString();
+          if (legacyTpl != null && legacyTpl.trim().isNotEmpty) {
+            return legacyTpl;
+          }
+
           return kDefaultWhatsAppTemplates[id] ??
               kDefaultWhatsAppTemplates[eventType] ??
               kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
@@ -328,13 +316,6 @@ class TemplateResolver {
     } catch (_) {
       // Malformed JSON — silent
     }
-
-    // If channel is WhatsApp and not explicitly disabled, provide default
-    if (channel == NotificationTemplateChannel.whatsapp) {
-      return kDefaultWhatsAppTemplates[eventType] ??
-          kDefaultWhatsAppTemplates[_legacyAliases[eventType]];
-    }
-
     return null;
   }
 

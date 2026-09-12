@@ -102,4 +102,33 @@ void main() {
       'Ayşe, siparişiniz hazır.',
     );
   });
+
+  test('resolves distinct sms_template and whatsapp_template for the same event', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'sale_created',
+        'sms_template': 'SMS: {customer}, {amount}',
+        'whatsapp_template': 'WA: {customer}, {amount}',
+        'sms_enabled': true,
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    expect(
+      resolver.resolve(
+        eventType: kSmsEventSaleCreated,
+        settings: settings,
+        vars: variables,
+      ),
+      'SMS: Ayşe, 250,00 ₺',
+    );
+    expect(
+      resolver.resolveWhatsApp(
+        eventType: kSmsEventSaleCreated,
+        settings: settings,
+        vars: variables,
+      ),
+      'WA: Ayşe, 250,00 ₺',
+    );
+  });
 }
