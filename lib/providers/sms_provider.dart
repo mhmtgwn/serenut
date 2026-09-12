@@ -17,6 +17,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:serenutos/infrastructure/services/sms_gateway_service.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
 import 'package:serenutos/infrastructure/sync_v4/whatsapp_notification_outbox.dart';
+import 'package:serenutos/domain/services/debt_reminder_service.dart';
 
 /// Builds SmsConfig from the current app Settings.
 SmsConfig? _buildSmsConfig(Settings? settings) {
@@ -181,3 +182,21 @@ final smsLogsProvider =
   final repo = ref.watch(smsLogRepositoryProvider);
   return repo.getRecentLogs(limit: 100);
 });
+
+/// Provider for DebtReminderService
+final debtReminderServiceProvider =
+    FutureProvider<DebtReminderService>((ref) async {
+  final customerRepo = await ref.watch(customerRepositoryProvider.future);
+  final smsLogRepo = ref.watch(smsLogRepositoryProvider);
+  final smsService = ref.watch(smsServiceProvider);
+  final apiClient = ref.watch(apiClientProvider);
+  final whatsappOutbox = WhatsappNotificationOutbox(apiClient);
+
+  return DebtReminderService(
+    customerRepository: customerRepo,
+    smsLogRepository: smsLogRepo,
+    smsService: smsService,
+    whatsappOutbox: whatsappOutbox,
+  );
+});
+

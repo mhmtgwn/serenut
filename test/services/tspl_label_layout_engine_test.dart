@@ -435,6 +435,35 @@ void main() {
     expect(p2Idx, isNonNegative);
     expect(p1Idx, lessThan(p2Idx), reason: 'Sayfa 1 önce, Sayfa 2 sonra basılmalıdır');
   });
+
+  test('sipariş etiketinde uzun not yutulmaz ve çok satırlı olarak basılır', () {
+    const longNote =
+        'Müşteri zili çalmasın bebek uyuyor siparişi kapıya asın lütfen ve sosları bol koyun';
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: '4005',
+        customerName: 'Mehmet Yılmaz',
+        productName: '1 Urun',
+        quantity: 1,
+        note: longNote,
+        items: const [
+          {'product_name': 'Pizza', 'quantity': 1.0, 'unit_price': 150.0},
+        ],
+        itemsCount: 1,
+        totalAmount: 150.0,
+        widthMm: 50,
+        heightMm: 30,
+        gapMm: 2,
+      ),
+    );
+
+    // Assert that text is wrapped across multiple lines and note is completely preserved
+    expect(output, contains('Not: Musteri zili'));
+    expect(output, contains('calmasin bebek uyuyor'));
+    expect(output, contains('siparisi kapiya asin'));
+    expect(output, contains('soslari bol'));
+    expect(output, contains('koyun'));
+  });
 }
 
 

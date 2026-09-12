@@ -286,7 +286,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
               ? (first?['quantity'] as num?)?.toDouble() ?? 1
               : 1.0,
           'items': items,
-          'note': first?['note']?.toString() ?? order.notes,
+          'note': (order.notes?.trim().isNotEmpty == true)
+              ? order.notes!.trim()
+              : ((first?['note']?.toString().trim().isNotEmpty == true)
+                  ? first!['note'].toString().trim()
+                  : null),
           'timestamp': order.createdAt.toIso8601String(),
           'totalAmount': order.totalAmount,
           'subtotalAmount': order.subtotalAmount,

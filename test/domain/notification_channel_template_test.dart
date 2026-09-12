@@ -255,4 +255,42 @@ void main() {
     expect(wa, contains('▫️ *Toplam Tutar:* *180,00 ₺*'));
     expect(wa, contains('Müşteri kartı indirimi uygulandı'));
   });
+
+  test('Balance reminder resolves for both SMS and WhatsApp correctly', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'balance_reminder',
+        'sms_enabled': true,
+        'whatsapp_enabled': true,
+      }
+    ]);
+
+    final vars = SmsTemplateVars.forBalanceReminder(
+      customerName: 'Fatma Şahin',
+      balance: 1450.0,
+      businessName: 'Serenut POS',
+      currency: '₺',
+    );
+
+    final sms = resolver.resolveSms(
+      eventType: kSmsEventBalanceReminder,
+      settings: settings,
+      vars: vars,
+    );
+    final wa = resolver.resolveWhatsApp(
+      eventType: kSmsEventBalanceReminder,
+      settings: settings,
+      vars: vars,
+    );
+
+    expect(sms, isNotNull);
+    expect(sms, contains('Fatma Şahin'));
+    expect(sms, contains('1450,00 ₺'));
+
+    expect(wa, isNotNull);
+    expect(wa, contains('🔔 *Bakiye Hatırlatması*'));
+    expect(wa, contains('Fatma Şahin'));
+    expect(wa, contains('1450,00 ₺'));
+    expect(wa, contains('Serenut POS'));
+  });
 }

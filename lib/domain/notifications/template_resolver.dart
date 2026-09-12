@@ -22,6 +22,7 @@ const kSmsEventOrderReady = 'order_ready';
 const kSmsEventOrderDelivered = 'order_delivered';
 const kSmsEventOrderCancelled = 'order_cancelled';
 const kSmsEventDiscountApplied = 'discount_applied';
+const kSmsEventBalanceReminder = 'balance_reminder';
 
 // Legacy aliases (still supported in template JSON)
 const _kLegacySale = 'sale';
@@ -189,6 +190,28 @@ Sağlıklı ve bereketli günler dileriz.
 *{business}*''',
 };
 
+/// Canonical default templates for SMS
+const kDefaultSmsTemplates = <String, String>{
+  kSmsEventSaleCreated:
+      'Merhaba {customer}, {amount} tutarındaki alışverişiniz kaydedilmiştir. {business}',
+  kSmsEventDebtCreated:
+      'Merhaba {customer}, hesabınıza {balance} tutarında vadeli işlem kaydedilmiştir. {business}',
+  kSmsEventCollectionRecorded:
+      'Merhaba {customer}, {amount} tutarındaki ödemeniz alınmıştır. Kalan bakiye: {debt}. {business}',
+  kSmsEventOrderCreated:
+      'Merhaba {customer}, {id} numaralı siparişiniz alınmıştır. Tutar: {amount}. {business}',
+  kSmsEventOrderPreparing:
+      'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
+  kSmsEventOrderReady:
+      'Merhaba {customer}, {id} numaralı siparişiniz hazır, teslim alabilirsiniz. {business}',
+  kSmsEventOrderDelivered:
+      'Merhaba {customer}, {id} numaralı siparişiniz teslim edilmiştir. {business}',
+  kSmsEventOrderCancelled:
+      'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. {business}',
+  kSmsEventBalanceReminder:
+      'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
+};
+
 // ── Template Variables Reference ──────────────────────────────────────────────
 // {customer}  → müşteri adı
 // {amount}    → toplam tutar
@@ -228,6 +251,14 @@ class TemplateResolver {
 
     return _fillTokens(templateText, vars, isWhatsApp: false);
   }
+
+  /// Resolve SMS template for [eventType] with given [vars]. Alias for [resolve].
+  String? resolveSms({
+    required String eventType,
+    required Settings settings,
+    required Map<String, String> vars,
+  }) =>
+      resolve(eventType: eventType, settings: settings, vars: vars);
 
   /// Check if [eventType] template exists and is enabled.
   bool isEnabled({required String eventType, required Settings settings}) {
@@ -318,6 +349,9 @@ class TemplateResolver {
           if (template != null && template.trim().isNotEmpty) {
             return template;
           }
+          return kDefaultSmsTemplates[id] ??
+              kDefaultSmsTemplates[eventType] ??
+              kDefaultSmsTemplates[_legacyAliases[eventType]];
         }
       }
     } catch (_) {
@@ -517,6 +551,30 @@ class SmsTemplateVars {
       'items': smsItems,
       'sms_items': smsItems,
       'whatsapp_items': whatsappItems,
+    };
+  }
+
+  static Map<String, String> forBalanceReminder({
+    required String customerName,
+    required double balance,
+    required String businessName,
+    String currency = '₺',
+  }) {
+    final balanceText = _fmt(balance.abs(), currency);
+    return {
+      'customer': customerName,
+      'balance': balanceText,
+      'debt': balanceText,
+      'amount': balanceText,
+      'business': businessName,
+      'date': _today(),
+      'items': '',
+      'discount': _fmt(0, currency),
+      'discount_amount': _fmt(0, currency),
+      'discount_line': '',
+      'note': '',
+      'order_note': '',
+      'note_line': '',
     };
   }
 

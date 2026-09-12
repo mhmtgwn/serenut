@@ -251,7 +251,24 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       ref.read(telemetryBridgeProvider);
       ref.read(smsNotificationHandlerProvider);
       ref.read(smsGatewayServiceProvider);
+      unawaited(_checkAutoDebtReminders());
     });
+  }
+
+  Future<void> _checkAutoDebtReminders() async {
+    try {
+      final settings = ref.read(settingsNotifierProvider).value;
+      if (settings == null || !settings.smsAutoDebtReminderEnabled) return;
+      final reminderService = await ref.read(debtReminderServiceProvider.future);
+      await reminderService.runAutoDebtReminderCheck(
+        settings: settings,
+        onSettingsUpdate: (updated) async {
+          await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Auto debt reminder check error: $e');
+    }
   }
 
   @override

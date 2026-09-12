@@ -164,8 +164,17 @@ class TsplCanvasLabelEngine {
         (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
-    final noteFontSize =
-        (isWide ? (isTall ? 28.0 : 23.0) : (isTall ? 22.0 : 19.5)) * fontScale;
+    final cleanNote = note?.trim() ?? '';
+    final isLongNote = cleanNote.length > 45;
+    final isVeryLongNote = cleanNote.length > 90;
+    final noteFontSize = (isWide
+            ? (isTall
+                ? (isVeryLongNote ? 20.0 : (isLongNote ? 23.0 : 28.0))
+                : (isLongNote ? 18.0 : 23.0))
+            : (isTall
+                ? (isVeryLongNote ? 16.0 : (isLongNote ? 18.0 : 22.0))
+                : (isVeryLongNote ? 14.0 : (isLongNote ? 16.0 : 19.5)))) *
+        fontScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -431,7 +440,7 @@ class TsplCanvasLabelEngine {
             ),
           ),
           textDirection: TextDirection.ltr,
-          maxLines: 2,
+          maxLines: 6,
         )..layout(maxWidth: footerTextW);
         leftTextH += notePainter.height + 1.5;
       }
@@ -1002,7 +1011,7 @@ class TsplCanvasLabelEngine {
               ),
             ),
             textDirection: TextDirection.ltr,
-            maxLines: 2,
+            maxLines: 6,
           )..layout(maxWidth: textMaxW);
           notePainter.paint(canvas, Offset(paddingLeft, currentY));
 

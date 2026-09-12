@@ -1002,6 +1002,31 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 54 && newVersion >= 54) {
+          try {
+            await txn.execute(
+                "ALTER TABLE settings ADD COLUMN auto_debt_reminder_channel TEXT NOT NULL DEFAULT 'both'");
+          } catch (e) {
+            handleMigrationError(e, 54);
+          }
+          try {
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN auto_debt_reminder_repeat_days INTEGER NOT NULL DEFAULT 7');
+          } catch (e) {
+            handleMigrationError(e, 54);
+          }
+          try {
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN auto_debt_reminder_last_run TEXT');
+          } catch (e) {
+            handleMigrationError(e, 54);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 54,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

@@ -66,6 +66,9 @@ class Settings {
   final bool smsAutoDebtReminderEnabled;
   final int smsAutoDebtReminderDays;
   final double smsAutoDebtReminderMinAmount;
+  final String autoDebtReminderChannel; // 'sms', 'whatsapp', 'both'
+  final int autoDebtReminderRepeatDays; // repeat every X days (e.g. 7)
+  final DateTime? autoDebtReminderLastRun;
   final bool labelPrinterEnabled;
   final String? labelPrinterName;
   final String? labelPrinterIp;
@@ -148,6 +151,9 @@ class Settings {
     this.smsAutoDebtReminderEnabled = false,
     this.smsAutoDebtReminderDays = 15,
     this.smsAutoDebtReminderMinAmount = 100.0,
+    this.autoDebtReminderChannel = 'both',
+    this.autoDebtReminderRepeatDays = 7,
+    this.autoDebtReminderLastRun,
     this.labelPrinterEnabled = false,
     this.labelPrinterName,
     this.labelPrinterIp,
@@ -251,6 +257,13 @@ class Settings {
       smsAutoDebtReminderMinAmount:
           (map['sms_auto_debt_reminder_min_amount'] as num?)?.toDouble() ??
               100.0,
+      autoDebtReminderChannel:
+          (map['auto_debt_reminder_channel'] as String?) ?? 'both',
+      autoDebtReminderRepeatDays:
+          (map['auto_debt_reminder_repeat_days'] as int?) ?? 7,
+      autoDebtReminderLastRun: map['auto_debt_reminder_last_run'] != null
+          ? DateTime.tryParse(map['auto_debt_reminder_last_run'] as String)
+          : null,
       labelPrinterEnabled: (map['label_printer_enabled'] as int?) == 1,
       labelPrinterName: map['label_printer_name'] as String?,
       labelPrinterIp: map['label_printer_ip'] as String?,
@@ -352,6 +365,9 @@ class Settings {
       'sms_auto_debt_reminder_enabled': smsAutoDebtReminderEnabled ? 1 : 0,
       'sms_auto_debt_reminder_days': smsAutoDebtReminderDays,
       'sms_auto_debt_reminder_min_amount': smsAutoDebtReminderMinAmount,
+      'auto_debt_reminder_channel': autoDebtReminderChannel,
+      'auto_debt_reminder_repeat_days': autoDebtReminderRepeatDays,
+      'auto_debt_reminder_last_run': autoDebtReminderLastRun?.toIso8601String(),
       'label_printer_enabled': labelPrinterEnabled ? 1 : 0,
       'label_printer_name': labelPrinterName,
       'label_printer_ip': labelPrinterIp,
@@ -438,6 +454,9 @@ class Settings {
     bool? smsAutoDebtReminderEnabled,
     int? smsAutoDebtReminderDays,
     double? smsAutoDebtReminderMinAmount,
+    String? autoDebtReminderChannel,
+    int? autoDebtReminderRepeatDays,
+    DateTime? autoDebtReminderLastRun,
     bool? labelPrinterEnabled,
     String? labelPrinterName,
     String? labelPrinterIp,
@@ -523,6 +542,12 @@ class Settings {
           smsAutoDebtReminderDays ?? this.smsAutoDebtReminderDays,
       smsAutoDebtReminderMinAmount:
           smsAutoDebtReminderMinAmount ?? this.smsAutoDebtReminderMinAmount,
+      autoDebtReminderChannel:
+          autoDebtReminderChannel ?? this.autoDebtReminderChannel,
+      autoDebtReminderRepeatDays:
+          autoDebtReminderRepeatDays ?? this.autoDebtReminderRepeatDays,
+      autoDebtReminderLastRun:
+          autoDebtReminderLastRun ?? this.autoDebtReminderLastRun,
       labelPrinterEnabled: labelPrinterEnabled ?? this.labelPrinterEnabled,
       labelPrinterName: labelPrinterName ?? this.labelPrinterName,
       labelPrinterIp: labelPrinterIp ?? this.labelPrinterIp,

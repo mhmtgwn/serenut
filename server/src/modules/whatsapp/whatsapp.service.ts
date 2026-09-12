@@ -73,6 +73,12 @@ export const STANDARD_WHATSAPP_TEMPLATES = [
     text: 'ℹ️ *Sipariş İptal Edildi*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz iptal edilmiştir.\n\nDetaylı bilgi için bizimle iletişime geçebilirsiniz.\n*{{3}}*',
     examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
   },
+  {
+    eventKey: 'balance_reminder',
+    name: 'serenut_pro_bakiye_hatirlatmasi',
+    text: '🔔 *Bakiye Hatırlatması*\n\nSayın *{{1}}*,\nHesabınızdaki güncel vadeli bakiye: *{{2}}*\n\nÖdeme ve mutabakat için bizimle iletişime geçebilirsiniz.\nTeşekkür ederiz.\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', '1.250,00 TL', 'Nutopian Fındık'],
+  },
 ] as const;
 
 export class WhatsAppProviderError extends Error {

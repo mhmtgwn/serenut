@@ -49,10 +49,12 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   late List<Map<String, dynamic>> listTemplates;
   late final TextEditingController minAmountCtrl;
   late final TextEditingController ageDaysCtrl;
+  late final TextEditingController repeatDaysCtrl;
   late final TextEditingController limitCtrl;
   late bool smsEnabled;
   late String selectedProvider;
   late bool autoDebtReminderEnabled;
+  late String reminderChannel;
   bool isSendingBulk = false;
   bool whatsappStatusLoading = true;
   bool whatsappConnected = false;
@@ -75,11 +77,15 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     smsEnabled = widget.settings.smsEnabled;
     selectedProvider = 'sim';
     autoDebtReminderEnabled = widget.settings.smsAutoDebtReminderEnabled;
+    reminderChannel = widget.settings.autoDebtReminderChannel;
     minAmountCtrl = TextEditingController(
       text: widget.settings.smsAutoDebtReminderMinAmount.toStringAsFixed(0),
     );
     ageDaysCtrl = TextEditingController(
       text: widget.settings.smsAutoDebtReminderDays.toString(),
+    );
+    repeatDaysCtrl = TextEditingController(
+      text: widget.settings.autoDebtReminderRepeatDays.toString(),
     );
     limitCtrl = TextEditingController(
       text: widget.settings.smsMonthlyLimit != null
@@ -118,6 +124,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     WidgetsBinding.instance.removeObserver(this);
     minAmountCtrl.dispose();
     ageDaysCtrl.dispose();
+    repeatDaysCtrl.dispose();
     limitCtrl.dispose();
     super.dispose();
   }
@@ -439,7 +446,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       final customerRepo = await ref.read(customerRepositoryProvider.future);
       final customers = await customerRepo.findAll();
       final logRepo = ref.read(smsLogRepositoryProvider);
-      final smsService = ref.read(smsServiceProvider);
 
       final activeLogs = await logRepo.getActiveCampaignLogs();
       List<String> pendingIds = [];
@@ -596,20 +602,31 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         );
                       }
 
+                      final debtReminderService =
+                          await ref.read(debtReminderServiceProvider.future);
+                      final currentSettings = widget.settings.copyWith(
+                        smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
+                        smsAutoDebtReminderMinAmount:
+                            double.tryParse(minAmountCtrl.text) ?? 100.0,
+                        smsAutoDebtReminderDays:
+                            int.tryParse(ageDaysCtrl.text) ?? 15,
+                        autoDebtReminderChannel: reminderChannel,
+                        autoDebtReminderRepeatDays:
+                            int.tryParse(repeatDaysCtrl.text) ?? 7,
+                      );
+
                       await Future.wait(
                         currentBatchDebtors.map((customer) async {
                           if (isBulkCancelled) return;
                           try {
-                            final debtAmount = customer.balance.abs();
-                            final message = _balanceReminderMessage(
-                              customer.name,
-                              debtAmount,
+                            final res =
+                                await debtReminderService.sendReminderToCustomer(
+                              customer: customer,
+                              settings: currentSettings,
+                              channelOverride: reminderChannel,
                             );
 
-                            final success = await smsService.sendSms(
-                              customer.phone,
-                              message,
-                            );
+                            final success = res.smsSuccess || res.waSuccess;
                             if (success) {
                               sentCount++;
                               await logRepo
@@ -625,17 +642,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   .updateStatus(
                                     'bulk_debt_${customer.id}',
                                     SmsLogStatus.failed,
-                                    errorMessage: 'Send failed',
+                                    errorMessage: 'Gönderim başarısız',
                                   )
                                   .onError((_, __) {});
                             }
-                          } catch (_) {
+                          } catch (err) {
                             failedCount++;
                             await logRepo
                                 .updateStatus(
                                   'bulk_debt_${customer.id}',
                                   SmsLogStatus.failed,
-                                  errorMessage: 'Exception',
+                                  errorMessage: err.toString(),
                                 )
                                 .onError((_, __) {});
                           }
@@ -2047,9 +2064,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 ),
                 const Divider(color: POSColors.border),
                 _buildSwitchRow(
-                  title: 'Bakiye Hatırlatma Tercihlerini Kullan',
+                  title: 'Otomatik Bakiye Hatırlatma',
                   subtitle:
-                      'Manuel hatırlatma listesinde belirlediğiniz eşikleri uygular',
+                      'Borçlu müşterilere belirlenen kanal, vade ve sıklıkta hatırlatma gönderir',
                   icon: Icons.notifications_active_rounded,
                   color: POSColors.blue,
                   value: autoDebtReminderEnabled,
@@ -2059,18 +2076,87 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 ),
                 if (autoDebtReminderEnabled) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  TextFormField(
-                    controller: minAmountCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: InputDecoration(
-                      labelText: 'Önerilecek Minimum Bakiye (TL)',
-                      helperText:
-                          'Hatırlatma ekranı bu tutarın altındaki müşterileri başlangıçta filtreler.',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                  const Text(
+                    'Hatırlatma Kanalı',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: POSColors.textSecondary,
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildReminderChannelOption(
+                        id: 'sms',
+                        label: 'Sadece SMS',
+                        icon: Icons.sms_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildReminderChannelOption(
+                        id: 'whatsapp',
+                        label: 'Sadece WhatsApp',
+                        icon: Icons.chat_bubble_outline_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildReminderChannelOption(
+                        id: 'both',
+                        label: 'Her İkisi (SMS+WA)',
+                        icon: Icons.mark_chat_read_rounded,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: minAmountCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Min. Tutar (TL)',
+                            hintText: '100',
+                            helperText: 'Bu tutarın üzeri borçlar',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: ageDaysCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Vade Süresi (Gün)',
+                            hintText: '15',
+                            helperText: 'İşlemden X gün sonra',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: repeatDaysCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: 'Tekrar Sıklığı (Gün)',
+                            hintText: '7',
+                            helperText: 'X günde bir tekrar et',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: AppSpacing.lg),
@@ -2561,10 +2647,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     );
                     final minAmt = double.tryParse(minAmountCtrl.text) ?? 100.0;
                     final ageDays = int.tryParse(ageDaysCtrl.text) ?? 15;
+                    final repeatDays = int.tryParse(repeatDaysCtrl.text) ?? 7;
                     final updatedWithReminder = updated.copyWith(
                       smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
                       smsAutoDebtReminderMinAmount: minAmt,
                       smsAutoDebtReminderDays: ageDays,
+                      autoDebtReminderChannel: reminderChannel,
+                      autoDebtReminderRepeatDays: repeatDays,
                     );
                     try {
                       await ref
@@ -2705,6 +2794,56 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReminderChannelOption({
+    required String id,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = reminderChannel == id;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => reminderChannel = id),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? POSColors.green.withValues(alpha: 0.08)
+                : POSColors.surface,
+            border: Border.all(
+              color: isSelected ? POSColors.green : POSColors.border,
+              width: isSelected ? 1.5 : 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? POSColors.green : POSColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? POSColors.green : POSColors.text,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -152,6 +152,38 @@ class SmsLogRepository {
     }
   }
 
+  /// Returns the most recent reminder log timestamp for the given phone number,
+  /// or null if no reminder has been sent.
+  Future<DateTime?> getLastReminderDate(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.isEmpty) return null;
+    if (kIsWeb) {
+      final matches = _inMemoryLogs.where((e) =>
+          e.phone.replaceAll(RegExp(r'[^0-9]'), '').contains(cleanPhone) &&
+          (e.eventType == 'balance_reminder' || e.eventType == 'bulk_debt_reminder') &&
+          e.status == SmsLogStatus.sent);
+      if (matches.isEmpty) return null;
+      return matches.map((e) => e.sentAt ?? e.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
+    }
+    try {
+      final database = await _db.getDatabase();
+      final rows = await database.rawQuery(
+        '''SELECT sent_at, created_at FROM sms_logs
+           WHERE phone LIKE ? AND event_type IN ('balance_reminder', 'bulk_debt_reminder')
+           AND status = 'sent'
+           ORDER BY created_at DESC LIMIT 1''',
+        ['%$cleanPhone%'],
+      );
+      if (rows.isEmpty) return null;
+      final sentStr = rows.first['sent_at'] as String? ?? rows.first['created_at'] as String?;
+      if (sentStr == null) return null;
+      return DateTime.tryParse(sentStr);
+    } catch (e) {
+      debugPrint('⚠️ SmsLogRepository.getLastReminderDate error: $e');
+      return null;
+    }
+  }
+
   /// Fetch all active campaign logs (status: pending or sending) for bulk_debt_reminder.
   Future<List<SmsLogEntry>> getActiveCampaignLogs() async {
     if (kIsWeb) {

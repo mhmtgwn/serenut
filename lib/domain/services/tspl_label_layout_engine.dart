@@ -315,6 +315,9 @@ class TsplLabelLayoutEngine {
     final phoneClean = _ascii(customerPhone?.trim() ?? '');
     final noteClean =
         note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
+    final noteLines = noteClean != null
+        ? bodyFont.wrap('Not: $noteClean', usableW, maxLines: 6)
+        : const <String>[];
 
     final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -376,7 +379,7 @@ class TsplLabelLayoutEngine {
     calculatedDots += sy(8); // Separator 2
     final prePaymentY = calculatedDots;
     calculatedDots += rowHeight; // Payment status
-    if (noteClean != null) calculatedDots += rowHeight;
+    if (noteLines.isNotEmpty) calculatedDots += rowHeight * noteLines.length;
     if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
 
     // QR code starts at paymentY (aligned with payment status)
@@ -460,7 +463,7 @@ class TsplLabelLayoutEngine {
     final closingFooterHeight = (barH + sy(3)) +
         math.max(
           rowHeight +
-              (noteClean != null ? rowHeight : 0) +
+              (noteLines.isNotEmpty ? rowHeight * noteLines.length : 0) +
               (showTotalAmount && totalAmount != null ? sy(26) : 0),
           qrBoxSize,
         ) +
@@ -498,11 +501,18 @@ class TsplLabelLayoutEngine {
         page1Used += h;
         itemIndex++;
       }
-      if (itemIndex == itemsList.length && page1Items.length > 1) {
-        page1Items.removeLast();
-        itemIndex--;
+      if (itemIndex == itemsList.length) {
+        if (page1Items.length > 1) {
+          page1Items.removeLast();
+          itemIndex--;
+          pages.add(page1Items);
+        } else {
+          pages.add(page1Items);
+          pages.add(<Map<String, dynamic>>[]);
+        }
+      } else {
+        pages.add(page1Items);
       }
-      pages.add(page1Items);
 
       // Subsequent pages budgets
       final closingPageItemBudget = math.max(
@@ -685,14 +695,14 @@ class TsplLabelLayoutEngine {
           );
           currentY += rowHeight;
 
-          if (noteClean != null) {
+          for (final nLine in noteLines) {
             commands.boldText(
               paddingX,
               currentY,
               bodyFont.font,
               1,
               1,
-              'Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}',
+              nLine,
             );
             currentY += rowHeight;
           }
@@ -813,14 +823,14 @@ class TsplLabelLayoutEngine {
       );
       currentY += rowHeight;
 
-      if (noteClean != null) {
+      for (final nLine in noteLines) {
         commands.boldText(
           paddingX,
           currentY,
           bodyFont.font,
           1,
           1,
-          'Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}',
+          nLine,
         );
         currentY += rowHeight;
       }
