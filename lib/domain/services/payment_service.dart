@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
@@ -219,14 +218,28 @@ class PaymentService {
     required double totalAmount,
     required double paidAmount,
   }) async {
-    final debt = MathEngine.calculateDebt(totalAmount, paidAmount);
+    // 1. Siparişe ait tüm finansal işlemleri tara (varsa sonradan yapılan parçalı ödeme/tahsilat kayıtları)
+    final existingTxs = await _transactionRepository.getByReferenceId(orderId);
+    final subsequentPayments = existingTxs
+        .where((t) => t.type == 'payment' || t.type == 'collection')
+        .toList();
+    final subsequentPaidTotal = subsequentPayments.fold<double>(
+        0.0, (sum, t) => sum + t.paidAmount);
+
+    // 2. Kök Matematiksel Denge Formülü (Ledger Balance Invariant):
+    // Net Bakiye Etkisi = sum(payment.paid_amount) - sale.debt_amount
+    // Hedef: Net Bakiye Etkisi == paidAmount - totalAmount
+    // Dolayısıyla: sale.debt_amount = totalAmount - paidAmount + subsequentPaidTotal
+    final effectiveSaleDebt = (totalAmount - paidAmount + subsequentPaidTotal)
+        .clamp(0.0, double.infinity);
+    final effectiveSalePaid = (paidAmount - subsequentPaidTotal).clamp(0.0, totalAmount);
 
     final updatedCount = await _transactionRepository.updateOrderSaleTransaction(
       orderId: orderId,
       customerId: newCustomerId,
       amount: totalAmount,
-      paidAmount: paidAmount,
-      debtAmount: debt,
+      paidAmount: effectiveSalePaid,
+      debtAmount: effectiveSaleDebt,
     );
 
     // Fallback: If no existing sale was found (e.g. legacy order), create initial sale
@@ -236,8 +249,8 @@ class PaymentService {
         type: 'sale',
         customerId: newCustomerId,
         amount: totalAmount,
-        paidAmount: paidAmount,
-        debtAmount: debt,
+        paidAmount: effectiveSalePaid,
+        debtAmount: effectiveSaleDebt,
         date: DateTime.now(),
         referenceId: orderId,
         metadata: {'origin': 'order'},

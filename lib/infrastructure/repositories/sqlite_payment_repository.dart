@@ -509,6 +509,15 @@ class SqliteFinancialTransactionRepository
           whereArgs: [txId],
         );
 
+        if (customerId != existingRows.first['customer_id']) {
+          await _executor.update(
+            'financial_transactions',
+            {'customer_id': customerId, 'is_synced': 0},
+            where: 'reference_id = ? AND id != ?',
+            whereArgs: [orderId, txId],
+          );
+        }
+
         final updatedRows = await _executor.query(
           'financial_transactions',
           where: 'id = ?',

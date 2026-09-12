@@ -133,6 +133,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
   int _labelCopies = 1;
   bool _isSubmitting = false;
   double _discountAmount = 0.0;
+  double _existingPaidAmount = 0.0;
 
   void updateState(VoidCallback fn) {
     if (mounted) {
@@ -250,17 +251,22 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
             .firstOrNull;
       }
       if (orderTx != null) {
+        final subsequentPaid = transactions
+            .where((t) => t.type == 'payment' || t.type == 'collection')
+            .fold<double>(0.0, (sum, t) => sum + t.paidAmount);
+        final totalPaid = orderTx.paidAmount + subsequentPaid;
+        final total = orderTx.amount;
+        final debt = (total - totalPaid).clamp(0.0, double.infinity);
+
         setState(() {
-          final total = orderTx!.amount;
-          final paid = orderTx.paidAmount;
-          final debt = orderTx.debtAmount;
-          if (paid == total) {
+          _existingPaidAmount = totalPaid;
+          if (totalPaid >= total - 0.01) {
             _paymentMethod = 'cash';
-          } else if (paid == 0) {
+          } else if (totalPaid <= 0.01) {
             _paymentMethod = 'debt';
           } else {
             _paymentMethod = 'karma';
-            _cashSplitController.text = paid.toStringAsFixed(2);
+            _cashSplitController.text = totalPaid.toStringAsFixed(2);
             _cardSplitController.text = '0.00';
             _debtSplitController.text = debt.toStringAsFixed(2);
           }

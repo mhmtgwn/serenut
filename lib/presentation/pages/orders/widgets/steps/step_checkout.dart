@@ -132,6 +132,51 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
               ],
             ),
           ),
+          if (widget.existingOrder != null && _existingPaidAmount > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _existingPaidAmount >= _totalAmount - 0.01
+                    ? const Color(0xFFF0FDF4)
+                    : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _existingPaidAmount >= _totalAmount - 0.01
+                      ? const Color(0xFF86EFAC)
+                      : const Color(0xFF93C5FD),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _existingPaidAmount >= _totalAmount - 0.01
+                        ? Icons.check_circle_rounded
+                        : Icons.info_outline_rounded,
+                    size: 18,
+                    color: _existingPaidAmount >= _totalAmount - 0.01
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _existingPaidAmount >= _totalAmount - 0.01
+                          ? 'Bu sipariş için daha önce ₺${_existingPaidAmount.toStringAsFixed(2)} tahsil edilmiştir. (Tamamı Ödenmiş)'
+                          : 'Önceden Tahsil Edilen: ₺${_existingPaidAmount.toStringAsFixed(2)} • Kalan Ödenecek: ₺${(_totalAmount - _existingPaidAmount).clamp(0.0, double.infinity).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _existingPaidAmount >= _totalAmount - 0.01
+                            ? const Color(0xFF15803D)
+                            : const Color(0xFF1E40AF),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
 
           // ── Payment Methods Selection ──

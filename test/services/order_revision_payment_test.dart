@@ -172,5 +172,63 @@ void main() {
       expect(allCancellations.isEmpty, true,
           reason: 'No fake cancellation transactions were generated!');
     });
+
+    test(
+        'Order created as Vadeli, then paid via subsequent payment, then edited to Nakit NEVER creates phantom credit',
+        () async {
+      const order2 = 'order-test-subsequent-payment-202';
+
+      // 1. Vadeli sipariş açıldı: 1000 TL borç
+      await paymentService.processSalePayment(
+        saleId: order2,
+        customerId: cust1,
+        totalAmount: 1000.0,
+        paidAmount: 0.0,
+        paymentMethod: 'debt',
+      );
+
+      var b1 = await customerRepo.getBalance(cust1);
+      expect(b1, -1000.0, reason: 'Müşteri 1000 TL borçlu olmalı');
+
+      // 2. Müşteri daha sonra 1000 TL nakit ödeme yaptı (parçalı/teslimat ödemesi)
+      await paymentService.recordPartialPayment(
+        saleId: order2,
+        customerId: cust1,
+        amount: 1000.0,
+        method: 'cash',
+        currentPaidAmount: 0.0,
+        totalAmount: 1000.0,
+      );
+
+      b1 = await customerRepo.getBalance(cust1);
+      expect(b1, 0.0, reason: '1000 TL ödendi, bakiye sıfırlandı');
+
+      // 3. Kullanıcı siparişi düzenleyip ödeme tipini "Nakit" (1000 TL ödendi) yaptı
+      await paymentService.reviseOrderPayment(
+        orderId: order2,
+        oldCustomerId: cust1,
+        newCustomerId: cust1,
+        totalAmount: 1000.0,
+        paidAmount: 1000.0,
+      );
+
+      b1 = await customerRepo.getBalance(cust1);
+      expect(b1, 0.0,
+          reason:
+              'Müşteri ASLA alacaklı çıkmamalı (+1000 değil, 0.0 olmalı)');
+
+      // 4. Sepet 1400 TL yapıldı, ek ödeme alınmadı (toplam ödenen hala 1000 TL)
+      await paymentService.reviseOrderPayment(
+        orderId: order2,
+        oldCustomerId: cust1,
+        newCustomerId: cust1,
+        totalAmount: 1400.0,
+        paidAmount: 1000.0,
+      );
+
+      b1 = await customerRepo.getBalance(cust1);
+      expect(b1, -400.0,
+          reason: '1400 TL toplam - 1000 TL ödenen = 400 TL borç kalmalı');
+    });
   });
 }
