@@ -12,7 +12,6 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -822,9 +821,8 @@ class _CustomerCard extends StatelessWidget {
                 const SizedBox(width: 12),
 
                 // ── Sağ Kısım: Bakiye ve Yönlendirme Ok ────────────────────────
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -842,55 +840,11 @@ class _CustomerCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (customer.phone.trim().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => _sendWhatsAppBalance(context, customer),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDCFCE7),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFF86EFAC)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.chat_bubble_rounded,
-                                        size: 11,
-                                        color: Color(0xFF15803D),
-                                      ),
-                                      SizedBox(width: 3),
-                                      Text(
-                                        'WhatsApp',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF15803D),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: _kTextSecondary,
-                          size: 20,
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _kTextSecondary,
+                      size: 20,
                     ),
                   ],
                 ),
@@ -900,66 +854,5 @@ class _CustomerCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _sendWhatsAppBalance(
-      BuildContext context, CustomerEntity customer) async {
-    final phone = customer.phone.trim();
-    if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Müşterinin kayıtlı telefon numarası bulunmuyor.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final isDebt = customer.balance < 0;
-    final isClear = customer.balance == 0;
-    final absBalance = customer.balance.abs();
-    final statusText =
-        isDebt ? 'Borçlu' : (isClear ? 'Bakiyesi Yok' : 'Alacaklı');
-
-    final message = '''📋 *Cari Hesap Bilgilendirmesi*
-
-Sayın *${customer.name}*,
-Güncel hesap durumunuz:
-
-▫️ *Durum:* $statusText
-▫️ *Güncel Tutar:* *₺${absBalance.toStringAsFixed(2)}*
-
-Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
-
-    final cleanedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final normalized = cleanedPhone.startsWith('0')
-        ? '9$cleanedPhone'
-        : (cleanedPhone.length == 10 ? '90$cleanedPhone' : cleanedPhone);
-    final encoded = Uri.encodeComponent(message);
-    final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('WhatsApp başlatılamadı.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Hata: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
   }
 }
