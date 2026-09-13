@@ -3,6 +3,7 @@
 // Yeşil + Sarı + Premium POS Teması
 // Generated: 21 Jun 2026 (v2)
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
   static final NumberFormat _stockFormat = NumberFormat.decimalPattern('tr_TR');
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
   bool _isSearching = false;
   bool _isLabelSelectionMode = false;
   final Set<String> _selectedLabelProductIds = <String>{};
@@ -56,6 +58,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     disposeBarcodeScanner();
     _searchController.dispose();
     _scrollController.dispose();
@@ -197,8 +200,13 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
       searchController: _searchController,
       searchHint: 'Ürün adı veya açıklama ara...',
       onSearchChanged: (val) {
-        ref.read(productSearchQueryProvider.notifier).state = val;
-        setState(() {});
+        _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            ref.read(productSearchQueryProvider.notifier).state = val;
+            setState(() {});
+          }
+        });
       },
       actions: [
         if (_isLabelSelectionMode)
@@ -613,7 +621,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
     final summary = summaryValue.valueOrNull;
     final productCount = summary?.productCount ?? visibleProducts.length;
     final totalStockQuantity = summary?.totalQuantity ??
-        visibleProducts.fold<int>(0, (sum, p) => sum + p.quantity);
+        visibleProducts.fold<num>(0, (sum, p) => sum + p.quantity);
     final totalStockValue = summary?.stockValue ??
         visibleProducts.fold<double>(
           0,
@@ -632,7 +640,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
             child: _SummaryChip(
               label: 'Toplam Envanter',
               value: '$productCount Çeşit',
-              count: '$totalStockQuantity Adet',
+              count: '${_stockFormat.format(totalStockQuantity)} Miktar',
               color: _kGreenDark,
               bg: _kGreenLight,
               icon: Icons.inventory_2_rounded,

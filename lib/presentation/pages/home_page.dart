@@ -16,6 +16,7 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/home/fast_collection_bottom_sheet.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/presentation/pages/order_details_page.dart';
+import 'package:serenutos/presentation/widgets/home/qr_order_scanner_dialog.dart';
 
 
 part 'home/hero_executive_metrics.dart';
@@ -44,6 +45,29 @@ class _HomePageState extends ConsumerState<HomePage> {
       onRefresh: () => ref.invalidate(dashboardProvider),
       showStatusIndicator: true,
       showSettings: true,
+      actions: [
+        IconButton(
+          tooltip: 'Sipariş / Satış QR & Barkod Oku',
+          onPressed: () => QrOrderScannerDialog.show(context),
+          icon: const Icon(
+            Icons.qr_code_scanner_rounded,
+            color: POSColors.greenDark,
+            size: 24,
+          ),
+        ),
+      ],
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'home_qr_scanner_fab',
+        backgroundColor: POSColors.green,
+        foregroundColor: Colors.white,
+        elevation: 3,
+        onPressed: () => QrOrderScannerDialog.show(context),
+        icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+        label: const Text(
+          'QR / Barkod Oku',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+      ),
       body: dashboard.when(
         skipLoadingOnReload: true,
         loading: () => const Center(

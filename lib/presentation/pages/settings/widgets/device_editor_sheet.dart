@@ -521,7 +521,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               ),
             ],
           ),
-
         ],
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
@@ -991,23 +990,17 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         return;
       }
       var device = _buildDevice().copyWith(
-        status: HardwareDeviceStatus.unverified,
-        lastMessage: 'Ayarlar kaydedildi; bağlantı doğrulaması bekleniyor.',
+        status: HardwareDeviceStatus.ready,
+        lastMessage: 'Ayarlar kaydedildi; aygıt hazır.',
         clearLastError: true,
       );
       final result = _draftTestResult;
       if (result?.success == true &&
           _verifiedFingerprint == _fingerprint(device)) {
-        final isPrinter = device.type == HardwareDeviceType.receiptPrinter ||
-            device.type == HardwareDeviceType.labelPrinter;
         device = device.copyWith(
-          status: isPrinter
-              ? HardwareDeviceStatus.unverified
-              : HardwareDeviceStatus.ready,
+          status: HardwareDeviceStatus.ready,
           lastTestedAt: result!.completedAt,
-          lastMessage: isPrinter
-              ? '${result.message}. Fiziksel çıktı testi bekleniyor.'
-              : result.message,
+          lastMessage: result.message,
           clearLastError: true,
         );
       }
@@ -1569,67 +1562,85 @@ class _SelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? color.withValues(alpha: .07) : Colors.white,
-      shape: RoundedRectangleBorder(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: selected ? color.withValues(alpha: .06) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
+        border: Border.all(
           color: selected ? color : kBorderColor,
-          width: selected ? 1.6 : 1,
+          width: selected ? 1.8 : 1,
         ),
+        boxShadow: [
+          if (selected)
+            BoxShadow(
+              color: color.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            )
+          else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
                 ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? color : kTextPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.3,
-                        color: kTextSecondary,
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.3,
+                          color: kTextSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: selected ? color : kBorderColor,
-              ),
-            ],
+                const SizedBox(width: 8),
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected ? color : kBorderColor,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

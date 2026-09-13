@@ -108,6 +108,16 @@ class _QuickUtilitiesCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _UtilityTile(
+                  title: 'QR / Barkod Oku',
+                  subtitle: 'Sipariş Teslim & Bul',
+                  icon: Icons.qr_code_scanner_rounded,
+                  color: const Color(0xFF0284C7),
+                  onTap: () => QrOrderScannerDialog.show(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _UtilityTile(
                   title: 'Hızlı Tahsilat',
                   subtitle: 'Borç Kapatma',
                   icon: Icons.payments_outlined,
@@ -115,7 +125,11 @@ class _QuickUtilitiesCard extends StatelessWidget {
                   onTap: () => FastCollectionBottomSheet.show(context),
                 ),
               ),
-              const SizedBox(width: 8),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               Expanded(
                 child: _UtilityTile(
                   title: 'Aygıtlar & Yazıcı',
@@ -125,11 +139,7 @@ class _QuickUtilitiesCard extends StatelessWidget {
                   onTap: () => context.push(AppRoutes.hardware),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
+              const SizedBox(width: 8),
               Expanded(
                 child: _UtilityTile(
                   title: 'Kasa & Raporlar',

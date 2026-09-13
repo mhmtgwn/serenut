@@ -307,6 +307,9 @@ class TsplLabelLayoutEngine {
     final bodyFont = isVeryWide
         ? const _TsplFontProfile('3', 18, 26)
         : const _TsplFontProfile('2', 14, 22);
+    final customerFont = isVeryWide
+        ? const _TsplFontProfile('4', 24, 34)
+        : const _TsplFontProfile('3', 16, 26);
     final rowHeight = bodyFont.lineHeight;
     final maxBodyChars = bodyFont.maxChars(usableW);
 
@@ -334,14 +337,11 @@ class TsplLabelLayoutEngine {
 
     // ── Pre-calculate Exact Dot Height ──
     int calculatedDots = topGapMargin;
-    if (hasOrderNo || hasDate) {
+    if (hasOrderNo || hasDate || phoneClean.isNotEmpty) {
       calculatedDots += rowHeight;
     }
     if (showCustomerName) {
-      calculatedDots += rowHeight;
-      if (phoneClean.isNotEmpty) {
-        calculatedDots += rowHeight;
-      }
+      calculatedDots += customerFont.lineHeight + 2;
     }
     if (previousDebt > 0.001) calculatedDots += rowHeight;
     calculatedDots += sy(8); // Separator 1
@@ -453,8 +453,8 @@ class TsplLabelLayoutEngine {
     }
 
     final page1HeaderHeight = topGapMargin +
-        ((hasOrderNo || hasDate) ? rowHeight : 0) +
-        (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
+        ((hasOrderNo || hasDate || phoneClean.isNotEmpty) ? rowHeight : 0) +
+        (showCustomerName ? (customerFont.lineHeight + 2) : 0) +
         (previousDebt > 0.001 ? rowHeight : 0) +
         (barH + sy(3));
 
@@ -571,20 +571,24 @@ class TsplLabelLayoutEngine {
         if (pageIdx == 0) {
           final page1OrderNo =
               _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
-          if (hasOrderNo && hasDate) {
-            final page1OrderText =
-                'Sip #$page1OrderNo (1/${pages.length})';
-            final orderPixelW = bodyFont.measureWidth(page1OrderText);
-            final naturalDateX = paddingX + orderPixelW + sy(16);
+          final leftOrder = hasOrderNo ? 'Sip #$page1OrderNo (1/${pages.length})' : '';
+          final phonePart = (showCustomerName && phoneClean.isNotEmpty)
+              ? ' Tel: ${_fit(phoneClean, 14)}'
+              : '';
+          final metaLeft = '$leftOrder$phonePart'.trim();
+
+          if (metaLeft.isNotEmpty && hasDate) {
+            final leftW = bodyFont.measureWidth(metaLeft);
+            final naturalDateX = paddingX + leftW + sy(16);
             final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$page1OrderText"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
             commands.writeln(
                 'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
-          } else if (hasOrderNo) {
+          } else if (metaLeft.isNotEmpty) {
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$page1OrderNo (1/${pages.length})"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
             currentY += rowHeight;
           } else if (hasDate) {
             commands.writeln(
@@ -593,20 +597,11 @@ class TsplLabelLayoutEngine {
           }
 
           if (showCustomerName) {
-            final whoText = custClean.isNotEmpty
-                ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
-                : 'Mus: Genel';
-            commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
-            currentY += rowHeight;
-
-            if (phoneClean.isNotEmpty) {
-              final phoneText =
-                  'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
-              commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
-              currentY += rowHeight;
-            }
+            final whoText = custClean.isNotEmpty ? custClean : 'Genel Musteri';
+            final fittedCust = _fit(whoText, customerFont.maxChars(usableW));
+            commands.boldText(
+                paddingX, currentY, customerFont.font, 1, 1, fittedCust);
+            currentY += customerFont.lineHeight + sy(2);
           }
           if (previousDebt > 0.001) {
             commands.writeln(
@@ -750,15 +745,24 @@ class TsplLabelLayoutEngine {
 
       final safeOrderNo =
           _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
-      if (hasOrderNo && hasDate) {
+      final leftOrder = hasOrderNo ? 'Sip #$safeOrderNo' : '';
+      final phonePart = (showCustomerName && phoneClean.isNotEmpty)
+          ? ' Tel: ${_fit(phoneClean, 14)}'
+          : '';
+      final metaLeft = '$leftOrder$phonePart'.trim();
+
+      if (metaLeft.isNotEmpty && hasDate) {
+        final leftW = bodyFont.measureWidth(metaLeft);
+        final naturalDateX = paddingX + leftW + sy(16);
+        final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
         commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$safeOrderNo"');
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
         commands.writeln(
-            'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+            'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
         currentY += rowHeight;
-      } else if (hasOrderNo) {
+      } else if (metaLeft.isNotEmpty) {
         commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$safeOrderNo"');
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
         currentY += rowHeight;
       } else if (hasDate) {
         commands.writeln(
@@ -766,22 +770,13 @@ class TsplLabelLayoutEngine {
         currentY += rowHeight;
       }
 
-      // ── 3. Customer Info ──
+      // ── 3. Customer Info (Büyük Tek Satır Müşteri İsmi) ──
       if (showCustomerName) {
-        final whoText = custClean.isNotEmpty
-            ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
-            : 'Mus: Genel';
-        commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
-        currentY += rowHeight;
-
-        if (phoneClean.isNotEmpty) {
-          final phoneText =
-              'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
-          commands.writeln(
-              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
-          currentY += rowHeight;
-        }
+        final whoText = custClean.isNotEmpty ? custClean : 'Genel Musteri';
+        final fittedCust = _fit(whoText, customerFont.maxChars(usableW));
+        commands.boldText(
+            paddingX, currentY, customerFont.font, 1, 1, fittedCust);
+        currentY += customerFont.lineHeight + sy(2);
       }
       if (previousDebt > 0.001) {
         commands.writeln(

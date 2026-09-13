@@ -258,7 +258,7 @@ class ProductInventorySummary {
   });
 
   final int productCount;
-  final int totalQuantity;
+  final num totalQuantity;
   final double stockValue;
   final int criticalCount;
 }
@@ -269,7 +269,7 @@ final productInventorySummaryProvider =
   final products = await repository.findAll();
   return ProductInventorySummary(
     productCount: products.length,
-    totalQuantity: products.fold(0, (sum, item) => sum + item.quantity),
+    totalQuantity: products.fold<num>(0, (sum, item) => sum + item.quantity),
     stockValue: products.fold(
       0,
       (sum, item) =>

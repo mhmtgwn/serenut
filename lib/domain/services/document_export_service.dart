@@ -333,7 +333,9 @@ class DocumentExportService {
         ex.TextCellValue(p.category),
         ex.IntCellValue(p.vat ?? 0),
         ex.DoubleCellValue(p.price),
-        ex.IntCellValue(p.quantity)
+        p.quantity is int
+            ? ex.IntCellValue(p.quantity.toInt())
+            : ex.DoubleCellValue(p.quantity.toDouble())
       ]);
     }
 

@@ -73,7 +73,7 @@ class OrderCancellationService {
             0.0;
         if (productId != null && rawQty > 0) {
           final int intQty =
-              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
+              rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
           restoredItems.add(SaleItemInput(
             productId: productId,
             quantity: intQty,

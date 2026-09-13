@@ -30,12 +30,6 @@ class SaleDetailsPage extends ConsumerWidget {
         (customerId.isNotEmpty && customerLookupMap != null)
             ? customerLookupMap[customerId]
             : null;
-    // ── Ürün adı haritası (UUID → isim) ──
-    final productsVal = ref.watch(productsControllerProvider);
-    final productNameMap = productsVal.maybeWhen(
-      data: (list) => {for (final p in list) p.id: p.name},
-      orElse: () => <String, String>{},
-    );
 
     return Scaffold(
       backgroundColor: POSColors.surface,
@@ -76,7 +70,7 @@ class SaleDetailsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildItemsCard(sale, productNameMap),
+                  _buildItemsCard(sale),
                   const SizedBox(height: 16),
                 ],
                 _buildPaymentSummaryCard(sale),
@@ -203,10 +197,7 @@ class SaleDetailsPage extends ConsumerWidget {
     return labels[method.toLowerCase()] ?? method;
   }
 
-  Widget _buildItemsCard(
-    SaleEntity sale,
-    Map<String, String> productNameMap,
-  ) {
+  Widget _buildItemsCard(SaleEntity sale) {
     final items = sale.items;
     double subtotal = 0;
     for (final item in items) {
@@ -232,9 +223,8 @@ class SaleDetailsPage extends ConsumerWidget {
             final price =
                 ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0;
             final productId = item['product_id']?.toString() ?? '';
-            // UUID → gerçek ürün adına çevir
-            final productName = productNameMap[productId] ??
-                item['product_name']?.toString() ??
+            final productName = item['product_name']?.toString() ??
+                item['name']?.toString() ??
                 productId;
             return Column(
               children: [
@@ -500,15 +490,17 @@ class SaleDetailsPage extends ConsumerWidget {
 
     // Build return items list from sale.items
     final returnItems = sale.items.map((item) {
-      final soldQty = (item['quantity'] as num?)?.toInt() ?? 0;
-      final refundedQty = (item['refunded_quantity'] as num?)?.toInt() ?? 0;
-      final qty = soldQty - refundedQty;
+      final soldQty = ((item['sale_quantity'] ?? item['quantity']) as num?)?.toDouble() ?? 0.0;
+      final refundedQty = ((item['refunded_quantity'] ?? item['refundedQuantity']) as num?)?.toDouble() ?? 0.0;
+      final qty = (soldQty - refundedQty).clamp(0.0, double.infinity);
+      final isWeighed = item['sale_type'] == 'weighed' || (soldQty != soldQty.roundToDouble());
       return _ReturnItem(
         saleItemId: item['id']?.toString() ?? '',
         productId: item['product_id']?.toString() ?? '',
         maxQty: qty,
         unitPrice: ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0,
-        returnQty: 0,
+        returnQty: 0.0,
+        isWeighed: isWeighed,
       );
     }).toList();
     String refundMethod = 'balance';
@@ -538,6 +530,7 @@ class SaleDetailsPage extends ConsumerWidget {
                   children: [
                     ...returnItems.map((ri) {
                       final name = productNameMap[ri.productId] ?? ri.productId;
+                      final step = ri.isWeighed ? 0.1 : 1.0;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Row(
@@ -547,18 +540,28 @@ class SaleDetailsPage extends ConsumerWidget {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w500))),
                             IconButton(
-                              onPressed: ri.returnQty > 0
-                                  ? () => setDialog(() => ri.returnQty--)
+                              onPressed: ri.returnQty > 0.0001
+                                  ? () => setDialog(() {
+                                        ri.returnQty = (ri.returnQty - step).clamp(0.0, ri.maxQty);
+                                        if (!ri.isWeighed) ri.returnQty = ri.returnQty.roundToDouble();
+                                      })
                                   : null,
                               icon: const Icon(Icons.remove_circle_outline),
                               color: const Color(0xFF16A34A),
                             ),
-                            Text('${ri.returnQty} / ${ri.maxQty}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
+                            Text(
+                              ri.isWeighed
+                                  ? '${ri.returnQty.toStringAsFixed(2)} / ${ri.maxQty.toStringAsFixed(2)}'
+                                  : '${ri.returnQty.toInt()} / ${ri.maxQty.toInt()}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold),
+                            ),
                             IconButton(
-                              onPressed: ri.returnQty < ri.maxQty
-                                  ? () => setDialog(() => ri.returnQty++)
+                              onPressed: ri.returnQty < ri.maxQty - 0.0001
+                                  ? () => setDialog(() {
+                                        ri.returnQty = (ri.returnQty + step).clamp(0.0, ri.maxQty);
+                                        if (!ri.isWeighed) ri.returnQty = ri.returnQty.roundToDouble();
+                                      })
                                   : null,
                               icon: const Icon(Icons.add_circle_outline),
                               color: const Color(0xFF16A34A),
@@ -619,11 +622,12 @@ class SaleDetailsPage extends ConsumerWidget {
                     ? () async {
                         Navigator.pop(ctx);
                         final items = returnItems
-                            .where((ri) => ri.returnQty > 0)
+                            .where((ri) => ri.returnQty > 0.0001)
                             .map((ri) => SaleItemInput(
                                   saleItemId: ri.saleItemId,
                                   productId: ri.productId,
-                                  quantity: ri.returnQty,
+                                  quantity: ri.returnQty.round(),
+                                  saleQuantity: ri.returnQty,
                                   unitPrice: ri.unitPrice,
                                 ))
                             .toList();
@@ -664,9 +668,10 @@ class SaleDetailsPage extends ConsumerWidget {
 class _ReturnItem {
   final String saleItemId;
   final String productId;
-  final int maxQty;
+  final double maxQty;
   final double unitPrice;
-  int returnQty;
+  double returnQty;
+  final bool isWeighed;
 
   _ReturnItem({
     required this.saleItemId,
@@ -674,6 +679,7 @@ class _ReturnItem {
     required this.maxQty,
     required this.unitPrice,
     required this.returnQty,
+    this.isWeighed = false,
   });
 }
 

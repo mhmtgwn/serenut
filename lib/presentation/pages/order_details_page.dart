@@ -138,12 +138,6 @@ class OrderDetailsPage extends ConsumerWidget {
             ? customerLookupMap[customerId]
             : null;
     final settingsAsync = ref.watch(settingsNotifierProvider);
-    // UUID â†’ ürün adı haritası
-    final productsVal = ref.watch(productsControllerProvider);
-    final productNameMap = productsVal.maybeWhen(
-      data: (list) => {for (final p in list) p.id: p.name},
-      orElse: () => <String, String>{},
-    );
 
     return Scaffold(
       backgroundColor: _kSurface,
@@ -210,30 +204,32 @@ class OrderDetailsPage extends ConsumerWidget {
                           } catch (_) {}
                         }
 
-                        // Load products to map IDs to names
-                        final products =
-                            ref.read(productsControllerProvider).value ?? [];
-                        final receiptItems = order.items.map((item) {
-                          final prod = products.firstWhere(
-                            (p) => p.id == item['product_id'],
-                            orElse: () => ProductEntity(
-                              id: item['product_id'] ?? '',
-                              name: item['product_id'] ?? 'Urun',
-                              description: '',
-                              price: (item['unit_price'] as num?)?.toDouble() ??
-                                  0.0,
-                              quantity: 0,
-                              category: '',
-                            ),
-                          );
+                        // Resolve product names
+                        final prodRepo =
+                            await ref.read(productRepositoryProvider.future);
+                        final receiptItems =
+                            await Future.wait(order.items.map((item) async {
+                          var name = (item['product_name'] ?? item['name'])
+                              ?.toString();
+                          final productId =
+                              item['product_id']?.toString() ?? '';
+                          if (name == null ||
+                              name.isEmpty ||
+                              name == productId) {
+                            if (productId.isNotEmpty) {
+                              final p = await prodRepo.findById(productId);
+                              if (p != null) name = p.name;
+                            }
+                          }
+                          name ??= 'Ürün';
                           return {
-                            'product_id': item['product_id'],
-                            'product_name': item['product_name'] ?? prod.name,
-                            'barcode': prod.id,
+                            'product_id': productId,
+                            'product_name': name,
+                            'barcode': productId,
                             'quantity': item['quantity'],
                             'unit_price': item['unit_price'],
                           };
-                        }).toList();
+                        }));
 
                         await ref
                             .read(printingApplicationServiceProvider)
@@ -310,24 +306,37 @@ class OrderDetailsPage extends ConsumerWidget {
                       try {
                         final txRepo = await ref
                             .read(financialTransactionRepositoryProvider.future);
-                        final txs =
-                            await txRepo.getByCustomerId(order.customerId);
+                        var txs = await txRepo.getByReferenceId(order.id);
+                        if (txs.isEmpty && order.customerId.isNotEmpty) {
+                          txs = await txRepo.getByCustomerId(order.customerId);
+                        }
                         for (final t in txs) {
                           if (t.referenceId == order.id) {
-                            if (t.type == 'sale' || t.type == 'payment') {
+                            if (t.type == 'sale' || t.type == 'payment' || t.type == 'collection') {
                               totalPaid += t.paidAmount;
                             }
                           }
                         }
                       } catch (_) {}
-                      final items = order.items.map((item) {
+                      final prodRepo =
+                          await ref.read(productRepositoryProvider.future);
+                      final items =
+                          await Future.wait(order.items.map((item) async {
                         final normalized = Map<String, dynamic>.from(item);
                         final productId = item['product_id']?.toString() ?? '';
-                        normalized['product_name'] = item['product_name'] ??
-                            productNameMap[productId] ??
-                            productId;
+                        var name = (item['product_name'] ?? item['name'])
+                            ?.toString();
+                        if (name == null ||
+                            name.isEmpty ||
+                            name == productId) {
+                          if (productId.isNotEmpty) {
+                            final p = await prodRepo.findById(productId);
+                            if (p != null) name = p.name;
+                          }
+                        }
+                        normalized['product_name'] = name ?? productId;
                         return normalized;
-                      }).toList(growable: false);
+                      }));
                       try {
                         await ref
                             .read(printingApplicationServiceProvider)
@@ -418,7 +427,7 @@ class OrderDetailsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildOrderItemsCard(order, productNameMap),
+                  _buildOrderItemsCard(order),
                   const SizedBox(height: 16),
                 ],
 

@@ -501,7 +501,7 @@ class SqliteProductRepository implements IProductRepository {
   }
 
   @override
-  Future<void> decreaseStock(String productId, int quantity) async {
+  Future<void> decreaseStock(String productId, num quantity) async {
     if (_hasDataset) {
       final localRes = await _executor
           .query('products', where: 'id = ?', whereArgs: [productId]);
@@ -551,7 +551,7 @@ class SqliteProductRepository implements IProductRepository {
   }
 
   @override
-  Future<void> increaseStock(String productId, int quantity) async {
+  Future<void> increaseStock(String productId, num quantity) async {
     if (_hasDataset) {
       final localRes = await _executor
           .query('products', where: 'id = ?', whereArgs: [productId]);

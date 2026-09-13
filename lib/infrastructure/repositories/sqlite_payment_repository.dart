@@ -20,11 +20,21 @@ class SqliteSaleRepository implements ISaleRepository {
     if (rows.isEmpty) return [];
 
     final saleIds = rows.map((r) => r['id'] as String).toList();
-    final placeholders = List.filled(saleIds.length, '?').join(',');
-    final itemRows = await _executor.rawQuery('''
-      SELECT si.*,COALESCE((SELECT SUM(ri.quantity) FROM refund_items ri
-        WHERE ri.sale_item_id=si.id),0) AS refunded_quantity
-      FROM sale_items si WHERE si.sale_id IN ($placeholders)''', saleIds);
+    final itemRows = <Map<String, dynamic>>[];
+    const chunkSize = 400;
+
+    for (var i = 0; i < saleIds.length; i += chunkSize) {
+      final chunk = saleIds.sublist(
+        i,
+        i + chunkSize > saleIds.length ? saleIds.length : i + chunkSize,
+      );
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final chunkRows = await _executor.rawQuery('''
+        SELECT si.*, COALESCE((SELECT SUM(ri.quantity) FROM refund_items ri
+          WHERE ri.sale_item_id=si.id), 0) AS refunded_quantity
+        FROM sale_items si WHERE si.sale_id IN ($placeholders)''', chunk);
+      itemRows.addAll(chunkRows);
+    }
 
     // Group items by sale_id for O(1) lookup
     final itemsBySaleId = <String, List<Map<String, dynamic>>>{};

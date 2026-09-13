@@ -119,8 +119,9 @@ class SalesService {
     for (final item in items) {
       subtotal += item.saleQuantity * item.unitPrice;
     }
-    final double discount =
-        (discountAmount != null && discountAmount > 0) ? discountAmount : 0.0;
+    final double discount = (discountAmount != null && discountAmount > 0)
+        ? discountAmount.clamp(0.0, subtotal)
+        : 0.0;
     final double totalAmount =
         (subtotal - discount).clamp(0.0, double.infinity);
 
@@ -478,7 +479,7 @@ class SalesService {
       if (saleItemId == null || saleItemId.isEmpty) {
         throw ArgumentError('İade kalemi satış kalemi kimliği içermelidir.');
       }
-      return RefundLineRequest(saleItemId: saleItemId, quantity: item.quantity);
+      return RefundLineRequest(saleItemId: saleItemId, quantity: item.saleQuantity);
     }).toList();
     await _refundStore.create(
       saleId: saleId,

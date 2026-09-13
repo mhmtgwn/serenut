@@ -215,7 +215,7 @@ class OrderDeliveredEvent extends DomainEvent {
 
 class StockChangedEvent extends DomainEvent {
   final int productId;
-  final int quantityChange; // + for increase, - for decrease
+  final num quantityChange; // + for increase, - for decrease
   final String reason; // 'sale', 'order_delivery', 'adjustment', 'receipt'
 
   StockChangedEvent({

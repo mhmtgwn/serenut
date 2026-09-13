@@ -372,19 +372,26 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         cartQuantities: const {},
         cartProducts: const {},
         paidAmount: 0.0,
+        discountAmount: 0.0,
       );
       _persistState();
       return;
     }
 
+    final newSubtotal = _calculateSubtotal(newQuantities, newProducts);
+    final sanitizedDiscount = state.discountAmount.clamp(0.0, newSubtotal);
     double nextPaid = state.paidAmount;
+    final newNetTotal = (newSubtotal - sanitizedDiscount).clamp(0.0, double.infinity);
     if (state.paymentMethod == 'cash' || state.paymentMethod == 'card') {
-      nextPaid = _calculateTotal(newQuantities, newProducts);
+      nextPaid = newNetTotal;
+    } else if (nextPaid > newNetTotal) {
+      nextPaid = newNetTotal;
     }
 
     state = state.copyWith(
       cartQuantities: newQuantities,
       cartProducts: newProducts,
+      discountAmount: sanitizedDiscount,
       paidAmount: nextPaid,
     );
     _persistState();
@@ -403,19 +410,26 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         cartQuantities: const {},
         cartProducts: const {},
         paidAmount: 0.0,
+        discountAmount: 0.0,
       );
       _persistState();
       return;
     }
 
+    final newSubtotal = _calculateSubtotal(newQuantities, newProducts);
+    final sanitizedDiscount = state.discountAmount.clamp(0.0, newSubtotal);
     double nextPaid = state.paidAmount;
+    final newNetTotal = (newSubtotal - sanitizedDiscount).clamp(0.0, double.infinity);
     if (state.paymentMethod == 'cash' || state.paymentMethod == 'card') {
-      nextPaid = _calculateTotal(newQuantities, newProducts);
+      nextPaid = newNetTotal;
+    } else if (nextPaid > newNetTotal) {
+      nextPaid = newNetTotal;
     }
 
     state = state.copyWith(
       cartQuantities: newQuantities,
       cartProducts: newProducts,
+      discountAmount: sanitizedDiscount,
       paidAmount: nextPaid,
     );
     _persistState();
@@ -565,7 +579,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     _persistenceService?.clearCart();
   }
 
-  double _calculateTotal(
+  double _calculateSubtotal(
       Map<String, int> quantities, Map<String, ProductEntity> products) {
     double sum = 0;
     quantities.forEach((id, qty) {
@@ -574,7 +588,14 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         sum += prod.price * (prod.isWeighed ? qty / 1000.0 : qty.toDouble());
       }
     });
-    final net = sum - state.discountAmount;
+    return sum;
+  }
+
+  double _calculateTotal(
+      Map<String, int> quantities, Map<String, ProductEntity> products) {
+    final sum = _calculateSubtotal(quantities, products);
+    final effectiveDiscount = state.discountAmount.clamp(0.0, sum);
+    final net = sum - effectiveDiscount;
     return net > 0 ? net : 0.0;
   }
 }

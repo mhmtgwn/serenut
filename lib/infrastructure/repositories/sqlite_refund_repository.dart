@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -82,10 +83,18 @@ class SqliteRefundMutationStore implements IRefundMutationStore {
       final customerId = sale['customer_id']?.toString();
       if (customerId != null && customerId.isNotEmpty) {
         await _gateway.insert('financial_transactions', {
-          'id': 'refund-$refundId', 'type': 'refund', 'customer_id': customerId,
-          'amount': amount, 'paid_amount': refundMethod == 'balance' ? 0.0 : amount,
-          'debt_amount': 0.0, 'reference_id': refundId, 'description': reason.trim(),
-          'payment_method': refundMethod, 'created_at': now, 'is_synced': 1,
+          'id': 'refund-$refundId',
+          'type': 'refund',
+          'customer_id': customerId,
+          'amount': amount,
+          'paid_amount': refundMethod == 'balance' ? 0.0 : amount,
+          'debt_amount': 0.0,
+          'reference_id': saleId,
+          'description': reason.trim(),
+          'payment_method': refundMethod,
+          'metadata': jsonEncode({'refund_id': refundId}),
+          'created_at': now,
+          'is_synced': 1,
         });
       }
       await SyncOutboxV4.enqueue(_gateway,

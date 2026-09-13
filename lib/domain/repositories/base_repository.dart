@@ -57,10 +57,10 @@ abstract class IProductRepository implements BaseRepository<ProductEntity> {
   Future<Map<String, List<ProductEntity>>> getGroupedByCategory();
 
   /// Decrease stock (for sale)
-  Future<void> decreaseStock(String productId, int quantity);
+  Future<void> decreaseStock(String productId, num quantity);
 
   /// Increase stock (for return/adjustment)
-  Future<void> increaseStock(String productId, int quantity);
+  Future<void> increaseStock(String productId, num quantity);
 
   /// Get low stock products
   Future<List<ProductEntity>> getLowStockProducts(int threshold);
@@ -272,8 +272,8 @@ class ProductEntity {
   final String description;
   final double price;
   final double purchasePrice;
-  final int quantity;
-  final int minStock;
+  final num quantity;
+  final num minStock;
   final String brand;
   final String unit;
   final String shelfCode;
@@ -311,8 +311,8 @@ class ProductEntity {
     String? description,
     double? price,
     double? purchasePrice,
-    int? quantity,
-    int? minStock,
+    num? quantity,
+    num? minStock,
     String? brand,
     String? unit,
     String? shelfCode,
@@ -374,11 +374,11 @@ class ProductEntity {
             : (double.tryParse((map['purchase_price'] ?? '0').toString()) ??
                 0.0),
         quantity: (map['quantity'] is num)
-            ? (map['quantity'] as num).toInt()
-            : (int.tryParse((map['quantity'] ?? '0').toString()) ?? 0),
+            ? (map['quantity'] as num)
+            : (num.tryParse((map['quantity'] ?? '0').toString()) ?? 0),
         minStock: (map['min_stock'] is num)
-            ? (map['min_stock'] as num).toInt()
-            : (int.tryParse((map['min_stock'] ?? '5').toString()) ?? 5),
+            ? (map['min_stock'] as num)
+            : (num.tryParse((map['min_stock'] ?? '5').toString()) ?? 5),
         brand: (map['brand'] ?? '').toString(),
         unit: (map['unit'] ?? 'adet').toString(),
         shelfCode: (map['shelf_code'] ?? '').toString(),
@@ -786,7 +786,7 @@ abstract class IDbTransactionRunner {
 class RefundLineRequest {
   const RefundLineRequest({required this.saleItemId, required this.quantity});
   final String saleItemId;
-  final int quantity;
+  final num quantity;
 }
 
 abstract class IRefundMutationStore {

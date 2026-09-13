@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nutopia Fındık Değirmeni — Fındık Kırma, Kavurma, Ezme & Nutopiano</title>
+  <meta name="description" content="Nutopia Fındık Değirmeni: fındık kırma, kavurma, zar soyma, ezme hizmetleri. Nutopiano markamız altında taze fındık ürünleri. Ormanlı / Kdz. Ereğli, Zonguldak. 0538 028 82 02">
+  <link rel="canonical" href="https://nutopiano.com/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* Fiyat listesi kartları */
+    .price-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1.5px solid var(--line);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      margin-top: 48px;
+    }
+    .price-card {
+      background: var(--white);
+      padding: 28px 22px;
+      text-align: center;
+      transition: background .2s;
+    }
+    .price-card:hover { background: var(--off-white); }
+    .price-label {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 6px;
+      letter-spacing: -.01em;
+    }
+    .price-amount {
+      font-family: var(--font-serif);
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--gold);
+      line-height: 1;
+      letter-spacing: -.03em;
+    }
+    .price-unit {
+      font-size: .75rem;
+      color: var(--muted-light);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .price-combo {
+      background: var(--green);
+      padding: 20px 22px;
+      text-align: center;
+    }
+    .price-combo .price-label { color: rgba(255,255,255,.75); font-size: .9rem; }
+    .price-combo .price-amount { font-size: 1.5rem; color: var(--gold-light); }
+    .price-combo .price-unit { color: rgba(255,255,255,.45); }
+
+    /* Makine grid */
+    .machines-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .machine-card {
+      background: var(--white);
+      border: 1.5px solid var(--line);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      transition: var(--t);
+    }
+    .machine-card:hover { border-color: var(--gold); box-shadow: var(--shadow-md); transform: translateY(-3px); }
+    .machine-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      background: var(--light);
+      display: block;
+    }
+    .machine-img-placeholder {
+      width: 100%;
+      height: 200px;
+      background: linear-gradient(135deg, var(--light) 0%, var(--green-soft) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .machine-body { padding: 18px 18px 20px; }
+    .machine-name {
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 6px;
+      letter-spacing: -.015em;
+    }
+    .machine-desc { font-size: .85rem; color: var(--muted); line-height: 1.65; }
+  </style>
+</head>
+<body>
+
+<div id="site-header"></div>
+
+<main>
+
+  <!-- ---- HERO ---- -->
+  <section class="home-hero" aria-label="Ana Sayfa Hero">
+    <div class="home-hero-bg" aria-hidden="true"></div>
+    <div class="container home-hero-inner">
+      <div class="eyebrow home-hero-eyebrow">Ormanlı / Kdz. Ereğli · Zonguldak · 0538 028 82 02</div>
+      <h1 class="home-hero-title">
+        Fındık dalda yetişir.<br>
+        Ama gerçek yolculuğu<br>
+        <em>değirmende başlar.</em>
+      </h1>
+      <p class="home-hero-desc">
+        Kırma, kavurma, zar soyma ve ezme hizmetleri.
+        Nutopiano markamız altında taze fındık ürünleri.
+        Şehit aileleri ve gazilerimize %20 indirim.
+      </p>
+      <div class="home-hero-actions">
+        <a class="btn btn-gold btn-lg" href="/degirmen">Değirmen Hizmetleri</a>
+        <a class="btn btn-outline-light btn-lg" href="/urunler">Nutopiano Ürünleri</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- MARKA MESAJI ---- -->
+  <section class="section-sm" style="background: var(--gold-pale); border-bottom: 1px solid rgba(201,154,69,.15);" aria-label="Marka mesajı">
+    <div class="container" style="max-width: 800px; text-align: center;">
+      <p style="font-family: var(--font-serif); font-size: clamp(1.1rem, 2.2vw, 1.35rem); color: var(--green); line-height: 1.65; font-weight: 700; margin-bottom: 12px; letter-spacing: -.015em;">
+        Fındığa sadece bir ürün olarak değil, emek ve değer olarak bakıyoruz.
+      </p>
+      <p style="font-size: 1rem; color: var(--muted); line-height: 1.75; max-width: 600px; margin: 0 auto 18px;">
+        Doğadan gelen organik fındıkları özenle işleyerek enfes fındık ezmesi ve kavrulmuş lezzetler sunuyoruz.
+      </p>
+      <a href="/hakkimizda" style="font-size: .875rem; font-weight: 700; color: var(--gold-dark); display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: .08em;">
+        Hikayemizi Okuyun →
+      </a>
+    </div>
+  </section>
+
+  <!-- ---- İKİ YOL ---- -->
+  <section class="section section-white" aria-labelledby="paths-title">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">İki Farklı Hizmet</div>
+        <h2 class="section-title" id="paths-title">Nasıl Yardımcı Olabiliriz?</h2>
+      </div>
+      <div class="paths-grid">
+        <div class="path-card path-card-a">
+          <div>
+            <span class="path-number">Hizmet — A</span>
+            <h3>Fındığınızı Getirin, Biz İşleyelim</h3>
+            <p>
+              Bahçenizden çıkan fındığı değirmenimize getirin. Kırma, kavurma, zar soyma ve ezme işlemlerini ihtiyacınıza göre gerçekleştiriyoruz.
+            </p>
+          </div>
+          <a href="/degirmen" class="link-arrow">Değirmen Hizmetleri ve Fiyatlar →</a>
+        </div>
+        <div class="path-card path-card-b">
+          <div>
+            <span class="path-number">Ürün — B</span>
+            <h3>Nutopiano Hazır Ürünleri</h3>
+            <p>
+              Değirmenimizde özenle işlenen fındıklardan hazırlanan Nutopiano ürün serisi. Fındık ezmesi, krema, krokan ve taze fındık çeşitleri.
+            </p>
+          </div>
+          <a href="/urunler" class="link-arrow">Nutopiano Ürünlerini İncele →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ---- MAKİNELER ---- -->
+  <section class="section section-light" aria-labelledby="machines-title">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">Değirmen Ekipmanları</div>
+        <h2 class="section-title" id="machines-title">4 Farklı Makine,<br>Eksiksiz İşleme.</h2>
+        <p class="section-desc">
+          Kırma'dan ezmeye kadar fındığın her işleme adımı için profesyonel ekipman.
+        </p>
+      </div>
+
+      <div class="machines-grid">
+
+        <div class="machine-card">
+          <img class="machine-img" src="/images/makine-kirma.png" alt="Fındık kırma makinesi — Nutopia Fındık Değirmeni" loading="lazy">
+          <div class="machine-body">
+            <div class="machine-name">Kırma Makinesi</div>
+            <p class="machine-desc">Kabuklu fındığı iç fındığa ayırır. Çekirdek sağlam çıkar, verim yüksektir.</p>
+          </div>
+        </div>
+
+        <div class="machine-card">
+          <img class="machine-img" src="/images/makine-kavurma.png" alt="Fındık kavurma makinesi — Nutopia Fındık Değirmeni" loading="lazy">
+          <div class="machine-body">
+            <div class="machine-name">Kavurma Makinesi</div>
+            <p class="machine-desc">Hassas sıcaklık ve süre kontrolü ile homojen kavurma. Aroması korunur.</p>
+          </div>
+        </div>
+
+        <div class="machine-card">
+          <img class="machine-img" src="/images/makine-zar-soyma.png" alt="Fındık zar soyma makinesi — Nutopia Fındık Değirmeni" loading="lazy">
+          <div class="machine-body">
+            <div class="machine-name">Zar Soyma Makinesi</div>
+            <p class="machine-desc">Kavrulmuş fındığın ince zarını soyar, temiz ve düzgün iç fındık elde edilir.</p>
+          </div>
+        </div>
+
+        <div class="machine-card">
+          <img class="machine-img" src="/images/urun-ezme.png" alt="Taş Değirmen Fındık Ezmesi Makinesi — Nutopia Fındık Değirmeni" loading="lazy">
+          <div class="machine-body">
+            <div class="machine-name">Fındık Ezmesi Makinesi</div>
+            <p class="machine-desc">Geleneksel taş değirmende düşük devirde soğuk öğütme. Fındığın doğal yağı, aroması ve besin değeri tam korunur.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ---- FİYAT LİSTESİ ---- -->
+  <section class="section section-white" aria-labelledby="prices-title">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">Zonguldak Fındık Değirmenleri Fiyat Listesi</div>
+        <h2 class="section-title" id="prices-title">Şeffaf Fiyatlandırma.</h2>
+        <p class="section-desc">
+          Tüm hizmet fiyatları aşağıdadır. Kombine paketlerde indirimli fiyat uygulanır.
+        </p>
+      </div>
+
+      <div class="price-grid" role="list">
+        <div class="price-card" role="listitem">
+          <div class="price-label">Kırma</div>
+          <div class="price-amount">40 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+        <div class="price-card" role="listitem">
+          <div class="price-label">Kavurma</div>
+          <div class="price-amount">70 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+        <div class="price-card" role="listitem">
+          <div class="price-label">Fındık Ezmesi</div>
+          <div class="price-amount">130 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+        <div class="price-card" role="listitem">
+          <div class="price-label">Paketleme</div>
+          <div class="price-amount">20 ₺</div>
+          <div class="price-unit">1 kg vakum</div>
+        </div>
+      </div>
+
+      <!-- Kombine Paketler -->
+      <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--green); border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--green);">
+        <div class="price-combo">
+          <div class="price-label">Kırma + Kavurma</div>
+          <div class="price-amount">65 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+        <div class="price-combo" style="border-left: 1px solid rgba(255,255,255,.1); border-right: 1px solid rgba(255,255,255,.1);">
+          <div class="price-label">Kırma + Kavurma + 1 kg Vakum</div>
+          <div class="price-amount">70 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+        <div class="price-combo">
+          <div class="price-label">Kırma + Kavurma + 500g Vakum</div>
+          <div class="price-amount">80 ₺</div>
+          <div class="price-unit">kg başına</div>
+        </div>
+      </div>
+
+      <!-- İndirim Notu -->
+      <div style="margin-top: 16px; padding: 18px 24px; background: var(--green-soft); border: 1.5px solid #c3dfc9; border-radius: var(--r-sm); display: flex; align-items: center; gap: 14px;">
+        <span style="font-size: 1.2rem; flex-shrink: 0;">🎖️</span>
+        <p style="font-size: .9rem; color: var(--green); font-weight: 600; line-height: 1.5; margin: 0;">
+          Şehit aileleri ve gazilerimize tüm ürün ve hizmetlerde <strong>%20 indirim</strong> uygulanmaktadır.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- CTA ---- -->
+  <section class="cta-strip" aria-label="İletişim">
+    <div class="container">
+      <div class="cta-strip-inner">
+        <div class="cta-strip-copy">
+          <div class="eyebrow">Hazır mısınız?</div>
+          <h2>Fındığınızı getirin veya sipariş verin.</h2>
+        </div>
+        <div class="cta-strip-btns">
+          <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopia%20Fındık%20Değirmeni%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">
+            WhatsApp'tan Yaz
+          </a>
+          <a class="btn btn-outline-light btn-lg" href="tel:05380288202">0538 028 82 02 Ara</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer"></div>
+<script src="/components.js"></script>
+</body>
+</html>

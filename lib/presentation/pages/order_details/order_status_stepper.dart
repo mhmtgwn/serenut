@@ -766,9 +766,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
                               .where((ri) => ((ri['returnQty'] as num?)?.toDouble() ?? 0.0) > 0)
                               .map((ri) {
                             final qty = (ri['returnQty'] as num?)?.toDouble() ?? 0.0;
-                            final intQty = qty < 1
-                                ? (qty * 1000).round()
-                                : qty.round();
+                            final intQty =
+                                qty >= 1.0 ? qty.round() : (qty > 0.0 ? 1 : 0);
                             return SaleItemInput(
                               productId: ri['productId'] as String,
                               quantity: intQty,

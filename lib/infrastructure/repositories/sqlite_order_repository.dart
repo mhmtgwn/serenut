@@ -17,14 +17,23 @@ class SqliteOrderRepository implements IOrderRepository {
       List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return [];
 
-    // Optimized: single bulk IN query instead of N+1 per-order subqueries
     final orderIds = rows.map((r) => r['id'].toString()).toList();
-    final placeholders = List.filled(orderIds.length, '?').join(',');
-    final itemRows = await _executor.query(
-      'order_items',
-      where: 'order_id IN ($placeholders)',
-      whereArgs: orderIds,
-    );
+    final itemRows = <Map<String, dynamic>>[];
+    const chunkSize = 400;
+
+    for (var i = 0; i < orderIds.length; i += chunkSize) {
+      final chunk = orderIds.sublist(
+        i,
+        i + chunkSize > orderIds.length ? orderIds.length : i + chunkSize,
+      );
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final chunkRows = await _executor.query(
+        'order_items',
+        where: 'order_id IN ($placeholders)',
+        whereArgs: chunk,
+      );
+      itemRows.addAll(chunkRows);
+    }
 
     // Group items by order_id for O(1) lookup
     final itemsByOrderId = <String, List<Map<String, dynamic>>>{};

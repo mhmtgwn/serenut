@@ -3,6 +3,7 @@
 // Design Evolution v2: Büyük dokunmatik hedefler, geliştirilmiş kart hiyerarşisi
 // Revized: 22 Jun 2026
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -52,6 +53,7 @@ class CatalogPanel extends ConsumerStatefulWidget {
 class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   bool _isSearching = false;
   final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -61,6 +63,7 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -159,8 +162,13 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
           searchController: widget.searchController,
           searchHint: 'Ürün ara...',
           onSearchChanged: (val) {
-            ref.read(salesProductSearchQueryProvider.notifier).state = val;
-            setState(() {});
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                ref.read(salesProductSearchQueryProvider.notifier).state = val;
+                setState(() {});
+              }
+            });
           },
           showSettings: false,
           showStatusIndicator: false,

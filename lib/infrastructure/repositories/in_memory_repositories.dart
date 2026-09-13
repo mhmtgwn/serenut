@@ -199,7 +199,7 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
-  Future<void> decreaseStock(String productId, int quantity) async {
+  Future<void> decreaseStock(String productId, num quantity) async {
     final idx = InMemoryDb.products.indexWhere((p) => p.id == productId);
     if (idx != -1) {
       final p = InMemoryDb.products[idx];
@@ -216,7 +216,7 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
-  Future<void> increaseStock(String productId, int quantity) async {
+  Future<void> increaseStock(String productId, num quantity) async {
     final idx = InMemoryDb.products.indexWhere((p) => p.id == productId);
     if (idx != -1) {
       final p = InMemoryDb.products[idx];

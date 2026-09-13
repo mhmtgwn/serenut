@@ -164,6 +164,8 @@ class TsplCanvasLabelEngine {
         (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
+    final customerTitleFontSize =
+        (isWide ? (isTall ? 36.0 : 30.0) : 25.5) * fontScale;
     final cleanNote = note?.trim() ?? '';
     final isLongNote = cleanNote.length > 45;
     final isVeryLongNote = cleanNote.length > 90;
@@ -281,21 +283,14 @@ class TsplCanvasLabelEngine {
     // Measure Header Heights with exact TextPainters matching painting
     double measurePage1HeaderHeight() {
       var h = topMargin;
-      if (showOrderNo || showDate) {
-        final leftOrder = showOrderNo ? 'Sip #$orderIdShort' : '';
-        final orderMaxW = dateStr.isNotEmpty ? usableW * 0.55 : usableW;
-        final orderPainter = TextPainter(
-          text: TextSpan(
-            text: leftOrder,
-            style: ts(
-              fontSize: bodyFontSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: orderMaxW);
-        h += math.max(orderPainter.height, bodyFontSize) + 2.0;
+      final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
+
+      // ── 1. Satır: Sipariş No + Telefon + Tarih/Saat ──
+      if (showOrderNo || showDate || hasPhone) {
+        h += detailFontSize + 5.0;
       }
+
+      // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──
       if (showCustomerName) {
         final cleanCust = customerName.trim();
         final isRawId = cleanCust.startsWith('cust-') ||
@@ -303,58 +298,18 @@ class TsplCanvasLabelEngine {
         final displayCust = (cleanCust.isNotEmpty && !isRawId)
             ? cleanCust
             : 'Genel Müşteri';
-        final custStr = 'Müş: $displayCust';
-        if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
-          final custPainter = TextPainter(
-            text: TextSpan(
-              text: custStr,
-              style: ts(
-                fontSize: bodyFontSize,
-                fontWeight: FontWeight.bold,
-              ),
+        final custPainter = TextPainter(
+          text: TextSpan(
+            text: displayCust,
+            style: ts(
+              fontSize: customerTitleFontSize,
+              fontWeight: FontWeight.w900,
             ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.58);
-
-          final phonePainter = TextPainter(
-            text: TextSpan(
-              text: 'Tel: ${customerPhone.trim()}',
-              style: ts(
-                fontSize: detailFontSize,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.40);
-
-          h += math.max(custPainter.height, phonePainter.height) + 2.0;
-        } else {
-          final custPainter = TextPainter(
-            text: TextSpan(
-              text: custStr,
-              style: ts(
-                fontSize: bodyFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW);
-          h += custPainter.height + 1.0;
-
-          if (customerPhone != null && customerPhone.trim().isNotEmpty) {
-            final phonePainter = TextPainter(
-              text: TextSpan(
-                text: 'Tel: ${customerPhone.trim()}',
-                style: ts(
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW);
-            h += phonePainter.height + 1.0;
-          }
-        }
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: usableW);
+        h += custPainter.height + 3.0;
       }
       if (previousDebt > 0.001) {
         final debtPainter = TextPainter(
@@ -628,49 +583,73 @@ class TsplCanvasLabelEngine {
       var currentY = topMargin;
 
       if (isFirstPage) {
-        // Order No & Date (placed with natural, balanced spacing rather than pushed to extreme edges)
         final pageSuffix = totalPagesCount > 1 ? ' (1/$totalPagesCount)' : '';
-        if (showOrderNo || showDate) {
-          final leftOrder = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
-          final orderPainter = TextPainter(
-            text: TextSpan(
-              text: leftOrder,
-              style: ts(
-                fontSize: bodyFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.55);
-          orderPainter.paint(canvas, Offset(paddingLeft, currentY));
+        final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
+        final cleanPhone = hasPhone ? customerPhone.trim() : '';
 
-          pageBoxes.add(ElementBoundingBox(
-            elementName: 'OrderNo',
-            left: paddingLeft,
-            top: currentY,
-            width: orderPainter.width,
-            height: orderPainter.height,
-          ));
+        // ── 1. Satır: Sipariş No + Telefon + Tarih Saat ──
+        if (showOrderNo || showDate || hasPhone) {
+          final leftOrder = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
+          var nextX = paddingLeft;
+
+          if (leftOrder.isNotEmpty) {
+            final orderPainter = TextPainter(
+              text: TextSpan(
+                text: leftOrder,
+                style: ts(
+                  fontSize: detailFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW * 0.45);
+            orderPainter.paint(canvas, Offset(nextX, currentY));
+
+            pageBoxes.add(ElementBoundingBox(
+              elementName: 'OrderNo',
+              left: nextX,
+              top: currentY,
+              width: orderPainter.width,
+              height: orderPainter.height,
+            ));
+
+            nextX += orderPainter.width + (isWide ? 14.0 : 8.0);
+          }
+
+          if (cleanPhone.isNotEmpty) {
+            final phonePainter = TextPainter(
+              text: TextSpan(
+                text: 'Tel: $cleanPhone',
+                style: ts(
+                  fontSize: detailFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW * 0.40);
+            phonePainter.paint(canvas, Offset(nextX, currentY));
+
+            pageBoxes.add(ElementBoundingBox(
+              elementName: 'CustomerPhone',
+              left: nextX,
+              top: currentY,
+              width: phonePainter.width,
+              height: phonePainter.height,
+            ));
+          }
 
           if (dateStr.isNotEmpty) {
             final datePainter = TextPainter(
               text: TextSpan(
                 text: dateStr,
                 style: ts(
-                  fontSize: bodyFontSize * 0.88,
+                  fontSize: detailFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.40);
-            final preferredGap = isWide ? 24.0 : 16.0;
-            final naturalDateX = paddingLeft + orderPainter.width + preferredGap;
-            final maxDateX = safeRightX - datePainter.width;
-            final dateX = isWide
-                ? maxDateX
-                : (naturalDateX <= maxDateX
-                    ? naturalDateX
-                    : maxDateX.clamp(paddingLeft, maxDateX));
+            )..layout(maxWidth: usableW * 0.38);
+            final dateX = safeRightX - datePainter.width;
             datePainter.paint(canvas, Offset(dateX, currentY));
 
             pageBoxes.add(ElementBoundingBox(
@@ -681,10 +660,11 @@ class TsplCanvasLabelEngine {
               height: datePainter.height,
             ));
           }
-          currentY += math.max(orderPainter.height, bodyFontSize) + 2.0;
+
+          currentY += detailFontSize + 5.0;
         }
 
-        // Customer & Phone
+        // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──
         if (showCustomerName) {
           final cleanCust = customerName.trim();
           final isRawId = cleanCust.startsWith('cust-') ||
@@ -692,94 +672,30 @@ class TsplCanvasLabelEngine {
           final displayCust = (cleanCust.isNotEmpty && !isRawId)
               ? cleanCust
               : 'Genel Müşteri';
-          final custStr = 'Müş: $displayCust';
-          if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
-            final custPainter = TextPainter(
-              text: TextSpan(
-                text: custStr,
-                style: ts(
-                  fontSize: bodyFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
+
+          final custPainter = TextPainter(
+            text: TextSpan(
+              text: displayCust,
+              style: ts(
+                fontSize: customerTitleFontSize,
+                fontWeight: FontWeight.w900,
               ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.58);
-            custPainter.paint(canvas, Offset(paddingLeft, currentY));
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+            ellipsis: '…',
+          )..layout(maxWidth: usableW);
+          custPainter.paint(canvas, Offset(paddingLeft, currentY));
 
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'CustomerName',
-              left: paddingLeft,
-              top: currentY,
-              width: custPainter.width,
-              height: custPainter.height,
-            ));
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'CustomerName',
+            left: paddingLeft,
+            top: currentY,
+            width: custPainter.width,
+            height: custPainter.height,
+          ));
 
-            final phonePainter = TextPainter(
-              text: TextSpan(
-                text: 'Tel: ${customerPhone.trim()}',
-                style: ts(
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.40);
-            final phoneX = safeRightX - phonePainter.width;
-            phonePainter.paint(canvas, Offset(phoneX, currentY));
-
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'CustomerPhone',
-              left: phoneX,
-              top: currentY,
-              width: phonePainter.width,
-              height: phonePainter.height,
-            ));
-            currentY += math.max(custPainter.height, phonePainter.height) + 2.0;
-          } else {
-            final custPainter = TextPainter(
-              text: TextSpan(
-                text: custStr,
-                style: ts(
-                  fontSize: bodyFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW);
-            custPainter.paint(canvas, Offset(paddingLeft, currentY));
-
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'CustomerName',
-              left: paddingLeft,
-              top: currentY,
-              width: custPainter.width,
-              height: custPainter.height,
-            ));
-            currentY += custPainter.height + 1.0;
-
-            if (customerPhone != null && customerPhone.trim().isNotEmpty) {
-              final phonePainter = TextPainter(
-                text: TextSpan(
-                  text: 'Tel: ${customerPhone.trim()}',
-                  style: ts(
-                    fontSize: detailFontSize,
-                    fontWeight: FontWeight.normal,
-                  ),
-                ),
-                textDirection: TextDirection.ltr,
-              )..layout(maxWidth: usableW);
-              phonePainter.paint(canvas, Offset(paddingLeft, currentY));
-
-              pageBoxes.add(ElementBoundingBox(
-                elementName: 'CustomerPhone',
-                left: paddingLeft,
-                top: currentY,
-                width: phonePainter.width,
-                height: phonePainter.height,
-              ));
-              currentY += phonePainter.height + 1.0;
-            }
-          }
+          currentY += custPainter.height + 3.0;
         }
 
         if (previousDebt > 0.001) {

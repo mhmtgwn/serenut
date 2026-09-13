@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hakkımızda — Nutopia Fındık Değirmeni</title>
+  <meta name="description" content="Nutopia Fındık Değirmeni'nin marka hikayesi: fındığın değirmenden sofraya yolculuğu. Nutopiano ürünlerinin doğuşu ve değirmen anlayışımız.">
+  <link rel="canonical" href="https://nutopiano.com/hakkimizda">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+
+  <style>
+    /* Sayfa-özel stiller */
+    .story-section {
+      padding: 96px 0;
+    }
+    .story-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 80px;
+      align-items: start;
+    }
+    .story-sticky {
+      position: sticky;
+      top: calc(var(--header-h) + 32px);
+    }
+    .story-chapter {
+      font-family: var(--font-sans);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--gold-dark);
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .story-chapter::before {
+      content: '';
+      width: 20px;
+      height: 2px;
+      background: var(--gold);
+      border-radius: 1px;
+      display: inline-block;
+    }
+
+    .story-heading {
+      font-family: var(--font-serif);
+      font-size: clamp(1.9rem, 3.5vw, 2.7rem);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.14;
+      letter-spacing: -0.028em;
+      margin-bottom: 10px;
+    }
+    .story-lead {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.1rem;
+      color: var(--gold-dark);
+      line-height: 1.72;
+      margin-top: 14px;
+    }
+    .story-prose {
+      font-size: 1.06rem;
+      color: var(--muted);
+      line-height: 1.85;
+    }
+    .story-prose p { margin-bottom: 22px; }
+    .story-prose p:last-child { margin-bottom: 0; }
+    .story-prose strong {
+      color: var(--green-deep);
+      font-weight: 600;
+    }
+    .story-prose em {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.08em;
+      color: var(--ink);
+    }
+    .story-pullquote {
+      padding: 28px 32px;
+      border-left: 3px solid var(--gold);
+      background: var(--gold-pale);
+      border-radius: 0 var(--r-sm) var(--r-sm) 0;
+      margin: 32px 0;
+    }
+    .story-pullquote p {
+      font-family: var(--font-serif);
+      font-size: 1.24rem;
+      font-style: italic;
+      color: var(--green);
+      line-height: 1.6;
+      margin: 0 !important;
+    }
+
+    /* Değer Listesi */
+    .pillars {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .pillar {
+      padding: 28px 30px;
+      border-bottom: 1px solid var(--line-light);
+      background: var(--white);
+      transition: background 0.2s;
+    }
+    .pillar:last-child { border-bottom: none; }
+    .pillar:hover { background: var(--off-white); }
+    .pillar-label {
+      font-family: var(--font-serif);
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .pillar-label span {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--gold-dark);
+    }
+    .pillar p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* Nutopia → Nutopiano köprüsü */
+    .bridge {
+      background: var(--green);
+      border-radius: var(--r-md);
+      padding: 56px 52px;
+      position: relative;
+      overflow: hidden;
+    }
+    .bridge::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 240px; height: 240px;
+      background: radial-gradient(circle, rgba(201,154,69,.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .bridge-chapter {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--gold);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .bridge-chapter::before {
+      content: '';
+      width: 20px;
+      height: 1px;
+      background: var(--gold);
+      display: inline-block;
+    }
+    .bridge h2 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.7rem, 3vw, 2.3rem);
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.025em;
+      line-height: 1.18;
+      margin-bottom: 20px;
+    }
+    .bridge-prose {
+      font-size: 1rem;
+      color: rgba(245,235,221,.72);
+      line-height: 1.82;
+      max-width: 640px;
+    }
+    .bridge-prose p { margin-bottom: 16px; }
+    .bridge-prose p:last-child { margin-bottom: 0; }
+    .bridge-prose strong { color: var(--beige); font-weight: 600; }
+
+    /* Zincir akışı */
+    .chain {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+      margin: 28px 0;
+    }
+    .chain-step {
+      padding: 9px 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(216,185,138,.18);
+      border-radius: 4px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: rgba(245,235,221,.85);
+    }
+    .chain-arrow {
+      padding: 0 8px;
+      color: var(--gold);
+      font-size: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .story-layout { grid-template-columns: 1fr; gap: 40px; }
+      .story-sticky { position: static; }
+      .bridge { padding: 36px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="site-header"></div>
+
+<main>
+
+  <!-- ---- SAYFA HERO ---- -->
+  <section class="page-hero" aria-labelledby="page-title">
+    <div class="container">
+      <div class="eyebrow">Nutopia Fındık Değirmeni</div>
+      <h1 class="page-hero-title" id="page-title">
+        Fındık dalda yetişir.<br>
+        Ama gerçek yolculuğu<br>
+        değirmende başlar.
+      </h1>
+      <p class="page-hero-desc">
+        Nutopia Fındık Değirmeni, bu dönüşümün merkezidir.
+      </p>
+    </div>
+  </section>
+
+  <!-- ======================================================================
+       BÖLÜM 1: BİR FINDIĞIN YOLCULUĞU — ANA MARKA HİKAYESİ
+       ====================================================================== -->
+  <section class="story-section section-white" aria-labelledby="story-title">
+    <div class="container">
+      <div class="story-layout">
+
+        <!-- Sol: Başlık & Bölüm Bilgisi (Sticky) -->
+        <div class="story-sticky">
+          <div class="story-chapter">Bölüm 01</div>
+          <h2 class="story-heading" id="story-title">
+            Bir Fındığın<br>Yolculuğu
+          </h2>
+          <p class="story-lead">
+            Karadeniz'in toprağında yetişen fındık, dalından ayrıldığında yolculuğunun sonuna değil, aslında yeni bir başlangıca ulaşır.
+          </p>
+        </div>
+
+        <!-- Sağ: Hikaye Metni -->
+        <div class="story-prose">
+          <p>
+            Nutopia Fındık Değirmeni'nde bu yolculuğu özenle sürdürüyoruz.
+          </p>
+          <p>
+            Kabuklu fındığı kırıyor, iç fındığı ayırıyor, isteğe göre kavuruyor ve fındığın kendine özgü lezzetini farklı ürünlere dönüştürüyoruz.
+          </p>
+          <p>
+            Bazen bir üreticinin kendi fındığını işliyoruz.
+          </p>
+          <p>
+            Bazen o fındığı ezmeye dönüştürüyoruz.
+          </p>
+          <p>
+            Bazen de <strong>Nutopiano</strong> markasıyla sofralara ulaşacak yeni bir ürüne hayat veriyoruz.
+          </p>
+
+          <div class="story-pullquote">
+            <p>
+              Bizim için değirmen yalnızca makinelerin çalıştığı bir yer değil.<br>
+              <em>Fındığın değer kazandığı yer.</em>
+            </p>
+          </div>
+
+          <div style="margin: 28px 0; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow-sm);">
+            <img src="/images/findik-kase-doga.png" alt="Karadeniz fındığı ve fındık bahçeleri" style="width: 100%; height: auto; display: block;" loading="lazy">
+            <div style="padding: 12px 18px; background: var(--off-white); font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line-light);">
+              Karadeniz'in bereketli topraklarından özenle toplanan fındıklar, Nutopia Değirmeni'nde taptaze işlenir.
+            </div>
+          </div>
+
+          <p>
+            Bu yüzden Nutopia'nın hikayesini "1990 yılında kuruldu, kalite bizim için önemlidir" gibi bir anlatıyla değil, tam tersine fındığın kendi yolculuğuyla anlatıyoruz.
+          </p>
+          <p>
+            Çünkü hikayenin sahibi fındık.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================================
+       BÖLÜM 2: BİZİM İÇİN FINDIK, SADECE FINDIK DEĞİL
+       ====================================================================== -->
+  <section class="story-section section-cream" aria-labelledby="pillars-title">
+    <div class="container">
+      <div class="story-layout">
+
+        <div class="story-sticky">
+          <div class="story-chapter">Bölüm 02</div>
+          <h2 class="story-heading" id="pillars-title">
+            Bizim İçin Fındık,<br>Sadece Fındık Değil.
+          </h2>
+        </div>
+
+        <div class="pillars">
+
+          <div class="pillar">
+            <div class="pillar-label">
+              Üreticinin Emeği
+              <span>01</span>
+            </div>
+            <p>
+              Bir yıl boyunca bakılan bahçenin karşılığı. Üreticinin toprağa kattığı emek, bize teslim ettiği her çuvala yansır. Biz bu emeğe saygı duyarak işliyoruz.
+            </p>
+          </div>
+
+          <div class="pillar">
+            <div class="pillar-label">
+              Değirmenin Ustalığı
+              <span>02</span>
+            </div>
+            <p>
+              Doğru kırma, doğru kavurma ve doğru işleme. Taş değirmenin ağır ve soğuk öğütme disiplini, fındığın doğal yağını ve zengin besin değerini yakmadan kıvama kavuşturur.
+            </p>
+          </div>
+
+          <div class="pillar">
+            <div class="pillar-label">
+              Tazelik
+              <span>03</span>
+            </div>
+            <p>
+              Fındığın aromasını mümkün olduğunca koruma anlayışı. Raflarda aylarca bekleyen ürünler değil; yakın zamanda işlenmiş, taze paketlenmiş lezzetler.
+            </p>
+          </div>
+
+          <div class="pillar">
+            <div class="pillar-label">
+              Lezzet
+              <span>04</span>
+            </div>
+            <p>
+              Sonunda sofraya ulaşan gerçek fındık tadı. Gizli katkı maddesi, palm yağı veya yapay tatlandırıcı yok. Sadece fındık, sadece doğallık.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Gerçek Tesis & Değirmen Fotoğrafları -->
+      <div style="margin-top: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
+        <div style="border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--white); box-shadow: var(--shadow-sm);">
+          <img src="/images/nutopia-ekip-tesis.png" alt="Nutopia Fındık İşleme Tesisi ve Kurucusu Mehmet Güven" style="width: 100%; height: 260px; object-fit: cover; display: block;" loading="lazy">
+          <div style="padding: 18px 22px;">
+            <div style="font-family: var(--font-serif); font-size: 1.05rem; font-weight: 700; color: var(--green); margin-bottom: 6px;">Nutopia Fındık İşleme Tesisi</div>
+            <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.6; margin: 0;">Kurucumuz Mehmet Güven ve Şehit Aileleri & Gaziler Derneği ziyareti. Şehit ailelerimize ve gazilerimize tüm hizmetlerimizde %20 indirim sunuyoruz.</p>
+          </div>
+        </div>
+        <div style="border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--line); background: var(--white); box-shadow: var(--shadow-sm);">
+          <img src="/images/nutopia-degirmen-ziyaret.png" alt="Ormanlı Değirmen İçi ve Üretim Alanı" style="width: 100%; height: 260px; object-fit: cover; display: block;" loading="lazy">
+          <div style="padding: 18px 22px;">
+            <div style="font-family: var(--font-serif); font-size: 1.05rem; font-weight: 700; color: var(--green); margin-bottom: 6px;">Ormanlı Değirmenimizden Bir Kare</div>
+            <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.6; margin: 0;">Ormanlı'daki üretim noktamızda üreticilerimiz fındıklarının kırma, kavurma ve ezme işlemlerini şeffaflıkla yerinde takip edebilir.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================================
+       BÖLÜM 3: DEĞİRMENDEN DOĞAN LEZZET — NUTOPİANO'NUN HİKAYESİ
+       ====================================================================== -->
+  <section class="story-section section-white" aria-labelledby="nutopiano-story-title">
+    <div class="container">
+      <div class="bridge">
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center;">
+          <div>
+            <div class="bridge-chapter">Bölüm 03</div>
+            <h2 id="nutopiano-story-title">Değirmenden Doğan Lezzet.</h2>
+            <div class="bridge-prose">
+              <p>
+                Nutopia'da yıllardır işlenen fındığın, kendi ürünlerimize dönüşen haline
+                <strong>Nutopiano</strong> adını verdik.
+              </p>
+              <p>
+                Sütlü fındık kremasından kakaolu fındık kremasına, %100 fındık ezmesinden
+                kavrulmuş fındığa kadar Nutopiano, fındığın farklı lezzetlerini bir araya getiriyor.
+              </p>
+              <p>
+                Bu ürünlerin her biri aynı değirmende, aynı anlayışla işleniyor.
+              </p>
+            </div>
+
+            <div class="chain" aria-label="Fındıktan sofraya zinciri" style="margin-top: 24px;">
+              <span class="chain-step">Fındık</span>
+              <span class="chain-arrow">→</span>
+              <span class="chain-step">Üretici</span>
+              <span class="chain-arrow">→</span>
+              <span class="chain-step">Değirmen</span>
+              <span class="chain-arrow">→</span>
+              <span class="chain-step" style="background: rgba(201,154,69,.2); border-color: rgba(201,154,69,.35); color: var(--beige);">Nutopiano</span>
+              <span class="chain-arrow">→</span>
+              <span class="chain-step">Sofra</span>
+            </div>
+
+            <a class="btn btn-gold" style="margin-top: 28px; display: inline-flex;" href="/urunler">Nutopiano Ürünlerini İncele →</a>
+          </div>
+
+          <div style="text-align: center;">
+            <img src="/images/nutopiano-kavanozlar.png" alt="Nutopiano Ürün Koleksiyonu" style="width: 100%; max-width: 380px; border-radius: var(--r-md); border: 1.5px solid rgba(201,154,69,.4); box-shadow: var(--shadow-lg); display: inline-block; object-fit: cover;" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ======================================================================
+       BÖLÜM 4: FINDIK SIZE AİT, İŞLEMESİ BİZE EMANET
+       ====================================================================== -->
+  <section class="story-section section-cream" aria-labelledby="service-story-title">
+    <div class="container">
+      <div class="story-layout">
+
+        <div class="story-sticky">
+          <div class="story-chapter">Bölüm 04</div>
+          <h2 class="story-heading" id="service-story-title">
+            Fındığınız Size Ait,<br>İşlemesi Bize Emanet.
+          </h2>
+          <p class="story-lead">
+            Bahçenizden topladığınız fındığı yalnızca satmak zorunda değilsiniz.
+          </p>
+          <a class="btn btn-dark" style="margin-top: 24px; display: inline-flex;" href="/degirmen">Değirmen Hizmetlerini İncele →</a>
+        </div>
+
+        <div>
+          <div class="story-prose">
+            <p>
+              Fındığınızı Nutopia Fındık Değirmeni'ne getirerek kırdırabilir, kavrattırabilir veya ezme haline getirebilirsiniz.
+            </p>
+            <p>
+              Fındığınızın nasıl işleneceğine birlikte karar verelim.
+            </p>
+          </div>
+
+          <div style="margin-top: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+
+            <div style="padding: 18px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;">
+              <img src="/images/makine-kirma.png" alt="Fındık Kırma Makinesi" style="width: 100%; height: 140px; object-fit: cover; border-radius: var(--r-sm); margin-bottom: 12px; background: var(--light);" loading="lazy">
+              <div style="font-family: var(--font-serif); font-size: 1.05rem; color: var(--green); font-weight: 700; margin-bottom: 6px;">1. Fındık Kırma</div>
+              <p style="font-size: .84rem; color: var(--muted); line-height: 1.6;">Kabuklu fındığı kırma makinemizde iç fındığa ayırıyoruz. Yüksek randıman ve sağlam çekirdek.</p>
+            </div>
+
+            <div style="padding: 18px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;">
+              <img src="/images/makine-kavurma.png" alt="Fındık Kavurma Makinesi" style="width: 100%; height: 140px; object-fit: cover; border-radius: var(--r-sm); margin-bottom: 12px; background: var(--light);" loading="lazy">
+              <div style="font-family: var(--font-serif); font-size: 1.05rem; color: var(--green); font-weight: 700; margin-bottom: 6px;">2. Kavurma</div>
+              <p style="font-size: .84rem; color: var(--muted); line-height: 1.6;">İsteğinize uygun sıcaklık ve sürede homojen kavurma. Aromasını tam kıvamında açığa çıkarıyoruz.</p>
+            </div>
+
+            <div style="padding: 18px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;">
+              <img src="/images/makine-zar-soyma.png" alt="Zar Soyma Makinesi" style="width: 100%; height: 140px; object-fit: cover; border-radius: var(--r-sm); margin-bottom: 12px; background: var(--light);" loading="lazy">
+              <div style="font-family: var(--font-serif); font-size: 1.05rem; color: var(--green); font-weight: 700; margin-bottom: 6px;">3. Zar Soyma</div>
+              <p style="font-size: .84rem; color: var(--muted); line-height: 1.6;">Kavrulmuş fındığın ince dış zarını soyma makinemizde temizleyerek beyaz ve pürüzsüz iç elde ediyoruz.</p>
+            </div>
+
+            <div style="padding: 18px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;">
+              <img src="/images/urun-ezme.png" alt="Taş Değirmen Fındık Ezmesi" style="width: 100%; height: 140px; object-fit: cover; border-radius: var(--r-sm); margin-bottom: 12px; background: var(--light);" loading="lazy">
+              <div style="font-family: var(--font-serif); font-size: 1.05rem; color: var(--green); font-weight: 700; margin-bottom: 6px;">4. Fındık Ezmesi</div>
+              <p style="font-size: .84rem; color: var(--muted); line-height: 1.6;">Kendi fındığınızı taş değirmen ezme makinemizde saf, katkısız ve taptaze fındık ezmesine dönüştürüyoruz.</p>
+            </div>
+
+          </div>
+
+          <div style="margin-top: 18px; padding: 18px 24px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md); border-left: 3px solid var(--gold); display: flex; flex-direction: column; gap: 10px;">
+            <p style="font-size: .9rem; color: var(--muted); line-height: 1.7; margin: 0;">
+              <strong style="color: var(--ink);">Paketleme:</strong> İsteğe göre 500 g ve 1 kg'lık hava almaz vakumlu paketleme yapılmaktadır.
+            </p>
+            <p style="font-size: .88rem; color: var(--green); font-weight: 600; line-height: 1.5; margin: 0;">
+              🎖️ Şehit aileleri ve gazilerimize tüm değirmen hizmetlerinde ve ürünlerimizde %20 indirim uygulanmaktadır.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- CTA ---- -->
+  <section class="cta-strip" aria-label="İletişim çağrısı">
+    <div class="container">
+      <div class="cta-strip-inner">
+        <div class="cta-strip-copy">
+          <div class="eyebrow">Değirmeni Tanıyın</div>
+          <h2>Fındığınızı getirin veya sipariş verin.</h2>
+        </div>
+        <div class="cta-strip-btns">
+          <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopia%20Fındık%20Değirmeni%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">
+            WhatsApp'tan Ulaşın
+          </a>
+          <a class="btn btn-outline-light btn-lg" href="/iletisim">İletişim & Konum</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer"></div>
+<script src="/components.js"></script>
+</body>
+</html>

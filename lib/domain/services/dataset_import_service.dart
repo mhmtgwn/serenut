@@ -1508,7 +1508,7 @@ class DatasetImportService {
             }
 
             if (strategy.updateExisting) {
-              int finalQty = existing.quantity;
+              num finalQty = existing.quantity;
               if (strategy.duplicateResolution == DuplicateResolution.merge) {
                 finalQty = existing.quantity + quantity;
               } else if (strategy.syncStocks) {
@@ -1641,7 +1641,9 @@ class DatasetImportService {
           ex.DoubleCellValue(p.price),
           ex.IntCellValue(p.vat ?? 18),
           ex.TextCellValue(remoteUrl),
-          ex.IntCellValue(p.quantity),
+          p.quantity is int
+              ? ex.IntCellValue(p.quantity.toInt())
+              : ex.DoubleCellValue(p.quantity.toDouble()),
         ]);
 
         index++;

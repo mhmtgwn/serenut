@@ -3,6 +3,7 @@
 // Phase 6 UI Redesign — Square/Loyverse POS Stili
 // Revized: 22 Jun 2026
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -91,6 +92,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
   final Set<String> _selectedIds = <String>{};
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
+  Timer? _searchDebounce;
   Map<String, int> _statusCounts = {
     'all': 0,
     'created': 0,
@@ -137,6 +139,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     disposeBarcodeScanner();
     _searchController.dispose();
     _scrollController.dispose();
@@ -211,8 +214,13 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
           searchController: _searchController,
           searchHint: 'Sipariş veya müşteri ara...',
           onSearchChanged: (val) {
-            ref.read(ordersControllerProvider.notifier).applySearch(val);
-            _refreshCounts();
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                ref.read(ordersControllerProvider.notifier).applySearch(val);
+                _refreshCounts();
+              }
+            });
           },
           filterWidget: LayoutBuilder(
             builder: (context, constraints) {

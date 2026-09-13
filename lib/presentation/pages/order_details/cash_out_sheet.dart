@@ -20,27 +20,25 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
       } catch (_) {}
     }
 
-    final products = ref.read(productsControllerProvider).value ?? [];
-    final receiptItems = order.items.map((item) {
-      final prod = products.firstWhere(
-        (p) => p.id == item['product_id'],
-        orElse: () => ProductEntity(
-          id: item['product_id'] ?? '',
-          name: item['product_id'] ?? 'Urun',
-          description: '',
-          price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          quantity: 0,
-          category: '',
-        ),
-      );
+    final prodRepo = await ref.read(productRepositoryProvider.future);
+    final receiptItems = await Future.wait(order.items.map((item) async {
+      var name = (item['product_name'] ?? item['name'])?.toString();
+      final productId = item['product_id']?.toString() ?? '';
+      if (name == null || name.isEmpty || name == productId) {
+        if (productId.isNotEmpty) {
+          final p = await prodRepo.findById(productId);
+          if (p != null) name = p.name;
+        }
+      }
+      name ??= 'Ürün';
       return {
-        'product_id': item['product_id'],
-        'product_name': item['product_name'] ?? prod.name,
-        'barcode': prod.id,
+        'product_id': productId,
+        'product_name': name,
+        'barcode': productId,
         'quantity': item['quantity'],
         'unit_price': item['unit_price'],
       };
-    }).toList();
+    }));
 
     await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
           order,
@@ -276,27 +274,25 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               } catch (_) {}
             }
 
-            final products = ref.read(productsControllerProvider).value ?? [];
-            final receiptItems = widget.order.items.map((item) {
-              final prod = products.firstWhere(
-                (p) => p.id == item['product_id'],
-                orElse: () => ProductEntity(
-                  id: item['product_id'] ?? '',
-                  name: item['product_id'] ?? 'Urun',
-                  description: '',
-                  price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-                  quantity: 0,
-                  category: '',
-                ),
-              );
+            final prodRepo = await ref.read(productRepositoryProvider.future);
+            final receiptItems = await Future.wait(widget.order.items.map((item) async {
+              var name = (item['product_name'] ?? item['name'])?.toString();
+              final productId = item['product_id']?.toString() ?? '';
+              if (name == null || name.isEmpty || name == productId) {
+                if (productId.isNotEmpty) {
+                  final p = await prodRepo.findById(productId);
+                  if (p != null) name = p.name;
+                }
+              }
+              name ??= 'Ürün';
               return {
-                'product_id': item['product_id'],
-                'product_name': item['product_name'] ?? prod.name,
-                'barcode': prod.id,
+                'product_id': productId,
+                'product_name': name,
+                'barcode': productId,
                 'quantity': item['quantity'],
                 'unit_price': item['unit_price'],
               };
-            }).toList();
+            }));
 
             final double currentFinalPaid = widget.totalPaid +
                 (_selectedMethod == 'cash'

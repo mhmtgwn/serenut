@@ -83,7 +83,10 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       future: ref
           .read(financialTransactionRepositoryProvider.future)
           .then((repo) async {
-        final txs = await repo.getByCustomerId(order.customerId);
+        var txs = await repo.getByReferenceId(order.id);
+        if (txs.isEmpty && order.customerId.isNotEmpty) {
+          txs = await repo.getByCustomerId(order.customerId);
+        }
         FinancialTransactionEntity? saleTx;
         double totalPaid = 0.0;
         for (final t in txs) {
@@ -91,7 +94,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
             if (t.type == 'sale') {
               saleTx = t;
               totalPaid += t.paidAmount;
-            } else if (t.type == 'payment') {
+            } else if (t.type == 'payment' || t.type == 'collection') {
               totalPaid += t.paidAmount;
             }
           }
@@ -325,7 +328,10 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       BuildContext context, WidgetRef ref, OrderEntity order) async {
     final txRepo =
         await ref.read(financialTransactionRepositoryProvider.future);
-    final txs = await txRepo.getByCustomerId(order.customerId);
+    var txs = await txRepo.getByReferenceId(order.id);
+    if (txs.isEmpty && order.customerId.isNotEmpty) {
+      txs = await txRepo.getByCustomerId(order.customerId);
+    }
     FinancialTransactionEntity? saleTx;
     double totalPaid = 0.0;
     for (final t in txs) {
@@ -333,7 +339,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
         if (t.type == 'sale') {
           saleTx = t;
           totalPaid += t.paidAmount;
-        } else if (t.type == 'payment') {
+        } else if (t.type == 'payment' || t.type == 'collection') {
           totalPaid += t.paidAmount;
         }
       }

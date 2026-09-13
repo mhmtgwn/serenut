@@ -152,8 +152,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         purchasePrice: double.tryParse(
                 _purchasePriceCtrl.text.trim().replaceAll(',', '.')) ??
             0,
-        quantity: int.parse(_qtyCtrl.text.trim()),
-        minStock: int.tryParse(_minStockCtrl.text.trim()) ?? 5,
+        quantity: num.parse(_qtyCtrl.text.trim().replaceAll(',', '.')),
+        minStock: num.tryParse(_minStockCtrl.text.trim().replaceAll(',', '.')) ?? 5,
         brand: _brandCtrl.text.trim(),
         unit: _saleType == 'weighed' ? 'kg' : _unit,
         shelfCode: _shelfCodeCtrl.text.trim(),
@@ -538,14 +538,17 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       controller: _qtyCtrl,
                       label: 'Stok Miktarı *',
                       icon: Icons.inventory_rounded,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: _saleType == 'weighed'
+                          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                          : [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Lütfen stok miktarı giriniz.';
                         }
-                        if (int.tryParse(v.trim()) == null) {
-                          return 'Lütfen geçerli bir tam sayı giriniz.';
+                        final clean = v.trim().replaceAll(',', '.');
+                        if (num.tryParse(clean) == null) {
+                          return 'Lütfen geçerli bir sayı giriniz.';
                         }
                         return null;
                       },
@@ -557,8 +560,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       controller: _minStockCtrl,
                       label: 'Min. Stok Uyarısı',
                       icon: Icons.warning_amber_rounded,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: _saleType == 'weighed'
+                          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                          : [FilteringTextInputFormatter.digitsOnly],
                     ),
                   ),
                 ],

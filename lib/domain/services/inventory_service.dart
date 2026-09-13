@@ -81,12 +81,10 @@ class InventoryService {
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty = (product != null && product.isWeighed)
-          ? (item.saleQuantity >= 1.0
-              ? item.saleQuantity.round()
-              : (item.saleQuantity > 0 ? 1 : 0))
-          : item.quantity;
-      final qtyToDeduct = effectiveQty > 0 ? effectiveQty : 1;
+      final double qtyToDeduct = (product != null && product.isWeighed)
+          ? item.saleQuantity
+          : (item.quantity > 0 ? item.quantity.toDouble() : item.saleQuantity);
+      if (qtyToDeduct <= 0) continue;
 
       await _productRepository.decreaseStock(item.productId, qtyToDeduct);
 
@@ -106,12 +104,10 @@ class InventoryService {
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty = (product != null && product.isWeighed)
-          ? (item.saleQuantity >= 1.0
-              ? item.saleQuantity.round()
-              : (item.saleQuantity > 0 ? 1 : 0))
-          : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
-      final qtyToApply = effectiveQty > 0 ? effectiveQty : 1;
+      final double qtyToApply = (product != null && product.isWeighed)
+          ? item.saleQuantity
+          : (item.quantity > 0 ? item.quantity.toDouble() : item.saleQuantity);
+      if (qtyToApply <= 0) continue;
 
       await _productRepository.increaseStock(item.productId, qtyToApply);
 

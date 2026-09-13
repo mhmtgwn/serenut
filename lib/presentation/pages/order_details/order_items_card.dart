@@ -5,9 +5,9 @@ part of '../order_details_page.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 Widget _buildOrderItemsCard(
-  OrderEntity order,
-  Map<String, String> productNameMap,
-) {
+  OrderEntity order, [
+  Map<String, String>? productNameMap,
+]) {
   final items = order.items;
   double subtotal = 0;
   for (final item in items) {
@@ -35,8 +35,8 @@ Widget _buildOrderItemsCard(
             final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
             final itemTotal = qty * price;
             final productId = item['product_id']?.toString() ?? '';
-            final productName = productNameMap[productId] ??
-                item['product_name']?.toString() ??
+            final productName = item['product_name']?.toString() ??
+                productNameMap?[productId] ??
                 productId;
 
             return Column(

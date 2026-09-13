@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
-import 'package:serenutos/domain/notifications/template_resolver.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/debt_reminder_service.dart';
 import 'package:serenutos/domain/services/sms_service.dart';
