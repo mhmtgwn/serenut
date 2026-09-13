@@ -99,19 +99,32 @@
 
   <!-- ---- SAYFA HERO ---- -->
   <section class="page-hero" aria-labelledby="page-title">
-    <div class="container">
-      <div class="eyebrow">Fındık İşleme Hizmetleri</div>
-      <h1 class="page-hero-title" id="page-title">
-        Fındığınızı Getirin,<br>Biz İşleyelim.
-      </h1>
-      <p class="page-hero-desc">
-        Kırma, kavurma, zar soyma, ezme ve paketleme. Her adımı ayrı ayrı ya da kombine olarak yaptırabilirsiniz.
-      </p>
-      <div class="page-hero-actions">
-        <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20fındık%20işleme%20hizmeti%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">
-          WhatsApp'tan Bilgi Al
-        </a>
-        <a class="btn btn-outline-light btn-lg" href="#fiyatlar">Fiyat Listesi</a>
+    <div class="container home-hero-container">
+      <div>
+        <div class="eyebrow">Fındık İşleme Hizmetleri</div>
+        <h1 class="page-hero-title" id="page-title">
+          Fındığınızı Getirin,<br>Biz İşleyelim.
+        </h1>
+        <p class="page-hero-desc">
+          Kırma, kavurma, zar soyma, ezme ve paketleme. Her adımı ayrı ayrı ya da kombine olarak yaptırabilirsiniz.
+        </p>
+        <div class="page-hero-actions">
+          <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20fındık%20işleme%20hizmeti%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">
+            WhatsApp'tan Bilgi Al
+          </a>
+          <a class="btn btn-outline-light btn-lg" href="#fiyatlar">Fiyat Listesi</a>
+        </div>
+      </div>
+      <div class="home-hero-showcase">
+        <div class="home-hero-frame">
+          <img src="/images/nutopia-degirmen-ziyaret.png" alt="Nutopia Fındık Değirmeni Ormanlı Üretim Alanı" loading="eager">
+          <div class="home-hero-tag">
+            <div>
+              <div class="home-hero-tag-title">Ormanlı Değirmenimiz</div>
+              <div class="home-hero-tag-sub">Fındığınız gözünüzün önünde, hijyenle işlenir</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -220,12 +233,23 @@
         <article class="step-row" role="listitem">
           <div class="step-num-big" aria-hidden="true">05</div>
           <div class="step-body">
-            <h3>Paketleme</h3>
-            <p>İşlenmiş fındık istenirse doğrudan müşteriye teslim edilir. İstenirse 250g, 500g veya 1 kg vakumlu paketlerde paketlenebilir.</p>
+            <h3>Paketleme & Vakum</h3>
+            <p>İşlenmiş fındık istenirse doğrudan müşteriye teslim edilir. İstenirse 250g, 500g veya 1 kg hava almaz vakumlu paketlerde tazeliği mühürlenir.</p>
           </div>
           <span class="step-tag">20 ₺/kg (1 kg)</span>
         </article>
 
+      </div>
+
+      <!-- Vakumlu Paketleme Görsel Kutusu -->
+      <div style="margin-top: 32px; background: var(--white); border: 1.5px solid var(--line); border-radius: var(--r-md); overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; align-items: center; box-shadow: var(--shadow-sm);">
+        <img src="/images/nutopiano-vakumlu-paketler.png" alt="Vakumlu Fındık Paketleri" style="width: 100%; height: 260px; object-fit: cover; display: block;" loading="lazy">
+        <div style="padding: 28px 32px;">
+          <div class="eyebrow" style="margin-bottom: 8px;">Tazelik Garantisi</div>
+          <h3 style="font-family: var(--font-serif); font-size: 1.35rem; color: var(--green); margin-bottom: 10px;">Hava Almaz Vakumlu Ambalaj</h3>
+          <p style="font-size: .92rem; color: var(--muted); line-height: 1.7; margin: 0 0 16px 0;">Kavrulan ve işlenen fındıklarınız 250g, 500g veya 1 kg özel vakumlu paketlerde kapatılarak aylarca ilk günkü çıtırlığını ve nefis kokusunu muhafaza eder.</p>
+          <span style="font-size: .85rem; font-weight: 700; color: var(--gold-dark);">20 ₺'den başlayan paketleme seçenekleri</span>
+        </div>
       </div>
     </div>
   </section>
@@ -283,32 +307,50 @@
         </tbody>
       </table>
 
-      <div style="margin-top: 14px; padding: 16px 22px; background: var(--green-soft); border: 1.5px solid #c3dfc9; border-radius: var(--r-sm); display: flex; align-items: flex-start; gap: 12px;">
-        <span style="font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;">🎖️</span>
-        <p style="font-size: .9rem; color: var(--green); font-weight: 600; line-height: 1.6; margin: 0;">
-          <strong>Şehit aileleri ve gazilerimize tüm ürün ve hizmetlerde %20 indirim uygulanmaktadır.</strong><br>
-          <span style="font-weight: 400; color: var(--muted);">Türkiye Harp Malulü Gaziler Şehit Dul ve Yetimleri Derneği iş birliğiyle.</span>
-        </p>
+      <!-- İndirim Notu -->
+      <div class="sehit-gazi-banner">
+        <img src="/images/nutopia-sehit-gazi.png" alt="Türkiye Harp Malulü Gaziler Şehit Dul ve Yetimleri Derneği" loading="lazy">
+        <div>
+          <p style="font-size: .95rem; color: var(--green); font-weight: 700; line-height: 1.5; margin: 0 0 4px 0;">
+            🎖️ Şehit aileleri ve gazilerimize tüm ürün ve hizmetlerde %20 indirim uygulanmaktadır.
+          </p>
+          <p style="font-size: .85rem; color: var(--muted); line-height: 1.5; margin: 0;">
+            Türkiye Harp Malulü Gaziler Şehit Dul ve Yetimleri Derneği iş birliği ve sonsuz minnetimizle.
+          </p>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ---- FINDIK SIZE AİT ---- -->
   <section class="section section-light" aria-labelledby="service-story-title">
-    <div class="container" style="max-width: 800px;">
-      <div class="section-head">
-        <div class="eyebrow">Değirmen Hizmeti Anlayışı</div>
-        <h2 class="section-title" id="service-story-title">Fındığınız Size Ait,<br>İşlemesi Bize Emanet.</h2>
-      </div>
-      <div style="font-size: 1.06rem; color: var(--muted); line-height: 1.85;">
-        <p style="margin-bottom: 18px;">Bahçenizden topladığınız fındığı yalnızca satmak zorunda değilsiniz.</p>
-        <p style="margin-bottom: 18px;">Fındığınızı Nutopia Fındık Değirmeni'ne getirerek kırdırabilir, kavrattırabilir, zar soyturabilir veya ezme haline getirebilirsiniz.</p>
-        <p>Fındığınızın nasıl işleneceğine <strong style="color: var(--green);">birlikte karar verelim.</strong></p>
-      </div>
-      <div style="margin-top: 28px; padding: 20px 26px; background: var(--white); border: 1.5px solid var(--line); border-radius: var(--r-sm); border-left: 3px solid var(--gold);">
-        <p style="font-size: .92rem; color: var(--muted); line-height: 1.72; margin: 0;">
-          <strong style="color: var(--ink);">Minimum miktar sınırı yok.</strong> Küçük miktarlardan büyük partilere kadar her hacmi işliyoruz.
-        </p>
+    <div class="container">
+      <div class="degirmen-split">
+        <div>
+          <div class="section-head" style="margin-bottom: 24px;">
+            <div class="eyebrow">Değirmen Hizmeti Anlayışı</div>
+            <h2 class="section-title" id="service-story-title">Fındığınız Size Ait,<br>İşlemesi Bize Emanet.</h2>
+          </div>
+          <div style="font-size: 1.05rem; color: var(--muted); line-height: 1.85;">
+            <p style="margin-bottom: 16px;">Bahçenizden topladığınız fındığı yalnızca toptan satmak zorunda değilsiniz.</p>
+            <p style="margin-bottom: 16px;">Fındığınızı Nutopia Fındık Değirmeni'ne getirerek kırdırabilir, kavrattırabilir, zar soyturabilir veya ezme haline getirebilirsiniz.</p>
+            <p style="margin-bottom: 24px;">Fındığınızın nasıl işleneceğine <strong style="color: var(--green);">birlikte karar verelim.</strong></p>
+          </div>
+          <div style="padding: 20px 24px; background: var(--white); border: 1.5px solid var(--line); border-radius: var(--r-sm); border-left: 3px solid var(--gold);">
+            <p style="font-size: .92rem; color: var(--muted); line-height: 1.72; margin: 0;">
+              <strong style="color: var(--ink);">Minimum miktar sınırı yok.</strong> Küçük miktarlardan büyük partilere kadar her hacmi titizlikle işliyoruz.
+            </p>
+          </div>
+        </div>
+        <div>
+          <div style="border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--line); background: var(--white); box-shadow: var(--shadow-md);">
+            <img src="/images/nutopia-onluk.png" alt="Değirmen Ustası ve Fındık Çuvalları" style="width: 100%; height: 360px; object-fit: cover; display: block;" loading="lazy">
+            <div style="padding: 16px 20px;">
+              <div style="font-family: var(--font-serif); font-weight: 700; color: var(--green); font-size: 1rem;">Geleneksel Emek & Ustalık</div>
+              <p style="font-size: .82rem; color: var(--muted); line-height: 1.5; margin: 4px 0 0 0;">Her çuval fındık, üreticisinin emeğine yaraşır özenle işlenir.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>

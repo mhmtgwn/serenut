@@ -908,3 +908,268 @@ a.contact-item-wa:hover { background: #f0fdf7 !important; }
   .page-hero-actions { flex-direction: column; align-items: stretch; }
   .page-hero::after { height: 36px; }
 }
+
+/* ==========================================================================
+   GÖRSEL ZENGİNLEŞTİRME ELEMANLARI (HERO, PATH, GALERİ, VITRIN)
+   ========================================================================== */
+.home-hero-container {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 48px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.home-hero-showcase {
+  position: relative;
+}
+
+.home-hero-frame {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 2px solid rgba(201, 154, 69, 0.4);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  background: var(--green-deep);
+}
+
+.home-hero-frame img {
+  width: 100%;
+  height: 420px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s ease;
+}
+
+.home-hero-frame:hover img {
+  transform: scale(1.03);
+}
+
+.home-hero-tag {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  right: 18px;
+  background: rgba(14, 43, 29, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(201, 154, 69, 0.4);
+  border-radius: var(--r-sm);
+  padding: 14px 18px;
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-hero-tag-title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gold-light);
+  line-height: 1.2;
+}
+
+.home-hero-tag-sub {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 3px;
+}
+
+/* Path Card Media */
+.path-card-media {
+  width: calc(100% + 64px);
+  height: 220px;
+  margin: -36px -32px 24px -32px;
+  overflow: hidden;
+  position: relative;
+  background: var(--light);
+}
+
+.path-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+
+.path-card:hover .path-card-media img {
+  transform: scale(1.05);
+}
+
+/* Vitrin Grid */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.featured-card {
+  background: var(--white);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: var(--t);
+  text-decoration: none;
+  color: inherit;
+}
+
+.featured-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.featured-card-img {
+  width: 100%;
+  height: 230px;
+  object-fit: cover;
+  display: block;
+  background: var(--light);
+  transition: transform 0.4s ease;
+}
+
+.featured-card:hover .featured-card-img {
+  transform: scale(1.03);
+}
+
+.featured-card-body {
+  padding: 20px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.featured-card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-dark);
+  margin-bottom: 6px;
+}
+
+.featured-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 8px;
+  line-height: 1.25;
+}
+
+.featured-card-desc {
+  font-size: 0.86rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.featured-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-light);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--green);
+}
+
+/* Galeri Grid */
+.gallery-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.gallery-strip-card {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  transition: var(--t);
+}
+
+.gallery-strip-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.gallery-strip-card img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-strip-content {
+  padding: 16px 18px;
+}
+
+.gallery-strip-title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+
+.gallery-strip-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Şehit Gazi Kartı */
+.sehit-gazi-banner {
+  margin-top: 20px;
+  padding: 18px 22px;
+  background: var(--green-soft);
+  border: 1.5px solid #c3dfc9;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.sehit-gazi-banner img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: #fff;
+  padding: 4px;
+  border: 1px solid rgba(22,138,82,0.2);
+  flex-shrink: 0;
+}
+
+/* Değirmen Split */
+.degirmen-split {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 40px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .home-hero-container { grid-template-columns: 1fr; gap: 36px; }
+  .featured-grid { grid-template-columns: 1fr 1fr; }
+  .gallery-strip-grid { grid-template-columns: 1fr 1fr; }
+  .degirmen-split { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .featured-grid { grid-template-columns: 1fr; }
+  .gallery-strip-grid { grid-template-columns: 1fr; }
+  .sehit-gazi-banner { flex-direction: column; align-items: flex-start; }
+  .home-hero-frame img { height: 280px; }
+}
