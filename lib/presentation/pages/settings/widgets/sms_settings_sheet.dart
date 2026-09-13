@@ -2375,6 +2375,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                 'order_ready',
                                 'order_delivered',
                                 'order_cancelled',
+                                'balance_reminder',
                               }.contains(eventId);
 
                           final isEnabled = isWhatsAppTab
