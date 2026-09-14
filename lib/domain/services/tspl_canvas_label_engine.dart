@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/printing/label_dimension_models.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 /// Next-Generation TSPL Label Renderer powered by Flutter's Canvas & TextPainter.
 ///
@@ -165,7 +166,7 @@ class TsplCanvasLabelEngine {
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
     final customerTitleFontSize =
-        (isWide ? (isTall ? 40.0 : 34.0) : 29.5) * fontScale;
+        (isWide ? (isTall ? 34.0 : 30.0) : 23.5) * fontScale;
     final cleanNote = note?.trim() ?? '';
     final isLongNote = cleanNote.length > 45;
     final isVeryLongNote = cleanNote.length > 90;
@@ -284,18 +285,52 @@ class TsplCanvasLabelEngine {
     double measurePage1HeaderHeight() {
       var h = topMargin;
       final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
+      final cleanPhone = hasPhone ? customerPhone.trim() : '';
+      final phoneDisplay = cleanPhone.isNotEmpty ? formatPhoneForDisplay(cleanPhone) : '';
 
-      // ── 1. Satır: Sipariş No ve Saat Yan Yana Sağ Köşeye Yaslı ──
-      if (showOrderNo || showDate) {
-        h += detailFontSize + 3.0;
+      final orderPart = showOrderNo ? 'Sip #$orderIdShort' : '';
+      final orderAndTime = [
+        if (orderPart.isNotEmpty) orderPart,
+        if (dateStr.isNotEmpty) dateStr,
+      ].join('   ');
+
+      double rightW = 0.0;
+      double orderTimeH = 0.0;
+      if ((showOrderNo || showDate) && orderAndTime.isNotEmpty) {
+        final otp = TextPainter(
+          text: TextSpan(
+            text: orderAndTime,
+            style: ts(
+              fontSize: detailFontSize,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: usableW * 0.65);
+        rightW = math.max(rightW, otp.width);
+        orderTimeH = otp.height;
       }
 
-      // ── Altında: Müşterinin Numarası ──
-      if (hasPhone) {
-        h += detailFontSize + 3.0;
+      double phoneH = 0.0;
+      if (phoneDisplay.isNotEmpty) {
+        final pp = TextPainter(
+          text: TextSpan(
+            text: 'Tel: $phoneDisplay',
+            style: ts(
+              fontSize: detailFontSize,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: usableW * 0.65);
+        rightW = math.max(rightW, pp.width);
+        phoneH = pp.height;
       }
 
-      // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──
+      final rightH = (orderTimeH > 0 ? orderTimeH : 0.0) +
+          (phoneH > 0 ? (phoneH + (orderTimeH > 0 ? 2.0 : 0.0)) : 0.0);
+
+      double leftH = 0.0;
       if (showCustomerName) {
         final cleanCust = customerName.trim();
         final isRawId = cleanCust.startsWith('cust-') ||
@@ -303,7 +338,10 @@ class TsplCanvasLabelEngine {
         final displayCust = (cleanCust.isNotEmpty && !isRawId)
             ? cleanCust
             : 'Genel Müşteri';
-        final custPainter = TextPainter(
+        final custMaxW = rightW > 0
+            ? (usableW - rightW - 8.0).clamp(60.0, usableW)
+            : usableW;
+        final cp = TextPainter(
           text: TextSpan(
             text: displayCust,
             style: ts(
@@ -312,10 +350,13 @@ class TsplCanvasLabelEngine {
             ),
           ),
           textDirection: TextDirection.ltr,
-          maxLines: 1,
-        )..layout(maxWidth: usableW);
-        h += custPainter.height + 3.0;
+          maxLines: 2,
+        )..layout(maxWidth: custMaxW);
+        leftH = cp.height;
       }
+
+      h += math.max(leftH, rightH) + 3.0;
+
       if (previousDebt > 0.001) {
         final debtPainter = TextPainter(
           text: TextSpan(
@@ -327,7 +368,7 @@ class TsplCanvasLabelEngine {
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: usableW);
-        h += debtPainter.height + 1.0;
+        h += debtPainter.height + 2.0;
       }
       h += 4.5; // Divider bar
       return h;
@@ -591,68 +632,61 @@ class TsplCanvasLabelEngine {
         final pageSuffix = totalPagesCount > 1 ? ' (1/$totalPagesCount)' : '';
         final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
         final cleanPhone = hasPhone ? customerPhone.trim() : '';
+        final phoneDisplay = cleanPhone.isNotEmpty ? formatPhoneForDisplay(cleanPhone) : '';
 
-        // ── 1. Satır: Sipariş No ve Saat Yan Yana Sağ Köşeye Yaslı ──
-        if (showOrderNo || showDate) {
-          final orderPart = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
-          final orderAndTime = [
-            if (orderPart.isNotEmpty) orderPart,
-            if (dateStr.isNotEmpty) dateStr,
-          ].join('   ');
+        final headerTopY = currentY;
 
-          if (orderAndTime.isNotEmpty) {
-            final orderTimePainter = TextPainter(
-              text: TextSpan(
-                text: orderAndTime,
-                style: ts(
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
+        // ── Sağ Taraf: Sipariş No ve Saat Yan Yana Sağ Köşeye Yaslı ──
+        final orderPart = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
+        final orderAndTime = [
+          if (orderPart.isNotEmpty) orderPart,
+          if (dateStr.isNotEmpty) dateStr,
+        ].join('   ');
+
+        TextPainter? orderTimePainter;
+        double orderTimeW = 0.0;
+        double orderTimeH = 0.0;
+        if ((showOrderNo || showDate) && orderAndTime.isNotEmpty) {
+          orderTimePainter = TextPainter(
+            text: TextSpan(
+              text: orderAndTime,
+              style: ts(
+                fontSize: detailFontSize,
+                fontWeight: FontWeight.bold,
               ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW);
-            final rightX = safeRightX - orderTimePainter.width;
-            orderTimePainter.paint(canvas, Offset(rightX, currentY));
-
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'OrderNo',
-              left: rightX,
-              top: currentY,
-              width: orderTimePainter.width,
-              height: orderTimePainter.height,
-            ));
-
-            currentY += detailFontSize + 3.0;
-          }
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW * 0.65);
+          orderTimeW = orderTimePainter.width;
+          orderTimeH = orderTimePainter.height;
         }
 
-        // ── Altında: Müşterinin Numarası (Sağ Köşeye Yaslı) ──
-        if (cleanPhone.isNotEmpty) {
-          final phonePainter = TextPainter(
+        // ── Sağ Taraf: Müşterinin Numarası (Sağ Köşeye Yaslı) ──
+        TextPainter? phonePainter;
+        double phoneW = 0.0;
+        double phoneH = 0.0;
+        if (phoneDisplay.isNotEmpty) {
+          phonePainter = TextPainter(
             text: TextSpan(
-              text: 'Tel: $cleanPhone',
+              text: 'Tel: $phoneDisplay',
               style: ts(
                 fontSize: detailFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
             textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW);
-          final phoneX = safeRightX - phonePainter.width;
-          phonePainter.paint(canvas, Offset(phoneX, currentY));
-
-          pageBoxes.add(ElementBoundingBox(
-            elementName: 'CustomerPhone',
-            left: phoneX,
-            top: currentY,
-            width: phonePainter.width,
-            height: phonePainter.height,
-          ));
-
-          currentY += detailFontSize + 3.0;
+          )..layout(maxWidth: usableW * 0.65);
+          phoneW = phonePainter.width;
+          phoneH = phonePainter.height;
         }
 
-        // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──
+        final rightBlockW = math.max(orderTimeW, phoneW);
+        final rightH = (orderTimeH > 0 ? orderTimeH : 0.0) +
+            (phoneH > 0 ? (phoneH + (orderTimeH > 0 ? 2.0 : 0.0)) : 0.0);
+
+        // ── Sol Taraf: Müşteri İsmi (Sip No ile Aynı Hizadan Başlar) ──
+        TextPainter? custPainter;
+        double custH = 0.0;
         if (showCustomerName) {
           final cleanCust = customerName.trim();
           final isRawId = cleanCust.startsWith('cust-') ||
@@ -660,8 +694,11 @@ class TsplCanvasLabelEngine {
           final displayCust = (cleanCust.isNotEmpty && !isRawId)
               ? cleanCust
               : 'Genel Müşteri';
+          final custMaxW = rightBlockW > 0
+              ? (usableW - rightBlockW - 8.0).clamp(60.0, usableW)
+              : usableW;
 
-          final custPainter = TextPainter(
+          custPainter = TextPainter(
             text: TextSpan(
               text: displayCust,
               style: ts(
@@ -670,21 +707,54 @@ class TsplCanvasLabelEngine {
               ),
             ),
             textDirection: TextDirection.ltr,
-            maxLines: 1,
+            maxLines: 2,
             ellipsis: '…',
-          )..layout(maxWidth: usableW);
-          custPainter.paint(canvas, Offset(paddingLeft, currentY));
+          )..layout(maxWidth: custMaxW);
+          custH = custPainter.height;
+
+          // Müşteri ismini sol üstten, Sip No ile tam aynı Y hizasından başlat
+          custPainter.paint(canvas, Offset(paddingLeft, headerTopY));
 
           pageBoxes.add(ElementBoundingBox(
             elementName: 'CustomerName',
             left: paddingLeft,
-            top: currentY,
+            top: headerTopY,
             width: custPainter.width,
             height: custPainter.height,
           ));
-
-          currentY += custPainter.height + 3.0;
         }
+
+        // Sipariş No & Saat'i headerTopY hizasında sağa yaslı çiz
+        if (orderTimePainter != null) {
+          final rightX = safeRightX - orderTimeW;
+          orderTimePainter.paint(canvas, Offset(rightX, headerTopY));
+
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'OrderNo',
+            left: rightX,
+            top: headerTopY,
+            width: orderTimeW,
+            height: orderTimeH,
+          ));
+        }
+
+        // Telefonu Sipariş No'nun hemen altına sağa yaslı çiz
+        if (phonePainter != null) {
+          final phoneY = headerTopY + (orderTimeH > 0 ? orderTimeH + 2.0 : 0.0);
+          final phoneX = safeRightX - phoneW;
+          phonePainter.paint(canvas, Offset(phoneX, phoneY));
+
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'CustomerPhone',
+            left: phoneX,
+            top: phoneY,
+            width: phoneW,
+            height: phoneH,
+          ));
+        }
+
+        final headerH = math.max(custH, rightH);
+        currentY = headerTopY + headerH + 3.0;
 
         if (previousDebt > 0.001) {
           final debtPainter = TextPainter(

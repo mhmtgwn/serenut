@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/models/label_model.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 /// Dynamic-size TSPL shelf-label and order-label renderer.
 ///
@@ -569,6 +570,9 @@ class TsplLabelLayoutEngine {
         var currentY = topGapMargin;
 
         if (pageIdx == 0) {
+          final headerTopY = currentY;
+          var rightY = headerTopY;
+
           final page1OrderNo =
               _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
           final orderPart = hasOrderNo ? 'Sip #$page1OrderNo (1/${pages.length})' : '';
@@ -578,32 +582,42 @@ class TsplLabelLayoutEngine {
             if (datePart.isNotEmpty) datePart,
           ].join('   ');
 
+          int rightW = 0;
           if (orderAndDate.isNotEmpty) {
             final orderW = bodyFont.measureWidth(orderAndDate);
+            rightW = math.max(rightW, orderW);
             final orderX =
                 (widthDots - rightPadding - orderW).clamp(paddingX, widthDots);
             commands.writeln(
-                'TEXT $orderX,$currentY,"$bodyFont",0,1,1,"$orderAndDate"');
-            currentY += rowHeight;
+                'TEXT $orderX,$rightY,"$bodyFont",0,1,1,"$orderAndDate"');
+            rightY += rowHeight;
           }
 
-          if (showCustomerName && phoneClean.isNotEmpty) {
-            final phoneStr = 'Tel: ${_fit(phoneClean, 16)}';
+          if (phoneClean.isNotEmpty) {
+            final phoneDisplay = formatPhoneForDisplay(phoneClean);
+            final phoneStr = 'Tel: ${_fit(phoneDisplay, 16)}';
             final phoneW = bodyFont.measureWidth(phoneStr);
+            rightW = math.max(rightW, phoneW);
             final phoneX =
                 (widthDots - rightPadding - phoneW).clamp(paddingX, widthDots);
             commands.writeln(
-                'TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneStr"');
-            currentY += rowHeight;
+                'TEXT $phoneX,$rightY,"$bodyFont",0,1,1,"$phoneStr"');
+            rightY += rowHeight;
           }
 
+          var leftH = 0;
           if (showCustomerName) {
             final whoText = custClean.isNotEmpty ? custClean : 'Genel Musteri';
-            final fittedCust = _fit(whoText, customerFont.maxChars(usableW));
+            final custW = rightW > 0 ? (usableW - rightW - 16).clamp(60, usableW) : usableW;
+            final fittedCust = _fit(whoText, customerFont.maxChars(custW));
             commands.boldText(
-                paddingX, currentY, customerFont.font, 1, 1, fittedCust);
-            currentY += customerFont.lineHeight + sy(2);
+                paddingX, headerTopY, customerFont.font, 1, 1, fittedCust);
+            leftH = customerFont.lineHeight + sy(2);
           }
+
+          final headerH = math.max(leftH, rightY - headerTopY);
+          currentY = headerTopY + headerH;
+
           if (previousDebt > 0.001) {
             commands.writeln(
               'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Brc: TL ${previousDebt.toStringAsFixed(2)}"',

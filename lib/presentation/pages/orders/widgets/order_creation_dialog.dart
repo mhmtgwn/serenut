@@ -16,6 +16,7 @@ import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/domain/services/inventory_service.dart'
     show SaleItemInput;
@@ -129,7 +130,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
   final TextEditingController _debtSplitController = TextEditingController();
   bool _printReceipt = true;
   int _printCopies = 1;
-  bool _printLabel = false;
+  bool _printLabel = true;
   int _labelCopies = 1;
   bool _isSubmitting = false;
   double _discountAmount = 0.0;
@@ -281,10 +282,17 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
     try {
       // Read label printer settings from SQLite settings (single source of truth)
       final settings = ref.read(settingsNotifierProvider).valueOrNull;
-      if (settings != null && mounted) {
+      final route = await ref
+          .read(printingRepositoryProvider)
+          .getRoute(PrintDocumentKind.orderLabel);
+      final hasActiveRoute = route != null && route.deviceId.isNotEmpty;
+      final isEnabled = hasActiveRoute || (settings?.labelPrinterEnabled ?? false);
+      if (mounted) {
         setState(() {
-          _printLabel = settings.labelPrinterEnabled;
-          _labelCopies = settings.labelPrinterCopies;
+          _printLabel = isEnabled || (settings?.labelPrinterEnabled ?? true);
+          if (settings != null) {
+            _labelCopies = settings.labelPrinterCopies;
+          }
         });
       }
     } catch (e) {

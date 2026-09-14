@@ -291,7 +291,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
 
           // Print order receipt & labels
           if (printReceiptNeeded || printLabelNeeded) {
-            final settings = ref.read(settingsNotifierProvider).value;
+            final settings = ref.read(settingsNotifierProvider).valueOrNull ??
+                ref.read(settingsNotifierProvider).value;
             if (settings != null) {
               // 1. Print main receipt copies
               if (printReceiptNeeded) {

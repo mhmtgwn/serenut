@@ -279,20 +279,21 @@ void main() {
     expect(qrX + 58, lessThanOrEqualTo(344));
   });
 
-  test('TsplCanvasLabelEngine splits 2 items across 2 pages when closing footer causes overflow', () async {
+  test('TsplCanvasLabelEngine splits items across 2 pages when closing footer causes overflow', () async {
     final items = [
       {'product_name': 'Findik Ezmesi 350g', 'quantity': 1.0, 'unit_price': 120.0},
       {'product_name': 'Kavrulmus Findik 500g', 'quantity': 2.0, 'unit_price': 250.0},
+      {'product_name': 'Cikolatali Lokum 250g', 'quantity': 1.0, 'unit_price': 90.0},
     ];
 
     final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
       orderIdShort: '4002',
       customerName: 'Ahmet Kaya',
       customerPhone: '0544 333 22 11',
-      productName: '2 Urun',
+      productName: '3 Urun',
       quantity: 1,
       items: items,
-      totalAmount: 620.0,
+      totalAmount: 710.0,
       widthMm: 50,
       heightMm: 30,
       gapMm: 2,
