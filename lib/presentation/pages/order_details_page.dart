@@ -33,6 +33,7 @@ part 'order_details/cash_out_sheet.dart';
 part 'order_details/order_status_stepper.dart';
 part 'order_details/order_info_card.dart';
 part 'order_details/order_items_card.dart';
+part 'order_details/order_payment_dialog.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;

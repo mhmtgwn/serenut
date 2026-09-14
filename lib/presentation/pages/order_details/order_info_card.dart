@@ -138,13 +138,11 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton.icon(
-                    onPressed: () => _showCashOutBottomSheet(
+                    onPressed: () => _OrderPaymentDialog.show(
                       context,
-                      ref,
-                      order,
-                      saleTx,
-                      totalPaid,
-                      markDelivered: false,
+                      order: order,
+                      saleTx: saleTx,
+                      totalPaid: totalPaid,
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,

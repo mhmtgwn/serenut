@@ -558,9 +558,11 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Teslim Et & Ödeme Al',
-              style: TextStyle(
+            Text(
+              widget.markDelivered
+                  ? 'Teslim Et & Ödeme Al'
+                  : 'Ödeme Al / Borç Kapat',
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: _kText,
@@ -659,7 +661,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   label: Text(
                     _isSubmitting
                         ? 'Ödeme Kaydediliyor...'
-                        : 'Ödemeyi Tamamla & Teslim Et',
+                        : (widget.markDelivered
+                            ? 'Ödemeyi Tamamla & Teslim Et'
+                            : 'Ödemeyi Kaydet'),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
