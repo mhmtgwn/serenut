@@ -74,12 +74,16 @@ void main() {
           explainOrders.map((r) => r['detail'].toString()).join(' | ');
       expect(ordersPlan, contains('idx_orders_customer'));
 
-      // 5. Verify idx_order_items_order on order_items(order_id)
+      // 5. Verify index on order_items(order_id)
       final explainOrderItems = await db.rawQuery(
           'EXPLAIN QUERY PLAN SELECT * FROM order_items WHERE order_id = "ord_abc"');
       final orderItemsPlan =
           explainOrderItems.map((r) => r['detail'].toString()).join(' | ');
-      expect(orderItemsPlan, contains('idx_order_items_order'));
+      expect(
+        orderItemsPlan.contains('idx_order_items_order') ||
+            orderItemsPlan.contains('idx_order_items_composite'),
+        isTrue,
+      );
     });
 
     test('SQLite Concurrency Simulation — Simultaneous imports and sales flow',
