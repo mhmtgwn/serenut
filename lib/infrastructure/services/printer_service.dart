@@ -1334,6 +1334,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         : (order.customerName != null && order.customerName!.trim().isNotEmpty
             ? order.customerName!.trim()
             : (order.customerId.isEmpty ? 'Genel Müşteri' : order.customerId));
+    final custPhone = (customer?.phone != null && customer!.phone.trim().isNotEmpty)
+        ? customer.phone.trim()
+        : (order.customerPhone != null && order.customerPhone!.trim().isNotEmpty
+            ? order.customerPhone!.trim()
+            : null);
     final rawCustomerId = customer?.id ?? order.customerId;
     final shortCustomerId = rawCustomerId.length > 8
         ? rawCustomerId.substring(0, 8).toUpperCase()
@@ -1361,6 +1366,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         allBytes.addAll(await TsplCanvasLabelEngine.generateOrderLabelBytes(
           orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
           customerName: custName,
+          customerPhone: custPhone,
           customerNo: shortCustomerId,
           productName: summaryName,
           quantity: summaryQuantity,
@@ -1393,6 +1399,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
           orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
           customerName: custName,
+          customerPhone: custPhone,
           customerNo: shortCustomerId,
           productName: summaryName,
           quantity: summaryQuantity,

@@ -165,7 +165,7 @@ class TsplCanvasLabelEngine {
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
     final customerTitleFontSize =
-        (isWide ? (isTall ? 36.0 : 30.0) : 25.5) * fontScale;
+        (isWide ? (isTall ? 40.0 : 34.0) : 29.5) * fontScale;
     final cleanNote = note?.trim() ?? '';
     final isLongNote = cleanNote.length > 45;
     final isVeryLongNote = cleanNote.length > 90;
@@ -285,9 +285,14 @@ class TsplCanvasLabelEngine {
       var h = topMargin;
       final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
 
-      // ── 1. Satır: Sipariş No + Telefon + Tarih/Saat ──
-      if (showOrderNo || showDate || hasPhone) {
-        h += detailFontSize + 5.0;
+      // ── 1. Satır: Sipariş No ve Saat Yan Yana Sağ Köşeye Yaslı ──
+      if (showOrderNo || showDate) {
+        h += detailFontSize + 3.0;
+      }
+
+      // ── Altında: Müşterinin Numarası ──
+      if (hasPhone) {
+        h += detailFontSize + 3.0;
       }
 
       // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──
@@ -587,81 +592,64 @@ class TsplCanvasLabelEngine {
         final hasPhone = customerPhone != null && customerPhone.trim().isNotEmpty;
         final cleanPhone = hasPhone ? customerPhone.trim() : '';
 
-        // ── 1. Satır: Sipariş No + Telefon + Tarih Saat ──
-        if (showOrderNo || showDate || hasPhone) {
-          final leftOrder = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
-          var nextX = paddingLeft;
+        // ── 1. Satır: Sipariş No ve Saat Yan Yana Sağ Köşeye Yaslı ──
+        if (showOrderNo || showDate) {
+          final orderPart = showOrderNo ? 'Sip #$orderIdShort$pageSuffix' : '';
+          final orderAndTime = [
+            if (orderPart.isNotEmpty) orderPart,
+            if (dateStr.isNotEmpty) dateStr,
+          ].join('   ');
 
-          if (leftOrder.isNotEmpty) {
-            final orderPainter = TextPainter(
+          if (orderAndTime.isNotEmpty) {
+            final orderTimePainter = TextPainter(
               text: TextSpan(
-                text: leftOrder,
+                text: orderAndTime,
                 style: ts(
                   fontSize: detailFontSize,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.45);
-            orderPainter.paint(canvas, Offset(nextX, currentY));
+            )..layout(maxWidth: usableW);
+            final rightX = safeRightX - orderTimePainter.width;
+            orderTimePainter.paint(canvas, Offset(rightX, currentY));
 
             pageBoxes.add(ElementBoundingBox(
               elementName: 'OrderNo',
-              left: nextX,
+              left: rightX,
               top: currentY,
-              width: orderPainter.width,
-              height: orderPainter.height,
+              width: orderTimePainter.width,
+              height: orderTimePainter.height,
             ));
 
-            nextX += orderPainter.width + (isWide ? 14.0 : 8.0);
+            currentY += detailFontSize + 3.0;
           }
+        }
 
-          if (cleanPhone.isNotEmpty) {
-            final phonePainter = TextPainter(
-              text: TextSpan(
-                text: 'Tel: $cleanPhone',
-                style: ts(
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.w600,
-                ),
+        // ── Altında: Müşterinin Numarası (Sağ Köşeye Yaslı) ──
+        if (cleanPhone.isNotEmpty) {
+          final phonePainter = TextPainter(
+            text: TextSpan(
+              text: 'Tel: $cleanPhone',
+              style: ts(
+                fontSize: detailFontSize,
+                fontWeight: FontWeight.w600,
               ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.40);
-            phonePainter.paint(canvas, Offset(nextX, currentY));
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW);
+          final phoneX = safeRightX - phonePainter.width;
+          phonePainter.paint(canvas, Offset(phoneX, currentY));
 
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'CustomerPhone',
-              left: nextX,
-              top: currentY,
-              width: phonePainter.width,
-              height: phonePainter.height,
-            ));
-          }
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'CustomerPhone',
+            left: phoneX,
+            top: currentY,
+            width: phonePainter.width,
+            height: phonePainter.height,
+          ));
 
-          if (dateStr.isNotEmpty) {
-            final datePainter = TextPainter(
-              text: TextSpan(
-                text: dateStr,
-                style: ts(
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.38);
-            final dateX = safeRightX - datePainter.width;
-            datePainter.paint(canvas, Offset(dateX, currentY));
-
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'Date',
-              left: dateX,
-              top: currentY,
-              width: datePainter.width,
-              height: datePainter.height,
-            ));
-          }
-
-          currentY += detailFontSize + 5.0;
+          currentY += detailFontSize + 3.0;
         }
 
         // ── 2. Satır: Büyük Tek Satır Müşteri İsmi ──

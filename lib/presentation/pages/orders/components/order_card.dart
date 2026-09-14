@@ -27,6 +27,8 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final meta = _statusMeta(order.status);
     final dateStr = DateFormat('dd.MM.yy HH:mm').format(order.createdAt);
+    final timeStr = DateFormat('HH:mm').format(order.createdAt);
+    final phoneStr = (order.customerPhone ?? '').trim();
     final subtotal = (order.items.fold<double>(0.0, (sum, item) {
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
@@ -139,70 +141,28 @@ class _OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
 
-                // ── Orta Kısım: Detaylar ─────────────────────────────────────
+                // ── Orta Kısım: Müşteri Bilgisi & Durum ────────────────────────
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            'Sipariş #${order.displayNumber}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: _kText,
-                            ),
-                          ),
-                          _StatusBadge(status: order.status),
-                        ],
+                      Text(
+                        customerName,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: _kText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
                       Row(
                         children: [
-                          const Icon(Icons.person_outline_rounded,
-                              size: 13, color: _kTextSecondary),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              customerName,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: _kText,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 2,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.calendar_month_outlined,
-                                  size: 13, color: _kTextSecondary),
-                              const SizedBox(width: 4),
-                              Text(
-                                dateStr,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: _kTextSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
+                          _StatusBadge(status: order.status),
+                          const SizedBox(width: 8),
                           Text(
-                            '•  $itemCount kalem',
+                            '$itemCount kalem • $dateStr',
                             style: const TextStyle(
                               fontSize: 12,
                               color: _kTextSecondary,
@@ -215,48 +175,95 @@ class _OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // ── Sağ Kısım: Fiyat ve Yönlendirme Ok ────────────────────────
+                // ── Sağ Kısım: Sipariş No & Saat (Üstte), Müşteri No (Altında), Fiyat ──
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (order.discountAmount > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(
-                          '₺${subtotal.toStringAsFixed(2)}',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '#${order.displayNumber}',
                           style: const TextStyle(
-                            fontSize: 11,
-                            decoration: TextDecoration.lineThrough,
-                            color: _kTextSecondary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: _kText,
                           ),
                         ),
-                      ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: meta.amountBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: meta.borderColor.withValues(alpha: 0.6),
-                          width: 1,
+                        const SizedBox(width: 6),
+                        Text(
+                          timeStr,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: _kTextSecondary,
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        '₺${totalAmount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: meta.amountColor,
-                        ),
-                      ),
+                      ],
                     ),
+                    if (phoneStr.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.phone_outlined,
+                              size: 11.5, color: _kTextSecondary),
+                          const SizedBox(width: 3),
+                          Text(
+                            phoneStr,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: _kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 6),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: _kTextSecondary,
-                      size: 20,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (order.discountAmount > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(
+                              '₺${subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                decoration: TextDecoration.lineThrough,
+                                color: _kTextSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: meta.amountBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: meta.borderColor.withValues(alpha: 0.6),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            '₺${totalAmount.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: meta.amountColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: _kTextSecondary,
+                          size: 18,
+                        ),
+                      ],
                     ),
                   ],
                 ),

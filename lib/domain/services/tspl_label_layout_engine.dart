@@ -571,28 +571,29 @@ class TsplLabelLayoutEngine {
         if (pageIdx == 0) {
           final page1OrderNo =
               _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
-          final leftOrder = hasOrderNo ? 'Sip #$page1OrderNo (1/${pages.length})' : '';
-          final phonePart = (showCustomerName && phoneClean.isNotEmpty)
-              ? ' Tel: ${_fit(phoneClean, 14)}'
-              : '';
-          final metaLeft = '$leftOrder$phonePart'.trim();
+          final orderPart = hasOrderNo ? 'Sip #$page1OrderNo (1/${pages.length})' : '';
+          final datePart = hasDate ? dateText : '';
+          final orderAndDate = [
+            if (orderPart.isNotEmpty) orderPart,
+            if (datePart.isNotEmpty) datePart,
+          ].join('   ');
 
-          if (metaLeft.isNotEmpty && hasDate) {
-            final leftW = bodyFont.measureWidth(metaLeft);
-            final naturalDateX = paddingX + leftW + sy(16);
-            final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
+          if (orderAndDate.isNotEmpty) {
+            final orderW = bodyFont.measureWidth(orderAndDate);
+            final orderX =
+                (widthDots - rightPadding - orderW).clamp(paddingX, widthDots);
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
-            commands.writeln(
-                'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $orderX,$currentY,"$bodyFont",0,1,1,"$orderAndDate"');
             currentY += rowHeight;
-          } else if (metaLeft.isNotEmpty) {
+          }
+
+          if (showCustomerName && phoneClean.isNotEmpty) {
+            final phoneStr = 'Tel: ${_fit(phoneClean, 16)}';
+            final phoneW = bodyFont.measureWidth(phoneStr);
+            final phoneX =
+                (widthDots - rightPadding - phoneW).clamp(paddingX, widthDots);
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$metaLeft"');
-            currentY += rowHeight;
-          } else if (hasDate) {
-            commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr (1/${pages.length})"');
+                'TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneStr"');
             currentY += rowHeight;
           }
 
