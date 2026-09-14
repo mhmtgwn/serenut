@@ -345,12 +345,15 @@ class SmsService {
 
   // ── Utilities ──────────────────────────────────────────────────────────────
 
-  /// Normalize Turkish phone numbers to international format.
+  /// Normalize phone numbers to international format (supporting +49, +90, etc.).
   String _normalizePhone(String phone) {
     var p = phone.trim().replaceAll(RegExp(r'[\s\-()]'), '');
-    if (p.startsWith('0')) p = '+90${p.substring(1)}';
-    if (!p.startsWith('+')) p = '+90$p';
-    return p;
+    if (p.startsWith('+')) return p;
+    if (p.startsWith('00')) return '+${p.substring(2)}';
+    if (p.startsWith('0') && p.length == 11) return '+90${p.substring(1)}';
+    if (p.length == 10 && p.startsWith('5')) return '+90$p';
+    if (p.length > 10) return '+$p';
+    return '+90$p';
   }
 
   Future<bool> _sendSim(String phone, String message, SmsConfig config) async {

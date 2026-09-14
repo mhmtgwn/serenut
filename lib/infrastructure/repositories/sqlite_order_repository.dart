@@ -94,39 +94,41 @@ class SqliteOrderRepository implements IOrderRepository {
         nextValue = (sequenceRows.single['next_value'] as num).toInt();
       }
 
-      final maxOrderRows = await _executor.rawQuery('''
-        SELECT MAX(CAST(SUBSTR(order_number, 4) AS INTEGER)) as max_num
-        FROM orders
-        WHERE order_number LIKE 'SP-%'
-      ''');
-      if (maxOrderRows.isNotEmpty && maxOrderRows.first['max_num'] != null) {
-        final maxExisting = (maxOrderRows.first['max_num'] as num).toInt();
-        if (maxExisting >= nextValue) {
-          nextValue = maxExisting + 1;
+      String orderNumber = entity.orderNumber;
+      if (orderNumber.isEmpty) {
+        if (sequenceRows.isEmpty) {
+          final maxOrderRows = await _executor.rawQuery('''
+            SELECT MAX(CAST(SUBSTR(order_number, 4) AS INTEGER)) as max_num
+            FROM orders
+            WHERE order_number LIKE 'SP-%'
+          ''');
+          if (maxOrderRows.isNotEmpty && maxOrderRows.first['max_num'] != null) {
+            final maxExisting = (maxOrderRows.first['max_num'] as num).toInt();
+            if (maxExisting >= nextValue) {
+              nextValue = maxExisting + 1;
+            }
+          }
+          orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+          await _executor.insert('order_number_sequence', {
+            'id': 1,
+            'next_value': nextValue + 1,
+          });
+        } else {
+          orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+          while (true) {
+            final existsRows = await _executor.rawQuery(
+              'SELECT 1 FROM orders WHERE order_number = ? LIMIT 1',
+              [orderNumber],
+            );
+            if (existsRows.isEmpty) break;
+            nextValue++;
+            orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+          }
+          await _executor.rawUpdate(
+            'UPDATE order_number_sequence SET next_value = ? WHERE id = 1',
+            [nextValue + 1],
+          );
         }
-      }
-
-      String orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
-      while (true) {
-        final existsRows = await _executor.rawQuery(
-          'SELECT 1 FROM orders WHERE order_number = ? LIMIT 1',
-          [orderNumber],
-        );
-        if (existsRows.isEmpty) break;
-        nextValue++;
-        orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
-      }
-
-      if (sequenceRows.isEmpty) {
-        await _executor.insert('order_number_sequence', {
-          'id': 1,
-          'next_value': nextValue + 1,
-        });
-      } else {
-        await _executor.rawUpdate(
-          'UPDATE order_number_sequence SET next_value = ? WHERE id = 1',
-          [nextValue + 1],
-        );
       }
       final payload = {
         'id': entity.id,
@@ -329,18 +331,13 @@ class SqliteOrderRepository implements IOrderRepository {
       // A status transition is a replicated domain mutation, just like create
       // and edit. Keep the row write and its complete aggregate payload in the
       // same transaction so another device can materialize it immediately.
-      final updatedRows = await _executor.query(
-        'orders',
-        where: 'id = ?',
-        whereArgs: [orderId],
-        limit: 1,
-      );
       final itemRows = await _executor.query(
         'order_items',
         where: 'order_id = ?',
         whereArgs: [orderId],
       );
-      final payload = Map<String, dynamic>.from(updatedRows.single)
+      final payload = Map<String, dynamic>.from(existing.first)
+        ..addAll(updateMap)
         ..['items'] = itemRows;
       await SyncOutboxV4.enqueue(
         _executor,

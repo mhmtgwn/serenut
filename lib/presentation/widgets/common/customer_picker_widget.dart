@@ -13,6 +13,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 // ─── Renk sabitleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
@@ -132,6 +133,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
   final _addFormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  CountryCode _selectedCountry = kDefaultCountry;
   bool _isSaving = false;
 
   @override
@@ -180,10 +182,12 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     setState(() => _isSaving = true);
 
     try {
+      final fullPhone =
+          formatFullPhoneNumber(_selectedCountry, _phoneController.text);
       final newCustomer = CustomerEntity(
         id: const Uuid().v4(),
         name: _nameController.text.toTurkishUpperCase,
-        phone: _phoneController.text.trim(),
+        phone: fullPhone.isNotEmpty ? fullPhone : _phoneController.text.trim(),
         email: '',
         balance: 0.0,
         createdAt: DateTime.now(),
@@ -301,6 +305,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     final addBtn = ElevatedButton.icon(
       onPressed: () => setState(() {
         _isAddingCustomer = true;
+        _selectedCountry = kDefaultCountry;
         _nameController.text = _searchQuery;
         _phoneController.clear();
       }),
@@ -620,14 +625,19 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(11),
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-]')),
+                    LengthLimitingTextInputFormatter(16),
                   ],
                   decoration: InputDecoration(
                     labelText: 'Telefon Numarası',
-                    hintText: 'Örn: 05xx xxx xx xx',
-                    prefixIcon: const Icon(Icons.phone_rounded,
-                        color: _kTextSecondary),
+                    hintText: _selectedCountry.dialCode == '+90'
+                        ? '5xx xxx xx xx'
+                        : '151 12345678',
+                    prefixIcon: CountryCodePrefixWidget(
+                      country: _selectedCountry,
+                      onCountryChanged: (c) =>
+                          setState(() => _selectedCountry = c),
+                    ),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10)),
                     focusedBorder: OutlineInputBorder(

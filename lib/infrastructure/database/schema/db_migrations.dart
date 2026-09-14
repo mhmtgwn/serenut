@@ -1027,6 +1027,25 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 55 && newVersion >= 55) {
+          try {
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_orders_active_lookup ON orders(is_deleted, status, created_at)');
+          } catch (e) {
+            handleMigrationError(e, 55);
+          }
+          try {
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_order_items_composite ON order_items(order_id, product_id)');
+          } catch (e) {
+            handleMigrationError(e, 55);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 55,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

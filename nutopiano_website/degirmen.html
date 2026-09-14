@@ -109,8 +109,8 @@
           Kırma, kavurma, zar soyma, ezme ve paketleme. Her adımı ayrı ayrı ya da kombine olarak yaptırabilirsiniz.
         </p>
         <div class="page-hero-actions">
-          <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20fındık%20işleme%20hizmeti%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">
-            WhatsApp'tan Bilgi Al
+          <a class="btn btn-gold btn-lg" href="#hesaplayici">
+            🧮 Maliyet Hesapla
           </a>
           <a class="btn btn-outline-light btn-lg" href="#fiyatlar">Fiyat Listesi</a>
         </div>
@@ -322,6 +322,116 @@
     </div>
   </section>
 
+  <!-- ---- İNTERAKTİF HESAPLAYICI ---- -->
+  <section class="section section-white" id="hesaplayici" aria-labelledby="calc-title">
+    <div class="container">
+      <div class="section-head section-head-center">
+        <div class="eyebrow">Akıllı Hesaplayıcı</div>
+        <h2 class="section-title" id="calc-title">İşleme Maliyeti & Mahsul Hesapla.</h2>
+        <p class="section-desc">
+          Fındık miktarınızı ve istediğiniz hizmeti seçin; tahmini iç fındık veriminizi ve işleme ücretinizi anında görün.
+        </p>
+      </div>
+
+      <div class="milling-calc">
+        <div class="calc-grid">
+          <div class="calc-field-group">
+            <div>
+              <div class="calc-label">
+                <span>Mahsul Miktarı (Kabuklu Fındık):</span>
+                <strong id="calcWeightVal" style="font-size: 1.15rem; color: var(--green);">50 kg</strong>
+              </div>
+              <input type="range" id="calcWeightSlider" class="calc-range" min="10" max="1000" step="5" value="50" style="margin-top: 8px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted-light); margin-top: 4px;">
+                <span>10 kg (Minimum)</span>
+                <span>500 kg</span>
+                <span>1.000 kg (1 Ton)</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="calc-label" style="margin-bottom: 8px;">Hizmet Türü Seçin:</div>
+              <div class="calc-radio-group">
+                <div class="calc-radio-card" data-unit-price="40" data-yield="0.5">
+                  <div>
+                    <div class="calc-radio-title">Yalnızca Kırma</div>
+                    <div style="font-size: 0.74rem; color: var(--muted);">Kabuklu fındığı temiz iç fındığa ayırma</div>
+                  </div>
+                  <div class="calc-radio-price">40 ₺/kg</div>
+                </div>
+
+                <div class="calc-radio-card" data-unit-price="65" data-yield="0.5">
+                  <div>
+                    <div class="calc-radio-title">Kırma + Kavurma</div>
+                    <div style="font-size: 0.74rem; color: var(--muted);">Kırma ve homojen fırın kavurma</div>
+                  </div>
+                  <div class="calc-radio-price">65 ₺/kg</div>
+                </div>
+
+                <div class="calc-radio-card active" data-unit-price="70" data-yield="0.5">
+                  <div>
+                    <div class="calc-radio-title">Kırma + Kavurma + 1 kg Vakum Paket</div>
+                    <div style="font-size: 0.74rem; color: var(--muted);">En çok tercih edilen tam korumalı paket</div>
+                  </div>
+                  <div class="calc-radio-price">70 ₺/kg</div>
+                </div>
+
+                <div class="calc-radio-card" data-unit-price="130" data-yield="0.48">
+                  <div>
+                    <div class="calc-radio-title">Kavurma + Taş Değirmende Fındık Ezmesi</div>
+                    <div style="font-size: 0.74rem; color: var(--muted);">İpeksi, katkısız saf kavanozluk ezme</div>
+                  </div>
+                  <div class="calc-radio-price">130 ₺/kg</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; background: var(--green-soft); padding: 12px 16px; border-radius: var(--r-sm); border: 1px solid rgba(22,138,82,0.2);">
+              <input type="checkbox" id="calcSehitGaziCheck" style="width: 18px; height: 18px; accent-color: var(--green); cursor: pointer;">
+              <label for="calcSehitGaziCheck" style="font-size: 0.84rem; font-weight: 600; color: var(--green); cursor: pointer;">
+                🎖️ Şehit Ailesi veya Gazi İndirimi (%20)
+              </label>
+            </div>
+          </div>
+
+          <div class="calc-summary-box">
+            <div>
+              <div style="font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700; color: var(--white); margin-bottom: 16px;">
+                Hesaplama Özeti
+              </div>
+
+              <div class="calc-stat-row">
+                <span>Tahmini İç Fındık / Ezme Verimi:</span>
+                <strong id="calcEstYield" style="color: var(--gold-light);">~25 kg</strong>
+              </div>
+
+              <div class="calc-stat-row">
+                <span>Standart Liste Bedeli:</span>
+                <span id="calcSubtotalDisp">₺3.500</span>
+              </div>
+
+              <div class="calc-stat-row" style="border-bottom: none;">
+                <span style="font-size: 0.95rem; font-weight: 600;">Net Ödenecek Tutar:</span>
+              </div>
+              <div class="calc-total-stat" id="calcTotalDisp">₺3.500</div>
+              <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 4px;">
+                * Tahmini iç fındık %50 randıman ortalamasına göredir.
+              </div>
+            </div>
+
+            <div style="margin-top: 24px;">
+              <a href="#" id="calcWaBookBtn" class="btn btn-gold btn-lg" style="width: 100%;" target="_blank" rel="noopener noreferrer">
+                Bu Hesaplama ile Randevu Al →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
   <!-- ---- FINDIK SIZE AİT ---- -->
   <section class="section section-light" aria-labelledby="service-story-title">
     <div class="container">
@@ -344,7 +454,7 @@
         </div>
         <div>
           <div style="border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--line); background: var(--white); box-shadow: var(--shadow-md);">
-            <img src="/images/nutopia-onluk.png" alt="Değirmen Ustası ve Fındık Çuvalları" style="width: 100%; height: 360px; object-fit: cover; display: block;" loading="lazy">
+            <img src="/images/nutopia-kirma-afis.png" alt="Nutopia Fındık Kırma, Kavurma ve İşleme Hizmeti" style="width: 100%; height: 360px; object-fit: cover; display: block;" loading="lazy">
             <div style="padding: 16px 20px;">
               <div style="font-family: var(--font-serif); font-weight: 700; color: var(--green); font-size: 1rem;">Geleneksel Emek & Ustalık</div>
               <p style="font-size: .82rem; color: var(--muted); line-height: 1.5; margin: 4px 0 0 0;">Her çuval fındık, üreticisinin emeğine yaraşır özenle işlenir.</p>

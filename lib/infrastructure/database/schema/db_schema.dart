@@ -307,6 +307,10 @@ class DatabaseSchema {
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
     await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_order_items_composite ON order_items(order_id, product_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_orders_active_lookup ON orders(is_deleted, status, created_at)');
+    await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_products_active_lookup ON products(is_deleted, is_active, category)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_customers_active_lookup ON customers(is_deleted, is_active)');

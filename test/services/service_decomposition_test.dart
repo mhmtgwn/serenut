@@ -335,7 +335,7 @@ void main() {
       expect(refundTx.amount, equals(200.0));
       expect(refundTx.paidAmount,
           equals(0.0)); // refundMethod is balance, so cash refund is 0
-      expect(refundTx.referenceId, isNot(equals(sale.id)));
+      expect(refundTx.referenceId, equals(sale.id));
     });
     group('v_financial_ledger view integration', () {
       test(

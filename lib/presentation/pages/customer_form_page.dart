@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -45,6 +46,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
+  CountryCode _selectedCountry = kDefaultCountry;
 
   bool _isSaving = false;
 
@@ -53,7 +55,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     super.initState();
     final c = widget.existingCustomer;
     _nameController = TextEditingController(text: c?.name ?? '');
-    _phoneController = TextEditingController(text: c?.phone ?? '');
+    final parsed = parsePhoneNumber(c?.phone);
+    _selectedCountry = parsed.country;
+    _phoneController = TextEditingController(text: parsed.localNumber);
     _emailController = TextEditingController(text: c?.email ?? '');
   }
 
@@ -76,10 +80,12 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
       final id =
           widget.isEditing ? widget.existingCustomer!.id : const Uuid().v4();
 
+      final fullPhone =
+          formatFullPhoneNumber(_selectedCountry, _phoneController.text);
       final customer = CustomerEntity(
         id: id,
         name: _nameController.text.toTurkishUpperCase,
-        phone: _phoneController.text.trim(),
+        phone: fullPhone.isNotEmpty ? fullPhone : _phoneController.text.trim(),
         email: _emailController.text.trim(),
         balance: widget.isEditing ? widget.existingCustomer!.balance : 0.0,
         createdAt: widget.isEditing
@@ -232,9 +238,18 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       focusNode: _phoneFocus,
                       label: 'Telefon Numarası',
                       icon: Icons.phone_rounded,
+                      customPrefix: CountryCodePrefixWidget(
+                        country: _selectedCountry,
+                        onCountryChanged: (c) =>
+                            setState(() => _selectedCountry = c),
+                      ),
+                      hintText: _selectedCountry.dialCode == '+90'
+                          ? '5xx xxx xx xx'
+                          : '151 12345678',
                       keyboardType: TextInputType.phone,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-]')),
+                        LengthLimitingTextInputFormatter(16),
                       ],
                       nextFocus: _emailFocus,
                     ),
@@ -370,6 +385,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     required FocusNode focusNode,
     required String label,
     required IconData icon,
+    Widget? customPrefix,
+    String? hintText,
     FocusNode? nextFocus,
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
@@ -394,7 +411,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
       },
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: _kTextSecondary),
+        hintText: hintText,
+        prefixIcon:
+            customPrefix ?? Icon(icon, size: 20, color: _kTextSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: _kBorder),

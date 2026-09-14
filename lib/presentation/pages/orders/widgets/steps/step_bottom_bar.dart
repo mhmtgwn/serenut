@@ -229,106 +229,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
             );
       }
 
-      // Refresh customers state so updated balance displays on screens
-      await ref.read(ordersCustomersControllerProvider.notifier).refresh();
-      ref.invalidate(customersControllerProvider);
-      ref.invalidate(salesCustomersControllerProvider);
-      ref.invalidate(customerBalanceSummaryProvider);
-      ref.invalidate(customerLookupMapProvider);
-      ref.invalidate(customerTransactionsProvider(_selectedCustomer!.id));
-      ref.invalidate(customerBalanceDetailsProvider(_selectedCustomer!.id));
-      ref.invalidate(customerDetailProvider(_selectedCustomer!.id));
-      if (isEdit &&
-          _selectedCustomer!.id != widget.existingOrder!.customerId) {
-        ref.invalidate(
-            customerTransactionsProvider(widget.existingOrder!.customerId));
-        ref.invalidate(
-            customerBalanceDetailsProvider(widget.existingOrder!.customerId));
-        ref.invalidate(
-            customerDetailProvider(widget.existingOrder!.customerId));
-      }
-      ref.invalidate(productsControllerProvider);
-      ref.invalidate(salesProductsControllerProvider);
-      ref.invalidate(ordersProductsControllerProvider);
-      ref.invalidate(dashboardProvider);
-
-      // Print order receipt & labels
-      // Isolated in try/catch to prevent printer errors from aborting the saved order
-      try {
-        final settings = ref.read(settingsNotifierProvider).value;
-        if (settings != null) {
-          final receiptItems = _cart.entries
-              .map((e) => {
-                    'product_name': e.key.name,
-                    'product_id': e.key.id,
-                    'barcode': e.key.id,
-                    'quantity': e.value,
-                    'unit_price': e.key.price,
-                  })
-              .toList();
-
-          // 1. Print main receipt copies
-          if (_printReceipt) {
-            await ref
-                .read(printingApplicationServiceProvider)
-                .queueOrderReceipt(
-                  newOrder,
-                  receiptItems,
-                  _selectedCustomer,
-                  settings,
-                  paidAmount: finalPaid,
-                  notes: _notesController.text.trim(),
-                  paymentMethod: _paymentMethod,
-                  paymentBreakdown: _paymentMethod == 'karma'
-                      ? {
-                          'cash_applied': _karmaResult.cashApplied,
-                          'card': _karmaResult.card,
-                          'debt': _karmaResult.debt,
-                        }
-                      : null,
-                  copies: _printCopies,
-                );
-          }
-
-          // 2. Print label stickers if label printer toggle is enabled
-          if (_printLabel) {
-            final String? labelPaymentStatus;
-            if (_paymentMethod == 'debt' ||
-                (_paymentMethod == 'karma' && _karmaDebt > 0.009)) {
-              if (finalPaid <= 0.01) {
-                labelPaymentStatus = 'Vadeli';
-              } else {
-                labelPaymentStatus =
-                    'Kısmi Ödeme (Borç: ₺${_karmaDebt.toStringAsFixed(2)})';
-              }
-            } else if (finalPaid >= _totalAmount - 0.01) {
-              labelPaymentStatus = 'Ödendi';
-            } else {
-              labelPaymentStatus = 'Kısmi Ödeme';
-            }
-
-            await ref
-                .read(printingApplicationServiceProvider)
-                .queueOrderLabel(
-                  newOrder,
-                  receiptItems,
-                  settings,
-                  customer: _selectedCustomer,
-                  paidAmount: finalPaid,
-                  previousDebt: previousDebt,
-                  paymentStatusOverride: labelPaymentStatus,
-                  copies: _labelCopies,
-                );
-          }
-        }
-      } catch (printError) {
-        debugPrint(
-            '[OrderCreationDialog] Yazıcı hatası (sipariş başarıyla kaydedildi): $printError');
-      }
-
-      ref.invalidate(dashboardProvider);
-      ref.invalidate(productsControllerProvider);
-
+      // ── Pop dialog immediately to keep UI ultra responsive (<50ms) ──
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -340,6 +241,118 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           ),
         );
       }
+
+      // ── Background tasks: Invalidate, refresh customers, and trigger printing ──
+      final customer = _selectedCustomer;
+      final existingCustId = widget.existingOrder?.customerId;
+      final printReceiptNeeded = _printReceipt;
+      final printLabelNeeded = _printLabel;
+      final printCopies = _printCopies;
+      final labelCopies = _labelCopies;
+      final paymentMethod = _paymentMethod;
+      final karmaResult = _karmaResult;
+      final karmaDebt = _karmaDebt;
+      final notes = _notesController.text.trim();
+      final totalAmount = _totalAmount;
+      final receiptItems = _cart.entries
+          .map((e) => {
+                'product_name': e.key.name,
+                'product_id': e.key.id,
+                'barcode': e.key.id,
+                'quantity': e.value,
+                'unit_price': e.key.price,
+              })
+          .toList();
+
+      unawaited(() async {
+        try {
+          // Refresh customers state so updated balance displays on screens
+          await ref.read(ordersCustomersControllerProvider.notifier).refresh();
+          ref.invalidate(customersControllerProvider);
+          ref.invalidate(salesCustomersControllerProvider);
+          ref.invalidate(customerBalanceSummaryProvider);
+          ref.invalidate(customerLookupMapProvider);
+          if (customer != null) {
+            ref.invalidate(customerTransactionsProvider(customer.id));
+            ref.invalidate(customerBalanceDetailsProvider(customer.id));
+            ref.invalidate(customerDetailProvider(customer.id));
+          }
+          if (isEdit &&
+              existingCustId != null &&
+              customer?.id != existingCustId) {
+            ref.invalidate(customerTransactionsProvider(existingCustId));
+            ref.invalidate(customerBalanceDetailsProvider(existingCustId));
+            ref.invalidate(customerDetailProvider(existingCustId));
+          }
+          ref.invalidate(productsControllerProvider);
+          ref.invalidate(salesProductsControllerProvider);
+          ref.invalidate(ordersProductsControllerProvider);
+          ref.invalidate(dashboardProvider);
+
+          // Print order receipt & labels
+          if (printReceiptNeeded || printLabelNeeded) {
+            final settings = ref.read(settingsNotifierProvider).value;
+            if (settings != null) {
+              // 1. Print main receipt copies
+              if (printReceiptNeeded) {
+                await ref
+                    .read(printingApplicationServiceProvider)
+                    .queueOrderReceipt(
+                      newOrder,
+                      receiptItems,
+                      customer,
+                      settings,
+                      paidAmount: finalPaid,
+                      notes: notes,
+                      paymentMethod: paymentMethod,
+                      paymentBreakdown: paymentMethod == 'karma'
+                          ? {
+                              'cash_applied': karmaResult.cashApplied,
+                              'card': karmaResult.card,
+                              'debt': karmaResult.debt,
+                            }
+                          : null,
+                      copies: printCopies,
+                    );
+              }
+
+              // 2. Print label stickers if label printer toggle is enabled
+              if (printLabelNeeded) {
+                final String? labelPaymentStatus;
+                if (paymentMethod == 'debt' ||
+                    (paymentMethod == 'karma' && karmaDebt > 0.009)) {
+                  if (finalPaid <= 0.01) {
+                    labelPaymentStatus = 'Vadeli';
+                  } else {
+                    labelPaymentStatus =
+                        'Kısmi Ödeme (Borç: ₺${karmaDebt.toStringAsFixed(2)})';
+                  }
+                } else if (finalPaid >= totalAmount - 0.01) {
+                  labelPaymentStatus = 'Ödendi';
+                } else {
+                  labelPaymentStatus = 'Kısmi Ödeme';
+                }
+
+                await ref
+                    .read(printingApplicationServiceProvider)
+                    .queueOrderLabel(
+                      newOrder,
+                      receiptItems,
+                      settings,
+                      customer: customer,
+                      paidAmount: finalPaid,
+                      previousDebt: previousDebt,
+                      paymentStatusOverride: labelPaymentStatus,
+                      copies: labelCopies,
+                    );
+              }
+            }
+          }
+        } catch (printError) {
+          debugPrint(
+              '[OrderCreationDialog] Arka plan yazdırma/senkronizasyon hatası: $printError');
+        }
+      }());
     } catch (e) {
       if (cardPayment != null) {
         await ref

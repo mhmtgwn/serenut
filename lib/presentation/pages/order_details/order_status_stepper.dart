@@ -115,7 +115,6 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         await ref
                             .read(ordersControllerProvider.notifier)
                             .updateStatus(order.id, status);
-                        ref.invalidate(_orderDetailProvider(order.id));
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -123,6 +122,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                                   '📱 Durum güncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
                               backgroundColor: _kGreenDark,
                               behavior: SnackBarBehavior.floating,
+                              duration: const Duration(milliseconds: 1500),
                             ),
                           );
                         }
@@ -286,7 +286,6 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 await ref
                     .read(ordersControllerProvider.notifier)
                     .updateStatus(order.id, 'cancelled');
-                ref.invalidate(_orderDetailProvider(order.id));
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

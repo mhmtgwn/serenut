@@ -20,17 +20,10 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
       } catch (_) {}
     }
 
-    final prodRepo = await ref.read(productRepositoryProvider.future);
-    final receiptItems = await Future.wait(order.items.map((item) async {
+    final receiptItems = order.items.map((item) {
       var name = (item['product_name'] ?? item['name'])?.toString();
       final productId = item['product_id']?.toString() ?? '';
-      if (name == null || name.isEmpty || name == productId) {
-        if (productId.isNotEmpty) {
-          final p = await prodRepo.findById(productId);
-          if (p != null) name = p.name;
-        }
-      }
-      name ??= 'Ürün';
+      name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
       return {
         'product_id': productId,
         'product_name': name,
@@ -38,7 +31,7 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
         'quantity': item['quantity'],
         'unit_price': item['unit_price'],
       };
-    }));
+    }).toList();
 
     await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
           order,
@@ -250,93 +243,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           .read(ordersControllerProvider.notifier)
           .updateStatus(widget.order.id, 'delivered');
 
-      await ref.read(customersControllerProvider.notifier).refresh();
-      ref.invalidate(customerTransactionsProvider(widget.order.customerId));
-      ref.invalidate(customerBalanceDetailsProvider(widget.order.customerId));
-      ref.invalidate(_orderDetailProvider(widget.order.id));
-
-      // Print Fiş (Receipt)
-      if (_printReceipt) {
-        final settingsAsync = ref.read(settingsNotifierProvider);
-        final settings = settingsAsync.value;
-        if (settings != null) {
-          final hasPrinter = await ref
-                  .read(printingRepositoryProvider)
-                  .getRoute(PrintDocumentKind.receipt) !=
-              null;
-          if (hasPrinter) {
-            CustomerEntity? customer;
-            if (widget.order.customerId.isNotEmpty) {
-              try {
-                final custRepo =
-                    await ref.read(customerRepositoryProvider.future);
-                customer = await custRepo.findById(widget.order.customerId);
-              } catch (_) {}
-            }
-
-            final prodRepo = await ref.read(productRepositoryProvider.future);
-            final receiptItems = await Future.wait(widget.order.items.map((item) async {
-              var name = (item['product_name'] ?? item['name'])?.toString();
-              final productId = item['product_id']?.toString() ?? '';
-              if (name == null || name.isEmpty || name == productId) {
-                if (productId.isNotEmpty) {
-                  final p = await prodRepo.findById(productId);
-                  if (p != null) name = p.name;
-                }
-              }
-              name ??= 'Ürün';
-              return {
-                'product_id': productId,
-                'product_name': name,
-                'barcode': productId,
-                'quantity': item['quantity'],
-                'unit_price': item['unit_price'],
-              };
-            }));
-
-            final double currentFinalPaid = widget.totalPaid +
-                (_selectedMethod == 'cash'
-                    ? remaining
-                    : (_selectedMethod == 'card'
-                        ? remaining
-                        : (_selectedMethod == 'karma'
-                            ? _karmaResult.paidAmount
-                            : 0.0)));
-
-            await ref
-                .read(printingApplicationServiceProvider)
-                .queueOrderReceipt(
-                  widget.order,
-                  receiptItems,
-                  customer != null && customer.id.isNotEmpty
-                      ? customer
-                      : (widget.order.customerName?.isNotEmpty == true
-                          ? CustomerEntity(
-                              id: widget.order.customerId,
-                              name: widget.order.customerName!,
-                              email: '',
-                              phone: widget.order.customerPhone ?? '',
-                              balance: 0,
-                              createdAt: DateTime.now())
-                          : null),
-                  settings,
-                  paidAmount: currentFinalPaid,
-                  notes: widget.order.notes?.trim(),
-                  paymentMethod: _selectedMethod,
-                  paymentBreakdown: _selectedMethod == 'karma'
-                      ? {
-                          'cash_applied': _karmaResult.cashApplied,
-                          'card': _karmaResult.card,
-                          'debt': _karmaResult.debt,
-                        }
-                      : null,
-                  copies: _printCopies,
-                );
-          }
-        }
-      }
-
-
       if (mounted) {
         Navigator.pop(context);
 
@@ -355,6 +261,99 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           ),
         );
       }
+
+      // Background tasks: Invalidate customer balance and trigger printing
+      final orderRef = widget.order;
+      final customerId = widget.order.customerId;
+      final printReceiptNeeded = _printReceipt;
+      final selectedMethod = _selectedMethod;
+      final karmaResult = _karmaResult;
+      final printCopies = _printCopies;
+      final currentFinalPaid = widget.totalPaid +
+          (_selectedMethod == 'cash'
+              ? remaining
+              : (_selectedMethod == 'card'
+                  ? remaining
+                  : (_selectedMethod == 'karma'
+                      ? _karmaResult.paidAmount
+                      : 0.0)));
+
+      unawaited(() async {
+        try {
+          await ref.read(customersControllerProvider.notifier).refresh();
+          if (customerId.isNotEmpty) {
+            ref.invalidate(customerTransactionsProvider(customerId));
+            ref.invalidate(customerBalanceDetailsProvider(customerId));
+          }
+
+          if (printReceiptNeeded) {
+            final settingsAsync = ref.read(settingsNotifierProvider);
+            final settings = settingsAsync.value;
+            if (settings != null) {
+              final hasPrinter = await ref
+                      .read(printingRepositoryProvider)
+                      .getRoute(PrintDocumentKind.receipt) !=
+                  null;
+              if (hasPrinter) {
+                CustomerEntity? customer;
+                if (customerId.isNotEmpty) {
+                  try {
+                    final custRepo =
+                        await ref.read(customerRepositoryProvider.future);
+                    customer = await custRepo.findById(customerId);
+                  } catch (_) {}
+                }
+
+                final receiptItems = orderRef.items.map((item) {
+                  var name = (item['product_name'] ?? item['name'])?.toString();
+                  final productId = item['product_id']?.toString() ?? '';
+                  name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
+                  return {
+                    'product_id': productId,
+                    'product_name': name,
+                    'barcode': productId,
+                    'quantity': item['quantity'],
+                    'unit_price': item['unit_price'],
+                  };
+                }).toList();
+
+                await ref
+                    .read(printingApplicationServiceProvider)
+                    .queueOrderReceipt(
+                      orderRef,
+                      receiptItems,
+                      customer != null && customer.id.isNotEmpty
+                          ? customer
+                          : (orderRef.customerName?.isNotEmpty == true
+                              ? CustomerEntity(
+                                  id: orderRef.customerId,
+                                  name: orderRef.customerName!,
+                                  email: '',
+                                  phone: orderRef.customerPhone ?? '',
+                                  balance: 0,
+                                  createdAt: DateTime.now())
+                              : null),
+                      settings,
+                      paidAmount: currentFinalPaid,
+                      notes: orderRef.notes?.trim(),
+                      paymentMethod: selectedMethod,
+                      paymentBreakdown: selectedMethod == 'karma'
+                          ? {
+                              'cash_applied': karmaResult.cashApplied,
+                              'card': karmaResult.card,
+                              'debt': karmaResult.debt,
+                            }
+                          : null,
+                      copies: printCopies,
+                    );
+              }
+            }
+          }
+        } catch (e, st) {
+          unawaited(TelemetryService().logError(e, st, context: 'order_cashout_bg'));
+          debugPrint('Background task error in cash out: $e');
+        }
+      }());
     } catch (e, st) {
       unawaited(TelemetryService().logError(e, st, context: 'order_cashout_payment'));
       if (cardPayment != null) {

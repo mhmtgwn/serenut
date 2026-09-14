@@ -14,6 +14,7 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _kGreen = POSColors.green;
@@ -692,10 +693,7 @@ Güncel hesap durumunuz:
 
 Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
 
-    final cleanedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final normalized = cleanedPhone.startsWith('0')
-        ? '9$cleanedPhone'
-        : (cleanedPhone.length == 10 ? '90$cleanedPhone' : cleanedPhone);
+    final normalized = normalizeForWhatsApp(phone);
     final encoded = Uri.encodeComponent(message);
     final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
 

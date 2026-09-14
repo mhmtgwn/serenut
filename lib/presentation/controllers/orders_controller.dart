@@ -255,9 +255,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
-    // Log to Audit Trail
-    try {
-      final auditService = await ref.read(auditServiceProvider.future);
+    // Log to Audit Trail (non-blocking fire-and-forget)
+    unawaited(ref.read(auditServiceProvider.future).then((auditService) async {
       final customerRepo = await ref.read(customerRepositoryProvider.future);
       final customer = await customerRepo.findById(order.customerId);
       await auditService.logEvent(
@@ -268,15 +267,23 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${order.customerId.isEmpty ? 'Genel Müşteri' : (customer?.name ?? 'Bilinmeyen Müşteri')}',
         notes: 'Yeni sipariş oluşturuldu: ${order.id}',
       );
-    } catch (e, st) {
+    }).catchError((e, st) {
       TelemetryService().logError(e, st,
           context: 'orders_controller', level: LogLevel.warning);
-    }
+    }));
 
     ref.invalidate(productsControllerProvider);
     ref.invalidate(dashboardProvider);
-    unawaited(ref.read(syncProvider.notifier).triggerSync());
-    await refresh();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      ref.read(syncProvider.notifier).triggerSync().ignore();
+    });
+
+    // In-memory prepend for instantaneous 0ms UI update
+    final current = state.valueOrNull ?? [];
+    state = AsyncValue.data([
+      persistedOrder,
+      ...current.where((o) => o.id != persistedOrder.id),
+    ]);
   }
 
   Future<void> updateOrder(OrderEntity order) async {
@@ -485,12 +492,17 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             context: 'orders_controller', level: LogLevel.warning);
       }));
 
-      // Non-blocking background sync trigger
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
+      // Non-blocking background sync trigger with slight delay to prevent SQLite locking
+      Future.delayed(const Duration(milliseconds: 500), () {
+        ref.read(syncProvider.notifier).triggerSync().ignore();
+      });
 
-      // If active filter no longer matches new status, refresh in background
-      if (_statusFilter != null && _statusFilter != status) {
-        unawaited(refresh());
+      // If active filter no longer matches new status, smoothly filter from in-memory state
+      if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != status) {
+        final current = state.valueOrNull;
+        if (current != null) {
+          state = AsyncValue.data(current.where((o) => o.id != id).toList());
+        }
       }
     } catch (e, st) {
       if (previousList != null) {
@@ -710,9 +722,15 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
       if (updatedCount > 0) {
         ref.invalidate(dashboardProvider);
-        unawaited(ref.read(syncProvider.notifier).triggerSync());
-        if (_statusFilter != null && _statusFilter != targetStatus) {
-          unawaited(refresh());
+        Future.delayed(const Duration(milliseconds: 500), () {
+          ref.read(syncProvider.notifier).triggerSync().ignore();
+        });
+        if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != targetStatus) {
+          final current = state.valueOrNull;
+          if (current != null) {
+            state = AsyncValue.data(
+                current.where((o) => !idSet.contains(o.id)).toList());
+          }
         }
       }
     } catch (e) {

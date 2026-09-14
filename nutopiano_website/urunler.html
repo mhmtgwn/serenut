@@ -20,7 +20,7 @@
   <!-- ---- SAYFA HERO ---- -->
   <section class="page-hero" aria-labelledby="page-title">
     <div class="container">
-      <div class="eyebrow">B Müşterisi — Hazır Ürün Alan</div>
+      <div class="eyebrow">%100 Karadeniz Fındığı · Butik Gurme Koleksiyonu</div>
       <h1 class="page-hero-title" id="page-title">Nutopiano</h1>
       <p class="page-hero-desc" style="font-family: var(--font-serif); font-style: italic; font-size: 1.25rem; color: var(--beige);">
         Fındığın En Lezzetli Halleri
@@ -40,56 +40,130 @@
         <div class="eyebrow">Ürün Koleksiyonu</div>
         <h2 class="section-title" id="products-title">7 Nutopiano Ürünü.</h2>
         <p class="section-desc" style="margin: 12px auto 0;">
-          Her ürün için "Bilgi Al" bağlantısına tıkladığınızda WhatsApp'ta ürün adı otomatik olarak mesaja eklenir.
+          Gramaj seçiminizi yaparak ürünleri doğrudan sepete ekleyebilir, WhatsApp ile tek tıkla siparişinizi iletebilirsiniz.
         </p>
       </div>
 
+      <!-- Kategori Filtreleme & Canlı Arama Çubuğu -->
+      <div class="products-toolbar">
+        <div class="category-tabs" role="tablist">
+          <button type="button" class="cat-tab active" data-category="all">Tüm Ürünler (7)</button>
+          <button type="button" class="cat-tab" data-category="krema">Ezme & Krema</button>
+          <button type="button" class="cat-tab" data-category="kavurma">Kavrulmuş & Krokan</button>
+          <button type="button" class="cat-tab" data-category="ic-kabuklu">İç & Kabuklu Fındık</button>
+        </div>
+        <div class="product-search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="productSearchInput" placeholder="Ürün ara (örn: ezme, krokan)..." aria-label="Ürün Ara">
+        </div>
+      </div>
+
       <!-- Krema Serisi: 3 ürün -->
-      <div style="margin-bottom: 12px;">
+      <div style="margin-bottom: 12px;" class="product-category-group" data-group-cat="krema">
         <p style="font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted-light); margin-bottom: 14px;">Krema & Ezme Serisi</p>
         <div class="products-grid products-grid-3" role="list">
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
+          <article class="product-card" role="listitem" data-cat="krema" data-keywords="sütlü fındık kreması tatlı kahvaltılık krema">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Sütlü Fındık Kreması">
               <img src="/images/urun-sutlu.png?v=3" alt="Nutopiano Sütlü Fındık Kreması" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Krema Serisi</span>
-              <h3 class="product-name">Sütlü Fındık Kreması</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Sütlü Fındık Kreması">Sütlü Fındık Kreması</h3>
               <p class="product-desc">Fındığın yoğun lezzetini sütlü ve yumuşak bir krema dokusuyla buluşturur. Kahvaltıların ve tatlıların vazgeçilmezi.</p>
-              <div class="product-footer">
-                <span class="product-size">300 g · 700 g Cam Kavanoz</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Sütlü%20Fındık%20Kreması%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer" aria-label="Sütlü Fındık Kreması için WhatsApp'tan bilgi al">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="165">300 g</button>
+                <button type="button" class="variant-pill" data-price="340">700 g</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺165</span>
+                <span style="font-size: .75rem; color: var(--muted-light);">Cam Kavanoz</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="165" data-variant="300 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Sütlü Fındık Kreması">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Doğal & Katkısız</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Sütlü%20Fındık%20Kreması%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer" aria-label="Sütlü Fındık Kreması için WhatsApp'tan bilgi al">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
+          <article class="product-card" role="listitem" data-cat="krema" data-keywords="kakaolu fındık kreması çikolata kakao tatlı kavanoz">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Kakaolu Fındık Kreması">
               <img src="/images/urun-kakaolu.png?v=3" alt="Nutopiano Kakaolu Fındık Kreması" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Krema Serisi</span>
-              <h3 class="product-name">Kakaolu Fındık Kreması</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Kakaolu Fındık Kreması">Kakaolu Fındık Kreması</h3>
               <p class="product-desc">Fındığın aroması ve birinci sınıf kakaonun karakteristik lezzetinin buluştuğu zengin ve akışkan özel krema.</p>
-              <div class="product-footer">
-                <span class="product-size">300 g · 700 g Cam Kavanoz</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kakaolu%20Fındık%20Kreması%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="165">300 g</button>
+                <button type="button" class="variant-pill" data-price="340">700 g</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺165</span>
+                <span style="font-size: .75rem; color: var(--muted-light);">Cam Kavanoz</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="165" data-variant="300 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Kakaolu Fındık Kreması">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Doğal Kakao & Fındık</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kakaolu%20Fındık%20Kreması%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
+          <article class="product-card" role="listitem" data-cat="krema" data-keywords="%100 fındık ezmesi şekersiz saf diyet sporcu protein doğal">
+            <div class="product-img" style="cursor: pointer;" data-quickview="%100 Fındık Ezmesi">
               <img src="/images/urun-ezme.png?v=3" alt="Nutopiano %100 Fındık Ezmesi" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family" style="color: #137333;">Saf Ezme</span>
-              <h3 class="product-name">%100 Fındık Ezmesi</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="%100 Fındık Ezmesi">%100 Fındık Ezmesi</h3>
               <p class="product-desc">İçeriğinde yalnızca seçme fındığın bulunduğu, ilave şeker veya yağ içermeyen; yoğun aromalı saf fındık ezmesi.</p>
-              <div class="product-footer">
-                <span class="product-size">320 g · 650 g Cam Kavanoz</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20%100%20Fındık%20Ezmesi%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="195">320 g</button>
+                <button type="button" class="variant-pill" data-price="380">650 g</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺195</span>
+                <span style="font-size: .75rem; color: #137333; font-weight: 600;">%100 Şekersiz</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="195" data-variant="320 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="%100 Fındık Ezmesi">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Tek İçerik: Fındık</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20%100%20Fındık%20Ezmesi%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
@@ -98,36 +172,76 @@
       </div>
 
       <!-- Krokan & Kavrulmuş: 2 ürün -->
-      <div style="margin-bottom: 12px;">
+      <div style="margin-bottom: 12px;" class="product-category-group" data-group-cat="kavurma">
         <p style="font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted-light); margin-bottom: 14px; margin-top: 32px;">Kavurma & Krokan</p>
         <div class="products-grid products-grid-2" role="list">
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
+          <article class="product-card" role="listitem" data-cat="kavurma" data-keywords="fındık krokan karamel çıtır tatlı kuruyemiş ikram">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Fındık Krokan">
               <img src="/images/urun-krokan.png?v=3" alt="Nutopiano Fındık Krokan" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Geleneksel Tat</span>
-              <h3 class="product-name">Fındık Krokan</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Fındık Krokan">Fındık Krokan</h3>
               <p class="product-desc">Kavrulmuş fındığın çıtır dokusunu karamelize lezzetle buluşturan geleneksel krokan. Tatlılar için mükemmel.</p>
-              <div class="product-footer">
-                <span class="product-size">250 g · 500 g Özel Paket</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Fındık%20Krokan%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="145">250 g</button>
+                <button type="button" class="variant-pill" data-price="275">500 g</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺145</span>
+                <span style="font-size: .75rem; color: var(--muted-light);">Özel Paket</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="145" data-variant="250 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Fındık Krokan">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Çıtır Karamelize</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Fındık%20Krokan%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
+          <article class="product-card" role="listitem" data-cat="kavurma" data-keywords="çifte kavrulmuş fındık çıtır taze kavurma vakumlu kuruyemiş">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Kavrulmuş Fındık">
               <img src="/images/urun-kavrulmus.png?v=3" alt="Nutopiano Kavrulmuş Fındık" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Çıtır Lezzet</span>
-              <h3 class="product-name">Kavrulmuş Fındık</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Kavrulmuş Fındık">Kavrulmuş Fındık</h3>
               <p class="product-desc">Usta dokunuşuyla kavurma işlemi tamamlanmış; aroması ve çıtırlığı öne çıkan taze paketler.</p>
-              <div class="product-footer">
-                <span class="product-size">500 g · 1 kg Vakumlu Paket</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kavrulmuş%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="275">500 g</button>
+                <button type="button" class="variant-pill" data-price="520">1 kg</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺275</span>
+                <span style="font-size: .75rem; color: var(--gold-dark); font-weight: 600;">Vakumlu Paket</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="275" data-variant="500 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Kavrulmuş Fındık">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Taze Fırınlanmış</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kavrulmuş%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
@@ -136,36 +250,76 @@
       </div>
 
       <!-- Çiğ & Kabuklu: 2 ürün -->
-      <div>
+      <div class="product-category-group" data-group-cat="ic-kabuklu">
         <p style="font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted-light); margin-bottom: 14px; margin-top: 32px;">İç & Kabuklu Fındık</p>
         <div class="products-grid products-grid-2" role="list">
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
-              <img src="/images/findik-kase-doga.png" alt="Nutopiano Çiğ Fındık" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
+          <article class="product-card" role="listitem" data-cat="ic-kabuklu" data-keywords="çiğ fındık naturel iç fındık taze çiğ hasat">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Çiğ Fındık">
+              <img src="/images/urun-cig.png?v=4" alt="Nutopiano Çiğ Fındık" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Seçme İç Fındık</span>
-              <h3 class="product-name">Çiğ Fındık</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Çiğ Fındık">Çiğ Fındık</h3>
               <p class="product-desc">Hiçbir kavurma veya işlem görmeden sunulan, besin değeri en üst düzeyde seçilmiş iç fındık.</p>
-              <div class="product-footer">
-                <span class="product-size">500 g · 1 kg Vakumlu Paket</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Çiğ%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="260">500 g</button>
+                <button type="button" class="variant-pill" data-price="490">1 kg</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺260</span>
+                <span style="font-size: .75rem; color: var(--gold-dark); font-weight: 600;">Vakumlu Paket</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="260" data-variant="500 g">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Çiğ Fındık">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Doğal Çiğ Lezzet</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Çiğ%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
 
-          <article class="product-card" role="listitem">
-            <div class="product-img">
-              <img src="/images/nutopia-onluk.png" alt="Nutopiano Kabuklu Fındık" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
+          <article class="product-card" role="listitem" data-cat="ic-kabuklu" data-keywords="kabuklu fındık geleneksel harman çuval ormanlı ereğli">
+            <div class="product-img" style="cursor: pointer;" data-quickview="Kabuklu Fındık">
+              <img src="/images/urun-kabuklu.png?v=4" alt="Nutopiano Doğal Kabuklu Fındık" style="width: 100%; height: 220px; object-fit: cover; display: block;" loading="lazy">
             </div>
             <div class="product-body">
               <span class="product-family">Kabuklu</span>
-              <h3 class="product-name">Kabuklu Fındık</h3>
+              <h3 class="product-name" style="cursor: pointer;" data-quickview="Kabuklu Fındık">Kabuklu Fındık</h3>
               <p class="product-desc">Doğal sert kabuğu içinde, dalından toplandığı geleneksel haliyle kurutulmuş ve elenmiş fındık.</p>
-              <div class="product-footer">
-                <span class="product-size">1 kg · 5 kg · Çuval</span>
-                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kabuklu%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">Bilgi Al →</a>
+              
+              <div class="product-variant-group">
+                <button type="button" class="variant-pill active" data-price="220">1 kg</button>
+                <button type="button" class="variant-pill" data-price="980">5 kg</button>
+              </div>
+
+              <div class="product-card-price-row">
+                <span class="product-card-price">₺220</span>
+                <span style="font-size: .75rem; color: var(--muted-light);">Doğal Kabuklu</span>
+              </div>
+
+              <button type="button" class="btn-card-add" data-price="220" data-variant="1 kg">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Sepete Ekle</span>
+              </button>
+
+              <div style="text-align: center; margin-top: 8px;">
+                <button type="button" class="btn-quickview-trigger" data-quickview="Kabuklu Fındık">🔬 Besin Değerleri & Detay</button>
+              </div>
+
+              <div class="product-footer" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line-light);">
+                <span class="product-size" style="font-size: .76rem;">Geleneksel Dalından</span>
+                <a class="product-action" href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20Kabuklu%20Fındık%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp Bilgi →</a>
               </div>
             </div>
           </article>
@@ -173,15 +327,16 @@
         </div>
       </div>
 
+
       <!-- Ambalaj & Hediye Sunumu -->
       <div style="margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
         <div style="border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--line); background: var(--white); box-shadow: var(--shadow-sm);">
-          <img src="/images/nutopia-luks-kutular.png" alt="Nutopiano Lüks Hediye Kutuları" style="width: 100%; height: 240px; object-fit: cover; display: block;" loading="lazy">
+          <img src="/images/nutopiano-kavanozlar.png" alt="Nutopiano Gurme Ürün Koleksiyonu" style="width: 100%; height: 240px; object-fit: cover; display: block;" loading="lazy">
           <div style="padding: 18px 22px;">
             <span style="font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--gold-dark);">Özel Ambalaj</span>
-            <div style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: var(--green); margin: 6px 0;">Prestij Hediye Kutuları</div>
-            <p style="font-size: .86rem; color: var(--muted); line-height: 1.6; margin: 0 0 14px 0;">Özel davetler, sevdikleriniz ve kurumsal hediyeler için altın yaldızlı şık sunum kutularımız mevcuttur.</p>
-            <a href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20hediyelik%20kutular%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer" style="font-size: .85rem; font-weight: 700; color: var(--gold-dark); text-decoration: none;">Hediye Kutusu Bilgisi Al →</a>
+            <div style="font-family: var(--font-serif); font-size: 1.15rem; font-weight: 700; color: var(--green); margin: 6px 0;">Nutopiano Gurme Koleksiyonu</div>
+            <p style="font-size: .86rem; color: var(--muted); line-height: 1.6; margin: 0 0 14px 0;">Özel davetler, sevdikleriniz ve kurumsal hediyeler için zengin ezme, krokan ve kavrulmuş fındık sunumlarımız mevcuttur.</p>
+            <a href="https://wa.me/905380288202?text=Merhaba%2C%20Nutopiano%20koleksiyon%20ürünleri%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer" style="font-size: .85rem; font-weight: 700; color: var(--gold-dark); text-decoration: none;">Koleksiyon Bilgisi Al →</a>
           </div>
         </div>
         <div style="border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--line); background: var(--white); box-shadow: var(--shadow-sm);">
@@ -198,17 +353,109 @@
     </div>
   </section>
 
+  <!-- ---- GURME EŞLEŞMELER & TÜKETİM REHBERİ ---- -->
+  <section class="pairing-section" aria-labelledby="pairing-title">
+    <div class="container">
+      <div class="section-head section-head-center">
+        <div class="eyebrow">Gurme İlhamlar</div>
+        <h2 class="section-title" id="pairing-title">Nasıl Tüketilir? Gurme Eşleşmeler.</h2>
+        <p class="section-desc">
+          Nutopiano lezzetlerini günün her anında en iyi şekilde deneyimlemeniz için usta önerilerimiz.
+        </p>
+      </div>
+
+      <div class="pairing-grid">
+        <div class="pairing-card">
+          <div class="pairing-icon">🥣</div>
+          <div class="pairing-tag">Sağlık & Enerji</div>
+          <div class="pairing-title">Sporcu & Granola Kasesi</div>
+          <div class="pairing-desc">
+            Sıcak yulaf ezmesi, taze muz dilimleri ve chia tohumu üzerine eklenen 1 tepeleme yemek kaşığı <strong>%100 Nutopiano Fındık Ezmesi</strong>, gün boyu saf bitkisel protein ve temiz enerji sağlar.
+          </div>
+        </div>
+
+        <div class="pairing-card">
+          <div class="pairing-icon">☕</div>
+          <div class="pairing-tag">Kahve Molası</div>
+          <div class="pairing-title">Espresso & Filtre Kahve Yanı</div>
+          <div class="pairing-desc">
+            Kavrulma profili güçlü bir espresso veya taze demlenmiş filtre kahvenin yanında <strong>Çifte Kavrulmuş Fındık</strong> veya karamelize <strong>Fındık Krokan</strong> eşsiz bir aroma dengesi yaratır.
+          </div>
+        </div>
+
+        <div class="pairing-card">
+          <div class="pairing-icon">🥞</div>
+          <div class="pairing-tag">Pazar Kahvaltısı</div>
+          <div class="pairing-title">Sıcak Pankek & Taze Krep</div>
+          <div class="pairing-desc">
+            Tavadan yeni çıkmış sıcacık pankek veya ekşi mayalı kızarmış ekmek üzerine sürülen <strong>Sütlü ya da Kakaolu Fındık Kreması</strong>, ipeksi dokusuyla kahvaltı sofrasını şölene çevirir.
+          </div>
+        </div>
+
+        <div class="pairing-card">
+          <div class="pairing-icon">🍨</div>
+          <div class="pairing-tag">Gurme Dokunuş</div>
+          <div class="pairing-title">Dondurma & Tatlı Süslemesi</div>
+          <div class="pairing-desc">
+            Vanilyalı dondurma veya magnolia tatlılarının üzerine serpiştirilen kıtır <strong>Fındık Krokan parçacıkları</strong>, profesyonel pastane kalitesinde çıtır bir son dokunuş katar.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ---- GÜVEN & KALİTE STANDARTLARI ---- -->
+  <section class="trust-strip" aria-label="Kalite ve Güven Standartları">
+    <div class="container">
+      <div class="trust-grid">
+        <div class="trust-item">
+          <div class="trust-icon-box">🌰</div>
+          <div>
+            <div class="trust-item-title">%100 Karadeniz Fındığı</div>
+            <div class="trust-item-sub">Ormanlı değirmenimizde seçilmiş birinci sınıf hasat.</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon-box">🌿</div>
+          <div>
+            <div class="trust-item-title">Sıfır İlave Şeker & Yağ</div>
+            <div class="trust-item-sub">Doğal fındık ezmemiz tek içerikten oluşur.</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon-box">🚚</div>
+          <div>
+            <div class="trust-item-title">750 ₺ Üzeri Ücretsiz Kargo</div>
+            <div class="trust-item-sub">Darbe korumalı güvenli ambalajla tüm Türkiye'ye.</div>
+          </div>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon-box">🎖️</div>
+          <div>
+            <div class="trust-item-title">Şehit & Gaziye %20 İndirim</div>
+            <div class="trust-item-sub">Tüm Nutopiano ürünlerinde daimi minnet indirimi.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ---- NOT ---- -->
   <section class="section-sm section-cream" aria-label="Sipariş bilgisi">
     <div class="container">
       <div style="max-width: 680px; margin: 0 auto; text-align: center;">
-        <p style="font-size: 1rem; color: var(--muted); line-height: 1.75;">
-          Tüm Nutopiano ürünleri için fiyat bilgisi ve sipariş işlemleri WhatsApp hattımız üzerinden yürütülmektedir.
-          Ürün adına tıkladığınızda mesaj otomatik oluşur.
+        <p style="font-size: 1.05rem; color: var(--green); font-weight: 600; line-height: 1.75;">
+          Ürünlerinizi sepete ekleyerek ister tek tıkla WhatsApp üzerinden, ister teslimat formunu doldurarak anında sipariş verebilirsiniz.
         </p>
-        <a class="btn btn-dark" style="margin-top: 22px;" href="https://wa.me/905380288202" target="_blank" rel="noopener noreferrer">
-          WhatsApp Hattımıza Ulaşın
-        </a>
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-gold" onclick="window.NutopiaCart.openDrawer()">
+            Sepeti Görüntüle 🛒
+          </button>
+          <a class="btn btn-dark" href="https://wa.me/905380288202" target="_blank" rel="noopener noreferrer">
+            WhatsApp Hattımıza Ulaşın
+          </a>
+        </div>
       </div>
     </div>
   </section>

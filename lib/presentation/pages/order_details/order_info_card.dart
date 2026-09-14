@@ -222,6 +222,20 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
                           color: Colors.blue[700], size: 14),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => _sendWhatsApp(customer.phone, order),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDCFCE7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chat_rounded,
+                          color: Color(0xFF16A34A), size: 14),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -324,6 +338,17 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     }
   }
 
+  Future<void> _sendWhatsApp(String phoneNumber, OrderEntity order) async {
+    final normalized = normalizeForWhatsApp(phoneNumber);
+    final message =
+        'Sayın *${order.customerName ?? 'Müşterimiz'}*,\n#${order.id} numaralı siparişiniz hakkında bilgilendirme.';
+    final encoded = Uri.encodeComponent(message);
+    final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _handleDelivery(
       BuildContext context, WidgetRef ref, OrderEntity order) async {
     final txRepo =
@@ -374,8 +399,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');
-      ref.invalidate(_orderDetailProvider(order.id));
-      _triggerPrint(ref, order);
+      unawaited(_triggerPrint(ref, order));
       return;
     }
 
@@ -386,8 +410,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');
-      ref.invalidate(_orderDetailProvider(order.id));
-      _triggerPrint(ref, order);
+      unawaited(_triggerPrint(ref, order));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
