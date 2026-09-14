@@ -28,7 +28,7 @@ class _OrderCard extends StatelessWidget {
     final meta = _statusMeta(order.status);
     final dateStr = DateFormat('dd.MM.yy HH:mm').format(order.createdAt);
     final timeStr = DateFormat('HH:mm').format(order.createdAt);
-    final phoneStr = (order.customerPhone ?? '').trim();
+    final phoneStr = formatPhoneForDisplay(order.customerPhone);
     final subtotal = (order.items.fold<double>(0.0, (sum, item) {
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;

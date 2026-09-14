@@ -198,11 +198,26 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
                       style:
                           TextStyle(color: Colors.grey[600], fontSize: 13)),
                 ),
-                Text(customerName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                        fontSize: 14)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(customerName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            fontSize: 14)),
+                    if (hasPhone)
+                      Text(
+                        formatPhoneForDisplay(customer.phone),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
                 if (hasPhone) ...[
                   const SizedBox(width: 8),
                   InkWell(

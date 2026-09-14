@@ -12,6 +12,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -762,7 +763,7 @@ class _CustomerCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                customer.phone,
+                                formatPhoneForDisplay(customer.phone),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,

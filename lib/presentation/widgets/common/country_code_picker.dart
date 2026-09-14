@@ -166,6 +166,29 @@ String normalizeForWhatsApp(String phone) {
   return '$countryDigits$digits';
 }
 
+/// Formats a phone number for beautiful, readable display across the UI.
+/// e.g. +905321234567 -> 0532 123 45 67
+/// e.g. +4915112345678 -> +49 151 12345678
+String formatPhoneForDisplay(String? phone) {
+  if (phone == null || phone.trim().isEmpty) return '';
+  final trimmed = phone.trim();
+  final parsed = parsePhoneNumber(trimmed);
+  var digits = parsed.localNumber.replaceAll(RegExp(r'\D'), '');
+  while (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+
+  if (parsed.country.code == 'TR') {
+    if (digits.length == 10) {
+      return '0${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6, 8)} ${digits.substring(8, 10)}';
+    }
+    return digits.isNotEmpty ? '0$digits' : trimmed;
+  }
+
+  // Other countries: +{dialCode} {digits}
+  return '${parsed.country.dialCode} $digits'.trim();
+}
+
 /// Opens a clean modal dialog to select a country code.
 Future<CountryCode?> showCountryPickerModal(
   BuildContext context, {

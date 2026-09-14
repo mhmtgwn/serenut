@@ -309,7 +309,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         customer.phone.isNotEmpty
-                            ? customer.phone
+                            ? formatPhoneForDisplay(customer.phone)
                             : customer.email.isNotEmpty
                                 ? customer.email
                                 : 'Kayıt: ${DateFormat('dd.MM.yyyy').format(customer.createdAt)}',

@@ -109,7 +109,12 @@ class SmsSenderPlugin(private val context: Context) : MethodCallHandler {
                 return
             }
 
-            smsManager.sendTextMessage(phone, null, message, null, null)
+            val parts = smsManager.divideMessage(message)
+            if (parts.size > 1) {
+                smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
+            } else {
+                smsManager.sendTextMessage(phone, null, message, null, null)
+            }
             result.success(true)
         } catch (e: SecurityException) {
             result.error("PERMISSION_DENIED", "Security exception: ${e.message}", null)

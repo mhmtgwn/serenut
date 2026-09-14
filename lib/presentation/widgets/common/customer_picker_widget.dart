@@ -471,7 +471,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                   color: _kText,
                   fontSize: 13)),
           subtitle: Text(
-            c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
+            c.phone.isNotEmpty ? formatPhoneForDisplay(c.phone) : 'Telefon Yok',
             style: const TextStyle(
                 color: _kTextSecondary, fontSize: 11),
           ),
@@ -548,7 +548,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                 const SizedBox(height: 3),
                 Row(children: [
                   Text(
-                    c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
+                    c.phone.isNotEmpty ? formatPhoneForDisplay(c.phone) : 'Telefon Yok',
                     style: const TextStyle(
                         color: _kTextSecondary, fontSize: 12),
                   ),
