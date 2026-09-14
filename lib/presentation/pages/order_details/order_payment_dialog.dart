@@ -1,7 +1,8 @@
 part of '../order_details_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Order Payment Dialog (Vadeli Sipariş İçin Tam veya Kısmi Tahsilat Alma)
+// Order Payment Dialog (Vadeli Sipariş İçin Nakit, Kart veya Miks Ödeme Alma)
+// Bu işlem sadece o sipariş özelinde ödemeyi günceller, teslimat durumunu bozmaz.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _OrderPaymentDialog extends ConsumerStatefulWidget {
@@ -35,8 +36,8 @@ class _OrderPaymentDialog extends ConsumerStatefulWidget {
         ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
-            maxWidth: 520,
-            maxHeight: 700,
+            maxWidth: 540,
+            maxHeight: 740,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -57,9 +58,15 @@ class _OrderPaymentDialog extends ConsumerStatefulWidget {
 }
 
 class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
+  // Tekli ödeme tutarı (Nakit veya Kart seçildiğinde)
   final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
-  String _selectedMethod = 'cash'; // 'cash' | 'card'
+
+  // Miks ödeme tutarları
+  final _karmaCashController = TextEditingController();
+  final _karmaCardController = TextEditingController();
+
+  // Seçili yöntem: 'cash' | 'card' | 'karma' (Miks)
+  String _selectedMethod = 'cash';
   bool _isSubmitting = false;
   bool _printReceipt = true;
 
@@ -71,8 +78,36 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
     return double.tryParse(clean) ?? 0.0;
   }
 
+  double get _karmaCash {
+    final clean = _karmaCashController.text.trim().replaceAll(',', '.');
+    return double.tryParse(clean) ?? 0.0;
+  }
+
+  double get _karmaCard {
+    final clean = _karmaCardController.text.trim().replaceAll(',', '.');
+    return double.tryParse(clean) ?? 0.0;
+  }
+
+  /// Aktif yönteme göre alınacak toplam ödeme miktarı
+  double get _effectiveAmount {
+    if (_selectedMethod == 'karma') {
+      return _karmaCash + _karmaCard;
+    }
+    return _enteredAmount;
+  }
+
   double get _newRemainingDebt =>
-      (_remainingDebt - _enteredAmount).clamp(0.0, double.infinity);
+      (_remainingDebt - _effectiveAmount).clamp(0.0, double.infinity);
+
+  bool get _isValid {
+    final amt = _effectiveAmount;
+    if (_selectedMethod == 'karma') {
+      return amt > 0.01 &&
+          amt <= _remainingDebt + 0.01 &&
+          (_karmaCash > 0 || _karmaCard > 0);
+    }
+    return amt > 0.01 && amt <= _remainingDebt + 0.01;
+  }
 
   @override
   void initState() {
@@ -80,6 +115,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
     // Varsayılan olarak kalan borcun tamamını yaz
     _amountController.text = _remainingDebt.toStringAsFixed(2);
     _amountController.addListener(() => setState(() {}));
+    _karmaCashController.addListener(() => setState(() {}));
+    _karmaCardController.addListener(() => setState(() {}));
 
     final settings = ref.read(settingsNotifierProvider).valueOrNull;
     if (settings != null) {
@@ -90,12 +127,29 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
   @override
   void dispose() {
     _amountController.dispose();
-    _noteController.dispose();
+    _karmaCashController.dispose();
+    _karmaCardController.dispose();
     super.dispose();
   }
 
+  void _onMethodChanged(String method) {
+    setState(() {
+      _selectedMethod = method;
+      if (method == 'karma') {
+        // Miks seçildiğinde eğer boşsa borcun yarısını nakit, yarısını kart yap veya kolaylaştır
+        if (_karmaCashController.text.isEmpty &&
+            _karmaCardController.text.isEmpty) {
+          final half = (_remainingDebt / 2).roundToDouble();
+          final otherHalf = _remainingDebt - half;
+          _karmaCashController.text = half.toStringAsFixed(2);
+          _karmaCardController.text = otherHalf.toStringAsFixed(2);
+        }
+      }
+    });
+  }
+
   Future<void> _submitPayment() async {
-    final amount = _enteredAmount;
+    final amount = _effectiveAmount;
     if (amount <= 0.01) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -111,7 +165,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Girilen tutar kalan borçtan (₺${_remainingDebt.toStringAsFixed(2)}) fazla olamaz.'),
+              'Girilen tutar (₺${amount.toStringAsFixed(2)}) kalan borçtan (₺${_remainingDebt.toStringAsFixed(2)}) fazla olamaz.'),
           backgroundColor: _kRed,
           behavior: SnackBarBehavior.floating,
         ),
@@ -124,37 +178,83 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
     AuthorizedCardPayment? cardPayment;
     try {
       final paymentService = await ref.read(paymentServiceProvider.future);
+      final cardAmount = _selectedMethod == 'card'
+          ? amount
+          : _selectedMethod == 'karma'
+              ? _karmaCard
+              : 0.0;
 
-      if (_selectedMethod == 'card') {
+      if (cardAmount > 0) {
         final hasPos =
             ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
         if (hasPos) {
           cardPayment =
               await ref.read(physicalCardPaymentServiceProvider).authorize(
-                    amount: amount,
+                    amount: cardAmount,
                     idempotencyKey:
                         'order-pay-${widget.order.id}-${DateTime.now().millisecondsSinceEpoch}',
                   );
         }
       }
 
-      final cardMetadata = _selectedMethod != 'card'
+      final cardMetadata = cardAmount <= 0
           ? null
           : cardPayment?.ledgerMetadata ??
               PhysicalCardPaymentService.manualLedgerMetadata(
                 context: 'order_collection',
               );
 
-      // 1. Ödemeyi finansal sisteme kaydet (Sipariş durumunu ASLA değiştirmez)
-      await paymentService.recordPartialPayment(
-        saleId: widget.order.id,
-        customerId: widget.order.customerId,
-        amount: amount,
-        method: _selectedMethod,
-        currentPaidAmount: widget.totalPaid,
-        totalAmount: widget.saleTx.amount,
-        terminalMetadata: cardMetadata,
-      );
+      // 1. Ödemeyi finansal sisteme kaydet (Sipariş durumuna DOKUNMAZ)
+      if (_selectedMethod == 'cash') {
+        await paymentService.recordPartialPayment(
+          saleId: widget.order.id,
+          customerId: widget.order.customerId,
+          amount: amount,
+          method: 'cash',
+          currentPaidAmount: widget.totalPaid,
+          totalAmount: widget.saleTx.amount,
+          terminalMetadata: null,
+        );
+      } else if (_selectedMethod == 'card') {
+        await paymentService.recordPartialPayment(
+          saleId: widget.order.id,
+          customerId: widget.order.customerId,
+          amount: amount,
+          method: 'card',
+          currentPaidAmount: widget.totalPaid,
+          totalAmount: widget.saleTx.amount,
+          terminalMetadata: cardMetadata,
+        );
+      } else if (_selectedMethod == 'karma') {
+        double currentPaid = widget.totalPaid;
+        final kCash = _karmaCash;
+        final kCard = _karmaCard;
+
+        if (kCash > 0) {
+          await paymentService.recordPartialPayment(
+            saleId: widget.order.id,
+            customerId: widget.order.customerId,
+            amount: kCash,
+            method: 'cash',
+            currentPaidAmount: currentPaid,
+            totalAmount: widget.saleTx.amount,
+            terminalMetadata: null,
+          );
+          currentPaid += kCash;
+        }
+
+        if (kCard > 0) {
+          await paymentService.recordPartialPayment(
+            saleId: widget.order.id,
+            customerId: widget.order.customerId,
+            amount: kCard,
+            method: 'card',
+            currentPaidAmount: currentPaid,
+            totalAmount: widget.saleTx.amount,
+            terminalMetadata: cardMetadata,
+          );
+        }
+      }
 
       if (cardPayment != null) {
         await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
@@ -187,13 +287,17 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 customer = await custRepo.findById(widget.order.customerId);
               }
               if (customer != null) {
+                final receiptNote = _selectedMethod == 'karma'
+                    ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
+                    : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
+
                 await ref
                     .read(printingApplicationServiceProvider)
                     .queueCollectionReceipt(
                       customer,
                       amount,
                       _selectedMethod,
-                      'Sipariş #${widget.order.displayNumber} Tahsilatı',
+                      receiptNote,
                       settings,
                     );
               }
@@ -220,7 +324,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
         );
       }
     } catch (e, st) {
-      unawaited(TelemetryService().logError(e, st, context: 'order_payment_dialog'));
+      unawaited(
+          TelemetryService().logError(e, st, context: 'order_payment_dialog'));
       if (cardPayment != null) {
         await ref
             .read(physicalCardPaymentServiceProvider)
@@ -230,7 +335,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Tahsilat kaydedilemedi: $e'),
+            content: Text('Ödeme kaydedilemedi: $e'),
             backgroundColor: _kRed,
             behavior: SnackBarBehavior.floating,
           ),
@@ -242,9 +347,10 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
   @override
   Widget build(BuildContext context) {
     final remaining = _remainingDebt;
-    final entered = _enteredAmount;
+    final effective = _effectiveAmount;
     final newRemaining = _newRemainingDebt;
-    final isValid = entered > 0.01 && entered <= remaining + 0.01;
+    final isValid = _isValid;
+    final isKarma = _selectedMethod == 'karma';
 
     final customerName = widget.order.customerName ?? 'Müşteri';
 
@@ -255,7 +361,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Sipariş Tahsilatı Al',
+              'Sipariş Ödemesini Güncelle',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -355,175 +461,9 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                   ),
                   const SizedBox(height: 18),
 
-                  // ── Alınacak Tutar Alanı ─────────────────────────────────
+                  // ── Ödeme Yöntemi Seçimi (Nakit, Kart, Miks) ───────────────
                   const Text(
-                    'Tahsil Edilecek Tutar (₺)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: _kText,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d{0,2}')),
-                    ],
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: _kGreenDark,
-                    ),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.payments_outlined,
-                          color: _kGreenDark),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () => _amountController.clear(),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF0FDF4),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFF86EFAC)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Color(0xFF86EFAC)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            const BorderSide(color: _kGreenDark, width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ── Hızlı Tutar Butonları ─────────────────────────────────
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      ActionChip(
-                        label: Text('Tam Borcu Kapat (₺${remaining.toStringAsFixed(2)})'),
-                        backgroundColor: _kGreenLight,
-                        side: const BorderSide(color: _kGreen),
-                        labelStyle: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _kGreenDark),
-                        onPressed: () {
-                          _amountController.text =
-                              remaining.toStringAsFixed(2);
-                        },
-                      ),
-                      if (remaining > 50)
-                        ActionChip(
-                          label: const Text('50 ₺'),
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          side: BorderSide.none,
-                          labelStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _kText),
-                          onPressed: () =>
-                              _amountController.text = '50.00',
-                        ),
-                      if (remaining > 100)
-                        ActionChip(
-                          label: const Text('100 ₺'),
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          side: BorderSide.none,
-                          labelStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _kText),
-                          onPressed: () =>
-                              _amountController.text = '100.00',
-                        ),
-                      if (remaining > 200)
-                        ActionChip(
-                          label: const Text('200 ₺'),
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          side: BorderSide.none,
-                          labelStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _kText),
-                          onPressed: () =>
-                              _amountController.text = '200.00',
-                        ),
-                      if (remaining > 500)
-                        ActionChip(
-                          label: const Text('500 ₺'),
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          side: BorderSide.none,
-                          labelStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _kText),
-                          onPressed: () =>
-                              _amountController.text = '500.00',
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // ── Tahsilat Sonrası Kalan Canlı Önizleme ─────────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: newRemaining <= 0.01
-                          ? const Color(0xFFF0FDF4)
-                          : const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: newRemaining <= 0.01
-                            ? const Color(0xFF86EFAC)
-                            : const Color(0xFFFDE68A),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          newRemaining <= 0.01
-                              ? Icons.check_circle_rounded
-                              : Icons.info_outline_rounded,
-                          size: 16,
-                          color: newRemaining <= 0.01
-                              ? _kGreenDark
-                              : const Color(0xFFB45309),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            newRemaining <= 0.01
-                                ? 'Bu tahsilat ile sipariş borcunun tamamı kapanacaktır.'
-                                : 'Tahsilat sonrası siparişte kalan borç: ₺${newRemaining.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: newRemaining <= 0.01
-                                  ? _kGreenDark
-                                  : const Color(0xFFB45309),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // ── Ödeme Yöntemi Seçimi ──────────────────────────────────
-                  const Text(
-                    'Ödeme Yöntemi',
+                    'Ödeme Yöntemi Seçin',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -533,98 +473,419 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
+                      // 1. Nakit
                       Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedMethod = 'cash'),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: _selectedMethod == 'cash'
-                                  ? _kGreenLight
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _selectedMethod == 'cash'
-                                    ? _kGreen
-                                    : _kBorder,
-                                width: _selectedMethod == 'cash' ? 2 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.payments_rounded,
-                                    size: 18,
-                                    color: _selectedMethod == 'cash'
-                                        ? _kGreenDark
-                                        : _kTextSecondary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Nakit',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedMethod == 'cash'
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: _selectedMethod == 'cash'
-                                        ? _kGreenDark
-                                        : _kText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        child: _buildMethodTab(
+                          id: 'cash',
+                          label: 'Nakit',
+                          icon: Icons.payments_rounded,
+                          activeColor: _kGreen,
+                          activeBg: _kGreenLight,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
+                      // 2. Kart
                       Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedMethod = 'card'),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: _selectedMethod == 'card'
-                                  ? const Color(0xFFDBEAFE)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _selectedMethod == 'card'
-                                    ? const Color(0xFF2563EB)
-                                    : _kBorder,
-                                width: _selectedMethod == 'card' ? 2 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.credit_card_rounded,
-                                    size: 18,
-                                    color: _selectedMethod == 'card'
-                                        ? const Color(0xFF1D4ED8)
-                                        : _kTextSecondary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Kredi Kartı',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedMethod == 'card'
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: _selectedMethod == 'card'
-                                        ? const Color(0xFF1D4ED8)
-                                        : _kText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        child: _buildMethodTab(
+                          id: 'card',
+                          label: 'Kredi Kartı',
+                          icon: Icons.credit_card_rounded,
+                          activeColor: const Color(0xFF2563EB),
+                          activeBg: const Color(0xFFDBEAFE),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 3. Miks
+                      Expanded(
+                        child: _buildMethodTab(
+                          id: 'karma',
+                          label: 'Miks',
+                          icon: Icons.call_split_rounded,
+                          activeColor: Colors.purple,
+                          activeBg: const Color(0xFFF3E8FF),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 18),
+
+                  // ── Tutar Girdi Alanları ──────────────────────────────────
+                  if (!isKarma) ...[
+                    // Tekli Tutar Girişi (Nakit veya Kart)
+                    Text(
+                      _selectedMethod == 'cash'
+                          ? 'Alınacak Nakit Tutarı (₺)'
+                          : 'Kart ile Çekilecek Tutar (₺)',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _kText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*[\.,]?\d{0,2}')),
+                      ],
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: _kGreenDark,
+                      ),
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(
+                          _selectedMethod == 'cash'
+                              ? Icons.payments_outlined
+                              : Icons.credit_card_rounded,
+                          color: _selectedMethod == 'cash'
+                              ? _kGreenDark
+                              : const Color(0xFF2563EB),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => _amountController.clear(),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF0FDF4),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF86EFAC)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF86EFAC)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _kGreenDark, width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Hızlı Tutar Butonları
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ActionChip(
+                          label: Text(
+                              'Tam Borcu Kapat (₺${remaining.toStringAsFixed(2)})'),
+                          backgroundColor: _kGreenLight,
+                          side: const BorderSide(color: _kGreen),
+                          labelStyle: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _kGreenDark),
+                          onPressed: () {
+                            _amountController.text =
+                                remaining.toStringAsFixed(2);
+                          },
+                        ),
+                        if (remaining > 50)
+                          ActionChip(
+                            label: const Text('50 ₺'),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: BorderSide.none,
+                            labelStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _kText),
+                            onPressed: () => _amountController.text = '50.00',
+                          ),
+                        if (remaining > 100)
+                          ActionChip(
+                            label: const Text('100 ₺'),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: BorderSide.none,
+                            labelStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _kText),
+                            onPressed: () => _amountController.text = '100.00',
+                          ),
+                        if (remaining > 200)
+                          ActionChip(
+                            label: const Text('200 ₺'),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: BorderSide.none,
+                            labelStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _kText),
+                            onPressed: () => _amountController.text = '200.00',
+                          ),
+                        if (remaining > 500)
+                          ActionChip(
+                            label: const Text('500 ₺'),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: BorderSide.none,
+                            labelStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _kText),
+                            onPressed: () => _amountController.text = '500.00',
+                          ),
+                      ],
+                    ),
+                  ] else ...[
+                    // Miks Tutar Girişi (Nakit + Kart)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAF5FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE9D5FF)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.call_split_rounded,
+                                  size: 16, color: Colors.purple),
+                              SizedBox(width: 8),
+                              Text(
+                                'Miks Ödeme Dağılımı (Nakit + Kart)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.purple,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          // 1. Nakit Girişi
+                          Row(
+                            children: [
+                              const Expanded(
+                                flex: 4,
+                                child: Text('💵 Nakit:',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: _kText)),
+                              ),
+                              Expanded(
+                                flex: 6,
+                                child: TextFormField(
+                                  controller: _karmaCashController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                        RegExp(r'^\d*[\.,]?\d{0,2}')),
+                                  ],
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: _kGreenDark,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '0.00',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          // 2. Kart Girişi
+                          Row(
+                            children: [
+                              const Expanded(
+                                flex: 4,
+                                child: Text('💳 Kredi Kartı:',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: _kText)),
+                              ),
+                              Expanded(
+                                flex: 6,
+                                child: TextFormField(
+                                  controller: _karmaCardController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                        RegExp(r'^\d*[\.,]?\d{0,2}')),
+                                  ],
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF1D4ED8),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '0.00',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                          color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Hızlı Dengeleme Butonları
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              ActionChip(
+                                label: const Text('Eşit Böl (50 / 50)'),
+                                backgroundColor: Colors.white,
+                                side: const BorderSide(
+                                    color: Color(0xFFD8B4FE)),
+                                labelStyle: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.purple),
+                                onPressed: () {
+                                  final half =
+                                      (_remainingDebt / 2).roundToDouble();
+                                  final otherHalf = _remainingDebt - half;
+                                  _karmaCashController.text =
+                                      half.toStringAsFixed(2);
+                                  _karmaCardController.text =
+                                      otherHalf.toStringAsFixed(2);
+                                },
+                              ),
+                              ActionChip(
+                                label: const Text('Kalanı Nakite Tamamla'),
+                                backgroundColor: Colors.white,
+                                side: const BorderSide(
+                                    color: Color(0xFF86EFAC)),
+                                labelStyle: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: _kGreenDark),
+                                onPressed: () {
+                                  final card = _karmaCard;
+                                  final diff = (_remainingDebt - card)
+                                      .clamp(0.0, double.infinity);
+                                  _karmaCashController.text =
+                                      diff.toStringAsFixed(2);
+                                },
+                              ),
+                              ActionChip(
+                                label: const Text('Kalanı Karta Tamamla'),
+                                backgroundColor: Colors.white,
+                                side: const BorderSide(
+                                    color: Color(0xFF93C5FD)),
+                                labelStyle: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1D4ED8)),
+                                onPressed: () {
+                                  final cash = _karmaCash;
+                                  final diff = (_remainingDebt - cash)
+                                      .clamp(0.0, double.infinity);
+                                  _karmaCardController.text =
+                                      diff.toStringAsFixed(2);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+
+                  // ── Tahsilat Sonrası Kalan Canlı Önizleme ─────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: newRemaining <= 0.01
+                          ? const Color(0xFFF0FDF4)
+                          : const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: newRemaining <= 0.01
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Alınacak Toplam Tutar:',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _kText)),
+                            Text(
+                              '₺${effective.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: effective > remaining + 0.01
+                                    ? _kRed
+                                    : _kGreenDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Kalan Sipariş Borcu:',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _kTextSecondary)),
+                            Text(
+                              newRemaining <= 0.01
+                                  ? '₺0.00 (Borç Tam Kapanır)'
+                                  : '₺${newRemaining.toStringAsFixed(2)} (Vadeli Devam Eder)',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: newRemaining <= 0.01
+                                    ? _kGreenDark
+                                    : const Color(0xFFB45309),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // ── Fiş Yazdırma Ayarı ────────────────────────────────────
                   Container(
@@ -682,9 +943,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: (_isSubmitting || !isValid)
-                      ? null
-                      : _submitPayment,
+                  onPressed: (_isSubmitting || !isValid) ? null : _submitPayment,
                   icon: _isSubmitting
                       ? const SizedBox(
                           width: 20,
@@ -697,10 +956,10 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                       : const Icon(Icons.check_circle_rounded, size: 18),
                   label: Text(
                     _isSubmitting
-                        ? 'Tahsilat Kaydediliyor...'
-                        : (entered > 0.01
-                            ? '₺${entered.toStringAsFixed(2)} Ödemeyi Al ve Kaydet'
-                            : 'Ödemeyi Kaydet'),
+                        ? 'Ödeme Güncelleniyor...'
+                        : (effective > 0.01
+                            ? '₺${effective.toStringAsFixed(2)} Ödemeyi Güncelle'
+                            : 'Ödemeyi Güncelle'),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -721,6 +980,52 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMethodTab({
+    required String id,
+    required String label,
+    required IconData icon,
+    required Color activeColor,
+    required Color activeBg,
+  }) {
+    final isSel = _selectedMethod == id;
+
+    return InkWell(
+      onTap: () => _onMethodChanged(id),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 48,
+        decoration: BoxDecoration(
+          color: isSel ? activeBg : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSel ? activeColor : _kBorder,
+            width: isSel ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: isSel ? activeColor : _kTextSecondary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                color: isSel ? activeColor : _kText,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
