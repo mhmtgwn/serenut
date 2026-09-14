@@ -79,39 +79,16 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
   }
 
   Widget _buildPaymentMethodRow(WidgetRef ref, OrderEntity order) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: ref
-          .read(financialTransactionRepositoryProvider.future)
-          .then((repo) async {
-        var txs = await repo.getByReferenceId(order.id);
-        if (txs.isEmpty && order.customerId.isNotEmpty) {
-          txs = await repo.getByCustomerId(order.customerId);
-        }
-        FinancialTransactionEntity? saleTx;
-        double totalPaid = 0.0;
-        for (final t in txs) {
-          if (t.referenceId == order.id) {
-            if (t.type == 'sale') {
-              saleTx = t;
-              totalPaid += t.paidAmount;
-            } else if (t.type == 'payment' || t.type == 'collection') {
-              totalPaid += t.paidAmount;
-            }
-          }
-        }
-        return {
-          'saleTx': saleTx,
-          'totalPaid': totalPaid,
-        };
-      }),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _infoRow(
-              'Ödeme Yöntemi', 'Yükleniyor...', Icons.payment_rounded);
-        }
-        final data = snapshot.data;
-        final saleTx = data?['saleTx'] as FinancialTransactionEntity?;
-        final totalPaid = (data?['totalPaid'] as num?)?.toDouble() ?? 0.0;
+    final paymentAsync = ref.watch(_orderPaymentInfoProvider(order.id));
+
+    return paymentAsync.when(
+      loading: () =>
+          _infoRow('Ödeme Yöntemi', 'Yükleniyor...', Icons.payment_rounded),
+      error: (_, __) =>
+          _infoRow('Ödeme Yöntemi', 'Bilinmiyor', Icons.payment_rounded),
+      data: (data) {
+        final saleTx = data['saleTx'] as FinancialTransactionEntity?;
+        final totalPaid = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
 
         if (saleTx == null) {
           return _infoRow('Ödeme Yöntemi', 'Bilinmiyor', Icons.payment_rounded);
@@ -154,6 +131,41 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
               isRed: remainingDebt > 0.01,
               positive: remainingDebt <= 0.01,
             ),
+            if (remainingDebt > 0.01) ...[
+              const SizedBox(height: 14),
+              Builder(
+                builder: (context) => SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showCashOutBottomSheet(
+                      context,
+                      ref,
+                      order,
+                      saleTx,
+                      totalPaid,
+                      markDelivered: false,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.payments_rounded, size: 18),
+                    label: const Text(
+                      'Ödeme Al / Borç Kapat',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -431,13 +443,15 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     WidgetRef ref,
     OrderEntity order,
     FinancialTransactionEntity saleTx,
-    double totalPaid,
-  ) {
+    double totalPaid, {
+    bool markDelivered = true,
+  }) {
     _CashOutSheet.show(
       context,
       order: order,
       saleTx: saleTx,
       totalPaid: totalPaid,
+      markDelivered: markDelivered,
     );
   }
 }

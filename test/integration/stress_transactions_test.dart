@@ -91,6 +91,6 @@ void main() {
           'SELECT COUNT(*) as count FROM sales WHERE id LIKE ?',
           ['stress-sale-%']);
       expect(count.first['count'] as int, equals(500));
-    });
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }

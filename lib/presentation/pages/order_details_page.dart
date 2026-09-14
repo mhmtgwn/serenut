@@ -61,6 +61,28 @@ final _orderDetailProvider = FutureProvider.autoDispose
   return repo.findById(orderId);
 });
 
+final _orderPaymentInfoProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, orderId) async {
+  final repo = await ref.watch(financialTransactionRepositoryProvider.future);
+  var txs = await repo.getByReferenceId(orderId);
+  FinancialTransactionEntity? saleTx;
+  double totalPaid = 0.0;
+  for (final t in txs) {
+    if (t.referenceId == orderId) {
+      if (t.type == 'sale') {
+        saleTx = t;
+        totalPaid += t.paidAmount;
+      } else if (t.type == 'payment' || t.type == 'collection') {
+        totalPaid += t.paidAmount;
+      }
+    }
+  }
+  return {
+    'saleTx': saleTx,
+    'totalPaid': totalPaid,
+  };
+});
+
 class OrderDetailsPage extends ConsumerWidget {
   final String orderId;
   final bool isModal;

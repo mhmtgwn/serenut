@@ -60,11 +60,13 @@ class _CashOutSheet extends ConsumerStatefulWidget {
   final OrderEntity order;
   final FinancialTransactionEntity saleTx;
   final double totalPaid;
+  final bool markDelivered;
 
   const _CashOutSheet({
     required this.order,
     required this.saleTx,
     required this.totalPaid,
+    this.markDelivered = true,
   });
 
   static Future<T?> show<T>(
@@ -72,6 +74,7 @@ class _CashOutSheet extends ConsumerStatefulWidget {
     required OrderEntity order,
     required FinancialTransactionEntity saleTx,
     required double totalPaid,
+    bool markDelivered = true,
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -97,6 +100,7 @@ class _CashOutSheet extends ConsumerStatefulWidget {
               order: order,
               saleTx: saleTx,
               totalPaid: totalPaid,
+              markDelivered: markDelivered,
             ),
           ),
         ),
@@ -239,18 +243,22 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               contextId: widget.order.id,
             );
       }
-      await ref
-          .read(ordersControllerProvider.notifier)
-          .updateStatus(widget.order.id, 'delivered');
+      if (widget.markDelivered && widget.order.status != 'delivered') {
+        await ref
+            .read(ordersControllerProvider.notifier)
+            .updateStatus(widget.order.id, 'delivered');
+      }
 
       if (mounted) {
         Navigator.pop(context);
 
         String msg = '';
         if (_selectedMethod == 'debt') {
-          msg = 'Sipariş vadeli olarak teslim edildi.';
-        } else {
+          msg = 'Sipariş vadeli olarak kaydedildi.';
+        } else if (widget.markDelivered) {
           msg = 'Ödeme alındı ve sipariş teslim edildi.';
+        } else {
+          msg = 'Ödeme başarıyla alındı ve kaydedildi.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -280,6 +288,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
       unawaited(() async {
         try {
+          ref.invalidate(_orderPaymentInfoProvider(orderRef.id));
           await ref.read(customersControllerProvider.notifier).refresh();
           if (customerId.isNotEmpty) {
             ref.invalidate(customerTransactionsProvider(customerId));
