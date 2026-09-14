@@ -166,7 +166,7 @@ class TsplCanvasLabelEngine {
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
     final customerTitleFontSize =
-        (isWide ? (isTall ? 36.0 : 31.0) : 27.5) * fontScale;
+        (isWide ? (isTall ? 52.0 : 44.0) : 36.0) * fontScale;
     final cleanNote = note?.trim() ?? '';
     final isLongNote = cleanNote.length > 45;
     final isVeryLongNote = cleanNote.length > 90;
@@ -288,45 +288,57 @@ class TsplCanvasLabelEngine {
       final cleanPhone = hasPhone ? customerPhone.trim() : '';
       final phoneDisplay = cleanPhone.isNotEmpty ? formatPhoneForDisplay(cleanPhone) : '';
 
-      // Sağ Taraf: Üstte Saat, Altında Müşteri Numarası
-      double rightW = 0.0;
-      double dateH = 0.0;
-      if (showDate && dateStr.isNotEmpty) {
-        final dp = TextPainter(
+      // ── Sağ Taraf: 2 Satır (Üstte Sip No & Tarih, Altta Müşteri No) ──
+      const pageSuffix = ' (1/9)';
+      final orderPart = showOrderNo ? '#$orderIdShort$pageSuffix' : '';
+      final orderAndTime = [
+        if (orderPart.isNotEmpty) orderPart,
+        if (dateStr.isNotEmpty) dateStr,
+      ].join('   ');
+
+      double orderTimeW = 0.0;
+      double orderTimeH = 0.0;
+      if (orderAndTime.isNotEmpty) {
+        final op = TextPainter(
           text: TextSpan(
-            text: dateStr,
+            text: orderAndTime,
             style: ts(
               fontSize: detailFontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW * 0.48);
-        rightW = math.max(rightW, dp.width);
-        dateH = dp.height;
+        )..layout(maxWidth: usableW * 0.52);
+        orderTimeW = op.width;
+        orderTimeH = op.height;
       }
 
+      double phoneW = 0.0;
       double phoneH = 0.0;
       if (phoneDisplay.isNotEmpty) {
         final pp = TextPainter(
           text: TextSpan(
-            text: phoneDisplay,
+            text: 'Tel: $phoneDisplay',
             style: ts(
               fontSize: detailFontSize,
               fontWeight: FontWeight.w600,
             ),
           ),
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW * 0.48);
-        rightW = math.max(rightW, pp.width);
+        )..layout(maxWidth: usableW * 0.52);
+        phoneW = pp.width;
         phoneH = pp.height;
       }
 
-      final rightH = (dateH > 0 ? dateH : 0.0) +
-          (phoneH > 0 ? (phoneH + (dateH > 0 ? 2.0 : 0.0)) : 0.0);
+      final rightBlockW = math.max(orderTimeW, phoneW);
+      final rightH = orderTimeH + (phoneH > 0 ? (phoneH + 1.0) : 0.0);
 
-      // Sol Taraf: Müşteri İsmi (Saat ile Aynı Hizadan Başlar)
-      double leftH = 0.0;
+      // ── Sol Taraf: Büyük Müşteri İsmi (Sağdaki 2 Satırla Yan Yana Aynı Hizadan Başlar) ──
+      final custMaxW = rightBlockW > 0
+          ? (usableW - rightBlockW - 8.0).clamp(60.0, usableW)
+          : usableW;
+
+      double custH = 0.0;
       if (showCustomerName) {
         final cleanCust = customerName.trim();
         final isRawId = cleanCust.startsWith('cust-') ||
@@ -334,24 +346,41 @@ class TsplCanvasLabelEngine {
         final displayCust = (cleanCust.isNotEmpty && !isRawId)
             ? cleanCust
             : 'Genel Müşteri';
-        final custMaxW = rightW > 0
-            ? (usableW - rightW - 8.0).clamp(60.0, usableW)
-            : usableW;
-        final cp = TextPainter(
+
+        double dynamicCustFontSize = (isWide ? (isTall ? 44.0 : 38.0) : 30.0) * fontScale;
+        var cp = TextPainter(
           text: TextSpan(
             text: displayCust,
             style: ts(
-              fontSize: customerTitleFontSize,
+              fontSize: dynamicCustFontSize,
               fontWeight: FontWeight.w900,
             ),
           ),
           textDirection: TextDirection.ltr,
           maxLines: 2,
+          ellipsis: '…',
         )..layout(maxWidth: custMaxW);
-        leftH = cp.height;
+
+        while ((cp.height > (rightH > 0 ? rightH + 8.0 : 50.0) || cp.didExceedMaxLines) && dynamicCustFontSize > 22.0) {
+          dynamicCustFontSize -= 1.0;
+          cp = TextPainter(
+            text: TextSpan(
+              text: displayCust,
+              style: ts(
+                fontSize: dynamicCustFontSize,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 2,
+            ellipsis: '…',
+          )..layout(maxWidth: custMaxW);
+        }
+        custH = cp.height;
       }
 
-      h += math.max(leftH, rightH) + 1.0;
+      final headerH = math.max(custH, rightH);
+      h += headerH + 2.0;
 
       if (previousDebt > 0.001) {
         final debtPainter = TextPainter(
@@ -364,9 +393,9 @@ class TsplCanvasLabelEngine {
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: usableW);
-        h += debtPainter.height + 2.0;
+        h += debtPainter.height + 1.5;
       }
-      h += 2.5; // Divider bar
+      h += (isWide ? 2.0 : 1.2) + 1.5; // HeaderDivider
       return h;
     }
 
@@ -406,19 +435,9 @@ class TsplCanvasLabelEngine {
     // Level-M QR code generates 21-25 modules (Version 1-2) + 8 modules quiet zone for short keys
     final qrModules = cleanQrData.length > 25 ? 35 : 29;
     final qrActualSizeDots = (qrModules * qrCellWidth).toDouble();
-
-    // Sipariş No QR kodun üstünde yer alır
-    final qrOrderNoFontSize =
-        (isWide ? (isTall ? 24.0 : 20.0) : 17.0) * fontScale;
-    final qrOrderNoH = showOrderNo
-        ? (qrOrderNoFontSize * 1.2 + 2.0)
-        : 0.0;
-    final qrCaptionH = isWide ? 13.0 : 0.0;
-    final totalQrColumnH = qrActualSizeDots + qrOrderNoH + qrCaptionH;
-
-    // Layout reservation on canvas to ensure breathing room and avoid collision:
+    // Layout reservation on canvas to ensure breathing room and avoid collision (plus caption if wide):
     final qrBoxDots = math.max(
-        totalQrColumnH + (isWide ? (requestedHeightMm <= 40 ? 4.0 : 8.0) : 2.0),
+        qrActualSizeDots + (isWide ? (requestedHeightMm <= 40 ? 6.0 : 16.0) : 4.0),
         (isWide ? (requestedHeightMm <= 40 ? 8.0 : 14.0) : 10.0) * dotsPerMm);
 
     // Guaranteed margins to prevent right or bottom overflow on physical label:
@@ -641,23 +660,30 @@ class TsplCanvasLabelEngine {
 
         final headerTopY = currentY;
 
-        // ── Sağ Üst: Saat / Tarih, Altında Müşteri Numarası (Sağa Yaslı) ──
-        TextPainter? datePainter;
-        double dateW = 0.0;
-        double dateH = 0.0;
-        if (showDate && dateStr.isNotEmpty) {
-          datePainter = TextPainter(
+        // ── Sağ Taraf: 2 Satır (Üstte Sip No & Tarih, Altta Müşteri No) ──
+        final pageSuffix = totalPagesCount > 1 ? ' (1/$totalPagesCount)' : '';
+        final orderPart = showOrderNo ? '#$orderIdShort$pageSuffix' : '';
+        final orderAndTime = [
+          if (orderPart.isNotEmpty) orderPart,
+          if (dateStr.isNotEmpty) dateStr,
+        ].join('   ');
+
+        TextPainter? orderTimePainter;
+        double orderTimeW = 0.0;
+        double orderTimeH = 0.0;
+        if (orderAndTime.isNotEmpty) {
+          orderTimePainter = TextPainter(
             text: TextSpan(
-              text: dateStr,
+              text: orderAndTime,
               style: ts(
                 fontSize: detailFontSize,
                 fontWeight: FontWeight.bold,
               ),
             ),
             textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.48);
-          dateW = datePainter.width;
-          dateH = datePainter.height;
+          )..layout(maxWidth: usableW * 0.52);
+          orderTimeW = orderTimePainter.width;
+          orderTimeH = orderTimePainter.height;
         }
 
         TextPainter? phonePainter;
@@ -666,24 +692,26 @@ class TsplCanvasLabelEngine {
         if (phoneDisplay.isNotEmpty) {
           phonePainter = TextPainter(
             text: TextSpan(
-              text: phoneDisplay,
+              text: 'Tel: $phoneDisplay',
               style: ts(
                 fontSize: detailFontSize,
                 fontWeight: FontWeight.w600,
               ),
             ),
             textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.48);
+          )..layout(maxWidth: usableW * 0.52);
           phoneW = phonePainter.width;
           phoneH = phonePainter.height;
         }
 
-        final rightBlockW = math.max(dateW, phoneW);
-        final rightH = (dateH > 0 ? dateH : 0.0) +
-            (phoneH > 0 ? (phoneH + (dateH > 0 ? 2.0 : 0.0)) : 0.0);
+        final rightBlockW = math.max(orderTimeW, phoneW);
+        final rightH = orderTimeH + (phoneH > 0 ? (phoneH + 1.0) : 0.0);
 
-        // ── Sol Üst: Müşteri İsmi (Saat ile Aynı Hizadan Başlar) ──
-        TextPainter? custPainter;
+        // ── Sol Taraf: Büyük Müşteri İsmi (Sağdaki 2 Satırla Yan Yana Aynı Hizadan Başlar) ──
+        final custMaxW = rightBlockW > 0
+            ? (usableW - rightBlockW - 8.0).clamp(60.0, usableW)
+            : usableW;
+
         double custH = 0.0;
         if (showCustomerName) {
           final cleanCust = customerName.trim();
@@ -692,15 +720,13 @@ class TsplCanvasLabelEngine {
           final displayCust = (cleanCust.isNotEmpty && !isRawId)
               ? cleanCust
               : 'Genel Müşteri';
-          final custMaxW = rightBlockW > 0
-              ? (usableW - rightBlockW - 8.0).clamp(60.0, usableW)
-              : usableW;
 
-          custPainter = TextPainter(
+          double dynamicCustFontSize = (isWide ? (isTall ? 44.0 : 38.0) : 30.0) * fontScale;
+          var custPainter = TextPainter(
             text: TextSpan(
               text: displayCust,
               style: ts(
-                fontSize: customerTitleFontSize,
+                fontSize: dynamicCustFontSize,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -708,8 +734,26 @@ class TsplCanvasLabelEngine {
             maxLines: 2,
             ellipsis: '…',
           )..layout(maxWidth: custMaxW);
+
+          while ((custPainter.height > (rightH > 0 ? rightH + 8.0 : 50.0) || custPainter.didExceedMaxLines) && dynamicCustFontSize > 22.0) {
+            dynamicCustFontSize -= 1.0;
+            custPainter = TextPainter(
+              text: TextSpan(
+                text: displayCust,
+                style: ts(
+                  fontSize: dynamicCustFontSize,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+              maxLines: 2,
+              ellipsis: '…',
+            )..layout(maxWidth: custMaxW);
+          }
+
           custH = custPainter.height;
 
+          // Müşteri ismini sol üstten, sağdaki blokla tam aynı Y hizasında çiz
           custPainter.paint(canvas, Offset(paddingLeft, headerTopY));
 
           pageBoxes.add(ElementBoundingBox(
@@ -721,23 +765,23 @@ class TsplCanvasLabelEngine {
           ));
         }
 
-        // Saati headerTopY hizasında sağa yaslı çiz
-        if (datePainter != null) {
-          final rightX = safeRightX - dateW;
-          datePainter.paint(canvas, Offset(rightX, headerTopY));
+        // Sağ Blok 1. Satır: Sipariş No & Tarih (headerTopY hizasında sağa yaslı)
+        if (orderTimePainter != null) {
+          final rightX = safeRightX - orderTimeW;
+          orderTimePainter.paint(canvas, Offset(rightX, headerTopY));
 
           pageBoxes.add(ElementBoundingBox(
-            elementName: 'Date',
+            elementName: showOrderNo ? 'OrderNo' : 'Date',
             left: rightX,
             top: headerTopY,
-            width: dateW,
-            height: dateH,
+            width: orderTimeW,
+            height: orderTimeH,
           ));
         }
 
-        // Müşteri Numarasını Saatin hemen altına sağa yaslı çiz
+        // Sağ Blok 2. Satır: Müşteri Numarası (Sip No & Tarih'in hemen altında sağa yaslı)
         if (phonePainter != null) {
-          final phoneY = headerTopY + (dateH > 0 ? dateH + 2.0 : 0.0);
+          final phoneY = headerTopY + (orderTimeH > 0 ? orderTimeH + 1.0 : 0.0);
           final phoneX = safeRightX - phoneW;
           phonePainter.paint(canvas, Offset(phoneX, phoneY));
 
@@ -751,7 +795,7 @@ class TsplCanvasLabelEngine {
         }
 
         final headerH = math.max(custH, rightH);
-        currentY = headerTopY + headerH + 1.0;
+        currentY = headerTopY + headerH + 2.0;
 
         if (previousDebt > 0.001) {
           final debtPainter = TextPainter(
@@ -767,19 +811,21 @@ class TsplCanvasLabelEngine {
           debtPainter.paint(canvas, Offset(paddingLeft, currentY));
 
           pageBoxes.add(ElementBoundingBox(
-            elementName: 'PreviousDebt',
+            elementName: 'CustomerDebt',
             left: paddingLeft,
             top: currentY,
             width: debtPainter.width,
             height: debtPainter.height,
           ));
-          currentY += debtPainter.height + 1.0;
+          currentY += debtPainter.height + 1.5;
         }
 
-        // Divider
-        currentY += 1.0;
-        canvas.drawLine(Offset(paddingLeft, currentY),
-            Offset(safeRightX, currentY), linePaint);
+        // Header Divider
+        canvas.drawLine(
+          Offset(paddingLeft, currentY),
+          Offset(safeRightX, currentY),
+          linePaint,
+        );
         pageBoxes.add(ElementBoundingBox(
           elementName: 'HeaderDivider',
           left: paddingLeft,
@@ -787,12 +833,12 @@ class TsplCanvasLabelEngine {
           width: safeRightX - paddingLeft,
           height: isWide ? 2.0 : 1.2,
         ));
-        currentY += 1.5;
+        currentY += (isWide ? 2.0 : 1.2) + 1.5;
       } else {
         // Subsequent Pages Header
         final contTitle = dateStr.isNotEmpty
-            ? 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount)'
-            : 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
+            ? '#$orderIdShort (${pageIdx + 1}/$totalPagesCount)'
+            : '#$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
         final contPainter = TextPainter(
           text: TextSpan(
             text: contTitle,
@@ -924,44 +970,10 @@ class TsplCanvasLabelEngine {
               (widthDots - qrActualSizeDots - qrRightMarginDots).round();
           pageQrX = maxSafeQrX.clamp(paddingLeft.round(), (safeRightX - qrActualSizeDots).round());
 
-          // Sipariş Numarası: QR kodun hemen üstünde ortalanmış
-          TextPainter? qrOrderNoPainter;
-          double qrOrderNoH = 0.0;
-          if (showOrderNo && orderIdShort.isNotEmpty) {
-            qrOrderNoPainter = TextPainter(
-              text: TextSpan(
-                text: '#$orderIdShort',
-                style: ts(
-                  fontSize: (isWide ? (isTall ? 24.0 : 20.0) : 17.0) * fontScale,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              textDirection: TextDirection.ltr,
-            )..layout(maxWidth: math.max(qrActualSizeDots + 30.0, 70.0));
-            qrOrderNoH = qrOrderNoPainter.height + 2.0;
-          }
-
-          final totalQrBlockH = qrActualSizeDots + qrOrderNoH + (isWide ? 13.0 : 0.0);
-          final maxSafeQrBlockTop =
-              (pageHeightDots - totalQrBlockH - qrBottomMarginDots).round();
-          final qrBlockTop = currentY.round().clamp(topMargin.round(), maxSafeQrBlockTop);
-
-          if (qrOrderNoPainter != null) {
-            final orderNoX = (pageQrX + (qrActualSizeDots - qrOrderNoPainter.width) / 2)
-                .clamp(paddingLeft, safeRightX - qrOrderNoPainter.width);
-            final orderNoY = qrBlockTop.toDouble();
-            qrOrderNoPainter.paint(canvas, Offset(orderNoX, orderNoY));
-
-            pageBoxes.add(ElementBoundingBox(
-              elementName: 'OrderNo',
-              left: orderNoX,
-              top: orderNoY,
-              width: qrOrderNoPainter.width,
-              height: qrOrderNoPainter.height,
-            ));
-          }
-
-          pageQrY = (qrBlockTop + qrOrderNoH).round();
+          // Position QR safely above the bottom border
+          final maxSafeQrY =
+              (pageHeightDots - qrActualSizeDots - qrBottomMarginDots).round();
+          pageQrY = currentY.round().clamp(topMargin.round(), maxSafeQrY);
 
           pageBoxes.add(ElementBoundingBox(
             elementName: 'QRCode',
@@ -987,7 +999,7 @@ class TsplCanvasLabelEngine {
                 .clamp(paddingLeft, safeRightX - qrLabelPainter.width);
             final labelY =
                 (pageQrY + qrActualSizeDots + 1.0).clamp(0.0, pageHeightDots - 11.0);
-            if (labelY + qrLabelPainter.height <= pageHeightDots - 2.0) {
+            if (labelY + qrLabelPainter.height <= maxSafePageY) {
               qrLabelPainter.paint(canvas, Offset(labelX, labelY));
               pageBoxes.add(ElementBoundingBox(
                 elementName: 'QRCaption',
