@@ -1086,16 +1086,17 @@ class _DeviceCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // 1. Sol: Cihaz İkonu & Aktiflik Rozeti
-                Stack(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact =
+                    !constraints.hasBoundedHeight && constraints.maxWidth < 460;
+
+                final iconWidget = Stack(
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 42,
-                      height: 42,
+                      width: isCompact ? 38 : 42,
+                      height: isCompact ? 38 : 42,
                       decoration: BoxDecoration(
                         color: typeColor.withValues(alpha: .1),
                         borderRadius: BorderRadius.circular(11),
@@ -1103,16 +1104,19 @@ class _DeviceCard extends StatelessWidget {
                           color: typeColor.withValues(alpha: .2),
                         ),
                       ),
-                      child: Icon(_typeIcon(device.type),
-                          color: typeColor, size: 21),
+                      child: Icon(
+                        _typeIcon(device.type),
+                        color: typeColor,
+                        size: isCompact ? 19 : 21,
+                      ),
                     ),
                     if (isActive)
                       Positioned(
                         right: -2,
                         top: -2,
                         child: Container(
-                          width: 11,
-                          height: 11,
+                          width: 10,
+                          height: 10,
                           decoration: BoxDecoration(
                             color: kGreen,
                             shape: BoxShape.circle,
@@ -1121,199 +1125,284 @@ class _DeviceCard extends StatelessWidget {
                         ),
                       ),
                   ],
-                ),
-                const SizedBox(width: 12),
+                );
 
-                // 2. Orta: Cihaz Adı, Rol Rozeti ve Bağlantı Meta Bilgisi
-                Expanded(
-                  child: Column(
+                final menuButton = PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded,
+                      size: 18, color: kTextSecondary),
+                  padding: EdgeInsets.zero,
+                  tooltip: 'İşlemler',
+                  onSelected: (value) {
+                    if (value == 'test') onTest();
+                    if (value == 'edit') onEdit();
+                    if (value == 'activate') onActivate();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.tune_rounded, size: 18),
+                        title: Text('Ayarlar & Düzenle'),
+                      ),
+                    ),
+                    if (!isActive)
+                      const PopupMenuItem(
+                        value: 'activate',
+                        child: ListTile(
+                          dense: true,
+                          leading: Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 18),
+                          title: Text('Aktif cihaz yap'),
+                        ),
+                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.delete_outline_rounded,
+                            color: kPink, size: 18),
+                        title: Text('Kaldır',
+                            style: TextStyle(color: kPink)),
+                      ),
+                    ),
+                  ],
+                );
+
+                final titleRow = Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        device.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                    ),
+                    if (isCloud) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: kTeal.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Bulut',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: kTeal,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (isPrinter && activeFor.isNotEmpty) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: kGreen.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          activeFor
+                              .map((k) => switch (k) {
+                                    'receipt' => 'Fiş',
+                                    'productLabel' => 'Etiket',
+                                    'orderLabel' => 'Sipariş',
+                                    _ => k,
+                                  })
+                              .join(' + '),
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: kGreen,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+
+                final subtitleWidget = Text(
+                  _deviceSubtitle(device),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: kTextSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+
+                final errorWidget = hasError
+                    ? Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              size: 12, color: kPink),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              device.lastError ??
+                                  device.lastMessage ??
+                                  'Aygıt çevrimdışı veya yanıt vermiyor',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: kPink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : null;
+
+                if (isCompact) {
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Flexible(
-                            child: Text(
-                              device.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                                color: kTextPrimary,
+                          iconWidget,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                titleRow,
+                                const SizedBox(height: 2),
+                                subtitleWidget,
+                              ],
+                            ),
+                          ),
+                          menuButton,
+                        ],
+                      ),
+                      if (errorWidget != null) ...[
+                        const SizedBox(height: 6),
+                        errorWidget,
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _DeviceStatusPill(
+                            label: status.$1,
+                            color: status.$2,
+                            isActive: isActive,
+                          ),
+                          const Spacer(),
+                          Tooltip(
+                            message: 'Bağlantıyı test et',
+                            child: SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: IconButton.filledTonal(
+                                padding: EdgeInsets.zero,
+                                style: IconButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: device.status ==
+                                        HardwareDeviceStatus.testing
+                                    ? null
+                                    : onTest,
+                                icon: device.status ==
+                                        HardwareDeviceStatus.testing
+                                    ? const SizedBox.square(
+                                        dimension: 12,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.play_arrow_rounded,
+                                        size: 16),
                               ),
                             ),
                           ),
-                          if (isCloud) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: kTeal.withValues(alpha: .12),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Bulut',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: kTeal,
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (isPrinter && activeFor.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: kGreen.withValues(alpha: .12),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                activeFor
-                                    .map((k) => switch (k) {
-                                          'receipt' => 'Fiş',
-                                          'productLabel' => 'Etiket',
-                                          'orderLabel' => 'Sipariş',
-                                          _ => k,
-                                        })
-                                    .join(' + '),
-                                style: const TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: kGreen,
-                                ),
-                              ),
-                            ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    iconWidget,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          titleRow,
+                          const SizedBox(height: 3),
+                          subtitleWidget,
+                          if (errorWidget != null) ...[
+                            const SizedBox(height: 3),
+                            errorWidget,
                           ],
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _deviceSubtitle(device),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: kTextSecondary,
-                          fontWeight: FontWeight.w500,
+                    ),
+                    const SizedBox(width: 10),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _DeviceStatusPill(
+                          label: status.$1,
+                          color: status.$2,
+                          isActive: isActive,
                         ),
-                      ),
-                      if (hasError) ...[
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            const Icon(Icons.error_outline_rounded,
-                                size: 12, color: kPink),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                device.lastError ??
-                                    device.lastMessage ??
-                                    'Aygıt çevrimdışı veya yanıt vermiyor',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: kPink,
-                                  fontWeight: FontWeight.w600,
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: 'Bağlantıyı test et',
+                          child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton.filledTonal(
+                              padding: EdgeInsets.zero,
+                              style: IconButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // 3. Sağ: Durum Rozeti + Kompakt Test İkonu + Menü
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _DeviceStatusPill(
-                      label: status.$1,
-                      color: status.$2,
-                      isActive: isActive,
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Bağlantıyı test et',
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: IconButton.filledTonal(
-                          padding: EdgeInsets.zero,
-                          style: IconButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed:
-                              device.status == HardwareDeviceStatus.testing
+                              onPressed: device.status ==
+                                      HardwareDeviceStatus.testing
                                   ? null
                                   : onTest,
-                          icon: device.status == HardwareDeviceStatus.testing
-                              ? const SizedBox.square(
-                                  dimension: 12,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
-                                )
-                              : const Icon(Icons.play_arrow_rounded,
-                                  size: 16),
-                        ),
-                      ),
-                    ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded,
-                          size: 18, color: kTextSecondary),
-                      padding: EdgeInsets.zero,
-                      tooltip: 'İşlemler',
-                      onSelected: (value) {
-                        if (value == 'test') onTest();
-                        if (value == 'edit') onEdit();
-                        if (value == 'activate') onActivate();
-                        if (value == 'delete') onDelete();
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.tune_rounded, size: 18),
-                            title: Text('Ayarlar & Düzenle'),
-                          ),
-                        ),
-                        if (!isActive)
-                          const PopupMenuItem(
-                            value: 'activate',
-                            child: ListTile(
-                              dense: true,
-                              leading: Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  size: 18),
-                              title: Text('Aktif cihaz yap'),
+                              icon: device.status ==
+                                      HardwareDeviceStatus.testing
+                                  ? const SizedBox.square(
+                                      dimension: 12,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.play_arrow_rounded,
+                                      size: 16),
                             ),
                           ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: ListTile(
-                            dense: true,
-                            leading: Icon(Icons.delete_outline_rounded,
-                                color: kPink, size: 18),
-                            title: Text('Kaldır',
-                                style: TextStyle(color: kPink)),
-                          ),
                         ),
+                        menuButton,
                       ],
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
