@@ -453,13 +453,11 @@ class _DeviceListState extends State<_DeviceList> {
       _DeviceFilter.salesHardware => salesHardware,
     };
 
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= 760 ? 2 : 1;
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final cardExtent = 84.0 + (textScale - 1).clamp(0.0, 1.0) * 24;
+
 
     return CustomScrollView(
       slivers: [
+        // ── YENİ KOMPAKT DURUM ŞERIDI ──────────────────────────────────────────
         SliverToBoxAdapter(
           child: _HardwareHero(
             total: devices.length,
@@ -469,57 +467,25 @@ class _DeviceListState extends State<_DeviceList> {
             onAddCloud: widget.onAddCloud,
           ),
         ),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+        // ── FİLTRE CHİPLERİ ───────────────────────────────────────────────────
         if (devices.isNotEmpty)
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    ChoiceChip(
-                      label: Text('Tümü (${devices.length})'),
-                      selected: _filter == _DeviceFilter.all,
-                      onSelected: (_) =>
-                          setState(() => _filter = _DeviceFilter.all),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.print_rounded, size: 16),
-                      label: Text('Yazıcılar (${allPrinters.length})'),
-                      selected: _filter == _DeviceFilter.printers,
-                      onSelected: (_) =>
-                          setState(() => _filter = _DeviceFilter.printers),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.point_of_sale_rounded, size: 16),
-                      label: Text('Satış donanımı (${salesHardware.length})'),
-                      selected: _filter == _DeviceFilter.salesHardware,
-                      onSelected: (_) =>
-                          setState(() => _filter = _DeviceFilter.salesHardware),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.computer_rounded, size: 16),
-                      label: Text('Cihaz donanımı (${localDevices.length})'),
-                      selected: _filter == _DeviceFilter.localDevices,
-                      onSelected: (_) =>
-                          setState(() => _filter = _DeviceFilter.localDevices),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      avatar: const Icon(Icons.cloud_done_rounded, size: 16),
-                      label: Text('Bulut yazıcılar (${cloudDevices.length})'),
-                      selected: _filter == _DeviceFilter.cloudPrinters,
-                      onSelected: (_) =>
-                          setState(() => _filter = _DeviceFilter.cloudPrinters),
-                    ),
-                  ],
-                ),
-              ),
+            child: _DeviceFilterBar(
+              filter: _filter,
+              allCount: devices.length,
+              printersCount: allPrinters.length,
+              salesCount: salesHardware.length,
+              localCount: localDevices.length,
+              cloudCount: cloudDevices.length,
+              onChanged: (f) => setState(() => _filter = f),
             ),
           ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+        // ── CİHAZ LİSTELERİ ───────────────────────────────────────────────────
         if (devices.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
@@ -531,109 +497,244 @@ class _DeviceListState extends State<_DeviceList> {
             SliverToBoxAdapter(
               child: _SectionHeader(
                 icon: Icons.devices_rounded,
+                iconColor: kBlue,
                 title: 'Bu Cihaza Bağlı Donanımlar',
                 count: localDevices.length,
-                subtitle:
-                    'Terminale doğrudan (USB, COM, Dahili, Windows) veya yerel ağla bağlı aygıtlar',
+                subtitle: 'USB, COM, Dahili, Windows veya yerel ağ bağlantısı',
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.only(top: 10, bottom: 20),
-              sliver: _buildDevicesLayout(localDevices, columns, cardExtent),
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
+              sliver: _buildDeviceList(localDevices),
             ),
           ],
           // Bölüm 2: Bulut & Ortak Ağ Yazıcıları
           SliverToBoxAdapter(
             child: _SectionHeader(
               icon: Icons.cloud_done_rounded,
+              iconColor: kTeal,
               title: 'Bulut ve Ortak Yazıcılar',
               count: cloudDevices.length,
-              subtitle:
-                  'Aynı işletmedeki diğer açık terminaller tarafından paylaşılan yazıcılar',
-              action: TextButton.icon(
-                style: TextButton.styleFrom(
+              subtitle: 'Diğer terminallerin paylaştığı ağ yazıcıları',
+              action: FilledButton.tonal(
+                style: FilledButton.styleFrom(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: widget.onAddCloud,
-                icon: const Icon(Icons.add_link_rounded, size: 16),
-                label: const Text('Ortak Yazıcı Bağla'),
+                child: const Text('Bağla'),
               ),
             ),
           ),
           if (cloudDevices.isNotEmpty)
             SliverPadding(
-              padding: const EdgeInsets.only(top: 10, bottom: 24),
-              sliver: _buildDevicesLayout(cloudDevices, columns, cardExtent),
+              padding: const EdgeInsets.only(top: 8, bottom: 24),
+              sliver: _buildDeviceList(cloudDevices),
             )
           else
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 28),
+                padding: const EdgeInsets.only(top: 8, bottom: 28),
                 child: _EmptyCloudNotice(onConnect: widget.onAddCloud),
               ),
             ),
         ] else if (visible.isEmpty)
           const SliverFillRemaining(
             hasScrollBody: false,
-            child: Center(child: Text('Bu grupta kayıtlı cihaz yok.')),
+            child: Center(
+              child: Text(
+                'Bu grupta kayıtlı cihaz yok.',
+                style: TextStyle(color: kTextSecondary, fontSize: 14),
+              ),
+            ),
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
-            sliver: _buildDevicesLayout(visible, columns, cardExtent),
+            padding: const EdgeInsets.only(top: 4, bottom: 24),
+            sliver: _buildDeviceList(visible),
           ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
       ],
     );
   }
 
-  Widget _buildDevicesLayout(
-    List<HardwareDevice> items,
-    int columns,
-    double cardExtent,
-  ) {
-    if (columns <= 1) {
-      return SliverList.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final device = items[index];
-          return _DeviceCard(
-            device: device,
-            onEdit: () => widget.onEdit(device),
-            onActivate: () => widget.onActivate(device),
-            onTest: () => widget.onTest(device),
-            onDelete: () => widget.onDelete(device),
-          );
-        },
-      );
-    }
-    return SliverGrid(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        mainAxisExtent: cardExtent,
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          final device = items[index];
-          return _DeviceCard(
-            device: device,
-            onEdit: () => widget.onEdit(device),
-            onActivate: () => widget.onActivate(device),
-            onTest: () => widget.onTest(device),
-            onDelete: () => widget.onDelete(device),
-          );
-        },
-        childCount: items.length,
+  Widget _buildDeviceList(List<HardwareDevice> items) {
+    return SliverList.separated(
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final device = items[index];
+        return _DeviceCard(
+          device: device,
+          onEdit: () => widget.onEdit(device),
+          onActivate: () => widget.onActivate(device),
+          onTest: () => widget.onTest(device),
+          onDelete: () => widget.onDelete(device),
+        );
+      },
+    );
+  }
+}
+
+// ── FİLTRE BAR ──────────────────────────────────────────────────────────────
+class _DeviceFilterBar extends StatelessWidget {
+  final _DeviceFilter filter;
+  final int allCount;
+  final int printersCount;
+  final int salesCount;
+  final int localCount;
+  final int cloudCount;
+  final ValueChanged<_DeviceFilter> onChanged;
+
+  const _DeviceFilterBar({
+    required this.filter,
+    required this.allCount,
+    required this.printersCount,
+    required this.salesCount,
+    required this.localCount,
+    required this.cloudCount,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _FilterChip(
+            label: 'Tümü',
+            count: allCount,
+            icon: Icons.apps_rounded,
+            selected: filter == _DeviceFilter.all,
+            onTap: () => onChanged(_DeviceFilter.all),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Yazıcılar',
+            count: printersCount,
+            icon: Icons.print_rounded,
+            color: kBlue,
+            selected: filter == _DeviceFilter.printers,
+            onTap: () => onChanged(_DeviceFilter.printers),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Satış',
+            count: salesCount,
+            icon: Icons.point_of_sale_rounded,
+            color: kOrange,
+            selected: filter == _DeviceFilter.salesHardware,
+            onTap: () => onChanged(_DeviceFilter.salesHardware),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Yerel',
+            count: localCount,
+            icon: Icons.computer_rounded,
+            color: kGreen,
+            selected: filter == _DeviceFilter.localDevices,
+            onTap: () => onChanged(_DeviceFilter.localDevices),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Bulut',
+            count: cloudCount,
+            icon: Icons.cloud_done_rounded,
+            color: kTeal,
+            selected: filter == _DeviceFilter.cloudPrinters,
+            onTap: () => onChanged(_DeviceFilter.cloudPrinters),
+          ),
+        ],
       ),
     );
   }
 }
 
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.count,
+    required this.icon,
+    this.color = kTextSecondary,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = selected ? color : kTextSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: .1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? color.withValues(alpha: .5) : kBorderColor,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: activeColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    selected ? FontWeight.w800 : FontWeight.w500,
+                color: activeColor,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected
+                    ? color.withValues(alpha: .15)
+                    : kBorderColor.withValues(alpha: .8),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? color : kTextSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── BÖLÜM BAŞLIĞI ────────────────────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
+  final Color iconColor;
   final String title;
   final int count;
   final String subtitle;
@@ -641,6 +742,7 @@ class _SectionHeader extends StatelessWidget {
 
   const _SectionHeader({
     required this.icon,
+    this.iconColor = kGreen,
     required this.title,
     required this.count,
     required this.subtitle,
@@ -649,86 +751,72 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCompact = MediaQuery.sizeOf(context).width < 450;
-    final headerContent = Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: kGreen.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16, color: kGreen),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: kTextPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: kBorderColor.withValues(alpha: .6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: kTextSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: kTextSecondary),
-              ),
-            ],
-          ),
-        ),
-        if (action != null && !isCompact) action!,
-      ],
-    );
-
-    if (action != null && isCompact) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            headerContent,
-            Align(alignment: Alignment.centerRight, child: action!),
-          ],
-        ),
-      );
-    }
-
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: headerContent,
+      padding: const EdgeInsets.only(top: 8, bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: kBorderColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: kTextSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 11, color: kTextSecondary),
+                ),
+              ],
+            ),
+          ),
+          if (action != null) ...[
+            const SizedBox(width: 8),
+            action!,
+          ],
+        ],
+      ),
     );
   }
 }
@@ -743,20 +831,21 @@ class _EmptyCloudNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kTeal.withValues(alpha: .04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderColor),
+        border: Border.all(color: kTeal.withValues(alpha: .2)),
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: kTeal.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(11),
             ),
-            child: const Icon(Icons.cloud_outlined, color: kTeal, size: 22),
+            child:
+                const Icon(Icons.cloud_outlined, color: kTeal, size: 22),
           ),
           const SizedBox(width: 14),
           const Expanded(
@@ -764,7 +853,7 @@ class _EmptyCloudNotice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Bağlı bulut yazıcı yok',
+                  'Ağda ortak yazıcı bulunamadı',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -773,24 +862,27 @@ class _EmptyCloudNotice extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Aynı işletmedeki diğer terminal veya bilgisayarların paylaştığı ortak yazıcıları kullanabilirsiniz.',
-                  style: TextStyle(fontSize: 11, color: kTextSecondary),
+                  'Aynı işletmedeki diğer terminallerin paylaştığı yazıcılara bağlanabilirsiniz.',
+                  style: TextStyle(fontSize: 11, color: kTextSecondary, height: 1.4),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          FilledButton.tonalIcon(
+          FilledButton.tonal(
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              backgroundColor: kTeal.withValues(alpha: .1),
+              foregroundColor: kTeal,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
+              textStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             ),
             onPressed: onConnect,
-            icon: const Icon(Icons.cloud_sync_rounded, size: 16),
-            label:
-                const Text('Ortak Yazıcı Bul', style: TextStyle(fontSize: 12)),
+            child: const Text('Tara & Bağla'),
           ),
         ],
       ),
@@ -798,6 +890,7 @@ class _EmptyCloudNotice extends StatelessWidget {
   }
 }
 
+// ── YENİ KOMPAKT HERO HEADER ─────────────────────────────────────────────────
 class _HardwareHero extends StatelessWidget {
   final int total;
   final int ready;
@@ -815,213 +908,145 @@ class _HardwareHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasIssue = attention > 0;
+    final allReady = total > 0 && attention == 0 && ready == total;
+    final statusColor = hasIssue ? kPink : (allReady ? kGreen : kOrange);
+    final statusLabel = hasIssue
+        ? '$attention cihazda sorun'
+        : (total == 0
+            ? 'Cihaz eklenmedi'
+            : (allReady ? 'Tüm cihazlar hazır' : '$ready / $total hazır'));
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: kBorderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 680;
-          final header = Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: kGreen.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
+      child: Row(
+        children: [
+          // Status indicator
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: statusColor.withValues(alpha: .2)),
+            ),
+            child: Icon(Icons.devices_rounded, color: statusColor, size: 22),
+          ),
+          const SizedBox(width: 12),
+          // Title + status
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Aygıt Yöneticisi',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: kTextPrimary,
+                  ),
                 ),
-                child: const Icon(Icons.devices_other_rounded,
-                    color: kGreen, size: 24),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 2),
+                Row(
                   children: [
-                    Text(
-                      'Aygıt & Donanım Merkezi',
-                      style: TextStyle(
-                        color: kTextPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(width: 5),
                     Text(
-                      'Yerel donanım bağlantıları ve işletme bulut yazıcıları',
+                      statusLabel,
                       style: TextStyle(
-                        color: kTextSecondary,
                         fontSize: 12,
-                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
                       ),
                     ),
+                    if (total > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '· $total toplam',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-            ],
-          );
-
-          final metrics = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _CompactDeviceMetric(value: '$total', label: 'Toplam'),
-              const SizedBox(width: 8),
-              _CompactDeviceMetric(
-                value: '$ready',
-                label: 'Hazır',
-                positive: true,
-              ),
-              if (attention > 0) ...[
-                const SizedBox(width: 8),
-                _CompactDeviceMetric(
-                  value: '$attention',
-                  label: 'Sorun',
-                  alert: true,
-                ),
               ],
-            ],
-          );
-
-          final actions = Row(
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Action buttons
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: kBorderColor),
+              Tooltip(
+                message: 'Ortak yazıcı bağla',
+                child: InkWell(
+                  onTap: onAddCloud,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: kBorderColor),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_sync_rounded,
+                            size: 16, color: kTeal),
+                        SizedBox(width: 5),
+                        Text(
+                          'Bulut',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                onPressed: onAddCloud,
-                icon: const Icon(Icons.cloud_sync_rounded,
-                    size: 17, color: kTeal),
-                label: const Text('Ortak Yazıcı',
-                    style: TextStyle(fontSize: 12, color: kTextPrimary)),
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  backgroundColor: kGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Aygıt ekle',
-                    style:
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Ekle'),
               ),
             ],
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                header,
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '$total toplam · $ready hazır${attention > 0 ? ' · $attention sorun' : ''}',
-                        style: TextStyle(
-                          color: attention > 0 ? kPink : kTextSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Tooltip(
-                      message: 'Ortak yazıcılar',
-                      child: IconButton.outlined(
-                        onPressed: onAddCloud,
-                        icon: const Icon(Icons.cloud_sync_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Hızlı ekle',
-                      child: IconButton.filled(
-                        onPressed: onAdd,
-                        icon: const Icon(Icons.add_rounded),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(child: header),
-              const SizedBox(width: 16),
-              metrics,
-              const SizedBox(width: 14),
-              actions,
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _CompactDeviceMetric extends StatelessWidget {
-  const _CompactDeviceMetric({
-    required this.value,
-    required this.label,
-    this.alert = false,
-    this.positive = false,
-  });
-
-  final String value;
-  final String label;
-  final bool alert;
-  final bool positive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = alert ? kPink : (positive ? kGreen : kTextPrimary);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 58),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: .15)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-                fontSize: 10,
-                color: kTextSecondary,
-                fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1029,6 +1054,9 @@ class _CompactDeviceMetric extends StatelessWidget {
   }
 }
 
+// _CompactDeviceMetric artık kullanılmıyor — _HardwareHero yenilendi
+
+// ── YENİ DEVICE CARD ─────────────────────────────────────────────────────────
 class _DeviceCard extends StatelessWidget {
   final HardwareDevice device;
   final VoidCallback onEdit;
@@ -1061,350 +1089,306 @@ class _DeviceCard extends StatelessWidget {
     final hasError = device.lastError != null ||
         device.status == HardwareDeviceStatus.error ||
         device.status == HardwareDeviceStatus.offline;
+    final isTesting = device.status == HardwareDeviceStatus.testing;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isActive ? kGreen.withValues(alpha: .5) : kBorderColor,
-          width: isActive ? 1.5 : 1,
+          color: hasError
+              ? kPink.withValues(alpha: .35)
+              : isActive
+                  ? typeColor.withValues(alpha: .35)
+                  : kBorderColor,
+          width: (hasError || isActive) ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact =
-                    !constraints.hasBoundedHeight && constraints.maxWidth < 460;
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Renkli sol şerit ──
+            Container(
+              width: 5,
+              color: hasError ? kPink : typeColor,
+            ),
 
-                final iconWidget = Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: isCompact ? 38 : 42,
-                      height: isCompact ? 38 : 42,
-                      decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(11),
-                        border: Border.all(
-                          color: typeColor.withValues(alpha: .2),
-                        ),
-                      ),
-                      child: Icon(
-                        _typeIcon(device.type),
-                        color: typeColor,
-                        size: isCompact ? 19 : 21,
-                      ),
-                    ),
-                    if (isActive)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: kGreen,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-
-                final menuButton = PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert_rounded,
-                      size: 18, color: kTextSecondary),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'İşlemler',
-                  onSelected: (value) {
-                    if (value == 'test') onTest();
-                    if (value == 'edit') onEdit();
-                    if (value == 'activate') onActivate();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(Icons.tune_rounded, size: 18),
-                        title: Text('Ayarlar & Düzenle'),
-                      ),
-                    ),
-                    if (!isActive)
-                      const PopupMenuItem(
-                        value: 'activate',
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 18),
-                          title: Text('Aktif cihaz yap'),
-                        ),
-                      ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(Icons.delete_outline_rounded,
-                            color: kPink, size: 18),
-                        title: Text('Kaldır',
-                            style: TextStyle(color: kPink)),
-                      ),
-                    ),
-                  ],
-                );
-
-                final titleRow = Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        device.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                    ),
-                    if (isCloud) ...[
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: kTeal.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Bulut',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: kTeal,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (isPrinter && activeFor.isNotEmpty) ...[
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: kGreen.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          activeFor
-                              .map((k) => switch (k) {
-                                    'receipt' => 'Fiş',
-                                    'productLabel' => 'Etiket',
-                                    'orderLabel' => 'Sipariş',
-                                    _ => k,
-                                  })
-                              .join(' + '),
-                          style: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: kGreen,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-
-                final subtitleWidget = Text(
-                  _deviceSubtitle(device),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: kTextSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                );
-
-                final errorWidget = hasError
-                    ? Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded,
-                              size: 12, color: kPink),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              device.lastError ??
-                                  device.lastMessage ??
-                                  'Aygıt çevrimdışı veya yanıt vermiyor',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: kPink,
-                                fontWeight: FontWeight.w600,
+            // ── Kart içeriği ──
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onEdit,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 13, 10, 13),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // İkon
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: typeColor.withValues(alpha: .1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                _typeIcon(device.type),
+                                color: typeColor,
+                                size: 20,
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    : null;
+                            const SizedBox(width: 12),
+                            // İsim + altyazı
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // İsim + badge'ler
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          device.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: kTextPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isCloud) ...[
+                                        const SizedBox(width: 6),
+                                        const _Badge(
+                                            label: 'Bulut', color: kTeal),
+                                      ],
+                                      if (isPrinter &&
+                                          activeFor.isNotEmpty) ...[
+                                        const SizedBox(width: 4),
+                                        _Badge(
+                                          label: activeFor
+                                              .map((k) => switch (k) {
+                                                    'receipt' => 'Fiş',
+                                                    'productLabel' =>
+                                                      'Etiket',
+                                                    'orderLabel' =>
+                                                      'Sipariş',
+                                                    _ => k,
+                                                  })
+                                              .join('+'),
+                                          color: kGreen,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  // Bağlantı bilgisi
+                                  Text(
+                                    _deviceSubtitle(device),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: kTextSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Durum pill
+                            _DeviceStatusPill(
+                              label: status.$1,
+                              color: status.$2,
+                              isActive: isActive,
+                            ),
+                          ],
+                        ),
 
-                if (isCompact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          iconWidget,
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                        // Hata mesajı
+                        if (hasError && device.lastError != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: kPink.withValues(alpha: .06),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: kPink.withValues(alpha: .15)),
+                            ),
+                            child: Row(
                               children: [
-                                titleRow,
-                                const SizedBox(height: 2),
-                                subtitleWidget,
+                                const Icon(Icons.error_outline_rounded,
+                                    size: 13, color: kPink),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    device.lastError ??
+                                        device.lastMessage ??
+                                        'Aygıt yanıt vermiyor',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: kPink,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          menuButton,
                         ],
-                      ),
-                      if (errorWidget != null) ...[
-                        const SizedBox(height: 6),
-                        errorWidget,
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _DeviceStatusPill(
-                            label: status.$1,
-                            color: status.$2,
-                            isActive: isActive,
-                          ),
-                          const Spacer(),
-                          Tooltip(
-                            message: 'Bağlantıyı test et',
-                            child: SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: IconButton.filledTonal(
-                                padding: EdgeInsets.zero,
-                                style: IconButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                onPressed: device.status ==
-                                        HardwareDeviceStatus.testing
-                                    ? null
-                                    : onTest,
-                                icon: device.status ==
-                                        HardwareDeviceStatus.testing
-                                    ? const SizedBox.square(
-                                        dimension: 12,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.play_arrow_rounded,
-                                        size: 16),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                }
 
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          titleRow,
-                          const SizedBox(height: 3),
-                          subtitleWidget,
-                          if (errorWidget != null) ...[
-                            const SizedBox(height: 3),
-                            errorWidget,
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _DeviceStatusPill(
-                          label: status.$1,
-                          color: status.$2,
-                          isActive: isActive,
-                        ),
-                        const SizedBox(width: 6),
-                        Tooltip(
-                          message: 'Bağlantıyı test et',
-                          child: SizedBox(
-                            width: 32,
-                            height: 32,
-                            child: IconButton.filledTonal(
-                              padding: EdgeInsets.zero,
-                              style: IconButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: device.status ==
-                                      HardwareDeviceStatus.testing
+                        // ── Aksiyon butonları ──
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            // Test
+                            _ActionButton(
+                              icon: isTesting
                                   ? null
-                                  : onTest,
-                              icon: device.status ==
-                                      HardwareDeviceStatus.testing
-                                  ? const SizedBox.square(
-                                      dimension: 12,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.play_arrow_rounded,
-                                      size: 16),
+                                  : Icons.wifi_tethering_rounded,
+                              label: isTesting ? 'Test...' : 'Test Et',
+                              color: kBlue,
+                              isLoading: isTesting,
+                              onTap: isTesting ? null : onTest,
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            // Düzenle
+                            _ActionButton(
+                              icon: Icons.tune_rounded,
+                              label: 'Düzenle',
+                              color: kTextSecondary,
+                              onTap: onEdit,
+                            ),
+                            if (!isActive) ...[
+                              const SizedBox(width: 8),
+                              _ActionButton(
+                                icon: Icons.check_circle_outline_rounded,
+                                label: 'Aktif Yap',
+                                color: kGreen,
+                                onTap: onActivate,
+                              ),
+                            ],
+                            const Spacer(),
+                            // Sil
+                            _ActionButton(
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Kaldır',
+                              color: kPink,
+                              onTap: onDelete,
+                            ),
+                          ],
                         ),
-                        menuButton,
                       ],
                     ),
-                  ],
-                );
-              },
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _Badge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool isLoading;
+
+  const _ActionButton({
+    this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: .15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: color,
+                ),
+              )
+            else if (icon != null)
+              Icon(icon, size: 13, color: color),
+            if (icon != null || isLoading) const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1488,6 +1472,7 @@ class _DeviceStatusPill extends StatelessWidget {
 }
 
 
+// ── YENİ BOŞ DURUM EKRANI ───────────────────────────────────────────────────
 class _EmptyDevices extends StatelessWidget {
   final VoidCallback onAdd;
 
@@ -1495,33 +1480,158 @@ class _EmptyDevices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final quickTypes = [
+      (
+        Icons.print_rounded,
+        kBlue,
+        'Fiş Yazıcısı',
+        'Kasa fişi, mutfak çıktısı'
+      ),
+      (
+        Icons.label_rounded,
+        kTeal,
+        'Etiket Yazıcısı',
+        'Ürün ve raf etiketi'
+      ),
+      (
+        Icons.scale_rounded,
+        kGreen,
+        'Terazi',
+        'Canlı tartım → satış'
+      ),
+      (
+        Icons.credit_card_rounded,
+        kOrange,
+        'Fiziksel POS',
+        'Banka POS terminali'
+      ),
+    ];
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.devices_other_rounded,
-            size: 64,
-            color: kTextSecondary,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Henüz cihaz eklenmedi',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Yazıcı, terazi veya POS bağlantınızı ekleyin. USB barkod okuyucular ve kamera ayrıca ayar gerektirmez.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: kTextSecondary),
-          ),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('İlk cihazı ekle'),
-          ),
-        ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: kGreen.withValues(alpha: .08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.devices_other_rounded,
+                size: 36,
+                color: kGreen,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Henüz cihaz eklenmedi',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: kTextPrimary),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Aşağıdaki cihaz türlerinden birini ekleyerek başlayın.\nUSB barkod okuyucular otomatik algılanır.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: kTextSecondary, fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            // Hızlı cihaz tipi kartları
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2.3,
+              children: quickTypes.map((t) {
+                final (icon, color, name, desc) = t;
+                return GestureDetector(
+                  onTap: onAdd,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: kBorderColor),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: .1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(icon, size: 18, color: color),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: kTextPrimary,
+                                ),
+                              ),
+                              Text(
+                                desc,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: kTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.add_rounded,
+                            size: 16, color: color.withValues(alpha: .6)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text(
+                  'Yeni Cihaz Ekle',
+                  style:
+                      TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
