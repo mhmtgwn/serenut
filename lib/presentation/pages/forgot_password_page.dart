@@ -19,6 +19,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
 
   // ── Adım 1: Bilgi Doğrulama ──
+  final _emailResetCtrl = TextEditingController();
   final _identifierCtrl = TextEditingController(); // E-posta veya Kullanıcı Adı
   final _companyNameCtrl = TextEditingController();
   final _taxNoCtrl = TextEditingController();
@@ -31,14 +32,17 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _confirmPasswordCtrl = TextEditingController();
 
   int _step = 0; // 0: Bilgi Doğrulama, 1: Yeni Şifre Belirleme, 2: Başarılı
+  int _recoveryMethod = 0; // 0: E-posta ile Sıfırlama, 1: Kurtarma Kodu ile Anında
   bool _isLoading = false;
   bool _obscurePass = true;
   bool _obscurePass2 = true;
   String? _errorMessage;
+  String? _successMessage;
   String? _resetToken;
 
   @override
   void dispose() {
+    _emailResetCtrl.dispose();
     _identifierCtrl.dispose();
     _companyNameCtrl.dispose();
     _taxNoCtrl.dispose();
@@ -50,6 +54,43 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     super.dispose();
   }
 
+  Future<void> _sendEmailReset() async {
+    final email = _emailResetCtrl.text.trim().toLowerCase();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() =>
+          _errorMessage = 'Lütfen geçerli bir e-posta adresi giriniz.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.post('/auth/forgot-password', {
+        'email': email,
+      });
+      final body = response.json as Map<String, dynamic>?;
+      final msg = body?['message']?.toString() ??
+          'Eğer bu e-posta adresiyle eşleşen bir hesap varsa, şifre sıfırlama bağlantısı gönderilmiştir.';
+      if (mounted) {
+        setState(() {
+          _successMessage = msg;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Şifre sıfırlama bağlantısı gönderilemedi: $e';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   // ── 1. Adım: Bilgileri Doğrula ──
   Future<void> _verifyIdentity() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -57,6 +98,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _successMessage = null;
     });
 
     try {
@@ -210,129 +252,233 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: POSColors.greenLight,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.verified_user_rounded,
-                  color: POSColors.green, size: 28),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bilgi Doğrulama',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: POSColors.greenDark,
+        // Metot Seçici (SegmentedButton)
+        SegmentedButton<int>(
+          segments: const [
+            ButtonSegment<int>(
+              value: 0,
+              label: Text('E-posta Bağlantısı'),
+              icon: Icon(Icons.email_outlined, size: 18),
+            ),
+            ButtonSegment<int>(
+              value: 1,
+              label: Text('Kurtarma Kodu'),
+              icon: Icon(Icons.key_rounded, size: 18),
+            ),
+          ],
+          selected: {_recoveryMethod},
+          onSelectionChanged: (set) {
+            setState(() {
+              _recoveryMethod = set.first;
+              _errorMessage = null;
+              _successMessage = null;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+
+        if (_recoveryMethod == 0) ...[
+          // E-posta ile Sıfırlama
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: POSColors.greenLight,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.mark_email_read_rounded,
+                    color: POSColors.green, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'E-posta ile Şifre Sıfırlama',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: POSColors.greenDark,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Kayıt bilgilerinizi ve tek kullanımlık kurtarma kodunuzu giriniz.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: POSColors.textSecondary,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Kayıtlı e-posta adresinize tek kullanımlık şifre sıfırlama bağlantısı gönderilecektir.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: POSColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        _buildField(
-          controller: _identifierCtrl,
-          label: 'E-posta veya Kullanıcı Adı *',
-          hint: 'ahmet@market.com',
-          icon: Icons.person_outline_rounded,
-          validator: (v) =>
-              (v?.trim().isEmpty ?? true) ? 'Bu alan zorunludur' : null,
-        ),
-        const SizedBox(height: 14),
-        _buildField(
-          controller: _recoveryCodeCtrl,
-          label: 'Kurtarma Kodu *',
-          hint: 'SRNT-XXXX-XXXX-XXXX-XXXX',
-          icon: Icons.key_rounded,
-          validator: (v) =>
-              (v?.trim().isEmpty ?? true) ? 'Kurtarma kodu zorunludur' : null,
-        ),
-        const SizedBox(height: 14),
-        _buildField(
-          controller: _companyNameCtrl,
-          label: 'İşletme Adı *',
-          hint: 'ABC Market',
-          icon: Icons.storefront_rounded,
-          validator: (v) =>
-              (v?.trim().isEmpty ?? true) ? 'İşletme adı zorunludur' : null,
-        ),
-        const SizedBox(height: 14),
-        _buildField(
-          controller: _taxNoCtrl,
-          label: 'Vergi No / TC *',
-          hint: '1234567890',
-          icon: Icons.badge_rounded,
-          keyboardType: TextInputType.number,
-          validator: (v) =>
-              (v?.trim().isEmpty ?? true) ? 'Vergi no / TC zorunludur' : null,
-        ),
-        if (_errorMessage != null) ...[
+          const SizedBox(height: 20),
+          _buildField(
+            controller: _emailResetCtrl,
+            label: 'Kayıtlı E-posta Adresi *',
+            hint: 'ahmet@market.com',
+            icon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 14),
+            _ErrorBox(message: _errorMessage!),
+          ],
+          if (_successMessage != null) ...[
+            const SizedBox(height: 14),
+            _SuccessBox(message: _successMessage!),
+          ],
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _isLoading ? null : _sendEmailReset,
+            style: FilledButton.styleFrom(
+              backgroundColor: POSColors.green,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isLoading
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : Text(
+                    'Sıfırlama Bağlantısı Gönder',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+          ),
+        ] else ...[
+          // Kurtarma Kodu ile Anında Sıfırlama
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: POSColors.greenLight,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_user_rounded,
+                    color: POSColors.green, size: 28),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Kurtarma Kodu ile Doğrulama',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: POSColors.greenDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Kayıt bilgilerinizi ve tek kullanımlık kurtarma kodunuzu giriniz.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: POSColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildField(
+            controller: _identifierCtrl,
+            label: 'E-posta veya Kullanıcı Adı *',
+            hint: 'ahmet@market.com',
+            icon: Icons.person_outline_rounded,
+            validator: (v) =>
+                (v?.trim().isEmpty ?? true) ? 'Bu alan zorunludur' : null,
+          ),
           const SizedBox(height: 14),
-          _ErrorBox(message: _errorMessage!),
-        ],
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _isLoading ? null : _verifyIdentity,
-          style: FilledButton.styleFrom(
-            backgroundColor: POSColors.green,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          _buildField(
+            controller: _recoveryCodeCtrl,
+            label: 'Kurtarma Kodu *',
+            hint: 'SRNT-XXXX-XXXX-XXXX-XXXX',
+            icon: Icons.key_rounded,
+            validator: (v) =>
+                (v?.trim().isEmpty ?? true) ? 'Kurtarma kodu zorunludur' : null,
           ),
-          child: _isLoading
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : Text(
-                  'Doğrula ve Devam Et',
-                  style: GoogleFonts.inter(
-                      fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-        ),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 12),
-        Text('Yönetici destekli kurtarma',
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildField(
-          controller: _requestIdCtrl,
-          label: 'Talep Numarası',
-          hint: 'prr-...',
-          icon: Icons.receipt_long_rounded,
-        ),
-        const SizedBox(height: 12),
-        _buildField(
-          controller: _claimCodeCtrl,
-          label: 'Tek Kullanımlık Kod',
-          hint: 'XXXXXXXXXX',
-          icon: Icons.password_rounded,
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: _isLoading ? null : _claimAdminRecovery,
-          child: const Text('Yönetici Kodunu Doğrula'),
-        ),
+          const SizedBox(height: 14),
+          _buildField(
+            controller: _companyNameCtrl,
+            label: 'İşletme Adı *',
+            hint: 'ABC Market',
+            icon: Icons.storefront_rounded,
+            validator: (v) =>
+                (v?.trim().isEmpty ?? true) ? 'İşletme adı zorunludur' : null,
+          ),
+          const SizedBox(height: 14),
+          _buildField(
+            controller: _taxNoCtrl,
+            label: 'Vergi No / TC *',
+            hint: '1234567890',
+            icon: Icons.badge_rounded,
+            keyboardType: TextInputType.number,
+            validator: (v) =>
+                (v?.trim().isEmpty ?? true) ? 'Vergi no / TC zorunludur' : null,
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 14),
+            _ErrorBox(message: _errorMessage!),
+          ],
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _isLoading ? null : _verifyIdentity,
+            style: FilledButton.styleFrom(
+              backgroundColor: POSColors.green,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isLoading
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : Text(
+                    'Doğrula ve Devam Et',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 12),
+          Text('Yönetici destekli kurtarma',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          _buildField(
+            controller: _requestIdCtrl,
+            label: 'Talep Numarası',
+            hint: 'prr-...',
+            icon: Icons.receipt_long_rounded,
+          ),
+          const SizedBox(height: 12),
+          _buildField(
+            controller: _claimCodeCtrl,
+            label: 'Tek Kullanımlık Kod',
+            hint: 'XXXXXXXXXX',
+            icon: Icons.password_rounded,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _isLoading ? null : _claimAdminRecovery,
+            child: const Text('Yönetici Kodunu Doğrula'),
+          ),
+        ],
       ],
     );
   }
@@ -576,6 +722,39 @@ class _ErrorBox extends StatelessWidget {
               message,
               style: GoogleFonts.inter(
                   color: POSColors.red,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuccessBox extends StatelessWidget {
+  final String message;
+  const _SuccessBox({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: POSColors.greenLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: POSColors.green.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline_rounded,
+              color: POSColors.green, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(
+                  color: POSColors.greenDark,
                   fontSize: 12,
                   fontWeight: FontWeight.w500),
             ),

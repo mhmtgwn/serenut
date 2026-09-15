@@ -180,7 +180,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'bootstrap',
             name: 'onboardingBootstrap',
             builder: (context, state) => BootstrapLoadingView(
-              onCompleted: () => context.go(AppRoutes.login),
+              onCompleted: () => context.go(AppRoutes.home),
             ),
           ),
         ],

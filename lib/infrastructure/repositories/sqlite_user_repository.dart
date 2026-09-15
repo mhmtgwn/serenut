@@ -53,11 +53,13 @@ class SqliteUserRepository implements IUserRepository {
 
   @override
   Future<AuthUser?> findByUsername(String username) async {
-    final queryVal = username.trim();
+    final queryVal = username.trim().toLowerCase();
+    final rawVal = username.trim();
     final rows = await _executor.query(
       'users',
-      where: '(username = ? OR email = ? OR name = ?) AND is_active = 1',
-      whereArgs: [queryVal, queryVal, queryVal],
+      where:
+          '(LOWER(username) = ? OR LOWER(email) = ? OR LOWER(name) = ? OR username = ? OR email = ? OR name = ?) AND is_active = 1',
+      whereArgs: [queryVal, queryVal, queryVal, rawVal, rawVal, rawVal],
     );
     if (rows.isEmpty) return null;
     return _mapRowToAuthUser(rows.first);
@@ -107,6 +109,7 @@ class SqliteUserRepository implements IUserRepository {
     String? businessCode,
     int? deviceTokenVersion,
   }) async {
+    final effectiveUsername = username ?? user.username;
     await _executor.insert(
       'users',
       {
@@ -118,7 +121,7 @@ class SqliteUserRepository implements IUserRepository {
         'is_active': 1,
         'created_at': user.createdAt.toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
-        if (username != null) 'username': username,
+        if (effectiveUsername != null) 'username': effectiveUsername,
         if (pinHash != null) 'pin_hash': pinHash,
         if (businessCode != null) 'business_code': businessCode,
         if (deviceTokenVersion != null)
@@ -139,6 +142,7 @@ class SqliteUserRepository implements IUserRepository {
     String? businessCode,
     int? deviceTokenVersion,
   }) async {
+    final effectiveUsername = username ?? user.username;
     final Map<String, dynamic> values = {
       'name': user.name,
       'email': user.email,
@@ -152,8 +156,8 @@ class SqliteUserRepository implements IUserRepository {
     if (isActive != null) {
       values['is_active'] = isActive ? 1 : 0;
     }
-    if (username != null) {
-      values['username'] = username;
+    if (effectiveUsername != null) {
+      values['username'] = effectiveUsername;
     }
     if (pinHash != null) {
       values['pin_hash'] = pinHash;

@@ -86,6 +86,12 @@ class AccountPage extends ConsumerWidget {
             },
           ),
           _AccountAction(
+            icon: Icons.lock_reset_rounded,
+            title: 'Şifre Değiştir',
+            subtitle: 'Hesabınızın giriş şifresini güncelleyin',
+            onTap: () => _showChangePasswordDialog(context, ref, user),
+          ),
+          _AccountAction(
             icon: Icons.history_rounded,
             title: 'Oturum & Çıkış Geçmişi',
             subtitle: 'Son oturum sonlandırma ve otomatik çıkış nedenlerini inceleyin',
@@ -166,6 +172,205 @@ class AccountPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showChangePasswordDialog(
+      BuildContext context, WidgetRef ref, AuthUser user) {
+    final oldPassCtrl = TextEditingController();
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        bool isLoading = false;
+        bool obscureOld = true;
+        bool obscureNew = true;
+        bool obscureConfirm = true;
+        String? errorMessage;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.lock_reset_rounded, color: POSColors.green),
+                  SizedBox(width: 8),
+                  Text(
+                    'Şifre Değiştir',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: oldPassCtrl,
+                      obscureText: obscureOld,
+                      decoration: InputDecoration(
+                        labelText: 'Mevcut Şifre',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureOld
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () =>
+                              setDialogState(() => obscureOld = !obscureOld),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: newPassCtrl,
+                      obscureText: obscureNew,
+                      decoration: InputDecoration(
+                        labelText: 'Yeni Şifre (En az 8 karakter)',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.password_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureNew
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () =>
+                              setDialogState(() => obscureNew = !obscureNew),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: confirmPassCtrl,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: 'Yeni Şifre Tekrar',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.check_circle_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirm
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () => setDialogState(
+                              () => obscureConfirm = !obscureConfirm),
+                        ),
+                      ),
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: POSColors.redLight,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: POSColors.red.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                color: POSColors.red, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                    color: POSColors.red,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(dialogCtx),
+                  child: const Text('İptal'),
+                ),
+                FilledButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final oldPass = oldPassCtrl.text;
+                          final newPass = newPassCtrl.text;
+                          final confirmPass = confirmPassCtrl.text;
+
+                          if (oldPass.isEmpty) {
+                            setDialogState(() => errorMessage =
+                                'Lütfen mevcut şifrenizi giriniz.');
+                            return;
+                          }
+                          if (newPass.length < 8) {
+                            setDialogState(() => errorMessage =
+                                'Yeni şifre en az 8 karakter olmalıdır.');
+                            return;
+                          }
+                          if (newPass != confirmPass) {
+                            setDialogState(() =>
+                                errorMessage = 'Yeni şifreler eşleşmiyor.');
+                            return;
+                          }
+
+                          setDialogState(() {
+                            isLoading = true;
+                            errorMessage = null;
+                          });
+
+                          try {
+                            final authService = ref.read(authServiceProvider);
+                            await authService.changePassword(
+                              userId: user.id,
+                              currentPassword: oldPass,
+                              newPassword: newPass,
+                            );
+
+                            if (context.mounted) {
+                              Navigator.pop(dialogCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Şifreniz başarıyla güncellendi.'),
+                                  backgroundColor: POSColors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              isLoading = false;
+                              errorMessage = e
+                                  .toString()
+                                  .replaceAll('Exception:', '')
+                                  .replaceAll('AuthException:', '')
+                                  .trim();
+                            });
+                          }
+                        },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: POSColors.green,
+                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Şifreyi Güncelle'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

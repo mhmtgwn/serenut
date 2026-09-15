@@ -3,6 +3,7 @@
 // Sub-route tabanlı wizard: /onboarding → /onboarding/business → /onboarding/admin → /onboarding/success
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
@@ -179,9 +180,24 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
             ),
           ),
           actions: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: const Text('Kodları Kopyala'),
+              onPressed: () {
+                Clipboard.setData(
+                    ClipboardData(text: recoveryCodes.join('\n')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Kurtarma kodları panoya kopyalandı!'),
+                    backgroundColor: POSColors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Kodları Kaydettim'),
+              child: const Text('Kodları Kaydettim ve Devam Et'),
             ),
           ],
         ),
@@ -249,7 +265,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
 
     // Login establishes the authenticated session, subscription cache and the
     // canonical device activation through /auth/session-bootstrap.
-    await ref.read(authServiceProvider).login(
+    await ref.read(authNotifierProvider.notifier).login(
           state.admin.username,
           rawPassword,
         );

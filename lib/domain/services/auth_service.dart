@@ -207,11 +207,17 @@ class AuthService {
             orElse: () => UserRole.cashier,
           );
 
+          final resolvedUsername =
+              (userMap['username'] as String?)?.trim().isNotEmpty == true
+                  ? (userMap['username'] as String).trim()
+                  : (!username.contains('@') ? username.trim() : null);
+
           final user = AuthUser(
             id: userMap['id'] as String,
             companyId: companyId,
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
+            username: resolvedUsername,
             role: role,
             permissions: (userMap['permissions'] as List<dynamic>?)
                     ?.map((e) => e.toString())
@@ -227,12 +233,15 @@ class AuthService {
           // Cache credentials in local sqlite for offline login
           try {
             final hash = _hashService.hashPassword(password);
-            await _userRepository.insertUser(user, hash);
+            await _userRepository.insertUser(user, hash,
+                username: user.username);
           } catch (_) {
             try {
               final hash = _hashService.hashPassword(password);
               await _userRepository.updateUserFields(user,
-                  isActive: true, passwordHash: hash);
+                  isActive: true,
+                  passwordHash: hash,
+                  username: user.username);
             } catch (e, st) {
               TelemetryService().logError(e, st,
                   context: 'AuthService', level: LogLevel.warning);
@@ -251,6 +260,24 @@ class AuthService {
           if (e.statusCode == 400 ||
               e.statusCode == 401 ||
               e.statusCode == 403) {
+            // Check if user exists locally in SQLite (e.g. local cashier) before failing
+            if (!kIsWeb) {
+              try {
+                final localUser =
+                    await _userRepository.findByUsername(username.trim());
+                if (localUser != null) {
+                  final hash =
+                      await _userRepository.getPasswordHash(localUser.id);
+                  if (hash != null &&
+                      _hashService.verifyPassword(password, hash)) {
+                    await _onLoginSuccess(localUser);
+                    await _userRepository.updateLastLogin(localUser.id);
+                    return localUser;
+                  }
+                }
+              } catch (_) {}
+            }
+
             final body = e.responseBody;
             String message = 'Giriş başarısız.';
             if (body != null) {

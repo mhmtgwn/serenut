@@ -22,6 +22,7 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/router.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sayfa
@@ -246,7 +247,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             'Kurtarma kodları oluşturulamadı. Kayıt güvenle tamamlanamadı.');
       }
       if (!verificationRequired) {
-        await ref.read(authServiceProvider).login(
+        await ref.read(authNotifierProvider.notifier).login(
               _emailCtrl.text.trim().toLowerCase(),
               _passwordCtrl.text,
             );
@@ -319,14 +320,35 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ),
           ),
           actions: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: const Text('Kodları Kopyala'),
+              onPressed: () {
+                Clipboard.setData(
+                    ClipboardData(text: recoveryCodes.join('\n')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Kurtarma kodları panoya kopyalandı!'),
+                    backgroundColor: POSColors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Kodları Kaydettim'),
+              child: const Text('Kodları Kaydettim ve Devam Et'),
             ),
           ],
         ),
       );
-      if (mounted) context.go('/login/form');
+      if (mounted) {
+        if (!verificationRequired) {
+          context.go(AppRoutes.home);
+        } else {
+          context.go('/login/form');
+        }
+      }
     } catch (e) {
       var message = e.toString();
       if (e is ApiException && e.responseBody != null) {

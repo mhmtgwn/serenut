@@ -11,7 +11,6 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/presentation/state/app_state.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:serenutos/config/theme.dart';
 
 // ═══════════════════════════════════════════════════════
@@ -193,14 +192,7 @@ class LoginPage extends ConsumerWidget {
 
                 // ── Alt bağlantı ──
                 TextButton(
-                  onPressed: () async {
-                    final uri =
-                        Uri.parse('https://serenut.com/forgot-password');
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri,
-                          mode: LaunchMode.externalApplication);
-                    }
-                  },
+                  onPressed: () => context.push('/forgot-password'),
                   child: Text(
                     'Şifremi unuttum',
                     style: GoogleFonts.inter(
