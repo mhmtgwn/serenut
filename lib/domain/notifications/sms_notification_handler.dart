@@ -50,6 +50,7 @@ class SmsNotificationHandler {
   late final void Function(OrderPreparingEvent) _orderPreparingListener;
   late final void Function(OrderReadyEvent) _orderReadyListener;
   late final void Function(OrderCancelledEvent) _orderCancelledListener;
+  late final void Function(ManualDebtAddedEvent) _manualDebtListener;
 
   SmsNotificationHandler({
     required EventPublisher eventPublisher,
@@ -71,6 +72,7 @@ class SmsNotificationHandler {
     _orderPreparingListener = _onOrderPreparing;
     _orderReadyListener = _onOrderReady;
     _orderCancelledListener = _onOrderCancelled;
+    _manualDebtListener = _onManualDebtAdded;
 
     _eventPublisher.subscribe<SaleCreatedEvent>(_saleListener);
     _eventPublisher.subscribe<CollectionRecordedEvent>(_collectionListener);
@@ -79,6 +81,7 @@ class SmsNotificationHandler {
     _eventPublisher.subscribe<OrderPreparingEvent>(_orderPreparingListener);
     _eventPublisher.subscribe<OrderReadyEvent>(_orderReadyListener);
     _eventPublisher.subscribe<OrderCancelledEvent>(_orderCancelledListener);
+    _eventPublisher.subscribe<ManualDebtAddedEvent>(_manualDebtListener);
   }
 
   // ── Event Handlers ──────────────────────────────────────────────────────────
@@ -119,7 +122,43 @@ class SmsNotificationHandler {
     _handleOrderCancelled(event).ignore();
   }
 
+  void _onManualDebtAdded(ManualDebtAddedEvent event) {
+    if (event.customerIdStr.isEmpty) return;
+    _handleManualDebtAdded(event).ignore();
+  }
+
   // ── Async Handlers ─────────────────────────────────────────────────────────
+
+  Future<void> _handleManualDebtAdded(ManualDebtAddedEvent event) async {
+    try {
+      final settings = await _getCurrentSettings();
+      if (settings == null) return;
+
+      final customer = await _customerRepository.findById(event.customerIdStr);
+      if (customer == null || customer.phone.isEmpty) return;
+
+      final currency = settings.currency;
+      final business = settings.businessName;
+
+      _sendIfEnabled(
+        eventType: kSmsEventDebtCreated,
+        settings: settings,
+        phone: customer.phone,
+        vars: SmsTemplateVars.forDebt(
+          customerName: customer.name,
+          totalAmount: event.amount,
+          paidAmount: 0.0,
+          saleId: event.transactionId,
+          businessName: business,
+          currentBalance: customer.balance,
+          currency: currency,
+          note: event.note,
+        ),
+      );
+    } catch (e) {
+      _log('⚠️ SmsNotificationHandler._handleManualDebtAdded error: $e');
+    }
+  }
 
   Future<void> _handleSaleCreated(SaleCreatedEvent event) async {
     try {
@@ -474,6 +513,7 @@ class SmsNotificationHandler {
     _eventPublisher.unsubscribe<OrderPreparingEvent>(_orderPreparingListener);
     _eventPublisher.unsubscribe<OrderReadyEvent>(_orderReadyListener);
     _eventPublisher.unsubscribe<OrderCancelledEvent>(_orderCancelledListener);
+    _eventPublisher.unsubscribe<ManualDebtAddedEvent>(_manualDebtListener);
   }
 
   void _log(String msg) {

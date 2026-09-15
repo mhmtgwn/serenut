@@ -134,22 +134,22 @@ Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı diler
   kSmsEventDebtCreated: '''📋 *Cari Hesap Bilgilendirmesi*
 
 Sayın *{customer}*,
-#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.
+#{id} numaralı vadeli işleminiz cari hesabınıza işlenmiştir.
 
 ▫️ *İşlem Tutarı:* {amount}
 ▫️ *Eklenen Borç:* *{debt}*
-▫️ *Güncel Toplam Bakiyeniz:* *{balance}*
+▫️ *Güncel Toplam Bakiyeniz:* *{balance}*{note_line}
 
 Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
 *{business}*''',
   _kLegacyDebt: '''📋 *Cari Hesap Bilgilendirmesi*
 
 Sayın *{customer}*,
-#{id} numaralı vadeli alışveriş işleminiz cari hesabınıza işlenmiştir.
+#{id} numaralı vadeli işleminiz cari hesabınıza işlenmiştir.
 
 ▫️ *İşlem Tutarı:* {amount}
 ▫️ *Eklenen Borç:* *{debt}*
-▫️ *Güncel Toplam Bakiyeniz:* *{balance}*
+▫️ *Güncel Toplam Bakiyeniz:* *{balance}*{note_line}
 
 Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
 *{business}*''',
@@ -195,7 +195,7 @@ const kDefaultSmsTemplates = <String, String>{
   kSmsEventSaleCreated:
       'Merhaba {customer}, {amount} tutarındaki alışverişiniz kaydedilmiştir. {business}',
   kSmsEventDebtCreated:
-      'Merhaba {customer}, hesabınıza {balance} tutarında vadeli işlem kaydedilmiştir. {business}',
+      'Merhaba {customer}, hesabınıza {balance} tutarında vadeli işlem kaydedilmiştir.{sms_note_line} {business}',
   kSmsEventCollectionRecorded:
       'Merhaba {customer}, {amount} tutarındaki ödemeniz alınmıştır. Kalan bakiye: {debt}. {business}',
   kSmsEventOrderCreated:
@@ -474,6 +474,9 @@ class SmsTemplateVars {
       'discount_amount': discountStr,
       'note': cleanNote,
       'order_note': cleanNote,
+      'description': cleanNote,
+      'note_line': cleanNote.isNotEmpty ? '\n▫️ *Açıklama:* $cleanNote' : '',
+      'sms_note_line': cleanNote.isNotEmpty ? ' (Açıklama: $cleanNote)' : '',
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(debtAmount, currency),
       'balance': _fmt(newBalance.abs(), currency),

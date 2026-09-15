@@ -230,19 +230,27 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       }
 
       // ── Pop dialog immediately to keep UI ultra responsive (<50ms) ──
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEdit
-                ? 'Sipariş başarıyla güncellendi.'
-                : 'Sipariş başarıyla oluşturuldu.'),
-            backgroundColor: _kGreen,
-          ),
-        );
-      }
+      if (!mounted) return;
+      // Capture necessary providers & root container BEFORE popping the dialog
+      // to eliminate "Bad state: Cannot use ref after the widget was disposed"
+      final container = ProviderScope.containerOf(context);
+      final printingService = ref.read(printingApplicationServiceProvider);
+      final settings = ref.read(settingsNotifierProvider).valueOrNull ??
+          ref.read(settingsNotifierProvider).value;
+      final ordersCustomersNotifier =
+          ref.read(ordersCustomersControllerProvider.notifier);
 
-      // ── Background tasks: Invalidate, refresh customers, and trigger printing ──
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEdit
+              ? 'Sipariş başarıyla güncellendi.'
+              : 'Sipariş başarıyla oluşturuldu.'),
+          backgroundColor: _kGreen,
+        ),
+      );
+
+      // ── Background tasks: Print immediately & refresh state via root container ──
       final customer = _selectedCustomer;
       final existingCustId = widget.existingOrder?.customerId;
       final printReceiptNeeded = _printReceipt;
@@ -265,93 +273,92 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           .toList();
 
       unawaited(() async {
+        // 1. Sipariş Etiketi Yazdırma (Bağımsız try-catch, fiş hatasından veya gecikmeden etkilenmez)
+        if (printLabelNeeded && settings != null) {
+          try {
+            final String? labelPaymentStatus;
+            if (paymentMethod == 'debt' ||
+                (paymentMethod == 'karma' && karmaDebt > 0.009)) {
+              if (finalPaid <= 0.01) {
+                labelPaymentStatus = 'Vadeli';
+              } else {
+                labelPaymentStatus =
+                    'Kısmi Ödeme (Borç: ₺${karmaDebt.toStringAsFixed(2)})';
+              }
+            } else if (finalPaid >= totalAmount - 0.01) {
+              labelPaymentStatus = 'Ödendi';
+            } else {
+              labelPaymentStatus = 'Kısmi Ödeme';
+            }
+
+            await printingService.queueOrderLabel(
+              newOrder,
+              receiptItems,
+              settings,
+              customer: customer,
+              paidAmount: finalPaid,
+              previousDebt: previousDebt,
+              paymentStatusOverride: labelPaymentStatus,
+              copies: labelCopies,
+            );
+          } catch (labelError) {
+            debugPrint(
+                '[OrderCreationDialog] Sipariş etiketi kuyruğa alma hatası: $labelError');
+          }
+        }
+
+        // 2. Fiş Yazdırma (Bağımsız try-catch, etiket hatasından etkilenmez)
+        if (printReceiptNeeded && settings != null) {
+          try {
+            await printingService.queueOrderReceipt(
+              newOrder,
+              receiptItems,
+              customer,
+              settings,
+              paidAmount: finalPaid,
+              notes: notes,
+              paymentMethod: paymentMethod,
+              paymentBreakdown: paymentMethod == 'karma'
+                  ? {
+                      'cash_applied': karmaResult.cashApplied,
+                      'card': karmaResult.card,
+                      'debt': karmaResult.debt,
+                    }
+                  : null,
+              copies: printCopies,
+            );
+          } catch (receiptError) {
+            debugPrint(
+                '[OrderCreationDialog] Fiş kuyruğa alma hatası: $receiptError');
+          }
+        }
+
+        // 3. Ekran yenilemeleri (Root Container üzerinden, Widget dispose'undan etkilenmez)
         try {
-          // Refresh customers state so updated balance displays on screens
-          await ref.read(ordersCustomersControllerProvider.notifier).refresh();
-          ref.invalidate(customersControllerProvider);
-          ref.invalidate(salesCustomersControllerProvider);
-          ref.invalidate(customerBalanceSummaryProvider);
-          ref.invalidate(customerLookupMapProvider);
+          await ordersCustomersNotifier.refresh();
+          container.invalidate(customersControllerProvider);
+          container.invalidate(salesCustomersControllerProvider);
+          container.invalidate(customerBalanceSummaryProvider);
+          container.invalidate(customerLookupMapProvider);
           if (customer != null) {
-            ref.invalidate(customerTransactionsProvider(customer.id));
-            ref.invalidate(customerBalanceDetailsProvider(customer.id));
-            ref.invalidate(customerDetailProvider(customer.id));
+            container.invalidate(customerTransactionsProvider(customer.id));
+            container.invalidate(customerBalanceDetailsProvider(customer.id));
+            container.invalidate(customerDetailProvider(customer.id));
           }
           if (isEdit &&
               existingCustId != null &&
               customer?.id != existingCustId) {
-            ref.invalidate(customerTransactionsProvider(existingCustId));
-            ref.invalidate(customerBalanceDetailsProvider(existingCustId));
-            ref.invalidate(customerDetailProvider(existingCustId));
+            container.invalidate(customerTransactionsProvider(existingCustId));
+            container.invalidate(customerBalanceDetailsProvider(existingCustId));
+            container.invalidate(customerDetailProvider(existingCustId));
           }
-          ref.invalidate(productsControllerProvider);
-          ref.invalidate(salesProductsControllerProvider);
-          ref.invalidate(ordersProductsControllerProvider);
-          ref.invalidate(dashboardProvider);
-
-          // Print order receipt & labels
-          if (printReceiptNeeded || printLabelNeeded) {
-            final settings = ref.read(settingsNotifierProvider).valueOrNull ??
-                ref.read(settingsNotifierProvider).value;
-            if (settings != null) {
-              // 1. Print main receipt copies
-              if (printReceiptNeeded) {
-                await ref
-                    .read(printingApplicationServiceProvider)
-                    .queueOrderReceipt(
-                      newOrder,
-                      receiptItems,
-                      customer,
-                      settings,
-                      paidAmount: finalPaid,
-                      notes: notes,
-                      paymentMethod: paymentMethod,
-                      paymentBreakdown: paymentMethod == 'karma'
-                          ? {
-                              'cash_applied': karmaResult.cashApplied,
-                              'card': karmaResult.card,
-                              'debt': karmaResult.debt,
-                            }
-                          : null,
-                      copies: printCopies,
-                    );
-              }
-
-              // 2. Print label stickers if label printer toggle is enabled
-              if (printLabelNeeded) {
-                final String? labelPaymentStatus;
-                if (paymentMethod == 'debt' ||
-                    (paymentMethod == 'karma' && karmaDebt > 0.009)) {
-                  if (finalPaid <= 0.01) {
-                    labelPaymentStatus = 'Vadeli';
-                  } else {
-                    labelPaymentStatus =
-                        'Kısmi Ödeme (Borç: ₺${karmaDebt.toStringAsFixed(2)})';
-                  }
-                } else if (finalPaid >= totalAmount - 0.01) {
-                  labelPaymentStatus = 'Ödendi';
-                } else {
-                  labelPaymentStatus = 'Kısmi Ödeme';
-                }
-
-                await ref
-                    .read(printingApplicationServiceProvider)
-                    .queueOrderLabel(
-                      newOrder,
-                      receiptItems,
-                      settings,
-                      customer: customer,
-                      paidAmount: finalPaid,
-                      previousDebt: previousDebt,
-                      paymentStatusOverride: labelPaymentStatus,
-                      copies: labelCopies,
-                    );
-              }
-            }
-          }
-        } catch (printError) {
+          container.invalidate(productsControllerProvider);
+          container.invalidate(salesProductsControllerProvider);
+          container.invalidate(ordersProductsControllerProvider);
+          container.invalidate(dashboardProvider);
+        } catch (refreshError) {
           debugPrint(
-              '[OrderCreationDialog] Arka plan yazdırma/senkronizasyon hatası: $printError');
+              '[OrderCreationDialog] Ekran verileri yenileme hatası: $refreshError');
         }
       }());
     } catch (e) {

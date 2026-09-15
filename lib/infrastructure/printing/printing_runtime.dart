@@ -29,6 +29,7 @@ class PrintingRuntime {
   Timer? _timer;
   StreamSubscription<PrintCoordinatorEvent>? _eventSubscription;
   bool _processing = false;
+  bool _needsAnotherPass = false;
   bool _running = false;
   PrintRecoverySummary? _recovery;
   PrintCoordinatorEvent? _latestEvent;
@@ -104,14 +105,20 @@ class PrintingRuntime {
   }
 
   Future<void> processNow() async {
-    if (_processing) return;
+    if (_processing) {
+      _needsAnotherPass = true;
+      return;
+    }
     _processing = true;
     _emit();
     try {
-      final devices = (await repository.getDevices())
-          .where((device) => device.enabled)
-          .toList(growable: false);
-      await Future.wait(devices.map(_drainDevice));
+      do {
+        _needsAnotherPass = false;
+        final devices = (await repository.getDevices())
+            .where((device) => device.enabled)
+            .toList(growable: false);
+        await Future.wait(devices.map(_drainDevice));
+      } while (_needsAnotherPass);
     } catch (error) {
       _emit(error: error.toString());
     } finally {

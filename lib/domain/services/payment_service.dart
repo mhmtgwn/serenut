@@ -326,9 +326,10 @@ class PaymentService {
     if (!amount.isFinite || amount <= 0) {
       throw ArgumentError('Borç tutarı sıfırdan büyük olmalıdır.');
     }
+    final txId = _generateTxId('trans-debt');
     await _transactionRepository.create(
       FinancialTransactionEntity(
-        id: _generateTxId('trans-debt'),
+        id: txId,
         type: 'manual_debt',
         customerId: customerId,
         amount: amount,
@@ -341,6 +342,13 @@ class PaymentService {
         },
       ),
     );
+
+    _eventPublisher.publish(ManualDebtAddedEvent(
+      transactionId: txId,
+      customerIdStr: customerId,
+      amount: amount,
+      note: notes?.trim(),
+    ));
   }
 
   /// Processes refund for returned items.

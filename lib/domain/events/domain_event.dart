@@ -341,3 +341,25 @@ class OrderCancelledEvent extends DomainEvent {
           aggregateType: 'Order',
         );
 }
+
+/// Müşteri detayından elle borç eklendiğinde yayınlanır.
+/// SmsNotificationHandler tarafından dinlenir.
+class ManualDebtAddedEvent extends DomainEvent {
+  final String transactionId;
+  final String customerIdStr;
+  final double amount;
+  final String? note;
+
+  ManualDebtAddedEvent({
+    required this.transactionId,
+    required this.customerIdStr,
+    required this.amount,
+    this.note,
+    super.occurredAt,
+    super.metadata,
+  }) : super(
+          type: EventType.debtCreated,
+          aggregateType: 'Debt',
+        );
+}
+
