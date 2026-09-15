@@ -195,7 +195,7 @@ const kDefaultSmsTemplates = <String, String>{
   kSmsEventSaleCreated:
       'Merhaba {customer}, {amount} tutarındaki alışverişiniz kaydedilmiştir. {business}',
   kSmsEventDebtCreated:
-      'Merhaba {customer}, hesabınıza {balance} tutarında vadeli işlem kaydedilmiştir.{sms_note_line} {business}',
+      'Merhaba {customer}, hesabınıza {debt} tutarında vadeli işlem kaydedilmiştir. Güncel bakiyeniz: {balance}.{sms_note_line} {business}',
   kSmsEventCollectionRecorded:
       'Merhaba {customer}, {amount} tutarındaki ödemeniz alınmıştır. Kalan bakiye: {debt}. {business}',
   kSmsEventOrderCreated:
@@ -463,7 +463,9 @@ class SmsTemplateVars {
     String? note,
   }) {
     final debtAmount = (totalAmount - paidAmount).clamp(0.0, double.maxFinite);
-    final newBalance = currentBalance - debtAmount;
+    // currentBalance is already the post-transaction customer.balance retrieved from repository.
+    // Subtracting debtAmount again would cause double-counting (e.g. 600 TL debt showing as 1200 TL).
+    final finalBalance = currentBalance;
     final discountStr = _fmt(discountAmount, currency);
     final cleanNote = (note ?? '').trim();
     return {
@@ -479,7 +481,7 @@ class SmsTemplateVars {
       'sms_note_line': cleanNote.isNotEmpty ? ' (Açıklama: $cleanNote)' : '',
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(debtAmount, currency),
-      'balance': _fmt(newBalance.abs(), currency),
+      'balance': _fmt(finalBalance.abs(), currency),
       'id': saleId.toShortId,
       'business': businessName,
       'date': _today(),
