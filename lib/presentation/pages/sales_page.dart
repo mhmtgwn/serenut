@@ -26,6 +26,7 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
+import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
 
 part 'sales/animated_cart_tab.dart';
 
@@ -299,6 +300,32 @@ class _SalesPageState extends ConsumerState<SalesPage>
       setState(() {
         _showSuccessNotification = true;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Satış kaydedildi (₺${createdSale.totalAmount.toStringAsFixed(2)})',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFF0F172A),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Fatura Kes',
+              textColor: const Color(0xFF2DD4BF),
+              onPressed: () {
+                CreateGibInvoiceDialog.show(
+                  context,
+                  sale: createdSale,
+                  customer: flowState.selectedCustomer,
+                  totalAmount: createdSale.totalAmount,
+                );
+              },
+            ),
+          ),
+        );
+      }
 
       // Automatically hide after 1.5 seconds
       Future.delayed(const Duration(milliseconds: 1500), () {

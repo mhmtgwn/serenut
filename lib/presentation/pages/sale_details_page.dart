@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
 
 class SaleDetailsPage extends ConsumerWidget {
   final String saleId;
@@ -76,7 +77,7 @@ class SaleDetailsPage extends ConsumerWidget {
                 _buildPaymentSummaryCard(sale),
                 const SizedBox(height: 16),
                 if (sale.status != 'cancelled' && sale.status != 'refunded')
-                  _buildActionBar(context, ref, sale),
+                  _buildActionBar(context, ref, sale, customer: customer),
               ],
             ),
           );
@@ -423,10 +424,35 @@ class SaleDetailsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionBar(BuildContext context, WidgetRef ref, SaleEntity sale) {
+  Widget _buildActionBar(BuildContext context, WidgetRef ref, SaleEntity sale,
+      {CustomerEntity? customer}) {
     final remaining = sale.totalAmount - sale.paidAmount;
     return Column(
       children: [
+        // GİB e-Arşiv / e-Fatura (Ücretsiz Resmi Belge)
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => CreateGibInvoiceDialog.show(
+              context,
+              sale: sale,
+              customer: customer,
+              totalAmount: sale.totalAmount,
+            ),
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('GİB e-Arşiv Fatura Kes (Ücretsiz)'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
         // Kısmi Ödeme — only if debt exists
         if (remaining > 0) ...[
           SizedBox(

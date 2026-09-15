@@ -30,6 +30,7 @@ import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/pages/settings/widgets/gib_settings_dialog.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
@@ -538,6 +539,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (groupBusiness.isNotEmpty) {
       groups.add(_buildSectionHeader('İŞLETME & PERSONEL'));
       groups.add(_buildRoundedCard(groupBusiness));
+      groups.add(const SizedBox(height: 16));
+    }
+
+    // ── GRUP: RESMİ BELGELER & E-FATURA ──────────────────────────────────
+    final groupInvoice = <Widget>[];
+    if (_hasPermission(currentUser, Permission.settingsFinance) ||
+        _hasPermission(currentUser, Permission.salesCreate)) {
+      if (_matchesQuery('fatura', 'e-arşiv', 'e-fatura', 'gib', 'vergi', 'portal')) {
+        groupInvoice.add(
+          _buildCategoryRow(
+            title: 'GİB e-Arşiv Fatura Portalı',
+            subtitle: 'Ücretsiz resmi e-Arşiv / e-Fatura entegrasyonu (0 TL)',
+            icon: Icons.receipt_long_rounded,
+            color: _kTeal,
+            onTap: () => GibSettingsDialog.show(context),
+          ),
+        );
+      }
+    }
+    if (groupInvoice.isNotEmpty) {
+      groups.add(_buildSectionHeader('E-FATURA & RESMİ BELGELER'));
+      groups.add(_buildRoundedCard(groupInvoice));
       groups.add(const SizedBox(height: 16));
     }
 
