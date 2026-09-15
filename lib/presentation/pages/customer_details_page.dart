@@ -829,6 +829,28 @@ class _TransactionRow extends ConsumerWidget {
                       style:
                           const TextStyle(fontSize: 11, color: _kTextSecondary),
                     ),
+                    if (txn.metadata?['notes']?.toString().trim().isNotEmpty == true ||
+                        txn.metadata?['note']?.toString().trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Not: ${(txn.metadata?['notes'] ?? txn.metadata?['note'])?.toString().trim()}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

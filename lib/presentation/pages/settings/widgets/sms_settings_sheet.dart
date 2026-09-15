@@ -280,9 +280,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         'id': 'debt',
         'name': 'Vadeli Bakiye Kaydı',
         'template':
-            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
+            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}.{sms_note_line} {business}',
         'sms_template':
-            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
+            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}.{sms_note_line} {business}',
         'whatsapp_template': kDefaultWhatsAppTemplates[kSmsEventDebtCreated],
         'enabled': true,
         'sms_enabled': true,
