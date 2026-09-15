@@ -283,7 +283,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
         }
 
         // 1. Sipariş Etiketi Yazdırma (Bağımsız try-catch, fiş hatasından veya gecikmeden etkilenmez)
-        if (printLabelNeeded && settings != null) {
+        final activeSettings = settings;
+        if (printLabelNeeded && activeSettings != null) {
           try {
             final String? labelPaymentStatus;
             if (paymentMethod == 'debt' ||
@@ -303,7 +304,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
             await printingService.queueOrderLabel(
               newOrder,
               receiptItems,
-              settings,
+              activeSettings,
               customer: customer,
               paidAmount: finalPaid,
               previousDebt: previousDebt,
@@ -317,13 +318,13 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
         }
 
         // 2. Fiş Yazdırma (Bağımsız try-catch, etiket hatasından etkilenmez)
-        if (printReceiptNeeded && settings != null) {
+        if (printReceiptNeeded && activeSettings != null) {
           try {
             await printingService.queueOrderReceipt(
               newOrder,
               receiptItems,
               customer,
-              settings,
+              activeSettings,
               paidAmount: finalPaid,
               notes: notes,
               paymentMethod: paymentMethod,

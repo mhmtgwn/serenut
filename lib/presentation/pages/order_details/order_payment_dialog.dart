@@ -281,35 +281,40 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
             ref.read(settingsNotifierProvider).value;
         unawaited(() async {
           try {
-            settings ??= await (await settingsFuture).getSettings();
-            if (settings == null) return;
-              CustomerEntity? customer;
-              if (widget.order.customerId.isNotEmpty) {
-                final custRepo =
-                    await ref.read(customerRepositoryProvider.future);
-                customer = await custRepo.findById(widget.order.customerId);
-              }
-              if (customer != null) {
-                final receiptNote = _selectedMethod == 'karma'
-                    ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
-                    : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
+            var safeSettings = settings;
+            if (safeSettings == null) {
+              try {
+                final repo = await settingsFuture;
+                safeSettings = await repo.getSettings();
+              } catch (_) {}
+            }
+            if (safeSettings == null) return;
+            CustomerEntity? customer;
+            if (widget.order.customerId.isNotEmpty) {
+              final custRepo =
+                  await ref.read(customerRepositoryProvider.future);
+              customer = await custRepo.findById(widget.order.customerId);
+            }
+            if (customer != null) {
+              final receiptNote = _selectedMethod == 'karma'
+                  ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
+                  : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
 
-                await ref
-                    .read(printingApplicationServiceProvider)
-                    .queueCollectionReceipt(
-                      customer,
-                      amount,
-                      _selectedMethod,
-                      receiptNote,
-                      settings,
-                    );
-              }
+              await ref
+                  .read(printingApplicationServiceProvider)
+                  .queueCollectionReceipt(
+                    customer,
+                    amount,
+                    _selectedMethod,
+                    receiptNote,
+                    safeSettings,
+                  );
+            }
             } catch (e) {
               debugPrint('Receipt print error: $e');
             }
           }());
         }
-      }
 
       if (mounted) {
         Navigator.pop(context);

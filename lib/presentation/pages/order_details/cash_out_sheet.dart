@@ -310,7 +310,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 settings = await repo.getSettings();
               } catch (_) {}
             }
-            if (settings != null) {
+            final safeSettings = settings;
+            if (safeSettings != null) {
               final hasPrinter = await ref
                       .read(printingRepositoryProvider)
                       .getRoute(PrintDocumentKind.receipt) !=
@@ -354,7 +355,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                                   balance: 0,
                                   createdAt: DateTime.now())
                               : null),
-                      settings,
+                      safeSettings,
                       paidAmount: currentFinalPaid,
                       notes: orderRef.notes?.trim(),
                       paymentMethod: selectedMethod,

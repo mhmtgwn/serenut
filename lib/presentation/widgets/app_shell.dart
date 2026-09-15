@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -54,7 +55,7 @@ class AppShell extends ConsumerWidget {
               action: SnackBarAction(
                 label: 'Kuyruk',
                 textColor: Colors.white,
-                onPressed: () => context.push('/settings/print-queue'),
+                onPressed: () => context.push(AppRoutes.hardware),
               ),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 5),
@@ -68,7 +69,7 @@ class AppShell extends ConsumerWidget {
               action: SnackBarAction(
                 label: 'Doğrula',
                 textColor: Colors.white,
-                onPressed: () => context.push('/settings/print-queue'),
+                onPressed: () => context.push(AppRoutes.hardware),
               ),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 6),

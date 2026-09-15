@@ -199,11 +199,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     await _loadSettingsAndPin();
   }
 
-  // ignore: unused_element
   Future<void> _handleLogout() async {
-    await ref.read(authNotifierProvider.notifier).logout();
-    if (mounted) {
-      context.go(AppRoutes.login);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Colors.redAccent),
+            SizedBox(width: 10),
+            Text('Oturumu Kapat', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Oturumu kapatmak istediğinize emin misiniz? Kaydedilmemiş değişiklikleriniz korunacaktır.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç', style: TextStyle(color: _kTextSecondary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Çıkış Yap'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await ref.read(authNotifierProvider.notifier).logout('Kullanıcı ayarlar sayfasından çıkış yaptı.');
+      if (mounted) {
+        context.go(AppRoutes.login);
+      }
     }
   }
 
@@ -363,6 +396,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
               // ── 4. Sürüm ve Çıkış Yap Grubu ──
               const SizedBox(height: 16),
+              if (_matchesQuery('çıkış', 'oturum', 'kapat', 'ayrıl', 'logout'))
+                _buildRoundedCard([
+                  _buildCategoryRow(
+                    title: 'Oturumu Kapat',
+                    subtitle: 'Mevcut kullanıcı oturumunu sonlandır',
+                    icon: Icons.logout_rounded,
+                    color: Colors.redAccent,
+                    onTap: _handleLogout,
+                  ),
+                ]),
 
               const SizedBox(height: 32),
             ],
