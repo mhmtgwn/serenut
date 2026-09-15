@@ -154,12 +154,39 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           Expanded(
             child: Builder(
               builder: (context) {
-                final customersList = customersAsync.valueOrNull;
+                final customersList = customersAsync.valueOrNull ??
+                    (ref.watch(customerSearchQueryProvider).isEmpty &&
+                            ref.watch(customerBalanceFilterProvider) ==
+                                CustomerBalanceFilter.all
+                        ? ref
+                            .watch(salesCustomersControllerProvider)
+                            .valueOrNull
+                        : null);
 
                 if (customersList == null && customersAsync.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(_kGreen)),
+                  return Column(
+                    children: [
+                      const LinearProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(_kGreen),
+                        backgroundColor: _kGreenLight,
+                      ),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: 6,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, __) => Container(
+                            height: 68,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: POSColors.border),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 }
 

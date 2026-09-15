@@ -701,4 +701,50 @@ class SqliteProductRepository implements IProductRepository {
         .where((c) => c.isNotEmpty)
         .toList();
   }
+
+  @override
+  Future<ProductInventorySummary> getInventorySummary() async {
+    if (_hasDataset) {
+      final products = await findAll();
+      return ProductInventorySummary(
+        productCount: products.length,
+        totalQuantity:
+            products.fold<num>(0, (sum, item) => sum + item.quantity),
+        stockValue: products.fold(
+          0,
+          (sum, item) =>
+              sum +
+              ((item.purchasePrice > 0 ? item.purchasePrice : item.price) *
+                  item.quantity),
+        ),
+        criticalCount:
+            products.where((item) => item.quantity <= item.minStock).length,
+      );
+    }
+
+    final rows = await _executor.rawQuery('''
+      SELECT 
+        COUNT(*) as product_count,
+        COALESCE(SUM(quantity), 0) as total_quantity,
+        COALESCE(SUM(CASE WHEN purchase_price > 0 THEN purchase_price * quantity ELSE price * quantity END), 0.0) as stock_value,
+        COALESCE(SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END), 0) as critical_count
+      FROM products
+      WHERE is_active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+    ''');
+    if (rows.isEmpty) {
+      return const ProductInventorySummary(
+        productCount: 0,
+        totalQuantity: 0,
+        stockValue: 0.0,
+        criticalCount: 0,
+      );
+    }
+    final row = rows.first;
+    return ProductInventorySummary(
+      productCount: (row['product_count'] as num?)?.toInt() ?? 0,
+      totalQuantity: (row['total_quantity'] as num?) ?? 0,
+      stockValue: (row['stock_value'] as num?)?.toDouble() ?? 0.0,
+      criticalCount: (row['critical_count'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

@@ -294,6 +294,24 @@ class InMemoryProductRepository implements IProductRepository {
   Future<List<String>> getCategories() async {
     return InMemoryDb.products.map((p) => p.category).toSet().toList();
   }
+
+  @override
+  Future<ProductInventorySummary> getInventorySummary() async {
+    final products = InMemoryDb.products;
+    return ProductInventorySummary(
+      productCount: products.length,
+      totalQuantity: products.fold<num>(0, (sum, item) => sum + item.quantity),
+      stockValue: products.fold(
+        0,
+        (sum, item) =>
+            sum +
+            ((item.purchasePrice > 0 ? item.purchasePrice : item.price) *
+                item.quantity),
+      ),
+      criticalCount:
+          products.where((item) => item.quantity <= item.minStock).length,
+    );
+  }
 }
 
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�

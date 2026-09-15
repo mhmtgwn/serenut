@@ -256,11 +256,74 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
       ],
       body: Builder(
         builder: (context) {
-          final cachedProducts = filteredProductsVal.valueOrNull;
+          final cachedProducts = filteredProductsVal.valueOrNull ??
+              (ref.watch(productSearchQueryProvider).isEmpty &&
+                      ref.watch(productCategoryFilterProvider) == null
+                  ? ref.watch(salesProductsControllerProvider).valueOrNull
+                  : null);
           if (cachedProducts == null && filteredProductsVal.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(_kGreen)),
+            return Column(
+              children: [
+                _buildSummaryBar(inventorySummary, const []),
+                const LinearProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                  backgroundColor: _kGreenLight,
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 6,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, __) => Container(
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _kBorder),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 140,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: 80,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           }
           if (filteredProductsVal.hasError && cachedProducts == null) {

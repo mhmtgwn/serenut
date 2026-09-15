@@ -257,7 +257,11 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
         Expanded(
           child: Builder(
             builder: (context) {
-              final cachedProducts = filteredProductsVal.valueOrNull;
+              final cachedProducts = filteredProductsVal.valueOrNull ??
+                  (ref.watch(salesProductSearchQueryProvider).isEmpty &&
+                          ref.watch(salesProductCategoryFilterProvider) == null
+                      ? ref.watch(productsControllerProvider).valueOrNull
+                      : null);
               final loadingMore = ref.watch(productLoadingMoreProvider);
               final hasMore =
                   ref.watch(salesProductsControllerProvider.notifier).hasMoreData;

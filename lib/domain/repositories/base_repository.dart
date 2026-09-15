@@ -42,6 +42,20 @@ abstract class BaseRepository<T> {
   Future<bool> exists(dynamic id);
 }
 
+class ProductInventorySummary {
+  const ProductInventorySummary({
+    required this.productCount,
+    required this.totalQuantity,
+    required this.stockValue,
+    required this.criticalCount,
+  });
+
+  final int productCount;
+  final num totalQuantity;
+  final double stockValue;
+  final int criticalCount;
+}
+
 /// Product repository
 abstract class IProductRepository implements BaseRepository<ProductEntity> {
   @override
@@ -77,6 +91,9 @@ abstract class IProductRepository implements BaseRepository<ProductEntity> {
 
   /// Get distinct categories of active products
   Future<List<String>> getCategories();
+
+  /// Fast aggregate inventory summary (total count, quantity, valuation, low stock)
+  Future<ProductInventorySummary> getInventorySummary();
 }
 
 /// Customer repository

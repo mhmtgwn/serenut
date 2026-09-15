@@ -249,37 +249,10 @@ final productsControllerProvider =
 // Search and Category Filter Providers
 final productSearchQueryProvider = StateProvider<String>((ref) => '');
 
-class ProductInventorySummary {
-  const ProductInventorySummary({
-    required this.productCount,
-    required this.totalQuantity,
-    required this.stockValue,
-    required this.criticalCount,
-  });
-
-  final int productCount;
-  final num totalQuantity;
-  final double stockValue;
-  final int criticalCount;
-}
-
 final productInventorySummaryProvider =
     FutureProvider<ProductInventorySummary>((ref) async {
   final repository = await ref.watch(productRepositoryProvider.future);
-  final products = await repository.findAll();
-  return ProductInventorySummary(
-    productCount: products.length,
-    totalQuantity: products.fold<num>(0, (sum, item) => sum + item.quantity),
-    stockValue: products.fold(
-      0,
-      (sum, item) =>
-          sum +
-          ((item.purchasePrice > 0 ? item.purchasePrice : item.price) *
-              item.quantity),
-    ),
-    criticalCount:
-        products.where((item) => item.quantity <= item.minStock).length,
-  );
+  return repository.getInventorySummary();
 });
 final productCategoryFilterProvider = StateProvider<String?>((ref) => null);
 

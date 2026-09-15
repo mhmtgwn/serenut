@@ -42,6 +42,9 @@ import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
 import 'package:serenutos/presentation/observers/telemetry_provider_observer.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/presentation/controllers/orders_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -252,6 +255,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       ref.read(smsNotificationHandlerProvider);
       ref.read(smsGatewayServiceProvider);
       unawaited(_checkAutoDebtReminders());
+      // Pre-warm primary POS tab controllers in background so navigation to Satış, Ürünler, Müşteriler, Siparişler is instant (0ms delay)
+      ref.read(salesProductsControllerProvider);
+      ref.read(productsControllerProvider);
+      ref.read(customersControllerProvider);
+      ref.read(ordersControllerProvider);
+      ref.read(productInventorySummaryProvider);
     });
   }
 
@@ -368,11 +377,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         await settingsRepo.getSettings();
 
         final productRepo = await ref.read(productRepositoryProvider.future);
-        await productRepo.findAll();
+        await productRepo.getInventorySummary();
         await productRepo.getCategories();
 
         final customerRepo = await ref.read(customerRepositoryProvider.future);
-        await customerRepo.findAll();
+        await customerRepo.count();
       } catch (e) {
         debugPrint('Pre-warm warning at startup: $e');
       }
