@@ -122,7 +122,14 @@ class SalesTab extends ConsumerWidget {
     ReportSummary? summary,
     List<CategoryRevenue>? categories,
   ) async {
-    final settings = ref.read(settingsNotifierProvider).value;
+    var settings = ref.read(settingsNotifierProvider).valueOrNull ??
+        ref.read(settingsNotifierProvider).value;
+    if (settings == null) {
+      try {
+        final repo = await ref.read(settingsRepositoryProvider.future);
+        settings = await repo.getSettings();
+      } catch (_) {}
+    }
     if (summary == null || categories == null || settings == null) {
       _showMessage(context, 'Rapor verileri henüz hazır değil.');
       return;

@@ -276,10 +276,13 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
 
       // 3. Fiş yazdırma (isteğe bağlı)
       if (_printReceipt) {
-        final settings = ref.read(settingsNotifierProvider).valueOrNull;
-        if (settings != null) {
-          unawaited(() async {
-            try {
+        final settingsFuture = ref.read(settingsRepositoryProvider.future);
+        var settings = ref.read(settingsNotifierProvider).valueOrNull ??
+            ref.read(settingsNotifierProvider).value;
+        unawaited(() async {
+          try {
+            settings ??= await (await settingsFuture).getSettings();
+            if (settings == null) return;
               CustomerEntity? customer;
               if (widget.order.customerId.isNotEmpty) {
                 final custRepo =

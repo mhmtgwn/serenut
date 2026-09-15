@@ -153,7 +153,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
   }
 
   Future<void> _queueShelfLabels() async {
-    final settings = ref.read(settingsNotifierProvider).valueOrNull;
+    var settings = ref.read(settingsNotifierProvider).valueOrNull ??
+        ref.read(settingsNotifierProvider).value;
+    if (settings == null) {
+      try {
+        final repo = await ref.read(settingsRepositoryProvider.future);
+        settings = await repo.getSettings();
+      } catch (_) {}
+    }
     if (settings == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Yazıcı ayarları henüz hazır değil.')),

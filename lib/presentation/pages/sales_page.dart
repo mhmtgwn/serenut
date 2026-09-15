@@ -330,7 +330,13 @@ class _SalesPageState extends ConsumerState<SalesPage>
       SaleEntity sale, CustomerEntity? selectedCustomer,
       {Map<String, dynamic>? paymentBreakdown}) async {
     final settingsAsync = ref.read(settingsNotifierProvider);
-    final settings = settingsAsync.value;
+    var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+    if (settings == null) {
+      try {
+        final repo = await ref.read(settingsRepositoryProvider.future);
+        settings = await repo.getSettings();
+      } catch (_) {}
+    }
     if (settings == null) {
       _showErrorSnackBar('Yazıcı ayarları yüklenemedi.');
       return;

@@ -191,7 +191,13 @@ class OrderDetailsPage extends ConsumerWidget {
                     icon: const Icon(Icons.print, color: _kGreen),
                     tooltip: 'Sipariş Fişi Yazdır',
                     onPressed: () async {
-                      final settings = settingsAsync.value;
+                      var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+                      if (settings == null) {
+                        try {
+                          final repo = await ref.read(settingsRepositoryProvider.future);
+                          settings = await repo.getSettings();
+                        } catch (_) {}
+                      }
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),
@@ -294,7 +300,13 @@ class OrderDetailsPage extends ConsumerWidget {
                         const Icon(Icons.local_offer_outlined, color: _kGreen),
                     tooltip: 'Sipariş Etiketi Yazdır',
                     onPressed: () async {
-                      final settings = settingsAsync.valueOrNull;
+                      var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+                      if (settings == null) {
+                        try {
+                          final repo = await ref.read(settingsRepositoryProvider.future);
+                          settings = await repo.getSettings();
+                        } catch (_) {}
+                      }
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),

@@ -436,7 +436,7 @@ class SqlitePrintingRepository implements PrintingRepository {
           PrintJobState.retryWait.name,
           now.toIso8601String(),
         ],
-        orderBy: 'created_at ASC',
+        orderBy: 'attempt_count ASC, created_at ASC',
         limit: 1,
       );
       if (rows.isEmpty) return;

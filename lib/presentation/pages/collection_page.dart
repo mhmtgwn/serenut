@@ -704,7 +704,14 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       }
 
       // Get the settings and the updated customer (which now has updated balance)
-      final settings = ref.read(settingsNotifierProvider).value;
+      var settings = ref.read(settingsNotifierProvider).valueOrNull ??
+          ref.read(settingsNotifierProvider).value;
+      if (settings == null) {
+        try {
+          final repo = await ref.read(settingsRepositoryProvider.future);
+          settings = await repo.getSettings();
+        } catch (_) {}
+      }
       final updatedCustomers =
           ref.read(collectionCustomersControllerProvider).value;
       final updatedCustomer =

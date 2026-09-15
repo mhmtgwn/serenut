@@ -3,7 +3,13 @@ part of '../order_details_page.dart';
 // ── Top-Level Helper For Printing ───────────────────────────────────────────
 Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
   final settingsAsync = ref.read(settingsNotifierProvider);
-  final settings = settingsAsync.value;
+  var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+  if (settings == null) {
+    try {
+      final repo = await ref.read(settingsRepositoryProvider.future);
+      settings = await repo.getSettings();
+    } catch (_) {}
+  }
   if (settings == null) return;
   final hasPrinter = await ref
           .read(printingRepositoryProvider)
@@ -297,7 +303,13 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
           if (printReceiptNeeded) {
             final settingsAsync = ref.read(settingsNotifierProvider);
-            final settings = settingsAsync.value;
+            var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+            if (settings == null) {
+              try {
+                final repo = await ref.read(settingsRepositoryProvider.future);
+                settings = await repo.getSettings();
+              } catch (_) {}
+            }
             if (settings != null) {
               final hasPrinter = await ref
                       .read(printingRepositoryProvider)

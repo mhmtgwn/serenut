@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -77,6 +78,7 @@ typedef RawNativePrint = Future<bool> Function(
 
 class WindowsSpoolerPrintTransport implements PrintTransport {
   final RawNativePrint rawPrint;
+  static Future<void> _spoolerChain = Future.value();
 
   WindowsSpoolerPrintTransport({RawNativePrint? rawPrint})
       : rawPrint = rawPrint ?? NativePrinterBridge.printUsbRaw;
@@ -88,6 +90,27 @@ class WindowsSpoolerPrintTransport implements PrintTransport {
 
   @override
   Future<PrintTransportObservation> send({
+    required Uint8List bytes,
+    required int copies,
+    required Map<String, Object?> configuration,
+  }) {
+    final completer = Completer<PrintTransportObservation>();
+    _spoolerChain = _spoolerChain.then((_) async {
+      try {
+        final res = await _sendInternal(
+          bytes: bytes,
+          copies: copies,
+          configuration: configuration,
+        );
+        completer.complete(res);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<PrintTransportObservation> _sendInternal({
     required Uint8List bytes,
     required int copies,
     required Map<String, Object?> configuration,
@@ -126,6 +149,7 @@ class WindowsSpoolerPrintTransport implements PrintTransport {
 class BluetoothPrintTransport implements PrintTransport {
   final Future<bool> Function(String address) connect;
   final Future<bool> Function(List<int> bytes) rawPrint;
+  static Future<void> _bluetoothChain = Future.value();
 
   BluetoothPrintTransport({
     Future<bool> Function(String address)? connect,
@@ -139,6 +163,27 @@ class BluetoothPrintTransport implements PrintTransport {
 
   @override
   Future<PrintTransportObservation> send({
+    required Uint8List bytes,
+    required int copies,
+    required Map<String, Object?> configuration,
+  }) {
+    final completer = Completer<PrintTransportObservation>();
+    _bluetoothChain = _bluetoothChain.then((_) async {
+      try {
+        final res = await _sendInternal(
+          bytes: bytes,
+          copies: copies,
+          configuration: configuration,
+        );
+        completer.complete(res);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<PrintTransportObservation> _sendInternal({
     required Uint8List bytes,
     required int copies,
     required Map<String, Object?> configuration,

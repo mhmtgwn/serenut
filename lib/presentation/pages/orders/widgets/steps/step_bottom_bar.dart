@@ -235,7 +235,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       // to eliminate "Bad state: Cannot use ref after the widget was disposed"
       final container = ProviderScope.containerOf(context);
       final printingService = ref.read(printingApplicationServiceProvider);
-      final settings = ref.read(settingsNotifierProvider).valueOrNull ??
+      final settingsFuture = ref.read(settingsRepositoryProvider.future);
+      var settings = ref.read(settingsNotifierProvider).valueOrNull ??
           ref.read(settingsNotifierProvider).value;
       final ordersCustomersNotifier =
           ref.read(ordersCustomersControllerProvider.notifier);
@@ -273,6 +274,14 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           .toList();
 
       unawaited(() async {
+        // Settings UI notifier'dan null gelse dahi SQLite repository'den garanti yükle
+        try {
+          settings ??= await (await settingsFuture).getSettings();
+        } catch (settingsError) {
+          debugPrint(
+              '[OrderCreationDialog] Ayarlar repository yükleme uyarısı: $settingsError');
+        }
+
         // 1. Sipariş Etiketi Yazdırma (Bağımsız try-catch, fiş hatasından veya gecikmeden etkilenmez)
         if (printLabelNeeded && settings != null) {
           try {
