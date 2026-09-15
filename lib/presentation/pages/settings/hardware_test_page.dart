@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
@@ -457,7 +456,7 @@ class _DeviceListState extends State<_DeviceList> {
     final width = MediaQuery.sizeOf(context).width;
     final columns = width >= 760 ? 2 : 1;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final cardExtent = 290.0 + (textScale - 1).clamp(0.0, 1.0) * 96;
+    final cardExtent = 84.0 + (textScale - 1).clamp(0.0, 1.0) * 24;
 
     return CustomScrollView(
       slivers: [
@@ -1059,235 +1058,298 @@ class _DeviceCard extends StatelessWidget {
         : device.configuration['isActive'] as bool? ?? true;
     final isCloud = device.connectionType == HardwareConnectionType.cloud;
     final typeColor = _typeColor(device.type);
+    final hasError = device.lastError != null ||
+        device.status == HardwareDeviceStatus.error ||
+        device.status == HardwareDeviceStatus.offline;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isActive ? kGreen.withValues(alpha: .4) : kBorderColor,
+          color: isActive ? kGreen.withValues(alpha: .5) : kBorderColor,
           width: isActive ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          if (isActive)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 4,
-              child: Container(color: kGreen),
-            ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onEdit,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(isActive ? 16 : 14, 12, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onEdit,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 1. Sol: Cihaz İkonu & Aktiflik Rozeti
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    // Header Satırı
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: typeColor.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(
+                          color: typeColor.withValues(alpha: .2),
+                        ),
+                      ),
+                      child: Icon(_typeIcon(device.type),
+                          color: typeColor, size: 21),
+                    ),
+                    if (isActive)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 11,
+                          height: 11,
                           decoration: BoxDecoration(
-                            color: typeColor.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(11),
-                          ),
-                          child: Icon(_typeIcon(device.type),
-                              color: typeColor, size: 20),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      device.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: kTextPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isCloud) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: kTeal.withValues(alpha: .1),
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      child: const Text(
-                                        'Bulut',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: kTeal,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}',
-                                style: const TextStyle(
-                                    fontSize: 11, color: kTextSecondary),
-                              ),
-                            ],
+                            color: kGreen,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        // Tek ve temiz durum rozeti
-                        _DeviceStatusPill(
-                          label: status.$1,
-                          color: status.$2,
-                          isActive: isActive,
-                        ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded,
-                              size: 18, color: kTextSecondary),
-                          padding: EdgeInsets.zero,
-                          tooltip: 'Diğer işlemler',
-                          onSelected: (value) {
-                            if (value == 'edit') onEdit();
-                            if (value == 'activate') onActivate();
-                            if (value == 'delete') onDelete();
-                          },
-                          itemBuilder: (_) => [
-                            if (!isActive)
-                              const PopupMenuItem(
-                                value: 'activate',
-                                child: ListTile(
-                                  dense: true,
-                                  leading: Icon(
-                                      Icons.check_circle_outline_rounded,
-                                      size: 18),
-                                  title: Text('Aktif cihaz yap'),
-                                ),
-                              ),
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: ListTile(
-                                dense: true,
-                                leading: Icon(Icons.edit_outlined, size: 18),
-                                title: Text('Düzenle'),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // 2. Orta: Cihaz Adı, Rol Rozeti ve Bağlantı Meta Bilgisi
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              device.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: kTextPrimary,
                               ),
                             ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: ListTile(
-                                dense: true,
-                                leading: Icon(Icons.delete_outline_rounded,
-                                    color: kPink, size: 18),
-                                title: Text('Kaldır',
-                                    style: TextStyle(color: kPink)),
+                          ),
+                          if (isCloud) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: kTeal.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Bulut',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: kTeal,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (isPrinter && activeFor.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: kGreen.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                activeFor
+                                    .map((k) => switch (k) {
+                                          'receipt' => 'Fiş',
+                                          'productLabel' => 'Etiket',
+                                          'orderLabel' => 'Sipariş',
+                                          _ => k,
+                                        })
+                                    .join(' + '),
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: kGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _deviceSubtitle(device),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (hasError) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                size: 12, color: kPink),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                device.lastError ??
+                                    device.lastMessage ??
+                                    'Aygıt çevrimdışı veya yanıt vermiyor',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: kPink,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // 3. Sağ: Durum Rozeti + Kompakt Test İkonu + Menü
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _DeviceStatusPill(
+                      label: status.$1,
+                      color: status.$2,
+                      isActive: isActive,
                     ),
-
-                    const SizedBox(height: 10),
-
-                    // Donanım Parametre Etiketleri (Spec Badges)
-                    _DeviceSpecChips(
-                      device: device,
-                      isPrinter: isPrinter,
-                      activeFor: activeFor,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Tanı / Son Durum Mesaj Kutucuğu
-                    _DeviceDiagnosticBar(device: device),
-
-                    const SizedBox(height: 10),
-
-                    // Aksiyon Butonları (Test Et + Düzenle)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed:
-                                device.status == HardwareDeviceStatus.testing
-                                    ? null
-                                    : onTest,
-                            icon: device.status == HardwareDeviceStatus.testing
-                                ? const SizedBox.square(
-                                    dimension: 14,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.play_arrow_rounded,
-                                    size: 17),
-                            label: Text(
-                              device.status == HardwareDeviceStatus.testing
-                                  ? 'Kontrol ediliyor…'
-                                  : 'Bağlantıyı test et',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w700),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Bağlantıyı test et',
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: IconButton.filledTonal(
+                          padding: EdgeInsets.zero,
+                          style: IconButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
+                          onPressed:
+                              device.status == HardwareDeviceStatus.testing
+                                  ? null
+                                  : onTest,
+                          icon: device.status == HardwareDeviceStatus.testing
+                              ? const SizedBox.square(
+                                  dimension: 12,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : const Icon(Icons.play_arrow_rounded,
+                                  size: 16),
                         ),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: 'Aygıt ayarları',
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              side: const BorderSide(color: kBorderColor),
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded,
+                          size: 18, color: kTextSecondary),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'İşlemler',
+                      onSelected: (value) {
+                        if (value == 'test') onTest();
+                        if (value == 'edit') onEdit();
+                        if (value == 'activate') onActivate();
+                        if (value == 'delete') onDelete();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.tune_rounded, size: 18),
+                            title: Text('Ayarlar & Düzenle'),
+                          ),
+                        ),
+                        if (!isActive)
+                          const PopupMenuItem(
+                            value: 'activate',
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 18),
+                              title: Text('Aktif cihaz yap'),
                             ),
-                            onPressed: onEdit,
-                            child: const Icon(Icons.tune_rounded,
-                                size: 17, color: kTextPrimary),
+                          ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.delete_outline_rounded,
+                                color: kPink, size: 18),
+                            title: Text('Kaldır',
+                                style: TextStyle(color: kPink)),
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+String _deviceSubtitle(HardwareDevice device) {
+  final parts = <String>[];
+  final config = device.configuration;
+  parts.add(_typeLabel(device.type));
+  if (device.connectionType == HardwareConnectionType.tcp &&
+      config['host'] != null) {
+    parts.add('${config['host']}:${config['port'] ?? 9100}');
+  } else if (device.connectionType == HardwareConnectionType.serial &&
+      config['serialPort'] != null) {
+    parts.add('${config['serialPort']}');
+  } else if (device.connectionType == HardwareConnectionType.windows &&
+      config['printerName'] != null) {
+    parts.add('${config['printerName']}');
+  } else if (device.connectionType == HardwareConnectionType.bluetooth &&
+      config['printerName'] != null) {
+    parts.add('${config['printerName']}');
+  } else {
+    parts.add(_connectionLabel(device.connectionType));
+  }
+  if (device.type == HardwareDeviceType.receiptPrinter) {
+    final w = config['paperWidth'] ?? 58;
+    parts.add('$w mm');
+  } else if (device.type == HardwareDeviceType.labelPrinter) {
+    final w = config['labelWidthMm'] ?? 50;
+    final h = config['labelHeightMm'] ?? 30;
+    parts.add('$w×$h mm');
+  }
+  return parts.join(' · ');
 }
 
 class _DeviceStatusPill extends StatelessWidget {
@@ -1336,222 +1398,6 @@ class _DeviceStatusPill extends StatelessWidget {
   }
 }
 
-class _DeviceSpecChips extends StatelessWidget {
-  final HardwareDevice device;
-  final bool isPrinter;
-  final List<String> activeFor;
-
-  const _DeviceSpecChips({
-    required this.device,
-    required this.isPrinter,
-    required this.activeFor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final config = device.configuration;
-    final chips = <Widget>[];
-
-    // Aktif rota etiketi
-    if (isPrinter && activeFor.isNotEmpty) {
-      final routeNames = activeFor
-          .map((kind) => switch (kind) {
-                'receipt' => 'Fiş',
-                'productLabel' => 'Ürün Etiketi',
-                'orderLabel' => 'Sipariş Etiketi',
-                _ => kind,
-              })
-          .join(' + ');
-      chips.add(_MiniChip(
-        icon: Icons.check_circle_rounded,
-        label: routeNames,
-        color: kGreen,
-      ));
-    }
-
-    // Bağlantı detayı
-    if (device.connectionType == HardwareConnectionType.tcp &&
-        config['host'] != null) {
-      chips.add(_MiniChip(
-        icon: Icons.lan_rounded,
-        label: '${config['host']}:${config['port'] ?? 9100}',
-      ));
-    } else if (device.connectionType == HardwareConnectionType.serial &&
-        config['serialPort'] != null) {
-      chips.add(_MiniChip(
-        icon: Icons.usb_rounded,
-        label: '${config['serialPort']} · ${config['baudRate'] ?? 9600}',
-      ));
-    } else if (device.connectionType == HardwareConnectionType.windows &&
-        config['printerName'] != null) {
-      chips.add(_MiniChip(
-        icon: Icons.desktop_windows_rounded,
-        label: '${config['printerName']}',
-      ));
-    } else if (device.connectionType == HardwareConnectionType.bluetooth &&
-        config['printerName'] != null) {
-      chips.add(_MiniChip(
-        icon: Icons.bluetooth_rounded,
-        label: '${config['printerName']}',
-      ));
-    } else if (device.connectionType == HardwareConnectionType.embedded) {
-      chips.add(const _MiniChip(
-        icon: Icons.smartphone_rounded,
-        label: 'Dahili Donanım',
-      ));
-    } else if (device.connectionType == HardwareConnectionType.cloud) {
-      chips.add(const _MiniChip(
-        icon: Icons.cloud_rounded,
-        label: 'Ağ Paylaşımı',
-        color: kTeal,
-      ));
-    }
-
-    // Donanım özellikleri
-    if (device.type == HardwareDeviceType.receiptPrinter) {
-      final width = config['paperWidth'] ?? 58;
-      chips.add(_MiniChip(icon: Icons.receipt_rounded, label: '$width mm'));
-      if (config['autoCut'] == true) {
-        chips.add(const _MiniChip(
-            icon: Icons.content_cut_rounded, label: 'Otomatik kesim'));
-      }
-      if (config['openDrawer'] == true) {
-        chips.add(const _MiniChip(
-            icon: Icons.point_of_sale_rounded, label: 'Çekmece'));
-      }
-    } else if (device.type == HardwareDeviceType.labelPrinter) {
-      final w = config['labelWidthMm'] ?? 50;
-      final h = config['labelHeightMm'] ?? 30;
-      chips.add(_MiniChip(icon: Icons.aspect_ratio_rounded, label: '$w×$h mm'));
-      if (config['dpi'] != null) {
-        chips.add(_MiniChip(
-            icon: Icons.high_quality_rounded, label: '${config['dpi']} DPI'));
-      }
-    } else if (device.type == HardwareDeviceType.scale) {
-      final unit = config['defaultUnit'] ?? 'kg';
-      chips.add(_MiniChip(icon: Icons.scale_rounded, label: 'Birim: $unit'));
-    } else if (device.type == HardwareDeviceType.paymentTerminal) {
-      final vendor = config['vendor'] ?? 'POS';
-      chips.add(_MiniChip(icon: Icons.credit_card_rounded, label: '$vendor'));
-    }
-
-    if (chips.isEmpty) {
-      return Text(
-        _deviceConfigurationSummary(device),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 11, color: kTextSecondary),
-      );
-    }
-
-    return Wrap(
-      spacing: 5,
-      runSpacing: 5,
-      children: chips,
-    );
-  }
-}
-
-class _MiniChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color? color;
-
-  const _MiniChip({
-    required this.icon,
-    required this.label,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final chipColor = color ?? kTextSecondary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: (color ?? kBorderColor).withValues(alpha: .1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: chipColor),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: color ?? kTextPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DeviceDiagnosticBar extends StatelessWidget {
-  final HardwareDevice device;
-
-  const _DeviceDiagnosticBar({required this.device});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasError = device.lastError != null;
-    final message =
-        device.lastError ?? device.lastMessage ?? 'Bağlantı durumu hazır.';
-    final dateStr = device.lastTestedAt != null
-        ? DateFormat('HH:mm').format(device.lastTestedAt!)
-        : null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: hasError ? kPink.withValues(alpha: .06) : kBgColor,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(
-          color: hasError
-              ? kPink.withValues(alpha: .2)
-              : kBorderColor.withValues(alpha: .5),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            hasError ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
-            size: 13,
-            color: hasError ? kPink : kTextSecondary,
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              message,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                color: hasError ? kPink : kTextSecondary,
-                fontWeight: hasError ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ),
-          if (dateStr != null) ...[
-            const SizedBox(width: 4),
-            Text(
-              dateStr,
-              style: const TextStyle(fontSize: 9, color: kTextSecondary),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 class _EmptyDevices extends StatelessWidget {
   final VoidCallback onAdd;
@@ -1724,22 +1570,6 @@ String _networkCandidateLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.barcodeScanner => 'Okuyucu adayı',
     };
 
-String _deviceConfigurationSummary(HardwareDevice device) {
-  final config = device.configuration;
-  int value(String key, int fallback) =>
-      int.tryParse(config[key]?.toString() ?? '') ?? fallback;
-  return switch (device.type) {
-    HardwareDeviceType.receiptPrinter =>
-      '${value('paperWidth', 58)} mm fiş · ${config['autoCut'] == true ? 'otomatik kesim' : 'kesimsiz'}',
-    HardwareDeviceType.labelPrinter =>
-      '${value('labelWidthMm', 50)}×${value('labelHeightMm', 30)} mm · ${value('dpi', 203)} DPI · ${(config['language'] ?? 'tspl').toString().toUpperCase()}',
-    HardwareDeviceType.scale =>
-      '${value('baudRate', 9600)} baud · ${(config['defaultUnit'] ?? 'kg').toString()}',
-    HardwareDeviceType.paymentTerminal =>
-      '${(config['vendor'] ?? 'generic').toString()} · ${(config['protocol'] ?? 'vendor_sdk').toString().toUpperCase()}',
-    HardwareDeviceType.barcodeScanner => 'Okutma ile doğrulama',
-  };
-}
 
 IconData _typeIcon(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => Icons.print_rounded,

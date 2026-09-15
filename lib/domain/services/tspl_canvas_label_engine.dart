@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/printing/label_dimension_models.dart';
-import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
 /// Next-Generation TSPL Label Renderer powered by Flutter's Canvas & TextPainter.
 ///
@@ -178,8 +177,6 @@ class TsplCanvasLabelEngine {
         (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
-    final customerTitleFontSize =
-        (isWide ? (isTall ? 52.0 : 44.0) : 36.0) * fontScale;
     final cleanNote = note?.trim() ?? '';
     final isLongNote = cleanNote.length > 45;
     final isVeryLongNote = cleanNote.length > 90;
