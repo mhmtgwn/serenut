@@ -295,21 +295,31 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                   await ref.read(customerRepositoryProvider.future);
               customer = await custRepo.findById(widget.order.customerId);
             }
-            if (customer != null) {
-              final receiptNote = _selectedMethod == 'karma'
-                  ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
-                  : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
+            final finalCustomer = customer ??
+                CustomerEntity(
+                  id: widget.order.customerId,
+                  name: widget.order.customerName?.isNotEmpty == true
+                      ? widget.order.customerName!
+                      : 'Genel Müşteri',
+                  email: '',
+                  phone: widget.order.customerPhone ?? '',
+                  balance: 0,
+                  createdAt: DateTime.now(),
+                );
 
-              await ref
-                  .read(printingApplicationServiceProvider)
-                  .queueCollectionReceipt(
-                    customer,
-                    amount,
-                    _selectedMethod,
-                    receiptNote,
-                    safeSettings,
-                  );
-            }
+            final receiptNote = _selectedMethod == 'karma'
+                ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
+                : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
+
+            await ref
+                .read(printingApplicationServiceProvider)
+                .queueCollectionReceipt(
+                  finalCustomer,
+                  amount,
+                  _selectedMethod,
+                  receiptNote,
+                  safeSettings,
+                );
             } catch (e) {
               debugPrint('Receipt print error: $e');
             }

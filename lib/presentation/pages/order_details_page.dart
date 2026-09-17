@@ -198,6 +198,7 @@ class OrderDetailsPage extends ConsumerWidget {
                           settings = await repo.getSettings();
                         } catch (_) {}
                       }
+                      if (!context.mounted) return;
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),
@@ -206,8 +207,7 @@ class OrderDetailsPage extends ConsumerWidget {
                       }
                       final hasPrinter = await ref
                               .read(printingRepositoryProvider)
-                              .getRoute(PrintDocumentKind.receipt) !=
-                          null;
+                              .hasUsableDevice(PrintDocumentKind.receipt);
                       if (!context.mounted) return;
                       if (!hasPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -307,21 +307,22 @@ class OrderDetailsPage extends ConsumerWidget {
                           settings = await repo.getSettings();
                         } catch (_) {}
                       }
+                      if (!context.mounted) return;
                       if (settings == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),
                         );
                         return;
                       }
-                      final route = await ref
+                      final hasLabelPrinter = await ref
                           .read(printingRepositoryProvider)
-                          .getRoute(PrintDocumentKind.orderLabel);
+                          .hasUsableDevice(PrintDocumentKind.orderLabel);
                       if (!context.mounted) return;
-                      if (route == null) {
+                      if (!hasLabelPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Sipariş etiketi için aktif yazıcı rotası seçilmedi.',
+                              'Lütfen Ayarlar sayfasından bir etiket yazıcısı tanımlayın.',
                             ),
                             backgroundColor: Colors.orange,
                           ),

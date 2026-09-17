@@ -15,6 +15,9 @@ class _FakePrintingRepository implements PrintingRepository {
   Future<PrinterRoute?> getRoute(PrintDocumentKind kind) async => null;
 
   @override
+  Future<bool> hasUsableDevice(PrintDocumentKind kind) async => true;
+
+  @override
   Future<PrinterDeviceProfile?> getDevice(String id) async => null;
 
   @override

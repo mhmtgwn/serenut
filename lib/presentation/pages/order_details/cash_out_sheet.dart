@@ -17,8 +17,7 @@ Future<void> triggerOrderDeliveryPrint(
   if (settings == null) return;
   final hasPrinter = await ref
           .read(printingRepositoryProvider)
-          .getRoute(PrintDocumentKind.receipt) !=
-      null;
+          .hasUsableDevice(PrintDocumentKind.receipt);
   if (!hasPrinter) return;
 
   try {
@@ -74,11 +73,6 @@ Future<void> triggerOrderDeliveryPrint(
     debugPrint('Printing error in delivery: $e');
   }
 }
-
-// Geriye dönük uyumluluk takma adı
-Future<void> _triggerPrint(WidgetRef ref, OrderEntity order,
-        {double? paidAmount}) =>
-    triggerOrderDeliveryPrint(ref, order, paidAmount: paidAmount);
 
 // ── Cash Out Bottom Sheet Widget ─────────────────────────────────────────────
 class _CashOutSheet extends ConsumerStatefulWidget {
@@ -333,8 +327,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             if (safeSettings != null) {
               final hasPrinter = await ref
                       .read(printingRepositoryProvider)
-                      .getRoute(PrintDocumentKind.receipt) !=
-                  null;
+                      .hasUsableDevice(PrintDocumentKind.receipt);
               if (hasPrinter) {
                 CustomerEntity? customer;
                 if (customerId.isNotEmpty) {

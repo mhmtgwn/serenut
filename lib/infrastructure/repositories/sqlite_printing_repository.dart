@@ -114,6 +114,20 @@ class SqlitePrintingRepository implements PrintingRepository {
   }
 
   @override
+  Future<bool> hasUsableDevice(PrintDocumentKind kind) async {
+    final route = await getRoute(kind);
+    if (route != null) {
+      final dev = await getDevice(route.deviceId);
+      if (dev != null && dev.enabled) return true;
+    }
+    final expectedLanguage = kind == PrintDocumentKind.receipt
+        ? PrinterLanguage.escPos
+        : PrinterLanguage.tspl;
+    final devices = await getDevices();
+    return devices.any((d) => d.enabled && d.language == expectedLanguage);
+  }
+
+  @override
   Future<void> saveRoute(PrinterRoute route) async {
     await _gateway.transaction(() async {
       final deviceRows = await _executor.query(

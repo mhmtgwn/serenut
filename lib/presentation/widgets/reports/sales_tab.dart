@@ -130,16 +130,17 @@ class SalesTab extends ConsumerWidget {
         settings = await repo.getSettings();
       } catch (_) {}
     }
+    if (!context.mounted) return;
     if (summary == null || categories == null || settings == null) {
       _showMessage(context, 'Rapor verileri henüz hazır değil.');
       return;
     }
 
-    final route = await ref
+    final hasPrinter = await ref
         .read(printingRepositoryProvider)
-        .getRoute(PrintDocumentKind.receipt);
+        .hasUsableDevice(PrintDocumentKind.receipt);
     if (!context.mounted) return;
-    if (route == null) {
+    if (!hasPrinter) {
       _showMessage(
         context,
         'Önce Ayarlar bölümünden bir yazıcı tanımlayın.',

@@ -8,6 +8,7 @@ abstract interface class PrintingRepository {
   Future<void> saveDevice(PrinterDeviceProfile device);
   Future<void> deleteDevice(String id);
   Future<PrinterRoute?> getRoute(PrintDocumentKind kind);
+  Future<bool> hasUsableDevice(PrintDocumentKind kind);
   Future<void> saveRoute(PrinterRoute route);
   Future<void> createJob(PrintJobRecord job);
   Future<PrintJobRecord> enqueue({
