@@ -890,7 +890,7 @@ class _EmptyCloudNotice extends StatelessWidget {
   }
 }
 
-// ── YENİ KOMPAKT HERO HEADER ─────────────────────────────────────────────────
+// ── YENİ KOMPAKT HERO HEADER ────────────────────────────────────────────────
 class _HardwareHero extends StatelessWidget {
   final int total;
   final int ready;
@@ -931,73 +931,81 @@ class _HardwareHero extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Status indicator
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: statusColor.withValues(alpha: .2)),
-            ),
-            child: Icon(Icons.devices_rounded, color: statusColor, size: 22),
-          ),
-          const SizedBox(width: 12),
-          // Title + status
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Aygıt Yöneticisi',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: kTextPrimary,
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 460;
+          final statusInfo = Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withValues(alpha: .2)),
                 ),
-                const SizedBox(height: 2),
-                Row(
+                child:
+                    Icon(Icons.devices_rounded, color: statusColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      statusLabel,
+                    const Text(
+                      'Aygıt Yöneticisi',
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: kTextPrimary,
                       ),
                     ),
-                    if (total > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '· $total toplam',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: kTextSecondary,
-                          fontWeight: FontWeight.w500,
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            statusLabel,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                        if (total > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '· $total toplam',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: kTextSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Action buttons
-          Row(
-            mainAxisSize: MainAxisSize.min,
+              ),
+            ],
+          );
+
+          final actions = Row(
+            mainAxisSize: isCompact ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment:
+                isCompact ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
               Tooltip(
                 message: 'Ortak yazıcı bağla',
@@ -1005,8 +1013,8 @@ class _HardwareHero extends StatelessWidget {
                   onTap: onAddCloud,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
                       border: Border.all(color: kBorderColor),
                       borderRadius: BorderRadius.circular(10),
@@ -1014,8 +1022,7 @@ class _HardwareHero extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_sync_rounded,
-                            size: 16, color: kTeal),
+                        Icon(Icons.cloud_sync_rounded, size: 16, color: kTeal),
                         SizedBox(width: 5),
                         Text(
                           'Bulut',
@@ -1047,8 +1054,27 @@ class _HardwareHero extends StatelessWidget {
                 label: const Text('Ekle'),
               ),
             ],
-          ),
-        ],
+          );
+
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                statusInfo,
+                const SizedBox(height: 10),
+                actions,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: statusInfo),
+              const SizedBox(width: 10),
+              actions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1260,7 +1286,10 @@ class _DeviceCard extends StatelessWidget {
 
                         // ── Aksiyon butonları ──
                         const SizedBox(height: 10),
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             // Test
                             _ActionButton(
@@ -1272,7 +1301,6 @@ class _DeviceCard extends StatelessWidget {
                               isLoading: isTesting,
                               onTap: isTesting ? null : onTest,
                             ),
-                            const SizedBox(width: 8),
                             // Düzenle
                             _ActionButton(
                               icon: Icons.tune_rounded,
@@ -1280,16 +1308,13 @@ class _DeviceCard extends StatelessWidget {
                               color: kTextSecondary,
                               onTap: onEdit,
                             ),
-                            if (!isActive) ...[
-                              const SizedBox(width: 8),
+                            if (!isActive)
                               _ActionButton(
                                 icon: Icons.check_circle_outline_rounded,
                                 label: 'Aktif Yap',
                                 color: kGreen,
                                 onTap: onActivate,
                               ),
-                            ],
-                            const Spacer(),
                             // Sil
                             _ActionButton(
                               icon: Icons.delete_outline_rounded,

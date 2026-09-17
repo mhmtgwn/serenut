@@ -174,12 +174,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Yazıcılar (1)'));
+    await tester.tap(find.text('Yazıcılar'));
     await tester.pumpAndSettle();
     expect(find.text('Kasa Yazıcısı'), findsOneWidget);
     expect(find.text('Kasa Terazisi'), findsNothing);
 
-    await tester.tap(find.text('Satış donanımı (1)'));
+    await tester.tap(find.text('Satış'));
     await tester.pumpAndSettle();
     expect(find.text('Kasa Terazisi'), findsOneWidget);
     expect(find.text('Kasa Yazıcısı'), findsNothing);
