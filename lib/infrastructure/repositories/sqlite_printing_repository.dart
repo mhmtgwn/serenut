@@ -110,51 +110,7 @@ class SqlitePrintingRepository implements PrintingRepository {
       whereArgs: [kind.name],
       limit: 1,
     );
-    if (rows.isNotEmpty) {
-      final route = PrinterRoute.fromMap(rows.first);
-      final activeDevice = await _executor.query(
-        'printer_devices',
-        where: 'id = ? AND enabled = 1',
-        whereArgs: [route.deviceId],
-        limit: 1,
-      );
-      if (activeDevice.isNotEmpty) {
-        return route;
-      }
-    }
-    // Auto-heal if an enabled compatible device exists
-    final expectedLanguage = kind == PrintDocumentKind.receipt
-        ? PrinterLanguage.escPos.name
-        : PrinterLanguage.tspl.name;
-    final availableDevices = await _executor.query(
-      'printer_devices',
-      where: 'enabled = 1 AND language = ?',
-      whereArgs: [expectedLanguage],
-      limit: 1,
-    );
-    if (availableDevices.isNotEmpty) {
-      final defaultProfiles = await _executor.query(
-        'print_design_profiles',
-        where: 'kind = ? AND is_default = 1',
-        whereArgs: [kind.name],
-        limit: 1,
-      );
-      if (defaultProfiles.isNotEmpty) {
-        final autoRoute = PrinterRoute(
-          kind: kind,
-          deviceId: availableDevices.first['id'] as String,
-          designProfileId: defaultProfiles.first['id'] as String,
-          updatedAt: DateTime.now(),
-        );
-        await _executor.insert(
-          'printer_routes',
-          autoRoute.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        return autoRoute;
-      }
-    }
-    return null;
+    return rows.isEmpty ? null : PrinterRoute.fromMap(rows.first);
   }
 
   @override
