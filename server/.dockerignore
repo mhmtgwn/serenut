@@ -6,3 +6,7 @@ data
 *.tgz
 Dockerfile*
 npm-debug.log
+releases
+releases/**
+_incoming
+_incoming/**

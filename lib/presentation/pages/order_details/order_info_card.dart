@@ -399,6 +399,26 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     final double remainingDebt =
         (totalAmount - totalPaid).clamp(0.0, double.infinity);
 
+    // Kalan borç varsa (vadeli veya kısmi ödenmiş sipariş) -> Ödeme ekranını aç!
+    if (remainingDebt > 0.01) {
+      if (context.mounted) {
+        final safeSaleTx = saleTx ??
+            FinancialTransactionEntity(
+              id: 'tx-${order.id}',
+              type: 'sale',
+              customerId: order.customerId,
+              amount: order.totalAmount,
+              paidAmount: totalPaid,
+              debtAmount: remainingDebt,
+              date: order.createdAt,
+              referenceId: order.id,
+            );
+        _showCashOutBottomSheet(context, ref, order, safeSaleTx, totalPaid);
+      }
+      return;
+    }
+
+    // Kalan borç yoksa (tamamı ödenmiş) -> Doğrudan teslim edildi işaretle ve fiş bas
     try {
       await ref
           .read(ordersControllerProvider.notifier)
@@ -408,12 +428,9 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       unawaited(triggerOrderDeliveryPrint(ref, order, paidAmount: totalPaid));
 
       if (context.mounted) {
-        final String msg = remainingDebt > 0.01
-            ? 'Sipariş teslim edildi (Kalan Borç: ₺${remainingDebt.toStringAsFixed(2)}) ve teslimat fişi yazdırıldı.'
-            : 'Sipariş teslim edildi ve teslimat fişi yazdırıldı.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
+          const SnackBar(
+            content: Text('Sipariş teslim edildi ve teslimat fişi yazdırıldı.'),
             backgroundColor: _kGreen,
             behavior: SnackBarBehavior.floating,
           ),

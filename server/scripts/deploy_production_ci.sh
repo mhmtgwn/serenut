@@ -20,6 +20,11 @@ fi
 sh scripts/ensure_maintenance_token.sh
 sh scripts/ensure_evolution_env.sh
 
+# Clean up old incoming release directories and prune builder cache to prevent disk exhaustion
+find releases/_incoming -mindepth 1 -maxdepth 1 -type d ! -name "$VERSION" -exec rm -rf {} + 2>/dev/null || true
+docker builder prune -af 2>/dev/null || true
+docker image prune -f 2>/dev/null || true
+
 mkdir -p releases
 # GitHub cancellation stops the runner but cannot reliably terminate an SSH
 # command that is already executing on the VPS. Serialize remote publishers so

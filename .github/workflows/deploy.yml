@@ -370,6 +370,9 @@ jobs:
             git fetch "https://x-access-token:${GITHUB_TOKEN}@github.com/mhmtgwn/serenut.git" main
             git cat-file -e '${{ github.sha }}^{commit}'
             git reset --hard '${{ github.sha }}'
+            # Prune build cache to ensure disk space for the build
+            docker builder prune -af 2>/dev/null || true
+            docker image prune -af --filter "until=48h" 2>/dev/null || true
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
