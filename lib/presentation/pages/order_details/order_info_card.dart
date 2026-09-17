@@ -395,59 +395,41 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       }
     }
 
-    if (saleTx == null) {
-      if (order.totalAmount > 0.01 && context.mounted) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Mali Kayıt Bulunamadı'),
-            content: Text(
-              'Bu siparişe (${order.id}) ait mali tahsilat/satış kaydı bulunamadı (Tutar: ₺${order.totalAmount.toStringAsFixed(2)}).\n\n'
-              'Siparişi ödeme alınmadan doğrudan teslim edildi olarak işaretlemek istiyor musunuz?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Vazgeç'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: _kGreen),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Teslim Edildi İşaretle'),
-              ),
-            ],
+    final double totalAmount = saleTx?.amount ?? order.totalAmount;
+    final double remainingDebt =
+        (totalAmount - totalPaid).clamp(0.0, double.infinity);
+
+    try {
+      await ref
+          .read(ordersControllerProvider.notifier)
+          .updateStatus(order.id, 'delivered');
+      ref.invalidate(_orderDetailProvider(order.id));
+
+      unawaited(triggerOrderDeliveryPrint(ref, order, paidAmount: totalPaid));
+
+      if (context.mounted) {
+        final String msg = remainingDebt > 0.01
+            ? 'Sipariş teslim edildi (Kalan Borç: ₺${remainingDebt.toStringAsFixed(2)}) ve teslimat fişi yazdırıldı.'
+            : 'Sipariş teslim edildi ve teslimat fişi yazdırıldı.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: _kGreen,
+            behavior: SnackBarBehavior.floating,
           ),
         );
-        if (confirmed != true) return;
       }
-
-      await ref
-          .read(ordersControllerProvider.notifier)
-          .updateStatus(order.id, 'delivered');
-      unawaited(_triggerPrint(ref, order));
-      return;
-    }
-
-    final double remainingDebt =
-        (saleTx.amount - totalPaid).clamp(0.0, double.infinity);
-
-    if (remainingDebt <= 0.01) {
-      await ref
-          .read(ordersControllerProvider.notifier)
-          .updateStatus(order.id, 'delivered');
-      unawaited(_triggerPrint(ref, order));
+    } catch (e, st) {
+      unawaited(TelemetryService().logError(e, st, context: 'order_delivery'));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Sipariş teslim edildi ve fiş yazdırıldı.'),
-              backgroundColor: _kGreen),
+          SnackBar(
+            content: Text('Durum güncellenemedi: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
-      return;
-    }
-
-    if (context.mounted) {
-      _showCashOutBottomSheet(context, ref, order, saleTx, totalPaid);
     }
   }
 

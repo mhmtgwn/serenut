@@ -1,7 +1,11 @@
 part of '../order_details_page.dart';
 
 // ── Top-Level Helper For Printing ───────────────────────────────────────────
-Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
+Future<void> triggerOrderDeliveryPrint(
+  WidgetRef ref,
+  OrderEntity order, {
+  double? paidAmount,
+}) async {
   final settingsAsync = ref.read(settingsNotifierProvider);
   var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
   if (settings == null) {
@@ -26,10 +30,17 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
       } catch (_) {}
     }
 
+    final cachedProducts =
+        ref.read(productsControllerProvider).valueOrNull ?? [];
+    final prodMap = {for (final p in cachedProducts) p.id: p.name};
+
     final receiptItems = order.items.map((item) {
-      var name = (item['product_name'] ?? item['name'])?.toString();
       final productId = item['product_id']?.toString() ?? '';
-      name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
+      var name = (item['product_name'] ?? item['name'])?.toString();
+      if (name == null || name.isEmpty || name == productId) {
+        name = prodMap[productId] ??
+            (name != null && name.isNotEmpty ? name : 'Ürün');
+      }
       return {
         'product_id': productId,
         'product_name': name,
@@ -54,12 +65,20 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
                       createdAt: DateTime.now())
                   : null),
           settings,
+          paidAmount: paidAmount,
+          notes: order.notes?.trim(),
         );
   } catch (e, st) {
-    unawaited(TelemetryService().logError(e, st, context: 'order_delivery_print'));
+    unawaited(
+        TelemetryService().logError(e, st, context: 'order_delivery_print'));
     debugPrint('Printing error in delivery: $e');
   }
 }
+
+// Geriye dönük uyumluluk takma adı
+Future<void> _triggerPrint(WidgetRef ref, OrderEntity order,
+        {double? paidAmount}) =>
+    triggerOrderDeliveryPrint(ref, order, paidAmount: paidAmount);
 
 // ── Cash Out Bottom Sheet Widget ─────────────────────────────────────────────
 class _CashOutSheet extends ConsumerStatefulWidget {

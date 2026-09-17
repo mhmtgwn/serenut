@@ -750,13 +750,26 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     final messenger = ScaffoldMessenger.of(context);
 
     try {
+      final orders = ref.read(ordersControllerProvider).valueOrNull ?? [];
+      final targetOrders =
+          orders.where((o) => _selectedIds.contains(o.id)).toList();
+
       final count = await ref
           .read(ordersControllerProvider.notifier)
           .bulkUpdateStatus(_selectedIds, targetStatus);
       if (!mounted) return;
+
+      if (targetStatus == 'delivered') {
+        for (final order in targetOrders) {
+          unawaited(triggerOrderDeliveryPrint(ref, order));
+        }
+      }
+
       messenger.showSnackBar(
         SnackBar(
-          content: Text('$count sipariş durumu güncellendi.'),
+          content: Text(targetStatus == 'delivered'
+              ? '$count sipariş teslim edildi ve teslimat fişleri yazdırıldı.'
+              : '$count sipariş durumu güncellendi.'),
           backgroundColor: _kGreen,
           duration: const Duration(seconds: 2),
         ),
