@@ -194,6 +194,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
   bool get _karmaValid => _karmaResult.isValid;
 
   Future<void> _submitPayment() async {
+    final container = ProviderScope.containerOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() {
       _isSubmitting = true;
     });
@@ -295,7 +299,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       }
 
       if (mounted) {
-        Navigator.pop(context);
+        navigator.pop();
 
         String msg = '';
         if (_selectedMethod == 'debt') {
@@ -310,7 +314,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           msg = 'Ödeme başarıyla alındı ve fiş yazdırıldı.';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(msg),
             backgroundColor: _kGreenDark,
@@ -337,19 +341,19 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
       unawaited(() async {
         try {
-          ref.invalidate(_orderPaymentInfoProvider(orderRef.id));
-          await ref.read(customersControllerProvider.notifier).refresh();
+          container.invalidate(_orderPaymentInfoProvider(orderRef.id));
+          await container.read(customersControllerProvider.notifier).refresh();
           if (customerId.isNotEmpty) {
-            ref.invalidate(customerTransactionsProvider(customerId));
-            ref.invalidate(customerBalanceDetailsProvider(customerId));
+            container.invalidate(customerTransactionsProvider(customerId));
+            container.invalidate(customerBalanceDetailsProvider(customerId));
           }
 
           if (printReceiptNeeded) {
-            final settingsAsync = ref.read(settingsNotifierProvider);
+            final settingsAsync = container.read(settingsNotifierProvider);
             var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
             if (settings == null) {
               try {
-                final repo = await ref.read(settingsRepositoryProvider.future);
+                final repo = await container.read(settingsRepositoryProvider.future);
                 settings = await repo.getSettings();
               } catch (_) {}
             }
@@ -357,7 +361,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             if (safeSettings != null) {
               bool hasPrinter = false;
               try {
-                hasPrinter = await ref
+                hasPrinter = await container
                     .read(printingRepositoryProvider)
                     .hasUsableDevice(PrintDocumentKind.receipt);
               } catch (_) {}
@@ -371,7 +375,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 if (customerId.isNotEmpty) {
                   try {
                     final custRepo =
-                        await ref.read(customerRepositoryProvider.future);
+                        await container.read(customerRepositoryProvider.future);
                     customer = await custRepo.findById(customerId);
                   } catch (_) {}
                 }
@@ -402,7 +406,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                         : null);
 
                 try {
-                  await ref
+                  await container
                       .read(printingApplicationServiceProvider)
                       .queueOrderReceipt(
                         orderRef,
@@ -424,7 +428,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 } catch (queueErr) {
                   debugPrint('Queue receipt print error in cash out, fallback to direct printer: $queueErr');
                   try {
-                    final printerService = ref.read(printerServiceProvider);
+                    final printerService = container.read(printerServiceProvider);
                     await printerService.printOrderReceipt(
                       orderRef,
                       receiptItems,
@@ -456,7 +460,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         setState(() {
           _isSubmitting = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Hata oluştu: $e'),
             backgroundColor: _kRed,
