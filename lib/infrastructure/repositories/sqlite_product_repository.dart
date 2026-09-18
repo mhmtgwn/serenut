@@ -175,7 +175,7 @@ class SqliteProductRepository implements IProductRepository {
     final placeholders = List.filled(candidates.length, '?').join(',');
     final duplicates = await _executor.query(
       'products',
-      where: 'id IN ($placeholders)',
+      where: 'id IN ($placeholders) AND (is_deleted = 0 OR is_deleted IS NULL) AND is_active = 1',
       whereArgs: candidates,
       limit: 1,
     );
@@ -184,13 +184,26 @@ class SqliteProductRepository implements IProductRepository {
           'Bu barkod (${normalizedProduct.id}) mevcut bir ürünle aynı ürünü temsil ediyor.');
     }
     return _gateway.transaction(() async {
+      // Clean up any old soft-deleted product records with matching candidate IDs to avoid PK conflict
+      await _executor.delete(
+        'products',
+        where: 'id IN ($placeholders) AND (is_deleted = 1 OR is_active = 0)',
+        whereArgs: candidates,
+      );
+
       final payload = {
         ...normalizedProduct.toMap(),
+        'is_active': 1,
+        'is_deleted': 0,
         'is_synced': 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String()
       };
-      final result = await _executor.insert('products', payload);
+      final result = await _executor.insert(
+        'products',
+        payload,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
       await SyncOutboxV4.enqueue(_executor,
           entityType: 'product',
           entityId: normalizedProduct.id,

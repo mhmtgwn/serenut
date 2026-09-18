@@ -120,6 +120,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
+    if (state.hasError) {
+      throw state.error!;
+    }
   }
 
   Future<void> updateProduct(ProductEntity product, {String? oldId}) async {
@@ -191,6 +194,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
+    if (state.hasError) {
+      throw state.error!;
+    }
   }
 
   Future<void> deleteProduct(String id,

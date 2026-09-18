@@ -262,7 +262,12 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               contextId: widget.order.id,
             );
       }
-      if (widget.markDelivered && widget.order.status != 'delivered') {
+
+      final bool canMarkDelivered = widget.markDelivered &&
+          _selectedMethod != 'debt' &&
+          (_selectedMethod != 'karma' || _karmaDebt <= 0.01);
+
+      if (canMarkDelivered && widget.order.status != 'delivered') {
         await ref
             .read(ordersControllerProvider.notifier)
             .updateStatus(widget.order.id, 'delivered');
@@ -273,9 +278,13 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
         String msg = '';
         if (_selectedMethod == 'debt') {
-          msg = 'Sipariş vadeli olarak kaydedildi.';
-        } else if (widget.markDelivered) {
+          msg =
+              'Sipariş vadeli olarak kaydedildi. Ödeme alınmadığı için teslim durumuna geçirilmedi.';
+        } else if (canMarkDelivered) {
           msg = 'Ödeme alındı ve sipariş teslim edildi.';
+        } else if (_selectedMethod == 'karma' && _karmaDebt > 0.01) {
+          msg =
+              'Kısmi ödeme alındı, kalan borç kaydedildi (Teslimat için tam ödeme gerekir).';
         } else {
           msg = 'Ödeme başarıyla alındı ve kaydedildi.';
         }
@@ -283,7 +292,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
-            backgroundColor: _kGreenDark,
+            backgroundColor:
+                canMarkDelivered ? _kGreenDark : const Color(0xFF334155),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -516,7 +526,64 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         ],
         // Payment Button Grid
         _buildMethodsGrid(remaining),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        if (widget.markDelivered && _selectedMethod == 'debt') ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.amber.shade900, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Vadeli seçiminde fiili ödeme alınmadığı için sipariş teslim edildi durumuna GEÇMEZ. Kalan tutar müşterinin cari hesabına borç yazılır.',
+                    style: TextStyle(
+                      color: Colors.amber.shade900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ] else if (widget.markDelivered && isKarma && _karmaDebt > 0.01) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.amber.shade900, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Kalan tutar vadeli borç bırakıldığı için sipariş teslim edildi durumuna GEÇMEZ. Teslimat için tam ödeme alınmalıdır.',
+                    style: TextStyle(
+                      color: Colors.amber.shade900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          const SizedBox(height: 4),
+        ],
         // Receipt Printer Controls (Sadece Fiş Yazdırma — Teslimat Aşamasında Etikete Gerek Yok)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -685,10 +752,16 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                           size: 20),
                   label: Text(
                     _isSubmitting
-                        ? 'Ödeme Kaydediliyor...'
-                        : (widget.markDelivered
-                            ? 'Ödemeyi Tamamla & Teslim Et'
-                            : 'Ödemeyi Kaydet'),
+                        ? 'İşlem Kaydediliyor...'
+                        : (_selectedMethod == 'debt'
+                            ? (widget.markDelivered
+                                ? 'Vadeli Olarak Kaydet (Teslim Edilmez)'
+                                : 'Vadeli Olarak Kaydet')
+                            : (widget.markDelivered
+                                ? (isKarma && _karmaDebt > 0.01
+                                    ? 'Kısmi Ödemeyi Kaydet (Teslim Edilmez)'
+                                    : 'Ödemeyi Tamamla & Teslim Et')
+                                : 'Ödemeyi Kaydet')),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

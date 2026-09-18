@@ -179,6 +179,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
 
   Future<void> _saveNewCustomer() async {
     if (!(_addFormKey.currentState?.validate() ?? false)) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
     setState(() => _isSaving = true);
 
     try {
@@ -199,20 +200,25 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
       await widget.config.readController(ref).refresh();
 
       widget.config.onAfterSave(ref, newCustomer);
-      widget.onSelected(newCustomer);
-      widget.onSavedAndSelected?.call(newCustomer);
+
+      if (widget.onSavedAndSelected != null) {
+        widget.onSavedAndSelected!(newCustomer);
+      } else {
+        widget.onSelected(newCustomer);
+      }
 
       if (mounted) {
         setState(() {
           _isAddingCustomer = false;
           _isSaving = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${newCustomer.name} eklendi ve seçildi.'),
-          backgroundColor: _kGreen,
-          behavior: SnackBarBehavior.floating,
-        ));
       }
+
+      messenger?.showSnackBar(SnackBar(
+        content: Text('${newCustomer.name} eklendi ve seçildi.'),
+        backgroundColor: _kGreen,
+        behavior: SnackBarBehavior.floating,
+      ));
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);

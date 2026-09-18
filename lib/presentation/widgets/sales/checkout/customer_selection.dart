@@ -55,10 +55,6 @@ class _CustomerSelectionSheet extends StatelessWidget {
               onCustomerChanged(null);
               Navigator.of(context).pop();
             },
-            onSavedAndSelected: (newCustomer) {
-              onCustomerChanged(newCustomer);
-              Navigator.of(context).pop();
-            },
           ),
         ),
       ],
