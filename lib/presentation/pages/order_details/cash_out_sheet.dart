@@ -15,9 +15,17 @@ Future<void> triggerOrderDeliveryPrint(
     } catch (_) {}
   }
   if (settings == null) return;
-  final hasPrinter = await ref
-          .read(printingRepositoryProvider)
-          .hasUsableDevice(PrintDocumentKind.receipt);
+
+  bool hasPrinter = false;
+  try {
+    hasPrinter = await ref
+        .read(printingRepositoryProvider)
+        .hasUsableDevice(PrintDocumentKind.receipt);
+  } catch (_) {}
+  if (!hasPrinter) {
+    hasPrinter = (settings.printerName?.isNotEmpty == true ||
+        settings.printerIp?.isNotEmpty == true);
+  }
   if (!hasPrinter) return;
 
   try {
@@ -49,24 +57,39 @@ Future<void> triggerOrderDeliveryPrint(
       };
     }).toList();
 
-    await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
-          order,
-          receiptItems,
-          customer != null && customer.id.isNotEmpty
-              ? customer
-              : (order.customerName?.isNotEmpty == true
-                  ? CustomerEntity(
-                      id: order.customerId,
-                      name: order.customerName!,
-                      email: '',
-                      phone: order.customerPhone ?? '',
-                      balance: 0,
-                      createdAt: DateTime.now())
-                  : null),
-          settings,
-          paidAmount: paidAmount,
-          notes: order.notes?.trim(),
-        );
+    final effectiveCustomer = customer != null && customer.id.isNotEmpty
+        ? customer
+        : (order.customerName?.isNotEmpty == true
+            ? CustomerEntity(
+                id: order.customerId,
+                name: order.customerName!,
+                email: '',
+                phone: order.customerPhone ?? '',
+                balance: 0,
+                createdAt: DateTime.now())
+            : null);
+
+    try {
+      await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
+            order,
+            receiptItems,
+            effectiveCustomer,
+            settings,
+            paidAmount: paidAmount,
+            notes: order.notes?.trim(),
+          );
+    } catch (queueErr) {
+      debugPrint('Queue receipt print error, trying direct fallback: $queueErr');
+      final printerService = ref.read(printerServiceProvider);
+      await printerService.printOrderReceipt(
+        order,
+        receiptItems,
+        effectiveCustomer,
+        settings,
+        paidAmount: paidAmount,
+        notes: order.notes?.trim(),
+      );
+    }
   } catch (e, st) {
     unawaited(
         TelemetryService().logError(e, st, context: 'order_delivery_print'));
@@ -263,9 +286,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             );
       }
 
-      final bool canMarkDelivered = widget.markDelivered &&
-          _selectedMethod != 'debt' &&
-          (_selectedMethod != 'karma' || _karmaDebt <= 0.01);
+      final bool canMarkDelivered = widget.markDelivered;
 
       if (canMarkDelivered && widget.order.status != 'delivered') {
         await ref
@@ -278,22 +299,21 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
         String msg = '';
         if (_selectedMethod == 'debt') {
-          msg =
-              'Sipariş vadeli olarak kaydedildi. Ödeme alınmadığı için teslim durumuna geçirilmedi.';
+          msg = canMarkDelivered
+              ? 'Sipariş vadeli olarak teslim edildi ve teslimat fişi yazdırıldı.'
+              : 'Sipariş vadeli borç olarak kaydedildi.';
         } else if (canMarkDelivered) {
-          msg = 'Ödeme alındı ve sipariş teslim edildi.';
+          msg = 'Ödeme alındı, sipariş teslim edildi ve teslimat fişi yazdırıldı.';
         } else if (_selectedMethod == 'karma' && _karmaDebt > 0.01) {
-          msg =
-              'Kısmi ödeme alındı, kalan borç kaydedildi (Teslimat için tam ödeme gerekir).';
+          msg = 'Kısmi ödeme alındı, kalan borç kaydedildi ve fiş yazdırıldı.';
         } else {
-          msg = 'Ödeme başarıyla alındı ve kaydedildi.';
+          msg = 'Ödeme başarıyla alındı ve fiş yazdırıldı.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
-            backgroundColor:
-                canMarkDelivered ? _kGreenDark : const Color(0xFF334155),
+            backgroundColor: _kGreenDark,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -335,9 +355,17 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             }
             final safeSettings = settings;
             if (safeSettings != null) {
-              final hasPrinter = await ref
-                      .read(printingRepositoryProvider)
-                      .hasUsableDevice(PrintDocumentKind.receipt);
+              bool hasPrinter = false;
+              try {
+                hasPrinter = await ref
+                    .read(printingRepositoryProvider)
+                    .hasUsableDevice(PrintDocumentKind.receipt);
+              } catch (_) {}
+              if (!hasPrinter) {
+                hasPrinter = (safeSettings.printerName?.isNotEmpty == true ||
+                    safeSettings.printerIp?.isNotEmpty == true);
+              }
+
               if (hasPrinter) {
                 CustomerEntity? customer;
                 if (customerId.isNotEmpty) {
@@ -361,35 +389,54 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   };
                 }).toList();
 
-                await ref
-                    .read(printingApplicationServiceProvider)
-                    .queueOrderReceipt(
+                final effectiveCustomer = customer != null && customer.id.isNotEmpty
+                    ? customer
+                    : (orderRef.customerName?.isNotEmpty == true
+                        ? CustomerEntity(
+                            id: orderRef.customerId,
+                            name: orderRef.customerName!,
+                            email: '',
+                            phone: orderRef.customerPhone ?? '',
+                            balance: 0,
+                            createdAt: DateTime.now())
+                        : null);
+
+                try {
+                  await ref
+                      .read(printingApplicationServiceProvider)
+                      .queueOrderReceipt(
+                        orderRef,
+                        receiptItems,
+                        effectiveCustomer,
+                        safeSettings,
+                        paidAmount: currentFinalPaid,
+                        notes: orderRef.notes?.trim(),
+                        paymentMethod: selectedMethod,
+                        paymentBreakdown: selectedMethod == 'karma'
+                            ? {
+                                'cash_applied': karmaResult.cashApplied,
+                                'card': karmaResult.card,
+                                'debt': karmaResult.debt,
+                              }
+                            : null,
+                        copies: printCopies,
+                      );
+                } catch (queueErr) {
+                  debugPrint('Queue receipt print error in cash out, fallback to direct printer: $queueErr');
+                  try {
+                    final printerService = ref.read(printerServiceProvider);
+                    await printerService.printOrderReceipt(
                       orderRef,
                       receiptItems,
-                      customer != null && customer.id.isNotEmpty
-                          ? customer
-                          : (orderRef.customerName?.isNotEmpty == true
-                              ? CustomerEntity(
-                                  id: orderRef.customerId,
-                                  name: orderRef.customerName!,
-                                  email: '',
-                                  phone: orderRef.customerPhone ?? '',
-                                  balance: 0,
-                                  createdAt: DateTime.now())
-                              : null),
+                      effectiveCustomer,
                       safeSettings,
                       paidAmount: currentFinalPaid,
                       notes: orderRef.notes?.trim(),
-                      paymentMethod: selectedMethod,
-                      paymentBreakdown: selectedMethod == 'karma'
-                          ? {
-                              'cash_applied': karmaResult.cashApplied,
-                              'card': karmaResult.card,
-                              'debt': karmaResult.debt,
-                            }
-                          : null,
-                      copies: printCopies,
                     );
+                  } catch (directErr) {
+                    debugPrint('Direct printer fallback also failed: $directErr');
+                  }
+                }
               }
             }
           }
@@ -531,20 +578,20 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade300),
+              border: Border.all(color: Colors.blue.shade200),
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    color: Colors.amber.shade900, size: 22),
+                Icon(Icons.info_outline_rounded,
+                    color: Colors.blue.shade800, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Vadeli seçiminde fiili ödeme alınmadığı için sipariş teslim edildi durumuna GEÇMEZ. Kalan tutar müşterinin cari hesabına borç yazılır.',
+                    'Vadeli teslimatta kalan tutar müşterinin cari hesabına borç yazılır ve teslimat fişi yazdırılır.',
                     style: TextStyle(
-                      color: Colors.amber.shade900,
+                      color: Colors.blue.shade900,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -558,20 +605,20 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.shade300),
+              border: Border.all(color: Colors.blue.shade200),
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    color: Colors.amber.shade900, size: 22),
+                Icon(Icons.info_outline_rounded,
+                    color: Colors.blue.shade800, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Kalan tutar vadeli borç bırakıldığı için sipariş teslim edildi durumuna GEÇMEZ. Teslimat için tam ödeme alınmalıdır.',
+                    'Kısmi ödeme alınacak, kalan tutar müşterinin cari hesabına borç yazılacak ve teslimat fişi yazdırılacaktır.',
                     style: TextStyle(
-                      color: Colors.amber.shade900,
+                      color: Colors.blue.shade900,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -753,14 +800,12 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   label: Text(
                     _isSubmitting
                         ? 'İşlem Kaydediliyor...'
-                        : (_selectedMethod == 'debt'
-                            ? (widget.markDelivered
-                                ? 'Vadeli Olarak Kaydet (Teslim Edilmez)'
-                                : 'Vadeli Olarak Kaydet')
-                            : (widget.markDelivered
-                                ? (isKarma && _karmaDebt > 0.01
-                                    ? 'Kısmi Ödemeyi Kaydet (Teslim Edilmez)'
-                                    : 'Ödemeyi Tamamla & Teslim Et')
+                        : (widget.markDelivered
+                            ? (_printReceipt
+                                ? 'Siparişi Teslim Et & Fiş Yazdır'
+                                : 'Siparişi Teslim Et')
+                            : (_printReceipt
+                                ? 'Ödemeyi Kaydet & Fiş Yazdır'
                                 : 'Ödemeyi Kaydet')),
                     style: const TextStyle(
                       fontSize: 14,

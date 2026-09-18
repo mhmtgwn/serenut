@@ -205,9 +205,16 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      final hasPrinter = await ref
-                              .read(printingRepositoryProvider)
-                              .hasUsableDevice(PrintDocumentKind.receipt);
+                      bool hasPrinter = false;
+                      try {
+                        hasPrinter = await ref
+                            .read(printingRepositoryProvider)
+                            .hasUsableDevice(PrintDocumentKind.receipt);
+                      } catch (_) {}
+                      if (!hasPrinter) {
+                        hasPrinter = (settings.printerName?.isNotEmpty == true ||
+                            settings.printerIp?.isNotEmpty == true);
+                      }
                       if (!context.mounted) return;
                       if (!hasPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -261,23 +268,36 @@ class OrderDetailsPage extends ConsumerWidget {
                           };
                         }));
 
-                        await ref
-                            .read(printingApplicationServiceProvider)
-                            .queueOrderReceipt(
-                              order,
-                              receiptItems,
-                              customerToUse != null && customerToUse.id.isNotEmpty
-                                  ? customerToUse
-                                  : (customer != null && customer.id.isNotEmpty
-                                      ? customer
-                                      : null),
-                              settings,
-                            );
+                        final effectiveCustomer = customerToUse != null && customerToUse.id.isNotEmpty
+                            ? customerToUse
+                            : (customer != null && customer.id.isNotEmpty
+                                ? customer
+                                : null);
+
+                        try {
+                          await ref
+                              .read(printingApplicationServiceProvider)
+                              .queueOrderReceipt(
+                                order,
+                                receiptItems,
+                                effectiveCustomer,
+                                settings,
+                              );
+                        } catch (queueErr) {
+                          debugPrint('Queue print error, fallback to direct printer: $queueErr');
+                          final printerService = ref.read(printerServiceProvider);
+                          await printerService.printOrderReceipt(
+                            order,
+                            receiptItems,
+                            effectiveCustomer,
+                            settings,
+                          );
+                        }
 
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Yazdırma işlemi sıraya eklendi.'),
+                            content: Text('Sipariş fişi başarıyla yazdırıldı.'),
                             backgroundColor: POSColors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -314,9 +334,17 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      final hasLabelPrinter = await ref
-                          .read(printingRepositoryProvider)
-                          .hasUsableDevice(PrintDocumentKind.orderLabel);
+                      bool hasLabelPrinter = false;
+                      try {
+                        hasLabelPrinter = await ref
+                            .read(printingRepositoryProvider)
+                            .hasUsableDevice(PrintDocumentKind.orderLabel);
+                      } catch (_) {}
+                      if (!hasLabelPrinter) {
+                        hasLabelPrinter = (settings.labelPrinterEnabled &&
+                            ((settings.labelPrinterName?.isNotEmpty == true) ||
+                                (settings.labelPrinterIp?.isNotEmpty == true)));
+                      }
                       if (!context.mounted) return;
                       if (!hasLabelPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -375,20 +403,32 @@ class OrderDetailsPage extends ConsumerWidget {
                         return normalized;
                       }));
                       try {
-                        await ref
-                            .read(printingApplicationServiceProvider)
-                            .queueOrderLabel(
-                              order,
-                              items,
-                              settings,
-                              customer: customerToUse,
-                              paidAmount: totalPaid,
-                            );
+                        try {
+                          await ref
+                              .read(printingApplicationServiceProvider)
+                              .queueOrderLabel(
+                                order,
+                                items,
+                                settings,
+                                customer: customerToUse,
+                                paidAmount: totalPaid,
+                              );
+                        } catch (queueErr) {
+                          debugPrint('Queue label print error, fallback to direct printer: $queueErr');
+                          final printerService = ref.read(printerServiceProvider);
+                          await printerService.printOrderLabels(
+                            order,
+                            items,
+                            settings,
+                            customer: customerToUse,
+                          );
+                        }
+
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Sipariş etiketi yazdırma kuyruğuna alındı.',
+                              'Sipariş etiketi başarıyla yazdırıldı.',
                             ),
                             backgroundColor: POSColors.green,
                           ),

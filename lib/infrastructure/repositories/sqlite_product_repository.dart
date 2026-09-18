@@ -166,6 +166,18 @@ class SqliteProductRepository implements IProductRepository {
     );
   }
 
+  bool? _hasIsDeletedCol;
+  Future<bool> _checkHasIsDeletedColumn() async {
+    if (_hasIsDeletedCol != null) return _hasIsDeletedCol!;
+    try {
+      final info = await _executor.rawQuery('PRAGMA table_info(products)');
+      _hasIsDeletedCol = info.any((row) => row['name'] == 'is_deleted');
+    } catch (_) {
+      _hasIsDeletedCol = true;
+    }
+    return _hasIsDeletedCol!;
+  }
+
   @override
   Future<int> create(ProductEntity product) async {
     final normalizedProduct = product.copyWith(
@@ -173,9 +185,11 @@ class SqliteProductRepository implements IProductRepository {
     );
     final candidates = BarcodeStandard.lookupCandidates(product.id);
     final placeholders = List.filled(candidates.length, '?').join(',');
+    final hasDeleted = await _checkHasIsDeletedColumn();
+    final deletedClause = hasDeleted ? ' AND (is_deleted = 0 OR is_deleted IS NULL)' : '';
     final duplicates = await _executor.query(
       'products',
-      where: 'id IN ($placeholders) AND (is_deleted = 0 OR is_deleted IS NULL) AND is_active = 1',
+      where: 'id IN ($placeholders)$deletedClause AND is_active = 1',
       whereArgs: candidates,
       limit: 1,
     );
@@ -185,16 +199,24 @@ class SqliteProductRepository implements IProductRepository {
     }
     return _gateway.transaction(() async {
       // Clean up any old soft-deleted product records with matching candidate IDs to avoid PK conflict
-      await _executor.delete(
-        'products',
-        where: 'id IN ($placeholders) AND (is_deleted = 1 OR is_active = 0)',
-        whereArgs: candidates,
-      );
+      if (hasDeleted) {
+        await _executor.delete(
+          'products',
+          where: 'id IN ($placeholders) AND (is_deleted = 1 OR is_active = 0)',
+          whereArgs: candidates,
+        );
+      } else {
+        await _executor.delete(
+          'products',
+          where: 'id IN ($placeholders) AND is_active = 0',
+          whereArgs: candidates,
+        );
+      }
 
       final payload = {
         ...normalizedProduct.toMap(),
         'is_active': 1,
-        'is_deleted': 0,
+        if (hasDeleted) 'is_deleted': 0,
         'is_synced': 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String()

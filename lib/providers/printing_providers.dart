@@ -16,6 +16,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_worker.dart';
+import 'package:serenutos/infrastructure/services/printer_service.dart';
 
 final sharedHardwareServiceProvider = Provider<SharedHardwareService>((ref) {
   return SharedHardwareService(
@@ -137,3 +138,10 @@ final activePrinterDeviceProvider =
   final route = await repository.getRoute(kind);
   return route == null ? null : repository.getDevice(route.deviceId);
 });
+
+// ignore: deprecated_member_use_from_same_package
+final printerServiceProvider = Provider<PrinterService>((ref) {
+  // ignore: deprecated_member_use_from_same_package
+  return PrinterService();
+});
+

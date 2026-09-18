@@ -52,6 +52,9 @@ void main() {
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
               image_url TEXT,
+              is_deleted INTEGER NOT NULL DEFAULT 0,
+              deleted_at TEXT,
+              deleted_by TEXT,
               sale_type TEXT NOT NULL DEFAULT 'piece',
               minimum_weight_grams INTEGER NOT NULL DEFAULT 20,
               origin TEXT NOT NULL DEFAULT 'TÜRKİYE'

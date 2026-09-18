@@ -124,7 +124,36 @@ class SqlitePrintingRepository implements PrintingRepository {
         ? PrinterLanguage.escPos
         : PrinterLanguage.tspl;
     final devices = await getDevices();
-    return devices.any((d) => d.enabled && d.language == expectedLanguage);
+    if (devices.any((d) => d.enabled && d.language == expectedLanguage)) {
+      return true;
+    }
+
+    // Fallback: settings tablosundaki doğrudan yazıcı konfigürasyonlarını kontrol et
+    try {
+      final settingsRows = await _executor.query('settings', limit: 1);
+      if (settingsRows.isNotEmpty) {
+        final s = settingsRows.first;
+        if (kind == PrintDocumentKind.receipt) {
+          final pName = (s['printer_name'] as String?)?.trim();
+          final pIp = (s['printer_ip'] as String?)?.trim();
+          if ((pName != null && pName.isNotEmpty) ||
+              (pIp != null && pIp.isNotEmpty)) {
+            return true;
+          }
+        } else {
+          final lpName = (s['label_printer_name'] as String?)?.trim();
+          final lpIp = (s['label_printer_ip'] as String?)?.trim();
+          final lpEnabled = (s['label_printer_enabled'] as int?) == 1;
+          if (lpEnabled &&
+              ((lpName != null && lpName.isNotEmpty) ||
+                  (lpIp != null && lpIp.isNotEmpty))) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   @override
@@ -204,19 +233,80 @@ class SqlitePrintingRepository implements PrintingRepository {
         final expectedLanguage = kind == PrintDocumentKind.receipt
             ? PrinterLanguage.escPos.name
             : PrinterLanguage.tspl.name;
-        final availableDevices = await _executor.query(
+        var availableDevices = await _executor.query(
           'printer_devices',
           where: 'enabled = 1 AND language = ?',
           whereArgs: [expectedLanguage],
           limit: 1,
         );
+
+        // Cihaz yoksa settings tablosundan auto-provision yap
+        if (availableDevices.isEmpty) {
+          try {
+            final sRows = await _executor.query('settings', limit: 1);
+            if (sRows.isNotEmpty) {
+              final s = sRows.first;
+              final pName = (s['printer_name'] as String?)?.trim() ?? 'Varsayılan Yazıcı';
+              final pIp = (s['printer_ip'] as String?)?.trim();
+              final connType = (pIp != null && pIp.isNotEmpty) ? 'tcp' : 'winspool';
+              final autoDev = PrinterDeviceProfile(
+                id: 'auto-device-${kind.name}',
+                name: pName,
+                language: kind == PrintDocumentKind.receipt
+                    ? PrinterLanguage.escPos
+                    : PrinterLanguage.tspl,
+                transport: connType == 'tcp'
+                    ? PrinterTransportKind.tcp
+                    : PrinterTransportKind.windowsSpooler,
+                transportConfig: {
+                  if (connType == 'tcp') 'host': pIp,
+                  if (connType == 'tcp') 'port': s['printer_port'] ?? 9100,
+                  'printerName': pName,
+                },
+                capabilities: const {},
+                enabled: true,
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+              await _executor.insert(
+                'printer_devices',
+                autoDev.toMap(),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+              availableDevices = [autoDev.toMap()];
+            }
+          } catch (_) {}
+        }
+
         if (availableDevices.isNotEmpty) {
-          final defaultProfiles = await _executor.query(
+          var defaultProfiles = await _executor.query(
             'print_design_profiles',
             where: 'kind = ? AND is_default = 1',
             whereArgs: [kind.name],
             limit: 1,
           );
+
+          // Profil yoksa varsayılan profil oluştur
+          if (defaultProfiles.isEmpty) {
+            final autoProfile = PrintDesignProfile(
+              id: 'default-${kind.name}-profile',
+              name: 'Standart ${kind.name}',
+              kind: kind,
+              schemaVersion: 1,
+              rendererVersion: '1.0.0',
+              definition: const {},
+              isDefault: true,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            await _executor.insert(
+              'print_design_profiles',
+              autoProfile.toMap(),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            defaultProfiles = [autoProfile.toMap()];
+          }
+
           if (defaultProfiles.isNotEmpty) {
             final autoRoute = PrinterRoute(
               kind: kind,
