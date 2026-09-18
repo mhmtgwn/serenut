@@ -173,6 +173,10 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       return;
     }
 
+    final container = ProviderScope.containerOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _isSubmitting = true);
 
     AuthorizedCardPayment? cardPayment;
@@ -276,24 +280,25 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
 
       // 3. Fiş yazdırma (isteğe bağlı)
       if (_printReceipt) {
-        final settingsFuture = ref.read(settingsRepositoryProvider.future);
-        var settings = ref.read(settingsNotifierProvider).valueOrNull ??
-            ref.read(settingsNotifierProvider).value;
+        final settingsAsync = container.read(settingsNotifierProvider);
+        var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
         unawaited(() async {
           try {
             var safeSettings = settings;
             if (safeSettings == null) {
               try {
-                final repo = await settingsFuture;
+                final repo = await container.read(settingsRepositoryProvider.future);
                 safeSettings = await repo.getSettings();
               } catch (_) {}
             }
             if (safeSettings == null) return;
             CustomerEntity? customer;
             if (widget.order.customerId.isNotEmpty) {
-              final custRepo =
-                  await ref.read(customerRepositoryProvider.future);
-              customer = await custRepo.findById(widget.order.customerId);
+              try {
+                final custRepo =
+                    await container.read(customerRepositoryProvider.future);
+                customer = await custRepo.findById(widget.order.customerId);
+              } catch (_) {}
             }
             final finalCustomer = customer ??
                 CustomerEntity(
@@ -311,25 +316,42 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 ? 'Sipariş #${widget.order.displayNumber} Miks Ödeme (Nakit: ₺${_karmaCash.toStringAsFixed(2)}, Kart: ₺${_karmaCard.toStringAsFixed(2)})'
                 : 'Sipariş #${widget.order.displayNumber} Tahsilatı (${_selectedMethod == 'cash' ? 'Nakit' : 'Kredi Kartı'})';
 
-            await ref
-                .read(printingApplicationServiceProvider)
-                .queueCollectionReceipt(
+            try {
+              await container
+                  .read(printingApplicationServiceProvider)
+                  .queueCollectionReceipt(
+                    finalCustomer,
+                    amount,
+                    _selectedMethod,
+                    receiptNote,
+                    safeSettings,
+                  );
+            } catch (queueErr) {
+              debugPrint(
+                  'Queue collection receipt error, trying direct fallback: $queueErr');
+              try {
+                final printerService = container.read(printerServiceProvider);
+                await printerService.printCollectionReceipt(
                   finalCustomer,
                   amount,
                   _selectedMethod,
                   receiptNote,
                   safeSettings,
                 );
-            } catch (e) {
-              debugPrint('Receipt print error: $e');
+              } catch (directErr) {
+                debugPrint('Direct collection print failed: $directErr');
+              }
             }
-          }());
-        }
+          } catch (e) {
+            debugPrint('Receipt print error: $e');
+          }
+        }());
+      }
 
       if (mounted) {
-        Navigator.pop(context);
+        navigator.pop();
         final remaining = _newRemainingDebt;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               remaining <= 0.01

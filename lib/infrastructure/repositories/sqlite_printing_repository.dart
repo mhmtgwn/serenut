@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/domain/printing/printing_repository.dart';
@@ -115,21 +118,21 @@ class SqlitePrintingRepository implements PrintingRepository {
 
   @override
   Future<bool> hasUsableDevice(PrintDocumentKind kind) async {
-    final route = await getRoute(kind);
-    if (route != null) {
-      final dev = await getDevice(route.deviceId);
-      if (dev != null && dev.enabled) return true;
-    }
-    final expectedLanguage = kind == PrintDocumentKind.receipt
-        ? PrinterLanguage.escPos
-        : PrinterLanguage.tspl;
-    final devices = await getDevices();
-    if (devices.any((d) => d.enabled && d.language == expectedLanguage)) {
-      return true;
-    }
-
-    // Fallback: settings tablosundaki doğrudan yazıcı konfigürasyonlarını kontrol et
     try {
+      final route = await getRoute(kind);
+      if (route != null) {
+        final dev = await getDevice(route.deviceId);
+        if (dev != null && dev.enabled) return true;
+      }
+      final expectedLanguage = kind == PrintDocumentKind.receipt
+          ? PrinterLanguage.escPos
+          : PrinterLanguage.tspl;
+      final devices = await getDevices();
+      if (devices.any((d) => d.enabled && d.language == expectedLanguage)) {
+        return true;
+      }
+
+      // Fallback: settings tablosundaki doğrudan yazıcı konfigürasyonlarını kontrol et
       final settingsRows = await _executor.query('settings', limit: 1);
       if (settingsRows.isNotEmpty) {
         final s = settingsRows.first;
@@ -153,7 +156,8 @@ class SqlitePrintingRepository implements PrintingRepository {
       }
     } catch (_) {}
 
-    return false;
+    // Web dışındaki platformlarda varsayılan yazıcı mekanizmasına izin ver
+    return !kIsWeb;
   }
 
   @override
@@ -244,37 +248,46 @@ class SqlitePrintingRepository implements PrintingRepository {
         if (availableDevices.isEmpty) {
           try {
             final sRows = await _executor.query('settings', limit: 1);
-            if (sRows.isNotEmpty) {
-              final s = sRows.first;
-              final pName = (s['printer_name'] as String?)?.trim() ?? 'Varsayılan Yazıcı';
-              final pIp = (s['printer_ip'] as String?)?.trim();
-              final connType = (pIp != null && pIp.isNotEmpty) ? 'tcp' : 'winspool';
-              final autoDev = PrinterDeviceProfile(
-                id: 'auto-device-${kind.name}',
-                name: pName,
-                language: kind == PrintDocumentKind.receipt
-                    ? PrinterLanguage.escPos
-                    : PrinterLanguage.tspl,
-                transport: connType == 'tcp'
-                    ? PrinterTransportKind.tcp
-                    : PrinterTransportKind.windowsSpooler,
-                transportConfig: {
-                  if (connType == 'tcp') 'host': pIp,
-                  if (connType == 'tcp') 'port': s['printer_port'] ?? 9100,
-                  'printerName': pName,
-                },
-                capabilities: const {},
-                enabled: true,
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-              await _executor.insert(
-                'printer_devices',
-                autoDev.toMap(),
-                conflictAlgorithm: ConflictAlgorithm.replace,
-              );
-              availableDevices = [autoDev.toMap()];
-            }
+            final s = sRows.isNotEmpty ? sRows.first : const <String, Object?>{};
+            final pName = (s['printer_name'] as String?)?.trim() ??
+                (Platform.isWindows ? 'Varsayılan Windows Yazıcısı' : 'Varsayılan Yazıcı');
+            final pIp = (s['printer_ip'] as String?)?.trim();
+            final isTcp = pIp != null && pIp.isNotEmpty;
+            final autoTransport = isTcp
+                ? PrinterTransportKind.tcp
+                : (Platform.isWindows
+                    ? PrinterTransportKind.windowsSpooler
+                    : (pName.toLowerCase() == 'sunmi'
+                        ? PrinterTransportKind.embedded
+                        : (pName.startsWith('usb:')
+                            ? PrinterTransportKind.usb
+                            : (pName.contains(':')
+                                ? PrinterTransportKind.bluetooth
+                                : PrinterTransportKind.embedded))));
+            final autoDev = PrinterDeviceProfile(
+              id: 'auto-device-${kind.name}',
+              name: pName,
+              language: kind == PrintDocumentKind.receipt
+                  ? PrinterLanguage.escPos
+                  : PrinterLanguage.tspl,
+              transport: autoTransport,
+              transportConfig: {
+                if (isTcp) 'host': pIp,
+                if (isTcp) 'port': s['printer_port'] ?? 9100,
+                'printerName': pName,
+                if (autoTransport == PrinterTransportKind.bluetooth) 'address': pName,
+              },
+              capabilities: const {},
+              enabled: true,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            await _executor.insert(
+              'printer_devices',
+              autoDev.toMap(),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            availableDevices = [autoDev.toMap()];
           } catch (_) {}
         }
 

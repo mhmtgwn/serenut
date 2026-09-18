@@ -122,7 +122,7 @@ class DatabaseManager {
     _databaseFuture ??= _initializeDatabase();
     _database = await _databaseFuture;
     try {
-      await _database!.execute('PRAGMA busy_timeout = 30000');
+      await _database!.rawQuery('PRAGMA busy_timeout = 30000');
     } catch (_) {}
     await _verifyDatabaseSchemaInvariants(_database!);
     await DatabaseTriggers.verifyAndRepairTriggers(_database!);
@@ -428,7 +428,9 @@ class DatabaseManager {
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
         onConfigure: (db) async {
-          await db.execute('PRAGMA busy_timeout = 30000');
+          try {
+            await db.rawQuery('PRAGMA busy_timeout = 30000');
+          } catch (_) {}
           await db.execute('PRAGMA foreign_keys = ON');
           try {
             await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -559,7 +561,9 @@ class DatabaseManager {
             onCreate: _onCreate,
             onUpgrade: _onUpgrade,
             onConfigure: (db) async {
-              await db.execute('PRAGMA busy_timeout = 30000');
+              try {
+                await db.rawQuery('PRAGMA busy_timeout = 30000');
+              } catch (_) {}
               await db.execute('PRAGMA foreign_keys = ON');
               try {
                 await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -614,7 +618,9 @@ class DatabaseManager {
       path,
       version: version,
       onConfigure: (db) async {
-        await db.execute('PRAGMA busy_timeout = 30000');
+        try {
+          await db.rawQuery('PRAGMA busy_timeout = 30000');
+        } catch (_) {}
         if (onConfigure != null) await onConfigure(db);
       },
       onCreate: onCreate,

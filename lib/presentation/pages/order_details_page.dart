@@ -205,28 +205,6 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      bool hasPrinter = false;
-                      try {
-                        hasPrinter = await ref
-                            .read(printingRepositoryProvider)
-                            .hasUsableDevice(PrintDocumentKind.receipt);
-                      } catch (_) {}
-                      if (!hasPrinter) {
-                        hasPrinter = (settings.printerName?.isNotEmpty == true ||
-                            settings.printerIp?.isNotEmpty == true);
-                      }
-                      if (!context.mounted) return;
-                      if (!hasPrinter) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
-                            backgroundColor: Colors.orange,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
 
                       try {
                         // Load customer

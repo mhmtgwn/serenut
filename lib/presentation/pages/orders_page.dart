@@ -748,6 +748,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
   Future<void> _handleBulkDirectStatusChange(String targetStatus) async {
     if (_selectedIds.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context);
 
     try {
       final orders = ref.read(ordersControllerProvider).valueOrNull ?? [];
@@ -761,7 +762,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
 
       if (targetStatus == 'delivered') {
         for (final order in targetOrders) {
-          unawaited(triggerOrderDeliveryPrint(ref, order));
+          unawaited(triggerOrderDeliveryPrint(container, order));
         }
       }
 

@@ -376,6 +376,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
 
   Future<void> _handleDelivery(
       BuildContext context, WidgetRef ref, OrderEntity order) async {
+    final container = ProviderScope.containerOf(context);
     final txRepo =
         await ref.read(financialTransactionRepositoryProvider.future);
     var txs = await txRepo.getByReferenceId(order.id);
@@ -425,7 +426,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
           .updateStatus(order.id, 'delivered');
       ref.invalidate(_orderDetailProvider(order.id));
 
-      unawaited(triggerOrderDeliveryPrint(ref, order, paidAmount: totalPaid));
+      unawaited(triggerOrderDeliveryPrint(container, order, paidAmount: totalPaid));
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

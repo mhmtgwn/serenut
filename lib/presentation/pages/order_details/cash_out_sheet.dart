@@ -2,43 +2,40 @@ part of '../order_details_page.dart';
 
 // ── Top-Level Helper For Printing ───────────────────────────────────────────
 Future<void> triggerOrderDeliveryPrint(
-  WidgetRef ref,
+  dynamic refOrContainer,
   OrderEntity order, {
   double? paidAmount,
 }) async {
-  final settingsAsync = ref.read(settingsNotifierProvider);
+  T read<T>(ProviderListenable<T> provider) {
+    if (refOrContainer is WidgetRef) {
+      return refOrContainer.read(provider);
+    } else if (refOrContainer is ProviderContainer) {
+      return refOrContainer.read(provider);
+    }
+    throw ArgumentError('Invalid refOrContainer: $refOrContainer');
+  }
+
+  final settingsAsync = read(settingsNotifierProvider);
   var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
   if (settings == null) {
     try {
-      final repo = await ref.read(settingsRepositoryProvider.future);
+      final repo = await read(settingsRepositoryProvider.future);
       settings = await repo.getSettings();
     } catch (_) {}
   }
   if (settings == null) return;
 
-  bool hasPrinter = false;
-  try {
-    hasPrinter = await ref
-        .read(printingRepositoryProvider)
-        .hasUsableDevice(PrintDocumentKind.receipt);
-  } catch (_) {}
-  if (!hasPrinter) {
-    hasPrinter = (settings.printerName?.isNotEmpty == true ||
-        settings.printerIp?.isNotEmpty == true);
-  }
-  if (!hasPrinter) return;
-
   try {
     CustomerEntity? customer;
     if (order.customerId.isNotEmpty) {
       try {
-        final custRepo = await ref.read(customerRepositoryProvider.future);
+        final custRepo = await read(customerRepositoryProvider.future);
         customer = await custRepo.findById(order.customerId);
       } catch (_) {}
     }
 
     final cachedProducts =
-        ref.read(productsControllerProvider).valueOrNull ?? [];
+        read(productsControllerProvider).valueOrNull ?? [];
     final prodMap = {for (final p in cachedProducts) p.id: p.name};
 
     final receiptItems = order.items.map((item) {
@@ -70,7 +67,7 @@ Future<void> triggerOrderDeliveryPrint(
             : null);
 
     try {
-      await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
+      await read(printingApplicationServiceProvider).queueOrderReceipt(
             order,
             receiptItems,
             effectiveCustomer,
@@ -80,7 +77,7 @@ Future<void> triggerOrderDeliveryPrint(
           );
     } catch (queueErr) {
       debugPrint('Queue receipt print error, trying direct fallback: $queueErr');
-      final printerService = ref.read(printerServiceProvider);
+      final printerService = read(printerServiceProvider);
       await printerService.printOrderReceipt(
         order,
         receiptItems,
@@ -359,87 +356,74 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             }
             final safeSettings = settings;
             if (safeSettings != null) {
-              bool hasPrinter = false;
-              try {
-                hasPrinter = await container
-                    .read(printingRepositoryProvider)
-                    .hasUsableDevice(PrintDocumentKind.receipt);
-              } catch (_) {}
-              if (!hasPrinter) {
-                hasPrinter = (safeSettings.printerName?.isNotEmpty == true ||
-                    safeSettings.printerIp?.isNotEmpty == true);
+              CustomerEntity? customer;
+              if (customerId.isNotEmpty) {
+                try {
+                  final custRepo =
+                      await container.read(customerRepositoryProvider.future);
+                  customer = await custRepo.findById(customerId);
+                } catch (_) {}
               }
 
-              if (hasPrinter) {
-                CustomerEntity? customer;
-                if (customerId.isNotEmpty) {
-                  try {
-                    final custRepo =
-                        await container.read(customerRepositoryProvider.future);
-                    customer = await custRepo.findById(customerId);
-                  } catch (_) {}
-                }
+              final receiptItems = orderRef.items.map((item) {
+                var name = (item['product_name'] ?? item['name'])?.toString();
+                final productId = item['product_id']?.toString() ?? '';
+                name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
+                return {
+                  'product_id': productId,
+                  'product_name': name,
+                  'barcode': productId,
+                  'quantity': item['quantity'],
+                  'unit_price': item['unit_price'],
+                };
+              }).toList();
 
-                final receiptItems = orderRef.items.map((item) {
-                  var name = (item['product_name'] ?? item['name'])?.toString();
-                  final productId = item['product_id']?.toString() ?? '';
-                  name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
-                  return {
-                    'product_id': productId,
-                    'product_name': name,
-                    'barcode': productId,
-                    'quantity': item['quantity'],
-                    'unit_price': item['unit_price'],
-                  };
-                }).toList();
+              final effectiveCustomer = customer != null && customer.id.isNotEmpty
+                  ? customer
+                  : (orderRef.customerName?.isNotEmpty == true
+                      ? CustomerEntity(
+                          id: orderRef.customerId,
+                          name: orderRef.customerName!,
+                          email: '',
+                          phone: orderRef.customerPhone ?? '',
+                          balance: 0,
+                          createdAt: DateTime.now())
+                      : null);
 
-                final effectiveCustomer = customer != null && customer.id.isNotEmpty
-                    ? customer
-                    : (orderRef.customerName?.isNotEmpty == true
-                        ? CustomerEntity(
-                            id: orderRef.customerId,
-                            name: orderRef.customerName!,
-                            email: '',
-                            phone: orderRef.customerPhone ?? '',
-                            balance: 0,
-                            createdAt: DateTime.now())
-                        : null);
-
-                try {
-                  await container
-                      .read(printingApplicationServiceProvider)
-                      .queueOrderReceipt(
-                        orderRef,
-                        receiptItems,
-                        effectiveCustomer,
-                        safeSettings,
-                        paidAmount: currentFinalPaid,
-                        notes: orderRef.notes?.trim(),
-                        paymentMethod: selectedMethod,
-                        paymentBreakdown: selectedMethod == 'karma'
-                            ? {
-                                'cash_applied': karmaResult.cashApplied,
-                                'card': karmaResult.card,
-                                'debt': karmaResult.debt,
-                              }
-                            : null,
-                        copies: printCopies,
-                      );
-                } catch (queueErr) {
-                  debugPrint('Queue receipt print error in cash out, fallback to direct printer: $queueErr');
-                  try {
-                    final printerService = container.read(printerServiceProvider);
-                    await printerService.printOrderReceipt(
+              try {
+                await container
+                    .read(printingApplicationServiceProvider)
+                    .queueOrderReceipt(
                       orderRef,
                       receiptItems,
                       effectiveCustomer,
                       safeSettings,
                       paidAmount: currentFinalPaid,
                       notes: orderRef.notes?.trim(),
+                      paymentMethod: selectedMethod,
+                      paymentBreakdown: selectedMethod == 'karma'
+                          ? {
+                              'cash_applied': karmaResult.cashApplied,
+                              'card': karmaResult.card,
+                              'debt': karmaResult.debt,
+                            }
+                          : null,
+                      copies: printCopies,
                     );
-                  } catch (directErr) {
-                    debugPrint('Direct printer fallback also failed: $directErr');
-                  }
+              } catch (queueErr) {
+                debugPrint('Queue receipt print error in cash out, fallback to direct printer: $queueErr');
+                try {
+                  final printerService = container.read(printerServiceProvider);
+                  await printerService.printOrderReceipt(
+                    orderRef,
+                    receiptItems,
+                    effectiveCustomer,
+                    safeSettings,
+                    paidAmount: currentFinalPaid,
+                    notes: orderRef.notes?.trim(),
+                  );
+                } catch (directErr) {
+                  debugPrint('Direct printer fallback also failed: $directErr');
                 }
               }
             }
