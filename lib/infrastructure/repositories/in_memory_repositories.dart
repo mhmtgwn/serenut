@@ -509,6 +509,87 @@ class InMemoryCustomerRepository implements ICustomerRepository {
     }
     return paid;
   }
+
+  static String _normalizePhone(String query) {
+    var digits = query.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('90')) digits = digits.substring(2);
+    if (digits.startsWith('0')) digits = digits.substring(1);
+    return digits;
+  }
+
+  static String _normalizeTurkish(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ş', 's')
+        .replaceAll('ö', 'o')
+        .replaceAll('ç', 'c')
+        .replaceAll('İ', 'i')
+        .replaceAll('I', 'i')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  @override
+  Future<CustomerDuplicateCheckResult> checkDuplicates({
+    required String name,
+    required String phone,
+    String? excludeId,
+  }) async {
+    final normName = _normalizeTurkish(name.trim());
+    final normPhone = _normalizePhone(phone.trim());
+    final hasValidPhone = normPhone.length >= 7;
+
+    final candidates = InMemoryDb.customers
+        .where((c) => c.id.isNotEmpty && (excludeId == null || c.id != excludeId))
+        .toList();
+
+    CustomerEntity? phoneConflictCustomer;
+
+    for (final existingCust in candidates) {
+      final existingNormName = _normalizeTurkish(existingCust.name.trim());
+      final existingNormPhone = _normalizePhone(existingCust.phone.trim());
+
+      final isPhoneMatch = hasValidPhone &&
+          existingNormPhone.length >= 7 &&
+          (existingNormPhone == normPhone ||
+              existingNormPhone.endsWith(normPhone) ||
+              normPhone.endsWith(existingNormPhone));
+
+      final isNameMatch = normName.isNotEmpty && existingNormName == normName;
+
+      if (isNameMatch && isPhoneMatch) {
+        return CustomerDuplicateCheckResult(
+          status: CustomerDuplicateStatus.exactMatch,
+          matchedCustomer: existingCust,
+        );
+      }
+
+      if (isNameMatch && !hasValidPhone && existingNormPhone.isEmpty) {
+        return CustomerDuplicateCheckResult(
+          status: CustomerDuplicateStatus.exactMatch,
+          matchedCustomer: existingCust,
+        );
+      }
+
+      if (isPhoneMatch && !isNameMatch) {
+        phoneConflictCustomer ??= existingCust;
+      }
+    }
+
+    if (phoneConflictCustomer != null) {
+      return CustomerDuplicateCheckResult(
+        status: CustomerDuplicateStatus.phoneConflict,
+        matchedCustomer: phoneConflictCustomer,
+      );
+    }
+
+    return const CustomerDuplicateCheckResult(
+      status: CustomerDuplicateStatus.none,
+    );
+  }
 }
 
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�

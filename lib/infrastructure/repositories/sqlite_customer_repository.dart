@@ -379,4 +379,77 @@ class SqliteCustomerRepository implements ICustomerRepository {
     if (result.isEmpty) return 0.0;
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
+
+  @override
+  Future<CustomerDuplicateCheckResult> checkDuplicates({
+    required String name,
+    required String phone,
+    String? excludeId,
+  }) async {
+    final normName = _normalizeTurkish(name.trim());
+    final normPhone = _normalizedPhone(phone.trim());
+
+    final hasValidPhone = normPhone.length >= 7;
+
+    final whereClauses = ['is_active = 1', "id != ''"];
+    final whereArgs = <dynamic>[];
+    if (excludeId != null && excludeId.isNotEmpty) {
+      whereClauses.add('id != ?');
+      whereArgs.add(excludeId);
+    }
+
+    final rows = await _executor.query(
+      'customers',
+      where: whereClauses.join(' AND '),
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+    );
+
+    CustomerEntity? phoneConflictCustomer;
+
+    for (final row in rows) {
+      final existingCust = CustomerEntity.fromMap(row);
+      final existingNormName = _normalizeTurkish(existingCust.name.trim());
+      final existingNormPhone = _normalizedPhone(existingCust.phone.trim());
+
+      final isPhoneMatch = hasValidPhone &&
+          existingNormPhone.length >= 7 &&
+          (existingNormPhone == normPhone ||
+              existingNormPhone.endsWith(normPhone) ||
+              normPhone.endsWith(existingNormPhone));
+
+      final isNameMatch = normName.isNotEmpty && existingNormName == normName;
+
+      // 1. Exact match: Both Name AND Phone match -> Strictly BLOCKED
+      if (isNameMatch && isPhoneMatch) {
+        return CustomerDuplicateCheckResult(
+          status: CustomerDuplicateStatus.exactMatch,
+          matchedCustomer: existingCust,
+        );
+      }
+
+      // Exact match when both have same name and no phone
+      if (isNameMatch && !hasValidPhone && existingNormPhone.isEmpty) {
+        return CustomerDuplicateCheckResult(
+          status: CustomerDuplicateStatus.exactMatch,
+          matchedCustomer: existingCust,
+        );
+      }
+
+      // 2. Phone match but different name -> User confirmation required
+      if (isPhoneMatch && !isNameMatch) {
+        phoneConflictCustomer ??= existingCust;
+      }
+    }
+
+    if (phoneConflictCustomer != null) {
+      return CustomerDuplicateCheckResult(
+        status: CustomerDuplicateStatus.phoneConflict,
+        matchedCustomer: phoneConflictCustomer,
+      );
+    }
+
+    return const CustomerDuplicateCheckResult(
+      status: CustomerDuplicateStatus.none,
+    );
+  }
 }

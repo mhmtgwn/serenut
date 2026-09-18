@@ -71,7 +71,43 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     }
   }
 
-  Future<void> addCustomer(CustomerEntity customer) async {
+  Future<CustomerDuplicateCheckResult> checkDuplicates({
+    required String name,
+    required String phone,
+    String? excludeId,
+  }) async {
+    await future;
+    return _repository.checkDuplicates(
+      name: name,
+      phone: phone,
+      excludeId: excludeId,
+    );
+  }
+
+  Future<void> addCustomer(CustomerEntity customer, {bool force = false}) async {
+    await future;
+    final dupCheck = await _repository.checkDuplicates(
+      name: customer.name,
+      phone: customer.phone,
+      excludeId: customer.id,
+    );
+
+    if (dupCheck.isExactMatch) {
+      throw DuplicateCustomerException(
+        'Bu isim ve telefon numarasına sahip müşteri zaten kayıtlı: '
+        '${dupCheck.matchedCustomer!.name} (${dupCheck.matchedCustomer!.phone})',
+        matchedCustomer: dupCheck.matchedCustomer,
+      );
+    }
+
+    if (dupCheck.hasPhoneConflict && !force) {
+      throw CustomerPhoneConflictException(
+        'Bu telefon numarası başka bir müşteride kayıtlı: '
+        '${dupCheck.matchedCustomer!.name}',
+        conflictingCustomer: dupCheck.matchedCustomer!,
+      );
+    }
+
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       await _repository.create(customer);
@@ -94,7 +130,30 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     _invalidateAll();
   }
 
-  Future<void> updateCustomer(CustomerEntity customer) async {
+  Future<void> updateCustomer(CustomerEntity customer, {bool force = false}) async {
+    await future;
+    final dupCheck = await _repository.checkDuplicates(
+      name: customer.name,
+      phone: customer.phone,
+      excludeId: customer.id,
+    );
+
+    if (dupCheck.isExactMatch) {
+      throw DuplicateCustomerException(
+        'Bu isim ve telefon numarasına sahip başka bir müşteri zaten kayıtlı: '
+        '${dupCheck.matchedCustomer!.name} (${dupCheck.matchedCustomer!.phone})',
+        matchedCustomer: dupCheck.matchedCustomer,
+      );
+    }
+
+    if (dupCheck.hasPhoneConflict && !force) {
+      throw CustomerPhoneConflictException(
+        'Bu telefon numarası başka bir müşteride kayıtlı: '
+        '${dupCheck.matchedCustomer!.name}',
+        conflictingCustomer: dupCheck.matchedCustomer!,
+      );
+    }
+
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(customer.id);
@@ -246,7 +305,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
 
   void _invalidateAll() {
     Future.microtask(() {
-      ref.invalidate(customersControllerProvider);
+      ref.invalidateSelf();
       ref.invalidate(salesCustomersControllerProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);

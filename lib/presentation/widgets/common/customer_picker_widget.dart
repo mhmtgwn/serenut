@@ -177,6 +177,30 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     widget.config.updateSearchQuery(ref, '');
   }
 
+  void _selectExistingCustomer(CustomerEntity existing) {
+    _clearSearch();
+    widget.config.onAfterSave(ref, existing);
+
+    if (widget.onSavedAndSelected != null) {
+      widget.onSavedAndSelected!(existing);
+    } else {
+      widget.onSelected(existing);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isAddingCustomer = false;
+        _isSaving = false;
+      });
+    }
+
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Text('${existing.name} seçildi.'),
+      backgroundColor: _kGreen,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   Future<void> _saveNewCustomer() async {
     if (!(_addFormKey.currentState?.validate() ?? false)) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
@@ -185,16 +209,142 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     try {
       final fullPhone =
           formatFullPhoneNumber(_selectedCountry, _phoneController.text);
+      final phoneToUse =
+          fullPhone.isNotEmpty ? fullPhone : _phoneController.text.trim();
+      final nameToUse = _nameController.text.toTurkishUpperCase;
+
+      final controller = widget.config.readController(ref);
+      final dupCheck = await controller.checkDuplicates(
+        name: nameToUse,
+        phone: phoneToUse,
+      );
+
+      // 1. EXACT MATCH: Same Name AND Phone -> BLOCKED!
+      if (dupCheck.isExactMatch) {
+        setState(() => _isSaving = false);
+        final existing = dupCheck.matchedCustomer!;
+        if (!mounted) return;
+
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.person_pin_rounded,
+                    color: Color(0xFFE11D48), size: 28),
+                SizedBox(width: 10),
+                Text('Müşteri Zaten Kayıtlı',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: Text(
+              'Bu isim ve telefon numarasına sahip müşteri sistemde zaten mevcuttur:\n\n'
+              '👤 ${existing.name}\n'
+              '📞 ${formatPhoneForDisplay(existing.phone)}\n\n'
+              'Mükerrer müşteri kaydı oluşturulamaz.',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Kapat'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.check_circle_rounded, size: 18),
+                label: const Text('Mevcut Müşteriyi Seç'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _selectExistingCustomer(existing);
+                },
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // 2. PHONE CONFLICT: Phone exists with a DIFFERENT name -> Ask confirmation!
+      if (dupCheck.hasPhoneConflict) {
+        setState(() => _isSaving = false);
+        final conflict = dupCheck.matchedCustomer!;
+        if (!mounted) return;
+
+        bool insistCreate = false;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFD97706), size: 28),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text('Telefon Numarası Kayıtlı',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ),
+              ],
+            ),
+            content: Text(
+              'Bu telefon numarası (${formatPhoneForDisplay(phoneToUse)}) sistemde başka bir müşteriye aittir:\n\n'
+              '👤 Mevcut Müşteri: ${conflict.name}\n\n'
+              'Yine de "$nameToUse" adıyla YENİ bir müşteri kaydı açmak istiyor musunuz?',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _selectExistingCustomer(conflict);
+                },
+                child: Text('Mevcut Müşteriyi Seç (${conflict.name})'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Vazgeç'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  insistCreate = true;
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Yine de Yeni Kayıt Aç'),
+              ),
+            ],
+          ),
+        );
+
+        if (!insistCreate) return;
+        setState(() => _isSaving = true);
+      }
+
       final newCustomer = CustomerEntity(
         id: const Uuid().v4(),
-        name: _nameController.text.toTurkishUpperCase,
-        phone: fullPhone.isNotEmpty ? fullPhone : _phoneController.text.trim(),
+        name: nameToUse,
+        phone: phoneToUse,
         email: '',
         balance: 0.0,
         createdAt: DateTime.now(),
       );
 
-      await widget.config.readController(ref).addCustomer(newCustomer);
+      await widget.config.readController(ref).addCustomer(newCustomer, force: true);
 
       _clearSearch();
       await widget.config.readController(ref).refresh();

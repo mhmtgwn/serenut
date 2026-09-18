@@ -94,10 +94,117 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
       );
 
       final notifier = ref.read(customersControllerProvider.notifier);
+      final dupCheck = await notifier.checkDuplicates(
+        name: customer.name,
+        phone: customer.phone,
+        excludeId: widget.isEditing ? widget.existingCustomer!.id : null,
+      );
+
+      // 1. EXACT MATCH: Same Name AND Phone -> BLOCKED!
+      if (dupCheck.isExactMatch) {
+        setState(() => _isSaving = false);
+        final existing = dupCheck.matchedCustomer!;
+        if (mounted) {
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.person_pin_rounded,
+                      color: Color(0xFFE11D48), size: 28),
+                  SizedBox(width: 10),
+                  Text('Müşteri Zaten Kayıtlı',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+              content: Text(
+                'Bu isim ve telefon numarasına sahip müşteri sistemde zaten mevcuttur:\n\n'
+                '👤 ${existing.name}\n'
+                '📞 ${formatPhoneForDisplay(existing.phone)}\n\n'
+                'Mükerrer müşteri kaydı oluşturulamaz.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Anladım'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2. PHONE CONFLICT: Phone exists with a DIFFERENT name -> Ask confirmation!
+      if (dupCheck.hasPhoneConflict) {
+        setState(() => _isSaving = false);
+        final conflict = dupCheck.matchedCustomer!;
+        if (!mounted) return;
+
+        bool insistCreate = false;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Color(0xFFD97706), size: 28),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text('Telefon Numarası Kayıtlı',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
+                ),
+              ],
+            ),
+            content: Text(
+              'Bu telefon numarası (${formatPhoneForDisplay(customer.phone)}) sistemde başka bir müşteriye aittir:\n\n'
+              '👤 Mevcut Müşteri: ${conflict.name}\n\n'
+              'Yine de "${customer.name}" adıyla yeni bir müşteri kaydı oluşturmak istiyor musunuz?',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Vazgeç'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  insistCreate = true;
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Yine de Kaydet'),
+              ),
+            ],
+          ),
+        );
+
+        if (!insistCreate) return;
+        setState(() => _isSaving = true);
+      }
+
       if (widget.isEditing) {
-        await notifier.updateCustomer(customer);
+        await notifier.updateCustomer(customer, force: true);
       } else {
-        await notifier.addCustomer(customer);
+        await notifier.addCustomer(customer, force: true);
       }
       ref.invalidate(dashboardProvider);
 

@@ -150,6 +150,55 @@ abstract class ICustomerRepository implements BaseRepository<CustomerEntity> {
 
   /// Fast lookup map of id -> name for order and sales listings
   Future<Map<String, String>> getLookupMap();
+
+  /// Checks for duplicate customers based on normalized name and phone number.
+  /// - exactMatch: Same name and same phone number (must be blocked).
+  /// - phoneConflict: Same phone number but different name (requires explicit user confirmation).
+  Future<CustomerDuplicateCheckResult> checkDuplicates({
+    required String name,
+    required String phone,
+    String? excludeId,
+  });
+}
+
+enum CustomerDuplicateStatus {
+  none,
+  exactMatch,
+  phoneConflict,
+}
+
+class CustomerDuplicateCheckResult {
+  final CustomerDuplicateStatus status;
+  final CustomerEntity? matchedCustomer;
+
+  const CustomerDuplicateCheckResult({
+    required this.status,
+    this.matchedCustomer,
+  });
+
+  bool get isExactMatch => status == CustomerDuplicateStatus.exactMatch;
+  bool get hasPhoneConflict => status == CustomerDuplicateStatus.phoneConflict;
+  bool get hasConflict => status != CustomerDuplicateStatus.none;
+}
+
+class DuplicateCustomerException implements Exception {
+  final String message;
+  final CustomerEntity? matchedCustomer;
+
+  DuplicateCustomerException(this.message, {this.matchedCustomer});
+
+  @override
+  String toString() => message;
+}
+
+class CustomerPhoneConflictException implements Exception {
+  final String message;
+  final CustomerEntity conflictingCustomer;
+
+  CustomerPhoneConflictException(this.message, {required this.conflictingCustomer});
+
+  @override
+  String toString() => message;
 }
 
 /// Sale repository
