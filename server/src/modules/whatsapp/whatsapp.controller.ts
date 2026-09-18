@@ -23,6 +23,7 @@ import {
   WhatsAppProviderError,
 } from './whatsapp.service';
 import { isNotificationChannelEnabled } from '../notification/notification_channels';
+import { dispatchNotificationOutboxBatch } from '../../workers/notification.worker';
 
 const router = Router();
 
@@ -319,6 +320,9 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
          RETURNING id`,
         [id, req.user!.company_id, recipient, fallbackBody || eventKey, clientEventId, req.user!.id],
       );
+      if (inserted.rows.length > 0) {
+        void dispatchNotificationOutboxBatch();
+      }
       return res.status(202).json({ queued: inserted.rows.length > 0, duplicate: inserted.rows.length === 0, queue_id: inserted.rows[0]?.id || null });
     }
 
@@ -349,6 +353,9 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
        RETURNING id`,
       [id, req.user!.company_id, recipient, fallbackBody || eventKey, JSON.stringify(payload), clientEventId, req.user!.id],
     );
+    if (inserted.rows.length > 0) {
+      void dispatchNotificationOutboxBatch();
+    }
     return res.status(202).json({ queued: inserted.rows.length > 0, duplicate: inserted.rows.length === 0, queue_id: inserted.rows[0]?.id || null });
   } catch (error) {
     return providerErrorResponse(res, error);

@@ -430,7 +430,7 @@ export async function sendTextMessage(
     {
       number: jid,
       text,
-      delay: 1000, // Spam koruması için 1 saniyelik gecikme
+      delay: 0, // Anında gönderim
     },
   );
 

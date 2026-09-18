@@ -49,6 +49,7 @@ class SmsNotificationHandler {
   late final void Function(OrderDeliveredEvent) _orderDeliveredListener;
   late final void Function(OrderPreparingEvent) _orderPreparingListener;
   late final void Function(OrderReadyEvent) _orderReadyListener;
+  late final void Function(OrderShippedEvent) _orderShippedListener;
   late final void Function(OrderCancelledEvent) _orderCancelledListener;
   late final void Function(ManualDebtAddedEvent) _manualDebtListener;
 
@@ -71,6 +72,7 @@ class SmsNotificationHandler {
     _orderDeliveredListener = _onOrderDelivered;
     _orderPreparingListener = _onOrderPreparing;
     _orderReadyListener = _onOrderReady;
+    _orderShippedListener = _onOrderShipped;
     _orderCancelledListener = _onOrderCancelled;
     _manualDebtListener = _onManualDebtAdded;
 
@@ -80,6 +82,7 @@ class SmsNotificationHandler {
     _eventPublisher.subscribe<OrderDeliveredEvent>(_orderDeliveredListener);
     _eventPublisher.subscribe<OrderPreparingEvent>(_orderPreparingListener);
     _eventPublisher.subscribe<OrderReadyEvent>(_orderReadyListener);
+    _eventPublisher.subscribe<OrderShippedEvent>(_orderShippedListener);
     _eventPublisher.subscribe<OrderCancelledEvent>(_orderCancelledListener);
     _eventPublisher.subscribe<ManualDebtAddedEvent>(_manualDebtListener);
   }
@@ -115,6 +118,11 @@ class SmsNotificationHandler {
   void _onOrderReady(OrderReadyEvent event) {
     if (event.customerIdStr.isEmpty) return;
     _handleOrderReady(event).ignore();
+  }
+
+  void _onOrderShipped(OrderShippedEvent event) {
+    if (event.customerIdStr.isEmpty) return;
+    _handleOrderShipped(event).ignore();
   }
 
   void _onOrderCancelled(OrderCancelledEvent event) {
@@ -376,6 +384,41 @@ class SmsNotificationHandler {
     }
   }
 
+  Future<void> _handleOrderShipped(OrderShippedEvent event) async {
+    try {
+      final settings = await _getCurrentSettings();
+      if (settings == null) return;
+
+      final customer = await _customerRepository.findById(event.customerIdStr);
+      if (customer == null || customer.phone.isEmpty) return;
+
+      final cleanNote = (event.note ?? '').trim();
+      _sendIfEnabled(
+        eventType: kSmsEventOrderShipped,
+        settings: settings,
+        phone: customer.phone,
+        vars: {
+          'customer': customer.name,
+          'id': _shortOrderId(event.orderIdStr, event.orderId),
+          'amount': TemplateResolver.formatCurrency(
+            event.totalAmount,
+            settings.currency,
+          ),
+          'note': cleanNote,
+          'order_note': cleanNote,
+          'note_line': cleanNote.isNotEmpty
+              ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
+              : '',
+          'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
+          'business': settings.businessName,
+          'date': _todayStr(),
+        },
+      );
+    } catch (e) {
+      _log('⚠️ SmsNotificationHandler._handleOrderShipped error: $e');
+    }
+  }
+
   Future<void> _handleOrderCancelled(OrderCancelledEvent event) async {
     try {
       final settings = await _getCurrentSettings();
@@ -512,6 +555,7 @@ class SmsNotificationHandler {
     _eventPublisher.unsubscribe<OrderDeliveredEvent>(_orderDeliveredListener);
     _eventPublisher.unsubscribe<OrderPreparingEvent>(_orderPreparingListener);
     _eventPublisher.unsubscribe<OrderReadyEvent>(_orderReadyListener);
+    _eventPublisher.unsubscribe<OrderShippedEvent>(_orderShippedListener);
     _eventPublisher.unsubscribe<OrderCancelledEvent>(_orderCancelledListener);
     _eventPublisher.unsubscribe<ManualDebtAddedEvent>(_manualDebtListener);
   }

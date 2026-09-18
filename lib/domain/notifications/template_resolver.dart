@@ -19,6 +19,7 @@ const kSmsEventCollectionRecorded = 'collection_recorded';
 const kSmsEventOrderCreated = 'order_created';
 const kSmsEventOrderPreparing = 'order_preparing';
 const kSmsEventOrderReady = 'order_ready';
+const kSmsEventOrderShipped = 'order_shipped';
 const kSmsEventOrderDelivered = 'order_delivered';
 const kSmsEventOrderCancelled = 'order_cancelled';
 const kSmsEventDiscountApplied = 'discount_applied';
@@ -84,6 +85,13 @@ Sayın *{customer}*,
 ▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 İşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!
+*{business}*''',
+  kSmsEventOrderShipped: '''🛵 *Siparişiniz Yola Çıktı*
+
+Sayın *{customer}*,
+#{id} numaralı siparişiniz kuryeye teslim edilmiş olup yola çıkmıştır.{note_line}
+
+En kısa sürede adresinize ulaştırılacaktır.
 *{business}*''',
   kSmsEventOrderDelivered: '''✨ *Sipariş Teslim Edildi*
 
@@ -203,7 +211,9 @@ const kDefaultSmsTemplates = <String, String>{
   kSmsEventOrderPreparing:
       'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
   kSmsEventOrderReady:
-      'Merhaba {customer}, {id} numaralı siparişiniz hazır, teslim alabilirsiniz. {business}',
+      'Merhaba {customer}, {id} numarali siparisiniz hazir, teslim alabilirsiniz. {business}',
+  kSmsEventOrderShipped:
+      'Merhaba {customer}, {id} numarali siparisiniz yola cikmistir. {business}',
   kSmsEventOrderDelivered:
       'Merhaba {customer}, {id} numaralı siparişiniz teslim edilmiştir. {business}',
   kSmsEventOrderCancelled:

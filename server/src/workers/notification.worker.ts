@@ -53,7 +53,7 @@ export function getNotificationQueue(): Queue {
         attempts: 3,
         backoff: {
           type: 'exponential',
-          delay: 60_000, // İlk yeniden deneme: 1 dakika sonra
+          delay: 5_000, // Hata durumunda yeniden deneme: 5 saniye sonra
         },
         removeOnComplete: { count: 100, age: 24 * 3600 }, // 24 saat saklama
         removeOnFail: { count: 500 },
@@ -568,7 +568,7 @@ export function startNotificationWorker(): void {
   void dispatchNotificationOutboxBatch();
   outboxDispatcher = setInterval(() => {
     void dispatchNotificationOutboxBatch();
-  }, 5_000);
+  }, 2_000);
   outboxDispatcher.unref();
 }
 

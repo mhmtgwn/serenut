@@ -20,6 +20,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
+import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
@@ -309,6 +310,7 @@ class SyncNotifier extends StateNotifier<SyncState>
           lastSyncAt: DateTime.now(),
           lastError: null,
         );
+        unawaited(_ref.read(whatsappNotificationOutboxProvider).flush());
       } else {
         // Log the partial sync failure event
         await TelemetryService().logStructured(

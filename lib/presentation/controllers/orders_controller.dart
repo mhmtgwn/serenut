@@ -474,6 +474,15 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             discountAmount: order.discountAmount,
             note: order.notes,
           ));
+        } else if (status == 'shipped') {
+          publisher.publish(OrderShippedEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            totalAmount: order.totalAmount,
+            note: order.notes,
+          ));
         }
       }
 
@@ -703,6 +712,16 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             orderIdStr: order.orderNumber,
             customerIdStr: order.customerId,
             totalAmount: total,
+          ));
+        } else if (targetStatus == 'shipped') {
+          final total = MathEngine.calculateMappedItemsTotal(order.items);
+          publisher.publish(OrderShippedEvent(
+            orderId: 0,
+            customerId: 0,
+            orderIdStr: order.orderNumber,
+            customerIdStr: order.customerId,
+            totalAmount: total,
+            note: order.notes,
           ));
         }
 

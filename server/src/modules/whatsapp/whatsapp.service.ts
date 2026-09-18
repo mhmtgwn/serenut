@@ -62,6 +62,12 @@ export const STANDARD_WHATSAPP_TEMPLATES = [
     examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
   },
   {
+    eventKey: 'order_shipped',
+    name: 'serenut_pro_siparis_yola_cikti',
+    text: '🛵 *Siparişiniz Yola Çıktı*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz kuryeye teslim edilmiş olup yola çıkmıştır.\n\nEn kısa sürede adresinize ulaştırılacaktır.\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
+  },
+  {
     eventKey: 'order_delivered',
     name: 'serenut_pro_siparis_teslim',
     text: '✨ *Sipariş Teslim Edildi*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{{3}}*',

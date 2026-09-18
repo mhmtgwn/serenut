@@ -9,6 +9,7 @@ enum EventType {
   orderCreated,
   orderPreparing,
   orderReady,
+  orderShipped,
   orderDelivered,
   orderCancelled,
   paymentAdded,
@@ -315,6 +316,30 @@ class OrderReadyEvent extends DomainEvent {
     super.metadata,
   }) : super(
           type: EventType.orderReady,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
+}
+
+class OrderShippedEvent extends DomainEvent {
+  final int orderId;
+  final int customerId;
+  final String orderIdStr;
+  final String customerIdStr;
+  final double totalAmount;
+  final String? note;
+
+  OrderShippedEvent({
+    required this.orderId,
+    required this.customerId,
+    this.orderIdStr = '',
+    this.customerIdStr = '',
+    this.totalAmount = 0.0,
+    this.note,
+    super.occurredAt,
+    super.metadata,
+  }) : super(
+          type: EventType.orderShipped,
           aggregateId: orderId,
           aggregateType: 'Order',
         );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:serenutos/infrastructure/network/api_client.dart';
@@ -12,6 +13,19 @@ class WhatsappNotificationOutbox {
   static const _storageKey = 'whatsapp_notification_outbox_v1';
   static Future<void> _serial = Future<void>.value();
   final ApiClient _api;
+  Timer? _periodicTimer;
+
+  /// Starts a background timer that automatically flushes any queued messages.
+  /// This ensures offline or failed messages are not stuck waiting for new events.
+  void startPeriodicFlush({Duration interval = const Duration(seconds: 15)}) {
+    _periodicTimer?.cancel();
+    _periodicTimer = Timer.periodic(interval, (_) => flush());
+  }
+
+  void stopPeriodicFlush() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+  }
 
   Future<void> enqueue(Map<String, dynamic> payload) => _serialized(() async {
         final prefs = await SharedPreferences.getInstance();

@@ -94,7 +94,19 @@ final smsLogRepositoryProvider = Provider<SmsLogRepository>((ref) {
   return SmsLogRepository(DatabaseManager());
 });
 
-/// Provider for SmsNotificationHandler (eagerly listens to events)
+/// Global provider for WhatsApp outbox with automatic background flushing
+final whatsappNotificationOutboxProvider =
+    Provider<WhatsappNotificationOutbox>((ref) {
+  final outbox = WhatsappNotificationOutbox(ref.watch(apiClientProvider));
+  outbox.flush();
+  outbox.startPeriodicFlush(interval: const Duration(seconds: 15));
+  ref.onDispose(() {
+    outbox.stopPeriodicFlush();
+  });
+  return outbox;
+});
+
+/// Provider for SmsNotificationHandler (handles auto SMS & WhatsApp on domain events)
 final smsNotificationHandlerProvider =
     FutureProvider<SmsNotificationHandler>((ref) async {
   final eventPublisher = ref.watch(eventPublisherProvider);
@@ -102,8 +114,7 @@ final smsNotificationHandlerProvider =
   final smsService = ref.watch(smsServiceProvider);
   final smsLogRepo = ref.watch(smsLogRepositoryProvider);
   final settings = ref.watch(settingsNotifierProvider).value;
-  final whatsappOutbox =
-      WhatsappNotificationOutbox(ref.watch(apiClientProvider));
+  final whatsappOutbox = ref.watch(whatsappNotificationOutboxProvider);
   whatsappOutbox.flush();
 
   final handler = SmsNotificationHandler(
@@ -146,6 +157,11 @@ final smsNotificationHandlerProvider =
             variables['customer'] ?? '',
             variables['id'] ?? '',
             variables['amount'] ?? '',
+            variables['business'] ?? '',
+          ],
+        'order_shipped' => [
+            variables['customer'] ?? '',
+            variables['id'] ?? '',
             variables['business'] ?? '',
           ],
         _ => [
