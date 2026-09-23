@@ -86,8 +86,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelCopies = TextEditingController(
       text: config['copies']?.toString() ?? '1',
     );
-    _vendor = config['vendor']?.toString() ?? 'generic';
-    _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
+    _vendor = config['vendor']?.toString() ??
+        (_type == HardwareDeviceType.paymentTerminal ? 'pax' : 'generic');
+    _protocol = config['protocol']?.toString() ??
+        (_type == HardwareDeviceType.paymentTerminal ? 'pax_d230' : 'vendor_sdk');
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
     _stopBits = int.tryParse(config['stopBits']?.toString() ?? '') ?? 1;
     _parity = config['parity']?.toString() ?? 'none';
@@ -798,6 +800,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Üretici'),
             items: const {
+              'pax': 'PAX (D230 vb.)',
               'generic': 'Genel POS',
               'beko_token': 'Beko / Token',
               'ingenico': 'Ingenico',
@@ -813,7 +816,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                   ),
                 )
                 .toList(),
-            onChanged: (value) => _vendor = value ?? 'generic',
+            onChanged: (value) => _vendor = value ?? 'pax',
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -821,16 +824,19 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Protokol'),
             items: const [
-              DropdownMenuItem(value: 'vendor_sdk', child: Text('Üretici SDK')),
+              DropdownMenuItem(value: 'pax_d230', child: Text('PAX POSLink / ECR')),
+              DropdownMenuItem(value: 'ecr', child: Text('BKM TechPOS / ECR')),
               DropdownMenuItem(value: 'gmp3', child: Text('GMP-3')),
-              DropdownMenuItem(value: 'ecr', child: Text('ECR')),
+              DropdownMenuItem(value: 'vendor_sdk', child: Text('Üretici SDK')),
             ],
-            onChanged: (value) => _protocol = value ?? 'vendor_sdk',
+            onChanged: (value) => _protocol = value ?? 'pax_d230',
           ),
           const SizedBox(height: 8),
-          const Text(
-            'POS cihazı doğrudan bağlanmaz; seçilen banka/üretici SDK’sını kullanan Serenut POS Bridge bu IP ve portta çalışmalıdır.',
-            style: TextStyle(fontSize: 11, color: kTextSecondary),
+          Text(
+            _connection == HardwareConnectionType.serial
+                ? 'USB (COM) portuna bağlı PAX D230 cihazı ile doğrudan haberleşilir.'
+                : 'POS cihazı doğrudan bağlanmaz; seçilen banka/üretici SDK’sını kullanan Serenut POS Bridge bu IP ve portta çalışmalıdır.',
+            style: const TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
         if (_type == HardwareDeviceType.receiptPrinter &&
