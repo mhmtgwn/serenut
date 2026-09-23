@@ -1859,7 +1859,10 @@ List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
         HardwareConnectionType.serial,
         HardwareConnectionType.tcp,
       ],
-    HardwareDeviceType.paymentTerminal => const [HardwareConnectionType.tcp],
+    HardwareDeviceType.paymentTerminal => const [
+        HardwareConnectionType.serial,
+        HardwareConnectionType.tcp,
+      ],
     HardwareDeviceType.barcodeScanner => const [
         HardwareConnectionType.keyboard,
         HardwareConnectionType.embedded,

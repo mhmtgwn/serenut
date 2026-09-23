@@ -11,6 +11,9 @@ class HardwareConfig {
   final int scaleStopBits;
   final String scaleParity;
   final String scaleDefaultUnit;
+  final String posConnection;
+  final String posSerialPort;
+  final int posBaudRate;
   final String posBridgeHost;
   final int posBridgePort;
   final String posVendor;
@@ -26,6 +29,9 @@ class HardwareConfig {
     this.scaleStopBits = 1,
     this.scaleParity = 'none',
     this.scaleDefaultUnit = 'kg',
+    this.posConnection = 'tcp',
+    this.posSerialPort = '',
+    this.posBaudRate = 9600,
     this.posBridgeHost = '',
     this.posBridgePort = 4100,
     this.posVendor = 'generic',
@@ -35,7 +41,10 @@ class HardwareConfig {
   bool get hasScale => scaleConnection == 'serial'
       ? scaleSerialPort.trim().isNotEmpty
       : scaleHost.trim().isNotEmpty;
-  bool get hasPosBridge => posBridgeHost.trim().isNotEmpty;
+  bool get hasPosBridge => posConnection == 'serial'
+      ? posSerialPort.trim().isNotEmpty
+      : posBridgeHost.trim().isNotEmpty;
+  bool get hasPosTerminal => hasPosBridge;
 }
 
 final hardwareConfigProvider = FutureProvider<HardwareConfig>((ref) async {
@@ -50,6 +59,9 @@ final hardwareConfigProvider = FutureProvider<HardwareConfig>((ref) async {
     scaleStopBits: prefs.getInt('hardware_scale_stop_bits') ?? 1,
     scaleParity: prefs.getString('hardware_scale_parity') ?? 'none',
     scaleDefaultUnit: prefs.getString('hardware_scale_default_unit') ?? 'kg',
+    posConnection: prefs.getString('hardware_pos_connection') ?? 'tcp',
+    posSerialPort: prefs.getString('hardware_pos_serial_port') ?? '',
+    posBaudRate: prefs.getInt('hardware_pos_baud_rate') ?? 9600,
     posBridgeHost: prefs.getString('hardware_pos_host') ?? '',
     posBridgePort: prefs.getInt('hardware_pos_port') ?? 4100,
     posVendor: prefs.getString('hardware_pos_vendor') ?? 'generic',
@@ -69,6 +81,9 @@ Future<void> saveHardwareConfig(HardwareConfig config) async {
   await prefs.setInt('hardware_scale_stop_bits', config.scaleStopBits);
   await prefs.setString('hardware_scale_parity', config.scaleParity);
   await prefs.setString('hardware_scale_default_unit', config.scaleDefaultUnit);
+  await prefs.setString('hardware_pos_connection', config.posConnection);
+  await prefs.setString('hardware_pos_serial_port', config.posSerialPort.trim());
+  await prefs.setInt('hardware_pos_baud_rate', config.posBaudRate);
   await prefs.setString('hardware_pos_host', config.posBridgeHost.trim());
   await prefs.setInt('hardware_pos_port', config.posBridgePort);
   await prefs.setString('hardware_pos_vendor', config.posVendor);

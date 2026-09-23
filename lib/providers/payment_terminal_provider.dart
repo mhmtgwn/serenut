@@ -10,6 +10,14 @@ final paymentTerminalAdapterProvider = Provider<IPaymentTerminalAdapter>((ref) {
   if (config == null || !config.hasPosBridge) {
     return UnconfiguredPaymentTerminal();
   }
+  if (config.posConnection == 'serial') {
+    return SerialPaymentTerminalAdapter(
+      portName: config.posSerialPort,
+      baudRate: config.posBaudRate,
+      vendor: config.posVendor.isNotEmpty ? config.posVendor : 'pax',
+      protocol: config.posProtocol.isNotEmpty ? config.posProtocol : 'pax_d230',
+    );
+  }
   return TcpPaymentTerminalAdapter(
     host: config.posBridgeHost,
     port: config.posBridgePort,

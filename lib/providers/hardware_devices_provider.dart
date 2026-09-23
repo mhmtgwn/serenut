@@ -164,8 +164,12 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         id: 'payment-terminal-primary',
         name: 'Fiziksel POS',
         type: HardwareDeviceType.paymentTerminal,
-        connectionType: HardwareConnectionType.tcp,
+        connectionType: hardware.posConnection == 'serial'
+            ? HardwareConnectionType.serial
+            : HardwareConnectionType.tcp,
         configuration: {
+          'serialPort': hardware.posSerialPort,
+          'baudRate': hardware.posBaudRate,
           'host': hardware.posBridgeHost,
           'port': hardware.posBridgePort,
           'vendor': hardware.posVendor,
@@ -551,12 +555,20 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           await adapter.disconnect();
         }
       case HardwareDeviceType.paymentTerminal:
-        final terminal = TcpPaymentTerminalAdapter(
-          host: config['host'] as String? ?? '',
-          port: _int(config['port'], 4100),
-          vendor: config['vendor'] as String? ?? 'generic',
-          protocol: config['protocol'] as String? ?? 'vendor_sdk',
-        );
+        final IPaymentTerminalAdapter terminal =
+            device.connectionType == HardwareConnectionType.serial
+                ? SerialPaymentTerminalAdapter(
+                    portName: config['serialPort'] as String? ?? '',
+                    baudRate: _int(config['baudRate'], 9600),
+                    vendor: config['vendor'] as String? ?? 'pax',
+                    protocol: config['protocol'] as String? ?? 'pax_d230',
+                  )
+                : TcpPaymentTerminalAdapter(
+                    host: config['host'] as String? ?? '',
+                    port: _int(config['port'], 4100),
+                    vendor: config['vendor'] as String? ?? 'generic',
+                    protocol: config['protocol'] as String? ?? 'vendor_sdk',
+                  );
         final result =
             await terminal.probe().timeout(const Duration(seconds: 8));
         if (!result.paired || !result.saleSupported) {
@@ -674,10 +686,16 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           scaleStopBits: current.scaleStopBits,
           scaleParity: current.scaleParity,
           scaleDefaultUnit: current.scaleDefaultUnit,
+          posConnection:
+              device.connectionType == HardwareConnectionType.serial
+                  ? 'serial'
+                  : 'tcp',
+          posSerialPort: config['serialPort'] as String? ?? '',
+          posBaudRate: _int(config['baudRate'], 9600),
           posBridgeHost: config['host'] as String? ?? '',
           posBridgePort: _int(config['port'], 4100),
-          posVendor: config['vendor'] as String? ?? 'generic',
-          posProtocol: config['protocol'] as String? ?? 'vendor_sdk',
+          posVendor: config['vendor'] as String? ?? 'pax',
+          posProtocol: config['protocol'] as String? ?? 'pax_d230',
         ));
         ref.invalidate(hardwareConfigProvider);
         return;
@@ -754,6 +772,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           scaleStopBits: current.scaleStopBits,
           scaleParity: current.scaleParity,
           scaleDefaultUnit: current.scaleDefaultUnit,
+          posConnection: 'tcp',
+          posSerialPort: '',
+          posBaudRate: 9600,
           posBridgeHost: '',
           posBridgePort: current.posBridgePort,
           posVendor: current.posVendor,

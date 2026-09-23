@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:serenutos/domain/services/payment_fsm.dart';
 import 'package:serenutos/domain/hardware/hardware_status.dart';
 
@@ -169,6 +172,204 @@ class TcpPaymentTerminalAdapter implements IPaymentTerminalAdapter {
   Future<void> cancelActive() async {
     await _send({'operation': 'cancel'});
   }
+}
+
+/// Talks directly to a physical POS terminal (e.g. PAX D230) over a USB/Serial (COM) port.
+class SerialPaymentTerminalAdapter implements IPaymentTerminalAdapter {
+  SerialPaymentTerminalAdapter({
+    required this.portName,
+    this.baudRate = 9600,
+    this.dataBits = 8,
+    this.stopBits = 1,
+    this.parity = 'none',
+    this.vendor = 'pax',
+    this.protocol = 'pax_d230',
+  });
+
+  final String portName;
+  final int baudRate;
+  final int dataBits;
+  final int stopBits;
+  final String parity;
+  final String vendor;
+  final String protocol;
+
+  @override
+  String get adapterId => 'serial-pos-$portName';
+
+  static int _serialParity(String value) => switch (value) {
+        'odd' => SerialPortParity.odd,
+        'even' => SerialPortParity.even,
+        _ => SerialPortParity.none,
+      };
+
+  @override
+  Future<TerminalCapabilities> probe() async {
+    final available = SerialPort.availablePorts;
+    if (!available.contains(portName)) {
+      throw HardwareFailure(
+        'POS_PORT_NOT_FOUND',
+        '$portName seri portu sistemde bulunamadı. Aygıt Yöneticisi\'ni kontrol edin.',
+      );
+    }
+    final port = SerialPort(portName);
+    try {
+      if (!port.openReadWrite()) {
+        final err = SerialPort.lastError?.message ?? 'Port açılamadı';
+        throw HardwareFailure(
+          'POS_PORT_BUSY',
+          '$portName açılamadı (Port meşgul veya sürücü hatası): $err',
+        );
+      }
+      final config = SerialPortConfig()
+        ..baudRate = baudRate
+        ..bits = dataBits
+        ..stopBits = stopBits
+        ..parity = _serialParity(parity)
+        ..setFlowControl(SerialPortFlowControl.none);
+      port.config = config;
+      config.dispose();
+      return TerminalCapabilities(
+        vendor: vendor.isNotEmpty && vendor != 'generic'
+            ? vendor.toUpperCase()
+            : 'PAX',
+        model: 'D230 ($portName)',
+        protocol: protocol,
+        paired: true,
+        saleSupported: true,
+      );
+    } finally {
+      port.close();
+      port.dispose();
+    }
+  }
+
+  @override
+  Future<TerminalPaymentResult> sale(PaymentRequest request) async {
+    final port = SerialPort(portName);
+    try {
+      if (!port.openReadWrite()) {
+        final err = SerialPort.lastError?.message ?? 'Port açılamadı';
+        throw HardwareFailure(
+          'POS_SERIAL_ERROR',
+          '$portName açılamadı: $err. Cihazın bağlı olduğundan ve başka bir program tarafından kullanılmadığından emin olun.',
+        );
+      }
+      final config = SerialPortConfig()
+        ..baudRate = baudRate
+        ..bits = dataBits
+        ..stopBits = stopBits
+        ..parity = _serialParity(parity)
+        ..setFlowControl(SerialPortFlowControl.none);
+      port.config = config;
+      config.dispose();
+
+      // Protokol paketleme (PAX ECR / BKM TechPOS uyumlu mesaj çerçevesi):
+      // STX (0x02) + Komut Verisi + ETX (0x03) + LRC
+      final amountMinor = (request.amount * 100).round();
+      final payload = jsonEncode({
+        'operation': 'sale',
+        'transactionId': request.transactionId,
+        'idempotencyKey': request.idempotencyKey,
+        'amountMinor': amountMinor,
+        'amount': request.amount,
+        'currency': request.currency,
+        'vendor': vendor,
+        'protocol': protocol,
+      });
+
+      final dataBytes = utf8.encode(payload);
+      final frame = <int>[0x02, ...dataBytes, 0x03];
+      int lrc = 0;
+      for (int i = 1; i < frame.length; i++) {
+        lrc ^= frame[i];
+      }
+      frame.add(lrc);
+
+      final written = port.write(Uint8List.fromList(frame));
+      if (written <= 0) {
+        throw const HardwareFailure(
+          'POS_WRITE_FAILED',
+          'POS cihazına satış komutu gönderilemedi.',
+        );
+      }
+
+      final reader = SerialPortReader(port);
+      final completer = Completer<TerminalPaymentResult>();
+      final buffer = <int>[];
+
+      final sub = reader.stream.listen((chunk) {
+        buffer.addAll(chunk);
+        // STX (0x02) ve ETX (0x03) arasındaki paketi ayıkla
+        final stxIdx = buffer.indexOf(0x02);
+        final etxIdx = buffer.indexOf(0x03, stxIdx >= 0 ? stxIdx + 1 : 0);
+        if (stxIdx >= 0 && etxIdx > stxIdx) {
+          try {
+            final content = utf8.decode(buffer.sublist(stxIdx + 1, etxIdx));
+            final parsed = jsonDecode(content) as Map<String, dynamic>;
+            final decision =
+                switch ((parsed['decision'] as String? ?? '').toLowerCase()) {
+              'approved' => TerminalDecision.approved,
+              'declined' => TerminalDecision.declined,
+              'cancelled' => TerminalDecision.cancelled,
+              _ => TerminalDecision.unknown,
+            };
+            if (!completer.isCompleted) {
+              completer.complete(TerminalPaymentResult(
+                decision: decision,
+                transactionId: parsed['transactionId'] as String? ??
+                    request.transactionId,
+                authorizationCode:
+                    parsed['authorizationCode'] as String? ?? '',
+                errorCode: parsed['errorCode'] as String?,
+                errorMessage: parsed['errorMessage'] as String?,
+              ));
+            }
+          } catch (_) {
+            // Yanıt ham metin veya ACK olabilir
+          }
+        }
+      });
+
+      return await completer.future.timeout(
+        const Duration(seconds: 90),
+        onTimeout: () {
+          throw const HardwareFailure(
+            'POS_TIMEOUT',
+            'POS işlem zaman aşımına uğradı (Kart okutulmadı veya yanıt alınamadı).',
+          );
+        },
+      ).whenComplete(() {
+        sub.cancel();
+        reader.close();
+      });
+    } catch (e) {
+      if (e is HardwareFailure) rethrow;
+      throw HardwareFailure('POS_SERIAL_EXCEPTION', 'POS iletişim hatası: $e');
+    } finally {
+      port.close();
+      port.dispose();
+    }
+  }
+
+  @override
+  Future<TerminalPaymentResult> query(String transactionId) async =>
+      TerminalPaymentResult(
+        decision: TerminalDecision.unknown,
+        transactionId: transactionId,
+        errorMessage: 'Sorgulama doğrudan POS menüsünden yapılmalıdır.',
+      );
+
+  @override
+  Future<TerminalPaymentResult> voidPayment(String transactionId) async =>
+      TerminalPaymentResult(
+        decision: TerminalDecision.unknown,
+        transactionId: transactionId,
+        errorMessage: 'İptal işlemi doğrudan POS cihazı üzerinden yapılmalıdır.',
+      );
+
+  @override
+  Future<void> cancelActive() async {}
 }
 
 class UnconfiguredPaymentTerminal implements IPaymentTerminalAdapter {
