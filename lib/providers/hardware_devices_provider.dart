@@ -211,7 +211,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     );
     await _repository.save(saved);
     if (wasActive) await _syncLegacy(saved);
-    final current = await _repository.getAll();
+    final current = await _loadAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
   }
@@ -252,7 +252,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       if (wasActive) await _disableLegacy(device);
     }
     await _repository.delete(device.id);
-    final current = await _repository.getAll();
+    final current = await _loadAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
   }
@@ -285,7 +285,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     );
     await _syncLegacy(active);
     await _repository.save(active);
-    final current = await _repository.getAll();
+    final current = await _loadAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
   }
@@ -491,7 +491,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     await _repository.save(
       device.copyWith(status: HardwareDeviceStatus.testing),
     );
-    state = AsyncData(await _repository.getAll());
+    state = AsyncData(await _loadAll());
     final result = await verify(device);
     await _repository.save(device.copyWith(
       status: result.success
@@ -502,7 +502,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       lastError: result.technicalDetail,
       clearLastError: result.success,
     ));
-    final current = await _repository.getAll();
+    final current = await _loadAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
     return result;
