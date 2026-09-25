@@ -460,64 +460,63 @@ final customerBalanceDetailsProvider =
 /// Provider to load details (items) of a financial transaction (sale or order)
 final transactionItemsProvider = FutureProvider.family<
     List<Map<String, dynamic>>, FinancialTransactionEntity>((ref, txn) async {
-  if (txn.referenceId == null || txn.referenceId!.isEmpty) {
+  final refId = txn.referenceId?.trim();
+  if (refId == null || refId.isEmpty) {
     return [];
   }
 
   final productRepo = await ref.watch(productRepositoryProvider.future);
 
-  if (txn.referenceId!.startsWith('ord-')) {
-    final orderRepo = await ref.watch(orderRepositoryProvider.future);
-    final order = await orderRepo.findById(txn.referenceId!);
-    if (order != null) {
-      final list = <Map<String, dynamic>>[];
-      for (final item in order.items) {
-        final prodId = item['product_id'] as String;
-        final storedName =
-            item['product_name'] as String? ?? item['name'] as String?;
-        if (storedName != null && storedName.isNotEmpty) {
-          list.add({
-            'name': storedName,
-            'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-            'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          });
-        } else {
-          final prod = await productRepo.findById(prodId);
-          list.add({
-            'name': prod?.name ?? 'Bilinmeyen Ürün',
-            'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-            'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          });
-        }
+  Future<List<Map<String, dynamic>>> extractItems(List<dynamic> rawItems) async {
+    final list = <Map<String, dynamic>>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = Map<String, dynamic>.from(raw);
+      final prodId = (item['product_id'] ?? '').toString();
+      final storedName =
+          (item['product_name'] ?? item['name'])?.toString();
+      final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+      final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+
+      if (storedName != null && storedName.isNotEmpty) {
+        list.add({
+          'name': storedName,
+          'quantity': qty,
+          'unit_price': price,
+        });
+      } else if (prodId.isNotEmpty) {
+        final prod = await productRepo.findById(prodId);
+        list.add({
+          'name': prod?.name ?? 'Ürün #$prodId',
+          'quantity': qty,
+          'unit_price': price,
+        });
+      } else {
+        list.add({
+          'name': 'Hizmet / Kalem',
+          'quantity': qty,
+          'unit_price': price,
+        });
       }
-      return list;
     }
-  } else if (txn.referenceId!.startsWith('sale-')) {
-    final saleRepo = await ref.watch(saleRepositoryProvider.future);
-    final sale = await saleRepo.findById(txn.referenceId!);
-    if (sale != null) {
-      final list = <Map<String, dynamic>>[];
-      for (final item in sale.items) {
-        final prodId = item['product_id'] as String;
-        final storedName =
-            item['name'] as String? ?? item['product_name'] as String?;
-        if (storedName != null && storedName.isNotEmpty) {
-          list.add({
-            'name': storedName,
-            'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-            'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          });
-        } else {
-          final prod = await productRepo.findById(prodId);
-          list.add({
-            'name': prod?.name ?? 'Bilinmeyen Ürün',
-            'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-            'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          });
-        }
-      }
-      return list;
+    return list;
+  }
+
+  // 1. Try order if prefix matches or directly
+  if (refId.startsWith('ord-') || !refId.startsWith('sale-')) {
+    final orderRepo = await ref.watch(orderRepositoryProvider.future);
+    final order = await orderRepo.findById(refId);
+    if (order != null && order.items.isNotEmpty) {
+      return extractItems(order.items);
     }
   }
+
+  // 2. Try sale if prefix matches or fallback
+  final saleRepo = await ref.watch(saleRepositoryProvider.future);
+  final sale = await saleRepo.findById(refId);
+  if (sale != null && sale.items.isNotEmpty) {
+    return extractItems(sale.items);
+  }
+
   return [];
 });

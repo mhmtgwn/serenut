@@ -54,9 +54,9 @@ class SharedHardwareWorker {
     _busy = true;
     try {
       for (var count = 0; count < 10; count++) {
-        final job = await service.claim();
+        final job = await service.claim().timeout(const Duration(seconds: 8));
         if (job == null) return;
-        await _execute(job);
+        await _execute(job).timeout(const Duration(seconds: 15));
       }
     } catch (_) {
       // Offline status, network handshake resets, or server restarts during deployment

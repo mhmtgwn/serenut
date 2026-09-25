@@ -83,7 +83,7 @@ class SyncNotifier extends StateNotifier<SyncState>
       );
       await triggerSync();
       _periodicSyncTimer ??= Timer.periodic(
-        const Duration(seconds: 30),
+        const Duration(seconds: 15),
         (_) => triggerSync(),
       );
     } catch (e, st) {

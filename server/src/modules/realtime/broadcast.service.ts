@@ -65,6 +65,7 @@ export class RealtimeBroadcastService {
     if (lowerType.includes('inventory') || lowerType.includes('price')) return 'inventory';
     if (lowerType.includes('customer')) return 'customers';
     if (lowerType.includes('notification')) return 'notifications';
+    if (lowerType.includes('hardware') || lowerType.includes('print')) return 'hardware';
     if (lowerType.includes('license')) return 'license';
     if (lowerType.includes('backup')) return 'backup';
     if (lowerType.includes('user') || lowerType.includes('auth') || lowerType.includes('log')) return 'auth';

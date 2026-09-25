@@ -16,6 +16,7 @@ import 'package:serenutos/providers/realtime/connection_state_notifier.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 final eventDispatcherProvider = Provider<EventDispatcher>((ref) {
   final dispatcher = EventDispatcher();
@@ -129,9 +130,15 @@ final realtimeAutoSyncProvider = Provider<void>((ref) {
     unawaited(ref.read(syncProvider.notifier).triggerSync());
   });
 
+  final subHardware =
+      repo.subscribeToTopic(user.companyId, 'hardware').listen((_) {
+    unawaited(ref.read(sharedHardwareWorkerProvider).processNow());
+  });
+
   ref.onDispose(() {
     subOrders.cancel();
     subInventory.cancel();
     subCustomers.cancel();
+    subHardware.cancel();
   });
 });

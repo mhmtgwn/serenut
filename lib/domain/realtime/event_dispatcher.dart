@@ -43,6 +43,10 @@ class EventDispatcher {
               type.contains('log'))) {
         return true;
       }
+      if (topicCategory == 'hardware' &&
+          (type.contains('hardware') || type.contains('print'))) {
+        return true;
+      }
       if (topicCategory == 'settings' && type.contains('setting')) return true;
       if (topicCategory == 'reports' && type.contains('report')) return true;
       return false;

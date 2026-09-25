@@ -138,9 +138,9 @@ class DatabaseManager {
         UPDATE customers
            SET balance = COALESCE((
              SELECT SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
                WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN ft.debt_amount
+               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
                WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
                ELSE 0
              END)
@@ -150,9 +150,9 @@ class DatabaseManager {
            ), 0)
           WHERE ABS(balance - COALESCE((
               SELECT SUM(CASE
-                WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+                WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
                 WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                WHEN ft.type = 'cancellation' THEN ft.debt_amount
+                WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
                 WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
                 ELSE 0
               END)

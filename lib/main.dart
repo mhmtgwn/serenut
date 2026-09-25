@@ -351,12 +351,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         await remoteConfig.fetchAndActivate();
         final localHardware = await ref.read(hardwareDevicesProvider.future);
         if (remoteConfig.isSharedHardwareEnabled()) {
-          await ref.read(sharedHardwareServiceProvider).publishPresence(
-                localHardware
-                    .where((device) =>
-                        device.connectionType != HardwareConnectionType.cloud)
-                    .toList(growable: false),
-              );
+          try {
+            await ref.read(sharedHardwareServiceProvider).publishPresence(
+                  localHardware
+                      .where((device) =>
+                          device.connectionType != HardwareConnectionType.cloud)
+                      .toList(growable: false),
+                );
+          } catch (presenceErr) {
+            debugPrint('Initial presence publish deferred: $presenceErr');
+          }
           ref.read(sharedHardwareWorkerProvider).start();
           ref.read(sharedHardwarePresenceRuntimeProvider).start();
         }

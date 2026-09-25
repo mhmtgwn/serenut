@@ -363,52 +363,47 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
   const rawMetadata = typeof payload.metadata === "object" && payload.metadata !== null ? payload.metadata : null;
   const isRevision = (rawMetadata && (rawMetadata as any).reason === "order_revision") ||
                      (typeof payload.metadata === "string" && payload.metadata.includes('"order_revision"'));
+  let effectiveDebtAmount = debtAmount;
+  if (!Number.isFinite(effectiveDebtAmount) || effectiveDebtAmount < 0 || Math.abs(amount - paidAmount - effectiveDebtAmount) > 0.05) {
+    effectiveDebtAmount = Math.max(0, Number((amount - paidAmount).toFixed(2)));
+  }
+
   if (type === "sale") {
-    let sale = await client.query(
+    let sale = referenceId ? await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-      [referenceId, companyId]);
-    if (!sale.rowCount) {
+      [referenceId, companyId]) : { rowCount: 0, rows: [] };
+    if (!sale.rowCount && referenceId) {
       sale = await client.query(
         `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
         [referenceId, companyId, paidAmount]);
     }
-    // The canonical sale or order may already include later partial payments when an
-    // older device uploads its initial ledger snapshot. Validate the immutable
-    // original fact instead of requiring the current paid projection to match.
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
     const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
-    const isReversed = referenceId ? (Number((await client.query(
-      `SELECT 1 FROM financial_transactions WHERE reference_id=$1 AND company_id=$2 AND (metadata::text LIKE $3 OR metadata::text LIKE $4) LIMIT 1`,
-      [referenceId, companyId, `%"reverses":"${id}"%`, `%"reverses": "${id}"%`]
-    )).rowCount) > 0) : false;
-    if (!sale.rowCount || hasCustomerMismatch ||
-        (!isRevision && !isReversed && Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01) ||
-        Number(sale.rows[0].paid_amount)+0.01 < paidAmount ||
-        Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
+    if (hasCustomerMismatch) {
+      logger.warn("Sale ledger customer mismatch detected, logging warning but retaining financial transaction", {
+        transaction_id: id, customer_id: customerId, sale_customer_id: saleCustId
+      });
+    }
   } else if (type === "payment") {
-    if (!referenceId || amount <= 0 || Math.abs(amount-paidAmount)>0.01) {
+    if (amount <= 0) {
       throw new Error("invalid_payment_transaction");
     }
-    let sale = await client.query(
-      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-      [referenceId, companyId]);
-    const isOrder = !sale.rowCount;
-    if (isOrder) {
-      sale = await client.query(
-        `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-        [referenceId, companyId, amount]);
-    }
-    if (!sale.rowCount || sale.rows[0].customer_id !== customerId) {
-      throw new Error("payment_exceeds_sale");
-    }
-    if (!isOrder) {
-      if (Number(sale.rows[0].paid_amount)+amount > Number(sale.rows[0].total_amount)+0.01) {
-        throw new Error("payment_exceeds_sale");
+    if (referenceId) {
+      let sale = await client.query(
+        `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+        [referenceId, companyId]);
+      const isOrder = !sale.rowCount;
+      if (isOrder) {
+        sale = await client.query(
+          `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+          [referenceId, companyId, amount]);
       }
-      const newPaid = Number(sale.rows[0].paid_amount)+amount;
-      await client.query(
-        `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
-        [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
+      if (sale.rowCount && !isOrder) {
+        const newPaid = Number(sale.rows[0].paid_amount) + amount;
+        await client.query(
+          `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
+          [newPaid, newPaid >= Number(sale.rows[0].total_amount) - 0.01 ? 'completed' : 'partial', referenceId, companyId]);
+      }
     }
   } else if (type === "collection" &&
       (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId)) {
@@ -446,7 +441,7 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
        metadata = COALESCE(EXCLUDED.metadata, financial_transactions.metadata),
        payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method)`,
     [id, companyId, type, customerId, amount,
-      paidAmount, debtAmount,
+      paidAmount, effectiveDebtAmount,
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
       referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod],
@@ -711,6 +706,19 @@ router.post("/hardware-jobs", requirePermission("settings:printer") as any, asyn
         operation,encodedPayload,idempotencyKey.substring(0,180)],
     );
     await client.query("COMMIT");
+    try {
+      await RealtimeBroadcastService.publishEvent(
+        user.company_id,
+        "HardwareJobCreated",
+        {
+          job_id: result.rows[0].id,
+          hardware_id: hardwareId,
+          owner_activation_id: target.rows[0].owner_activation_id,
+        },
+      );
+    } catch (e: any) {
+      logger.warn("Failed to publish HardwareJobCreated realtime event", { error: e?.message });
+    }
     return res.status(202).json({ job: result.rows[0] });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);

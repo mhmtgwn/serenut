@@ -40,7 +40,7 @@ class DatabaseTriggers {
           NEW.id,
           c.balance,
           c.balance + CASE 
-            WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+            WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
             WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
             WHEN NEW.type = 'payment' THEN NEW.paid_amount
             WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
@@ -54,7 +54,7 @@ class DatabaseTriggers {
 
         UPDATE customers
         SET balance = balance + CASE 
-          WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+          WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
           WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
           WHEN NEW.type = 'payment' THEN NEW.paid_amount
           WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
@@ -72,7 +72,7 @@ class DatabaseTriggers {
         -- Reverse the OLD transaction effect
         UPDATE customers
         SET balance = balance - CASE 
-          WHEN OLD.type = 'sale' THEN -OLD.debt_amount
+          WHEN OLD.type = 'sale' THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
           WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
           WHEN OLD.type = 'payment' THEN OLD.paid_amount
           WHEN OLD.type = 'cancellation' THEN OLD.debt_amount
@@ -85,7 +85,7 @@ class DatabaseTriggers {
         -- Apply the NEW transaction effect
         UPDATE customers
         SET balance = balance + CASE 
-          WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+          WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
           WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
           WHEN NEW.type = 'payment' THEN NEW.paid_amount
           WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
@@ -103,7 +103,7 @@ class DatabaseTriggers {
         -- Reverse the OLD transaction effect
         UPDATE customers
         SET balance = balance - CASE 
-          WHEN OLD.type = 'sale' THEN -OLD.debt_amount
+          WHEN OLD.type = 'sale' THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
           WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
           WHEN OLD.type = 'payment' THEN OLD.paid_amount
           WHEN OLD.type = 'cancellation' THEN OLD.debt_amount

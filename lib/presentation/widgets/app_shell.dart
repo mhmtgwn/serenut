@@ -12,6 +12,7 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -37,6 +38,8 @@ class AppShell extends ConsumerWidget {
     ref.listen(isAuthenticatedProvider, (previous, next) {
       if (next) {
         ref.read(connectionManagerProvider).connect();
+        ref.read(sharedHardwareWorkerProvider).start();
+        ref.read(sharedHardwarePresenceRuntimeProvider).start();
       } else {
         ref.read(connectionManagerProvider).disconnect();
       }

@@ -251,15 +251,14 @@ class ConnectionManager {
 
   void _onRawMessageReceived(String raw) {
     final msg = EventParser.parseRawMessage(raw);
-    if (msg == null) return;
-
-    if (msg.action == 'pong') {
+    if (msg != null && msg.action == 'pong') {
       heartbeatManager.receivedPong();
-    } else if (msg.event != null) {
-      final event = EventParser.parseEvent(raw);
-      if (event != null) {
-        eventDispatcher.dispatch(event);
-      }
+      return;
+    }
+
+    final event = EventParser.parseEvent(raw);
+    if (event != null) {
+      eventDispatcher.dispatch(event);
     }
   }
 

@@ -162,7 +162,13 @@ class ApiClient {
 
     // 2. Perform actual network call
     try {
-      final streamedResponse = await _client.send(request);
+      final streamedResponse = await _client.send(request).timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => throw const ApiException(
+              'Ağ bağlantısı zaman aşımına uğradı (20s). Lütfen bağlantınızı kontrol edin.',
+              statusCode: 408,
+            ),
+          );
       final response = await http.Response.fromStream(streamedResponse);
 
       final apiResponse = ApiResponse(
@@ -201,7 +207,13 @@ class ApiClient {
             retryRequest.body = bodyString;
           }
 
-          final retryStreamed = await _client.send(retryRequest);
+          final retryStreamed = await _client.send(retryRequest).timeout(
+                const Duration(seconds: 20),
+                onTimeout: () => throw const ApiException(
+                  'Ağ bağlantısı zaman aşımına uğradı (20s). Lütfen bağlantınızı kontrol edin.',
+                  statusCode: 408,
+                ),
+              );
           final retryResponse = await http.Response.fromStream(retryStreamed);
 
           final retryApiResponse = ApiResponse(
