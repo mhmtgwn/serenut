@@ -333,6 +333,11 @@ class SyncV4Service {
       if (changes.length < 200 || next <= cursor) break;
       cursor = next;
     }
+    await DatabaseManager.retryOnLock(() async {
+      await db.transaction((txn) async {
+        reconciled += await _reconcileCustomerBalances(txn);
+      });
+    });
     if (productImagesNeedCleanup && !kIsWeb) {
       await _productImageCleaner();
     }
@@ -814,16 +819,32 @@ class SyncV4Service {
       row.remove('balance');
     }
     if (type == 'financial_transaction') {
-      // Ledger rows are immutable. Replaying the same globally unique ID is
-      // an idempotent no-op; a new ID is inserted exactly once.
       final existing = await db.query(
         table,
-        columns: const ['id'],
         where: 'id = ?',
         whereArgs: [id],
         limit: 1,
       );
-      if (existing.isNotEmpty) return;
+      if (existing.isNotEmpty) {
+        final prev = existing.first;
+        final amountChanged =
+            (_syncDouble(prev['amount']) - _syncDouble(row['amount'])).abs() >
+                0.001;
+        final paidChanged = (_syncDouble(prev['paid_amount']) -
+                    _syncDouble(row['paid_amount']))
+                .abs() >
+            0.001;
+        final debtChanged = (_syncDouble(prev['debt_amount']) -
+                    _syncDouble(row['debt_amount']))
+                .abs() >
+            0.001;
+        final customerChanged =
+            prev['customer_id']?.toString() != row['customer_id']?.toString();
+        if (amountChanged || paidChanged || debtChanged || customerChanged) {
+          await db.update(table, row, where: 'id = ?', whereArgs: [id]);
+        }
+        return;
+      }
       await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
       return;
     }

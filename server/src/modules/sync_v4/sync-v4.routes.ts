@@ -352,20 +352,46 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
       (requiresCustomer && !customerId) ||
       !Number.isFinite(amount) || !Number.isFinite(paidAmount) || !Number.isFinite(debtAmount) ||
       amount < 0 || paidAmount < 0 || debtAmount < 0) throw new Error("invalid_financial_transaction");
-  const prior = await client.query(
-    `SELECT id FROM financial_transactions WHERE id=$1 AND company_id=$2 FOR UPDATE`, [id, companyId]);
-  if (prior.rowCount) return;
-  if (customerId) {
-    const customer = await client.query(
-      `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
-    if (!customer.rowCount) throw new Error("invalid_customer");
-  }
+  const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
+  const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
+  const paymentMethod = stringValue(payload, "payment_method") || null;
   const rawMetadata = typeof payload.metadata === "object" && payload.metadata !== null ? payload.metadata : null;
   const isRevision = (rawMetadata && (rawMetadata as any).reason === "order_revision") ||
                      (typeof payload.metadata === "string" && payload.metadata.includes('"order_revision"'));
   let effectiveDebtAmount = debtAmount;
   if (!Number.isFinite(effectiveDebtAmount) || effectiveDebtAmount < 0 || Math.abs(amount - paidAmount - effectiveDebtAmount) > 0.05) {
     effectiveDebtAmount = Math.max(0, Number((amount - paidAmount).toFixed(2)));
+  }
+
+  const prior = await client.query(
+    `SELECT id, amount, paid_amount, debt_amount, customer_id, type FROM financial_transactions WHERE id=$1 AND company_id=$2 FOR UPDATE`, [id, companyId]);
+  if (prior.rowCount) {
+    const prev = prior.rows[0];
+    const amountChanged = Math.abs(Number(prev.amount) - amount) > 0.001;
+    const paidChanged = Math.abs(Number(prev.paid_amount) - paidAmount) > 0.001;
+    const debtChanged = Math.abs(Number(prev.debt_amount) - effectiveDebtAmount) > 0.001;
+    const customerChanged = Boolean(customerId && prev.customer_id !== customerId);
+    if (amountChanged || paidChanged || debtChanged || customerChanged) {
+      await client.query(
+        `UPDATE financial_transactions
+         SET amount = $1,
+             paid_amount = $2,
+             debt_amount = $3,
+             customer_id = COALESCE($4, customer_id),
+             description = COALESCE($5, description),
+             metadata = COALESCE($6, metadata),
+             payment_method = COALESCE($7, payment_method),
+             updated_at = NOW()
+         WHERE id = $8 AND company_id = $9`,
+        [amount, paidAmount, effectiveDebtAmount, customerId, description, metadata, paymentMethod, id, companyId]
+      );
+    }
+    return;
+  }
+  if (customerId) {
+    const customer = await client.query(
+      `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
+    if (!customer.rowCount) throw new Error("invalid_customer");
   }
 
   if (type === "sale") {
@@ -430,16 +456,18 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
       throw new Error(`${type}_sale_mismatch`);
     }
   }
-  const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
-  const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
-  const paymentMethod = stringValue(payload, "payment_method") || null;
   await client.query(
     `INSERT INTO financial_transactions (id, company_id, type, customer_id, amount, paid_amount, debt_amount, date, reference_id, logical_clock, device_id, description, metadata, payment_method, is_deleted, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()),$9,$10,$11,$12,$13,$14,false,NOW())
      ON CONFLICT (id) DO UPDATE SET
+       amount = EXCLUDED.amount,
+       paid_amount = EXCLUDED.paid_amount,
+       debt_amount = EXCLUDED.debt_amount,
+       customer_id = COALESCE(EXCLUDED.customer_id, financial_transactions.customer_id),
        description = COALESCE(EXCLUDED.description, financial_transactions.description),
        metadata = COALESCE(EXCLUDED.metadata, financial_transactions.metadata),
-       payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method)`,
+       payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method),
+       updated_at = NOW()`,
     [id, companyId, type, customerId, amount,
       paidAmount, effectiveDebtAmount,
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
