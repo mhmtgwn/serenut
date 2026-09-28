@@ -45,7 +45,7 @@ class SalesPage extends ConsumerStatefulWidget {
 
 class _SalesPageState extends ConsumerState<SalesPage>
     with BarcodeScannerMixin<SalesPage> {
-  bool _showSuccessNotification = false;
+
 
   Future<void> _handleProductSelected(ProductEntity product) async {
     if (!product.isWeighed) {
@@ -297,10 +297,6 @@ class _SalesPageState extends ConsumerState<SalesPage>
         );
       }
 
-      setState(() {
-        _showSuccessNotification = true;
-      });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -326,15 +322,6 @@ class _SalesPageState extends ConsumerState<SalesPage>
           ),
         );
       }
-
-      // Automatically hide after 1.5 seconds
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          setState(() {
-            _showSuccessNotification = false;
-          });
-        }
-      });
 
       ref.read(salesFlowProvider.notifier).clearCart();
       _paidController.clear();
@@ -619,16 +606,6 @@ class _SalesPageState extends ConsumerState<SalesPage>
                 },
               ),
             ),
-            if (_showSuccessNotification)
-              Positioned.fill(
-                child: Center(
-                  child: Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: const Color(0xFF22C55E).withValues(alpha: 0.7),
-                    size: 96,
-                  ),
-                ),
-              ),
           ],
         ),
       ),

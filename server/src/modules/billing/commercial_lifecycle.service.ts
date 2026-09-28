@@ -39,7 +39,7 @@ export class CommercialLifecycleService {
   ): Promise<{ subscriptionId: string; entitlementId: string; licenseId: string; licenseKey: string }> {
     const planId = params.planId ?? 'plan-basic';
     const plan = await client.query(
-      `SELECT id,device_limit,store_limit FROM plans WHERE id=$1`,
+      `SELECT id,device_limit,store_limit,trial_days FROM plans WHERE id=$1`,
       [planId],
     );
     if (!plan.rowCount) throw new Error('trial_plan_not_found');
@@ -56,6 +56,7 @@ export class CommercialLifecycleService {
       licenseId: prior.rows[0].license_id,
       licenseKey: prior.rows[0].license_key,
     };
+    const trialDays = Math.max(1, Number(plan.rows[0].trial_days || 30));
     const subscriptionId = BillingDomainService.opaqueId('sub');
     const entitlementId = BillingDomainService.opaqueId('ent');
     const licenseId = BillingDomainService.opaqueId('lic');
@@ -63,20 +64,20 @@ export class CommercialLifecycleService {
     await client.query(
       `INSERT INTO subscriptions(id,company_id,plan_id,status,current_period_start,current_period_end,
          trial_started_at,trial_ends_at,payment_retry_count)
-       VALUES($1,$2,$3,'trialing',NOW(),NOW() + INTERVAL '1 second',NULL,NULL,0)`,
-      [subscriptionId, params.companyId, planId],
+       VALUES($1,$2,$3,'trialing',NOW(),NOW() + ($4 || ' days')::interval,NOW(),NOW() + ($4 || ' days')::interval,0)`,
+      [subscriptionId, params.companyId, planId, trialDays],
     );
     await client.query(
       `INSERT INTO license_entitlements(id,company_id,subscription_id,plan_id,status,
          device_limit,store_limit,valid_from,valid_until,token_version,license_key)
-       VALUES($1,$2,$3,$4,'trial',$5,$6,NULL,NULL,1,$7)`,
+       VALUES($1,$2,$3,$4,'trial',$5,$6,NOW(),NOW() + ($7 || ' days')::interval,1,$8)`,
       [entitlementId, params.companyId, subscriptionId, planId,
-        plan.rows[0].device_limit, plan.rows[0].store_limit, licenseKey],
+        plan.rows[0].device_limit, plan.rows[0].store_limit, trialDays, licenseKey],
     );
     await client.query(
       `INSERT INTO licenses(id,company_id,license_key,tier,allowed_devices_count,status,expires_at)
-       VALUES($1,$2,$3,'trial',$4,'inactive',NOW())`,
-      [licenseId, params.companyId, licenseKey, plan.rows[0].device_limit],
+       VALUES($1,$2,$3,'trial',$4,'active',NOW() + ($5 || ' days')::interval)`,
+      [licenseId, params.companyId, licenseKey, plan.rows[0].device_limit, trialDays],
     );
     return { subscriptionId, entitlementId, licenseId, licenseKey };
   }

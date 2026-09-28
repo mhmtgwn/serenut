@@ -10,6 +10,7 @@ import 'package:serenutos/domain/services/report_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/presentation/controllers/report_controller.dart';
+import 'package:serenutos/presentation/pages/end_of_day_page.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/widgets/reports/sales_tab.dart';
 import 'package:serenutos/presentation/widgets/reports/shared_report_widgets.dart';
@@ -39,7 +40,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -168,6 +169,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                           _ProductsTab(range: _selectedRange),
                           const _ReceivablesTab(),
                           _AnalyticsTab(range: _selectedRange),
+                          const EndOfDayPage(),
                         ],
                       ),
                     ),

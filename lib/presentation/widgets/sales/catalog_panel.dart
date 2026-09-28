@@ -192,6 +192,19 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 ),
               ),
             ),
+            // Aktif filtre varsa temizle butonu
+            if (selectedCategory != null || stockFilter != null || sortBy != null)
+              IconButton(
+                tooltip: 'Filtreleri Temizle',
+                onPressed: () {
+                  ref.read(salesProductCategoryFilterProvider.notifier).state =
+                      null;
+                  ref.read(salesProductStockFilterProvider.notifier).state =
+                      null;
+                  ref.read(salesProductSortProvider.notifier).state = null;
+                },
+                icon: const Icon(Icons.close_rounded, color: _kRed, size: 20),
+              ),
             // Barkod tarama ikonu - Kamera
             IconButton(
               padding: const EdgeInsets.all(6),
@@ -275,30 +288,26 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
               }
               if (filteredProductsVal.hasError && cachedProducts == null) {
                 return Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline_rounded,
-                            size: 36, color: _kRed.withValues(alpha: 0.6)),
-                        const SizedBox(height: 8),
+                        Icon(Icons.wifi_off_rounded,
+                            size: 36, color: _kRed.withValues(alpha: 0.5)),
+                        const SizedBox(height: 10),
                         const Text(
-                          'Ürünler yüklenirken hata oluştu',
-                          textAlign: TextAlign.center,
+                          'Ürünler yüklenemedi',
                           style: TextStyle(
                               color: _kRed,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          filteredProductsVal.error.toString(),
+                        const Text(
+                          'Veritabanı bağlantısını kontrol edin.',
                           textAlign: TextAlign.center,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: _kTextSecondary, fontSize: 11),
+                          style: TextStyle(color: _kTextSecondary, fontSize: 12),
                         ),
                       ],
                     ),
@@ -309,6 +318,10 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
               final products = cachedProducts ?? const <ProductEntity>[];
 
               if (products.isEmpty) {
+                final hasActiveFilters = selectedCategory != null ||
+                    stockFilter != null ||
+                    sortBy != null ||
+                    ref.watch(salesProductSearchQueryProvider).isNotEmpty;
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -316,9 +329,11 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                       Icon(Icons.inventory_2_outlined,
                           size: 64, color: Colors.grey[300]),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Ürün bulunamadı',
-                        style: TextStyle(
+                      Text(
+                        hasActiveFilters
+                            ? 'Sonuç bulunamadı'
+                            : 'Henüz ürün eklenmemiş',
+                        style: const TextStyle(
                           color: _kTextSecondary,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -326,9 +341,28 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Arama kriterlerini değiştirmeyi deneyin',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                        hasActiveFilters
+                            ? 'Arama veya filtre kriterlerini değiştirin'
+                            : 'Kataloga ürün eklemek için Kaydır',
+                        style:
+                            TextStyle(color: Colors.grey[400], fontSize: 13),
                       ),
+                      if (!hasActiveFilters) ...[
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => context.push('/products/add'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _kGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Ürün Ekle',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
                     ],
                   ),
                 );

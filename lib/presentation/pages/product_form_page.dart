@@ -1,6 +1,6 @@
 // lib/presentation/pages/product_form_page.dart
-// Serenut OS — Ürün Ekleme / Düzenleme (Tam Ekran, Çok Bölümlü Form)
-// UX Redesign v3: Full-screen form, Shopify admin style, no dialogs
+// Serenut OS — Ürün Ekleme / Düzenleme (Tam Ekran, Sadeleştirilmiş Form)
+// UX Redesign v4: Sadeleştirilmiş 3 kartlı grup, tekleştirilmiş satış birimi, marka ve raf kodu kaldırıldı
 
 import 'dart:convert';
 import 'dart:io';
@@ -20,7 +20,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
-import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
 const _kGreen = POSColors.green;
@@ -51,30 +50,26 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
   // Controllers
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _descCtrl;
   late final TextEditingController _priceCtrl;
   late final TextEditingController _purchasePriceCtrl;
   late final TextEditingController _qtyCtrl;
   late final TextEditingController _minStockCtrl;
   late final TextEditingController _vatCtrl;
   late final TextEditingController _barcodeCtrl;
-  late final TextEditingController _brandCtrl;
-  late final TextEditingController _shelfCodeCtrl;
-  late final TextEditingController _originCtrl;
-  String _unit = 'adet';
-  String? _imageUrl;
+  late final TextEditingController _minimumWeightCtrl;
 
+  String _selectedUnitKey = 'piece_adet';
+  String _unit = 'adet';
+  String _saleType = 'piece';
+  String? _imageUrl;
   String? _selectedCategory;
   bool _isSaving = false;
-  late String _saleType;
-  late final TextEditingController _minimumWeightCtrl;
 
   @override
   void initState() {
     super.initState();
     final p = widget.existingProduct;
     _nameCtrl = TextEditingController(text: p?.name ?? '');
-    _descCtrl = TextEditingController(text: p?.description ?? '');
     _priceCtrl = TextEditingController(
         text: p != null ? p.price.toStringAsFixed(2) : '');
     _purchasePriceCtrl = TextEditingController(
@@ -84,7 +79,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _qtyCtrl =
         TextEditingController(text: p != null ? p.quantity.toString() : '');
     _minStockCtrl = TextEditingController(text: p?.minStock.toString() ?? '5');
-    _vatCtrl = TextEditingController(text: p?.vat?.toString() ?? '18');
+    _vatCtrl = TextEditingController(text: p?.vat?.toString() ?? '1');
+
     final barcodeText = p != null
         ? (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
                 .hasMatch(p.id)
@@ -92,30 +88,46 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             : p.id)
         : '';
     _barcodeCtrl = TextEditingController(text: barcodeText);
-    _brandCtrl = TextEditingController(text: p?.brand ?? '');
-    _shelfCodeCtrl = TextEditingController(text: p?.shelfCode ?? '');
-    _originCtrl = TextEditingController(text: p?.origin ?? 'TÜRKİYE');
-    _unit = p?.unit ?? (p?.isWeighed == true ? 'kg' : 'adet');
-    _saleType = p?.saleType ?? 'piece';
     _minimumWeightCtrl =
         TextEditingController(text: (p?.minimumWeightGrams ?? 20).toString());
     _selectedCategory = p?.category;
     _imageUrl = p?.imageUrl;
+
+    // Satış birimi ve şeklini tekleştir
+    if (p != null) {
+      if (p.isWeighed) {
+        _selectedUnitKey = p.unit == 'gr' ? 'weighed_gr' : 'weighed_kg';
+        _unit = p.unit.isNotEmpty ? p.unit : 'kg';
+        _saleType = 'weighed';
+      } else {
+        if (p.unit == 'paket') {
+          _selectedUnitKey = 'piece_paket';
+        } else if (p.unit == 'lt') {
+          _selectedUnitKey = 'piece_lt';
+        } else if (p.unit == 'koli') {
+          _selectedUnitKey = 'piece_koli';
+        } else {
+          _selectedUnitKey = 'piece_adet';
+        }
+        _unit = p.unit.isNotEmpty ? p.unit : 'adet';
+        _saleType = 'piece';
+      }
+    } else {
+      _selectedUnitKey = 'piece_adet';
+      _unit = 'adet';
+      _saleType = 'piece';
+    }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _descCtrl.dispose();
     _priceCtrl.dispose();
     _purchasePriceCtrl.dispose();
     _qtyCtrl.dispose();
     _minStockCtrl.dispose();
     _vatCtrl.dispose();
     _barcodeCtrl.dispose();
-    _brandCtrl.dispose();
-    _shelfCodeCtrl.dispose();
-    _originCtrl.dispose();
     _minimumWeightCtrl.dispose();
     super.dispose();
   }
@@ -147,21 +159,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       final product = ProductEntity(
         id: id,
         name: _nameCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
+        description: widget.existingProduct?.description ?? '',
         price: double.parse(_priceCtrl.text.trim().replaceAll(',', '.')),
         purchasePrice: double.tryParse(
                 _purchasePriceCtrl.text.trim().replaceAll(',', '.')) ??
             0,
         quantity: num.parse(_qtyCtrl.text.trim().replaceAll(',', '.')),
         minStock: num.tryParse(_minStockCtrl.text.trim().replaceAll(',', '.')) ?? 5,
-        brand: _brandCtrl.text.trim(),
-        unit: _saleType == 'weighed' ? 'kg' : _unit,
-        shelfCode: _shelfCodeCtrl.text.trim(),
-        origin: _originCtrl.text.trim().isNotEmpty
-            ? _originCtrl.text.trim()
-            : 'TÜRKİYE',
+        brand: widget.existingProduct?.brand ?? '',
+        unit: _saleType == 'weighed' ? (_unit == 'gr' ? 'gr' : 'kg') : _unit,
+        shelfCode: widget.existingProduct?.shelfCode ?? '',
+        origin: widget.existingProduct?.origin ?? 'TÜRKİYE',
         category: _selectedCategory!,
-        vat: int.tryParse(_vatCtrl.text.trim()) ?? 18,
+        vat: int.tryParse(_vatCtrl.text.trim()) ?? 1,
         saleType: _saleType,
         minimumWeightGrams: int.tryParse(_minimumWeightCtrl.text.trim()) ?? 20,
         imageUrl: _imageUrl,
@@ -238,9 +248,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Bir hata oluştu: $e'),
-              backgroundColor: _kRed,
-              behavior: SnackBarBehavior.floating),
+            content: Text(widget.isEditing
+                ? '${_nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : 'Ürün'} güncellenemedi. Bilgileri kontrol edin.'
+                : 'Ürün eklenemedi. Barkod başka bir ürüne ait olabilir.'),
+            backgroundColor: _kRed,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -273,395 +286,423 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         final isWide = constraints.maxWidth > 860;
         final Widget innerScaffold = Scaffold(
           backgroundColor: _kSurface,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: _kText),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          widget.isEditing ? 'Ürün Düzenle' : 'Yeni Ürün',
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: _kText, fontSize: 17),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _isSaving
-                ? const Center(
-                    child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation(_kGreen)),
-                  ))
-                : TextButton(
-                    onPressed: _save,
-                    style: TextButton.styleFrom(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded, color: _kText),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              widget.isEditing ? 'Ürün Düzenle' : 'Yeni Ürün',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: _kText, fontSize: 17),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: _isSaving
+                    ? const Center(
+                        child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(_kGreen)),
+                      ))
+                    : TextButton(
+                        onPressed: _save,
+                        style: TextButton.styleFrom(
+                          backgroundColor: _kGreen,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                        ),
+                        child: Text(widget.isEditing ? 'Kaydet' : 'Ekle',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+              ),
+            ],
+          ),
+          body: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // ── Bölüm 1: Temel Bilgiler ────────────────────────────────────
+                _buildSectionHeader(
+                    icon: Icons.inventory_2_rounded,
+                    label: 'Temel Bilgiler',
+                    color: _kGreen),
+                const SizedBox(height: 10),
+                _buildSection(children: [
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: ProductImage(
+                          imageUrl: _imageUrl,
+                          barcode: _barcodeCtrl.text.trim(),
+                          size: 80,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _chooseProductImageSource,
+                              icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+                              label: Text(_imageUrl == null
+                                  ? 'Fotoğraf Ekle'
+                                  : 'Fotoğrafı Değiştir'),
+                            ),
+                            if (_imageUrl != null)
+                              TextButton(
+                                onPressed: () => setState(() => _imageUrl = null),
+                                child: const Text('Fotoğrafı Kaldır',
+                                    style: TextStyle(color: _kRed, fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildField(
+                    controller: _nameCtrl,
+                    label: 'Ürün Adı *',
+                    icon: Icons.shopping_bag_rounded,
+                    textCapitalization: TextCapitalization.words,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Lütfen ürün adı giriniz.'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildCategoryField(allCategories, parsedVatCategories),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _barcodeCtrl,
+                    keyboardType: TextInputType.text,
+                    decoration: InputDecoration(
+                      labelText: 'Barkod (Opsiyonel)',
+                      prefixIcon: const Icon(Icons.qr_code_rounded,
+                          size: 20, color: _kTextSecondary),
+                      suffixIcon: Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: _kGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: IconButton(
+                          tooltip: 'Kamerayla barkod okut',
+                          onPressed: _scanBarcode,
+                          icon: const Icon(Icons.qr_code_scanner_rounded,
+                              color: _kGreen),
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kGreen, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: _kSurface,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                // ── Bölüm 2: Fiyatlandırma & Satış Birimi ─────────────────────
+                _buildSectionHeader(
+                    icon: Icons.payments_rounded,
+                    label: 'Fiyatlandırma & Satış Birimi',
+                    color: _kGreenDark),
+                const SizedBox(height: 10),
+                _buildSection(children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedUnitKey,
+                    decoration: InputDecoration(
+                      labelText: 'Satış Birimi *',
+                      prefixIcon: Icon(
+                        _saleType == 'weighed'
+                            ? Icons.scale_rounded
+                            : Icons.straighten_rounded,
+                        color: _saleType == 'weighed' ? _kGreen : _kTextSecondary,
+                      ),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kGreen, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: _kSurface,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'piece_adet',
+                        child: Text('Adet (Barkodlu / Sayılabilir)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'weighed_kg',
+                        child: Text('Kilogram (Kg) — Terazi / Tartılı Satış'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'weighed_gr',
+                        child: Text('Gram (Gr) — Terazi / Tartılı Satış'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'piece_paket',
+                        child: Text('Paket'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'piece_lt',
+                        child: Text('Litre (Lt)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'piece_koli',
+                        child: Text('Koli'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedUnitKey = val;
+                          if (val == 'weighed_kg') {
+                            _unit = 'kg';
+                            _saleType = 'weighed';
+                          } else if (val == 'weighed_gr') {
+                            _unit = 'gr';
+                            _saleType = 'weighed';
+                          } else if (val == 'piece_paket') {
+                            _unit = 'paket';
+                            _saleType = 'piece';
+                          } else if (val == 'piece_lt') {
+                            _unit = 'lt';
+                            _saleType = 'piece';
+                          } else if (val == 'piece_koli') {
+                            _unit = 'koli';
+                            _saleType = 'piece';
+                          } else {
+                            _unit = 'adet';
+                            _saleType = 'piece';
+                          }
+                        });
+                      }
+                    },
+                  ),
+                  if (_saleType == 'weighed') ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _kGreen.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _kGreen.withValues(alpha: 0.2)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.scale_rounded, size: 20, color: _kGreen),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Terazili / Tartılı Ürün',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: _kGreenDark),
+                                ),
+                                Text(
+                                  'Kasa ekranında terazi ağırlığı okunur veya kilo elle yazılır. Fiyat kilogram birim fiyatıdır.',
+                                  style: TextStyle(
+                                      fontSize: 11, color: _kTextSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildField(
+                      controller: _minimumWeightCtrl,
+                      label: 'Minimum Tartım Eşiği (gram)',
+                      icon: Icons.scale_rounded,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (value) {
+                        if (_saleType != 'weighed') return null;
+                        final grams = int.tryParse(value?.trim() ?? '');
+                        if (grams == null || grams <= 0) {
+                          return 'Geçerli bir minimum gram değeri giriniz.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildField(
+                          controller: _priceCtrl,
+                          label: _saleType == 'weighed' ? 'Kg Satış Fiyatı *' : 'Satış Fiyatı *',
+                          icon: Icons.sell_rounded,
+                          prefix: '₺',
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                          ],
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Lütfen bir satış fiyatı giriniz.';
+                            }
+                            if (double.tryParse(v.trim().replaceAll(',', '.')) ==
+                                null) {
+                              return 'Lütfen geçerli bir satış fiyatı giriniz.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildField(
+                          controller: _purchasePriceCtrl,
+                          label: 'Alış / Maliyet Fiyatı',
+                          icon: Icons.store_rounded,
+                          prefix: '₺',
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildField(
+                    controller: _vatCtrl,
+                    label: 'KDV Oranı (%) *',
+                    icon: Icons.percent_rounded,
+                    prefix: '%',
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Lütfen KDV oranı giriniz.';
+                      }
+                      if (int.tryParse(v.trim()) == null) {
+                        return 'Lütfen geçerli bir tam sayı giriniz.';
+                      }
+                      return null;
+                    },
+                  ),
+                ]),
+                const SizedBox(height: 16),
+
+                // ── Bölüm 3: Stok Takibi ──────────────────────────────────────
+                _buildSectionHeader(
+                    icon: Icons.inventory_rounded,
+                    label: 'Stok Takibi',
+                    color: _kAmber),
+                const SizedBox(height: 10),
+                _buildSection(children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildField(
+                          controller: _qtyCtrl,
+                          label: _saleType == 'weighed' ? 'Mevcut Stok (Kg) *' : 'Mevcut Stok Miktarı *',
+                          icon: Icons.inventory_rounded,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: _saleType == 'weighed'
+                              ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                              : [FilteringTextInputFormatter.digitsOnly],
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Lütfen stok miktarı giriniz.';
+                            }
+                            final clean = v.trim().replaceAll(',', '.');
+                            if (num.tryParse(clean) == null) {
+                              return 'Lütfen geçerli bir sayı giriniz.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildField(
+                          controller: _minStockCtrl,
+                          label: 'Kritik Stok Uyarısı (Min)',
+                          icon: Icons.warning_amber_rounded,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: _saleType == 'weighed'
+                              ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                              : [FilteringTextInputFormatter.digitsOnly],
+                        ),
+                      ),
+                    ],
+                  ),
+                ]),
+                const SizedBox(height: 28),
+
+                // ── Kaydet Butonu ─────────────────────────────────────────────
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: Text(widget.isEditing ? 'Kaydet' : 'Ekle',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildSection(children: [
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: ProductImage(
-                      imageUrl: _imageUrl,
-                      barcode: _barcodeCtrl.text.trim(),
-                      size: 82,
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : Icon(widget.isEditing
+                            ? Icons.save_rounded
+                            : Icons.add_box_rounded),
+                    label: Text(
+                      widget.isEditing ? 'Değişiklikleri Kaydet' : 'Ürünü Kaydet',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _chooseProductImageSource,
-                          icon: const Icon(Icons.add_a_photo_rounded),
-                          label: Text(_imageUrl == null
-                              ? 'Ürün fotoğrafı ekle'
-                              : 'Fotoğrafı değiştir'),
-                        ),
-                        if (_imageUrl != null)
-                          TextButton(
-                            onPressed: () => setState(() => _imageUrl = null),
-                            child: const Text('Fotoğrafı kaldır'),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-            const SizedBox(height: 16),
-            // ── Bölüm 1: Temel Bilgiler ────────────────────────────────────
-            _buildSectionHeader(
-                icon: Icons.inventory_2_rounded,
-                label: 'Ürün Bilgileri',
-                color: _kGreen),
-            const SizedBox(height: 10),
-            _buildSection(children: [
-              _buildField(
-                controller: _nameCtrl,
-                label: 'Ürün Adı *',
-                icon: Icons.shopping_bag_rounded,
-                textCapitalization: TextCapitalization.words,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Lütfen ürün adı giriniz.'
-                    : null,
-              ),
-
-              const SizedBox(height: 12),
-              // ── Kategori ───────────────────────────────────────────────────
-              _buildCategoryField(allCategories, parsedVatCategories),
-
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      controller: _brandCtrl,
-                      label: 'Marka',
-                      icon: Icons.branding_watermark_rounded,
-                      textCapitalization: TextCapitalization.words,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildField(
-                      controller: _originCtrl,
-                      label: 'Menşei',
-                      icon: Icons.flag_rounded,
-                      textCapitalization: TextCapitalization.characters,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      controller: _shelfCodeCtrl,
-                      label: 'Raf Kodu',
-                      icon: Icons.table_restaurant_rounded,
-                      textCapitalization: TextCapitalization.characters,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _unit,
-                      decoration: InputDecoration(
-                        labelText: 'Birim',
-                        prefixIcon: const Icon(Icons.straighten_rounded),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'adet', child: Text('Adet')),
-                        DropdownMenuItem(
-                            value: 'kg', child: Text('Kilogram (kg)')),
-                        DropdownMenuItem(value: 'gr', child: Text('Gram (gr)')),
-                        DropdownMenuItem(value: 'paket', child: Text('Paket')),
-                        DropdownMenuItem(value: 'koli', child: Text('Koli')),
-                        DropdownMenuItem(value: 'lt', child: Text('Litre (lt)')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _unit = val);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-            const SizedBox(height: 16),
-
-            // ── Bölüm 2: Fiyat & Stok ─────────────────────────────────────
-            _buildSectionHeader(
-                icon: Icons.attach_money_rounded,
-                label: 'Fiyat & Stok',
-                color: _kGreenDark),
-            const SizedBox(height: 10),
-            _buildSection(children: [
-              DropdownButtonFormField<String>(
-                value: _saleType,
-                decoration: InputDecoration(
-                  labelText: 'Satış Şekli',
-                  prefixIcon: Icon(
-                    _saleType == 'weighed'
-                        ? Icons.monitor_weight_rounded
-                        : Icons.numbers_rounded,
-                  ),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'piece', child: Text('Adet')),
-                  DropdownMenuItem(value: 'weighed', child: Text('Ağırlık')),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _saleType = value);
-                },
-              ),
-              if (_saleType == 'weighed') ...[
-                const SizedBox(height: 12),
-                _buildField(
-                  controller: _minimumWeightCtrl,
-                  label: 'Minimum Tartım (gram)',
-                  icon: Icons.scale_rounded,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (value) {
-                    if (_saleType != 'weighed') return null;
-                    final grams = int.tryParse(value?.trim() ?? '');
-                    if (grams == null || grams <= 0) {
-                      return 'Geçerli bir minimum gram değeri giriniz.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Satış fiyatı kilogram fiyatı olarak kullanılır.',
-                  style: TextStyle(fontSize: 12, color: _kTextSecondary),
                 ),
               ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      controller: _priceCtrl,
-                      label: 'Satış Fiyatı *',
-                      icon: Icons.sell_rounded,
-                      prefix: '₺',
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
-                      ],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Lütfen bir satış fiyatı giriniz.';
-                        }
-                        if (double.tryParse(v.trim().replaceAll(',', '.')) ==
-                            null) {
-                          return 'Lütfen geçerli bir satış fiyatı giriniz.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildField(
-                      controller: _purchasePriceCtrl,
-                      label: 'Alış Fiyatı',
-                      icon: Icons.store_rounded,
-                      prefix: '₺',
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      controller: _qtyCtrl,
-                      label: 'Stok Miktarı *',
-                      icon: Icons.inventory_rounded,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: _saleType == 'weighed'
-                          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
-                          : [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Lütfen stok miktarı giriniz.';
-                        }
-                        final clean = v.trim().replaceAll(',', '.');
-                        if (num.tryParse(clean) == null) {
-                          return 'Lütfen geçerli bir sayı giriniz.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildField(
-                      controller: _minStockCtrl,
-                      label: 'Min. Stok Uyarısı',
-                      icon: Icons.warning_amber_rounded,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: _saleType == 'weighed'
-                          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
-                          : [FilteringTextInputFormatter.digitsOnly],
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-            const SizedBox(height: 16),
-
-            // ── Bölüm 3: Vergi & Barkod ────────────────────────────────────
-            _buildSectionHeader(
-                icon: Icons.receipt_long_rounded,
-                label: 'Vergi & Barkod',
-                color: _kAmber),
-            const SizedBox(height: 10),
-            _buildSection(children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      controller: _vatCtrl,
-                      label: 'KDV Oranı (%) *',
-                      icon: Icons.percent_rounded,
-                      prefix: '%',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Lütfen KDV oranı giriniz.';
-                        }
-                        if (int.tryParse(v.trim()) == null) {
-                          return 'Lütfen geçerli bir tam sayı giriniz.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _barcodeCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        labelText: 'Barkod',
-                        suffixIcon: Container(
-                          margin: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: _kGreen.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: IconButton(
-                            tooltip: 'Kamerayla barkod okut',
-                            onPressed: _scanBarcode,
-                            icon: const Icon(Icons.qr_code_scanner_rounded,
-                                color: _kGreen),
-                          ),
-                        ),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-            const SizedBox(height: 28),
-
-            // ── Kaydet Butonu ─────────────────────────────────────────────
-            SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : Icon(widget.isEditing
-                        ? Icons.save_rounded
-                        : Icons.add_box_rounded),
-                label: Text(
-                  widget.isEditing ? 'Değişiklikleri Kaydet' : 'Ürün Ekle',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
 
         if (isWide) {
           return Scaffold(
@@ -674,7 +715,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   onTap: () {}, // Prevent tap from dismissing modal
                   child: Container(
                     constraints:
-                        const BoxConstraints(maxWidth: 780, maxHeight: 860),
+                        const BoxConstraints(maxWidth: 720, maxHeight: 860),
                     margin:
                         const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
@@ -795,88 +836,276 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
+  Future<void> _openCategoryPicker(
+    List<String> allCategories,
+    List<Map<String, dynamic>> parsedVatCategories,
+  ) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final filtered = allCategories.where((c) {
+              return c.toLowerCase().contains(searchQuery.toLowerCase().trim());
+            }).toList();
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: _kBorder,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Kategori Seç',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _kText,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final newCat = await _showNewCategorySheet();
+                            if (newCat != null &&
+                                newCat.isNotEmpty &&
+                                context.mounted) {
+                              Navigator.pop(context, newCat);
+                            }
+                          },
+                          icon: const Icon(Icons.add, size: 18, color: _kGreen),
+                          label: const Text(
+                            'Yeni Kategori',
+                            style: TextStyle(
+                                color: _kGreen, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      autofocus: allCategories.length > 5,
+                      decoration: InputDecoration(
+                        hintText: 'Kategori ara...',
+                        prefixIcon: const Icon(Icons.search,
+                            size: 20, color: _kTextSecondary),
+                        filled: true,
+                        fillColor: _kSurface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _kBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _kBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _kGreen, width: 2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                      ),
+                      onChanged: (val) {
+                        setSheetState(() {
+                          searchQuery = val;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: filtered.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.search_off,
+                                      size: 36, color: _kTextSecondary),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '"$searchQuery" kategorisi bulunamadı',
+                                    style:
+                                        const TextStyle(color: _kTextSecondary),
+                                  ),
+                                  if (searchQuery.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: () {
+                                        final canonical =
+                                            _canonicalName(searchQuery);
+                                        Navigator.pop(context, canonical);
+                                      },
+                                      icon: const Icon(Icons.add,
+                                          color: _kGreen),
+                                      label: Text(
+                                          '"$searchQuery" olarak ekle',
+                                          style:
+                                              const TextStyle(color: _kGreen)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1, color: _kBorder),
+                              itemBuilder: (ctx, index) {
+                                final cat = filtered[index];
+                                final isSelected = cat == _selectedCategory;
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  title: Text(
+                                    cat,
+                                    style: TextStyle(
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? _kGreen
+                                          : _kText,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle,
+                                          color: _kGreen, size: 20)
+                                      : null,
+                                  onTap: () {
+                                    Navigator.pop(context, cat);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selected != null && selected.isNotEmpty) {
+      final canonical = _canonicalName(selected);
+      if (!allCategories
+          .map((e) => e.toLowerCase())
+          .contains(canonical.toLowerCase())) {
+        final vatText = _vatCtrl.text.trim();
+        final rate = vatText.isEmpty ? null : int.tryParse(vatText);
+        await _addNewCategoryToSettings(canonical, rate: rate);
+      }
+      setState(() {
+        _selectedCategory = canonical;
+        final match = parsedVatCategories.firstWhere(
+          (item) =>
+              item['name']?.toString().toLowerCase() ==
+              canonical.toLowerCase(),
+          orElse: () => <String, dynamic>{},
+        );
+        if (match.isNotEmpty && match['rate'] != null) {
+          _vatCtrl.text = match['rate'].toString();
+        }
+      });
+    }
+  }
+
   Widget _buildCategoryField(List<String> allCategories,
       List<Map<String, dynamic>> parsedVatCategories) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          value: allCategories.contains(_selectedCategory)
-              ? _selectedCategory
-              : null,
-          hint: const Text('Kategori Seç *',
-              style: TextStyle(color: _kTextSecondary)),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.category_rounded,
-                size: 20, color: _kTextSecondary),
-            border: OutlineInputBorder(
+    return FormField<String>(
+      initialValue: _selectedCategory,
+      validator: (_) =>
+          _selectedCategory == null ? 'Lütfen bir kategori seçiniz.' : null,
+      builder: (state) {
+        final hasError = state.hasError;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: _kGreen, width: 2),
-            ),
-            filled: true,
-            fillColor: _kSurface,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          ),
-          items: [
-            ...allCategories.map((cat) => DropdownMenuItem(
-                  value: cat,
-                  child: Text(cat),
-                )),
-            const DropdownMenuItem(
-              value: '__new__',
-              child: Row(
-                children: [
-                  Icon(Icons.add_circle_outline, size: 16, color: _kGreen),
-                  SizedBox(width: 6),
-                  Text('+ Yeni Kategori',
-                      style: TextStyle(
-                          color: _kGreen, fontWeight: FontWeight.w600)),
-                ],
+              onTap: () async {
+                await _openCategoryPicker(allCategories, parsedVatCategories);
+                state.didChange(_selectedCategory);
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: _kSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: hasError
+                        ? Theme.of(context).colorScheme.error
+                        : _kBorder,
+                    width: hasError ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.category_rounded,
+                        size: 20, color: _kTextSecondary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _selectedCategory ?? 'Kategori Seç *',
+                        style: TextStyle(
+                          color: _selectedCategory != null
+                              ? _kText
+                              : _kTextSecondary,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: _kTextSecondary),
+                  ],
+                ),
               ),
             ),
+            if (hasError)
+              Padding(
+                padding: const EdgeInsets.only(left: 14, top: 6),
+                child: Text(
+                  state.errorText ?? '',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
           ],
-          onChanged: (val) async {
-            if (val == '__new__') {
-              final newCat = await _showNewCategorySheet();
-              if (newCat != null && newCat.isNotEmpty) {
-                final canonical = _canonicalName(newCat);
-                final vatText = _vatCtrl.text.trim();
-                final rate = vatText.isEmpty ? null : int.tryParse(vatText);
-                await _addNewCategoryToSettings(canonical, rate: rate);
-                setState(() {
-                  _selectedCategory = canonical;
-                });
-              }
-            } else {
-              setState(() {
-                _selectedCategory = val;
-                if (val != null) {
-                  final match = parsedVatCategories.firstWhere(
-                    (item) =>
-                        item['name']?.toString().toLowerCase() ==
-                        val.toLowerCase(),
-                    orElse: () => <String, dynamic>{},
-                  );
-                  if (match.isNotEmpty && match['rate'] != null) {
-                    _vatCtrl.text = match['rate'].toString();
-                  }
-                }
-              });
-            }
-          },
-          validator: (_) =>
-              _selectedCategory == null ? 'Lütfen bir kategori seçiniz.' : null,
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -948,35 +1177,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Yeni Kategori',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                        color: _kText)),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined, size: 20),
-                  tooltip: 'Tüm kategorileri yönet',
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const CatalogSettingsPage()),
-                    );
-                  },
-                ),
-              ],
+            const Text(
+              'Yeni Kategori',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: _kText),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             TextField(
               controller: nameCtrl,
               autofocus: true,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
-                labelText: 'Kategori adı *',
-                hintText: 'Örn: İçecekler',
+                labelText: 'Kategori Adı *',
+                hintText: 'Örn: Hizmet, Kremalar, Kuruyemiş',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 focusedBorder: OutlineInputBorder(
@@ -990,7 +1203,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 labelText: 'Varsayılan KDV (%) (İsteğe bağlı)',
-                hintText: 'Örn: 20',
+                hintText: 'Örn: 20 veya 1',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 focusedBorder: OutlineInputBorder(

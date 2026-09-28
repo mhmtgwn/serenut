@@ -477,7 +477,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
       ),
       icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-      label: const Text('Yeni',
+      label: const Text('+ Yeni Müşteri',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
     );
 

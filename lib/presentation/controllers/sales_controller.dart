@@ -305,6 +305,16 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
 
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
+  String? get searchQuery => _searchQuery;
+  String? get paymentMethod => _paymentMethod;
+  String? get status => _status;
+
+  Future<void> resetFilters() async {
+    _searchQuery = null;
+    _paymentMethod = null;
+    _status = null;
+    await refresh();
+  }
 
   @override
   FutureOr<List<SaleEntity>> build() async {

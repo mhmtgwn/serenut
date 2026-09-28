@@ -109,7 +109,11 @@ class DailyRevenue {
   final DateTime date;
   final double totalAmount;
   final int saleCount;
+  /// Nakit tahsilat
   final double cashAmount;
+  /// Kredi kartı tahsilat
+  final double cardAmount;
+  /// Vadeli (ödenmemiş) tutar
   final double debtAmount;
 
   const DailyRevenue({
@@ -117,11 +121,15 @@ class DailyRevenue {
     required this.totalAmount,
     required this.saleCount,
     required this.cashAmount,
+    this.cardAmount = 0.0,
     required this.debtAmount,
   });
 
+  /// Toplam tahsil edilen (nakit + kart)
+  double get totalCollected => cashAmount + cardAmount;
+
   double get collectionRate =>
-      totalAmount == 0 ? 0 : (cashAmount / totalAmount * 100);
+      totalAmount == 0 ? 0 : (totalCollected / totalAmount * 100);
 }
 
 /// Kategori bazlı ciro
@@ -184,12 +192,41 @@ class DebtAgingRow {
   bool get hasOverdue => days31to60 > 0 || days61to90 > 0 || over90 > 0;
 }
 
+/// Ödeme tipi kırılımı (dönem bazlı)
+class PaymentBreakdownSummary {
+  /// Nakit tahsilat toplamı
+  final double cashTotal;
+  /// Kredi kartı tahsilat toplamı
+  final double cardTotal;
+  /// Vadeli satış toplamı (tahsil edilmemiş)
+  final double debtTotal;
+  /// Teslim edilen sipariş sayısı
+  final int deliveredOrderCount;
+  /// Teslim edilen sipariş tutarı
+  final double deliveredOrderTotal;
+
+  const PaymentBreakdownSummary({
+    required this.cashTotal,
+    required this.cardTotal,
+    required this.debtTotal,
+    this.deliveredOrderCount = 0,
+    this.deliveredOrderTotal = 0.0,
+  });
+
+  double get grandTotal => cashTotal + cardTotal + debtTotal;
+  double get collectedTotal => cashTotal + cardTotal;
+}
+
 /// Dönem özeti (tek kart grubu için)
 class ReportSummary {
   final double totalRevenue;
   final int totalSales;
   final double totalDebt;
   final double totalCollected;
+  /// Nakit tahsilat
+  final double cashCollected;
+  /// Kredi kartı tahsilat
+  final double cardCollected;
   final double avgBasket;
   final int newCustomers;
   final DateRange range;
@@ -199,6 +236,8 @@ class ReportSummary {
     required this.totalSales,
     required this.totalDebt,
     required this.totalCollected,
+    this.cashCollected = 0.0,
+    this.cardCollected = 0.0,
     required this.avgBasket,
     required this.newCustomers,
     required this.range,

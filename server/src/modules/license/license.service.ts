@@ -146,7 +146,12 @@ export class LicenseService {
           [entitlement.subscription_id, entitlement.company_id],
         );
         if (trialSub.rows[0] && !trialSub.rows[0].trial_started_at) {
-          const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const planRow = await client.query(
+            `SELECT trial_days FROM plans WHERE id = $1`,
+            [entitlement.plan_id]
+          );
+          const trialDays = Math.max(1, Number(planRow.rows[0]?.trial_days || 30));
+          const trialEnd = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
           await client.query(
             `UPDATE subscriptions
              SET trial_started_at=$1, trial_ends_at=$2,

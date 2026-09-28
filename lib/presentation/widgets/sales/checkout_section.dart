@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
@@ -106,6 +108,48 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   double get _karmaRemainder => _karmaResult.remaining;
   bool get _karmaValid => _karmaResult.isValid;
 
+  @override
+  Widget build(BuildContext context) {
+    // Sepet temizlenince karma alanlarını sıfırla
+    ref.listen(salesFlowProvider.select((s) => s.cartQuantities.isEmpty),
+        (prev, isEmpty) {
+      if (isEmpty == true) {
+        _cashSplitController.clear();
+        _cardSplitController.clear();
+        _debtSplitController.clear();
+      }
+    });
+
+    final isKarma = widget.paymentMethod == 'karma';
+    final hasPos =
+        ref.watch(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _kSurface,
+        border: Border(top: BorderSide(color: _kBorder)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildCustomerSection(),
+            const SizedBox(height: 12),
+            _buildTotalBox(),
+            const SizedBox(height: 12),
+            if (isKarma) ...[
+              _buildKarmaSplit(),
+              const SizedBox(height: 12),
+            ],
+            _buildPaymentButtons(isKarma, hasPos: hasPos),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handlePayment(String method) {
     if (method == 'cash') {
       _showCashPaymentDialog();
@@ -182,47 +226,6 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
           widget.onPaidAmountChanged(givenAmount);
           Future.microtask(() => widget.onSubmitSale());
         },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isKarma = widget.paymentMethod == 'karma';
-    final hasPos =
-        ref.watch(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: _kSurface,
-        border: Border(top: BorderSide(color: _kBorder)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── MÜŞTERİ SELECTİON ──────────────────────────────────────────
-            _buildCustomerSection(),
-            const SizedBox(height: 12),
-
-            // ── TOPLAM TUTAR BOX ────────────────────────────────────────────
-            _buildTotalBox(),
-            const SizedBox(height: 12),
-
-            // NAKİT: Dialog ile handle ediliyor (_showCashPaymentDialog)
-
-            // ── KARMA SPLIT ALANLAR (yalnızca karma seçiliyken) ────────────
-            if (isKarma) ...[
-              _buildKarmaSplit(),
-              const SizedBox(height: 12),
-            ],
-
-            // ── ÖDEME BUTONLARI ─────────────────────────────────────────────
-            _buildPaymentButtons(isKarma, hasPos: hasPos),
-          ],
-        ),
       ),
     );
   }
@@ -310,19 +313,35 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
     final cust = widget.selectedCustomer;
     if (cust == null) {
       return Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           _buildPrintReceiptToggle(),
           const SizedBox(width: 8),
-          IconButton(
-            onPressed: () => _showCustomerSelection(context),
-            icon:
-                const Icon(Icons.person_add_rounded, color: _kGreen, size: 20),
-            tooltip: 'Müşteri Seç veya Ekle',
-            style: IconButton.styleFrom(
-              backgroundColor: _kGreenLight,
-              padding: const EdgeInsets.all(8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          InkWell(
+            onTap: () => _showCustomerSelection(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _kGreenLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _kGreen.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.person_add_rounded, color: _kGreenDark, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Müşteri Seç',
+                    style: TextStyle(
+                      color: _kGreenDark,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -768,12 +787,14 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
             label: hasPos ? 'KART' : 'POS YOK',
             sublabel: hasPos
                 ? '₺${widget.total.toStringAsFixed(2)}'
-                : 'Cihaz tanımla',
+                : 'Ayarlardan tanımla →',
             icon: Icons.credit_card_rounded,
-            color: _kBlue,
-            disabled: disabled || !hasPos,
+            color: hasPos ? _kBlue : _kTextSecondary,
+            disabled: disabled && hasPos,
             height: 64,
-            onTap: () => _handlePayment('card'),
+            onTap: hasPos
+                ? () => _handlePayment('card')
+                : () => context.push(AppRoutes.hardware),
           ),
         ),
         const SizedBox(width: 6),

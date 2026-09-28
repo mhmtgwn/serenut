@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/pages/onboarding/widgets/step_indicator.d
 
 // İşletme türleri
 const List<_BusinessType> _businessTypes = [
+  _BusinessType(icon: Icons.eco_rounded, label: 'Fındıkçı'),
   _BusinessType(icon: Icons.store_rounded, label: 'Market'),
   _BusinessType(icon: Icons.coffee_rounded, label: 'Kafe'),
   _BusinessType(icon: Icons.grass_rounded, label: 'Kuruyemişçi'),

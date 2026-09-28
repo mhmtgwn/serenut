@@ -162,6 +162,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
       } catch (_) {}
     }
     if (settings == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Yazıcı ayarları henüz hazır değil.')),
       );
@@ -484,6 +485,144 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
     );
   }
 
+  Future<void> _showQuickPriceDialog(ProductEntity product) async {
+    final priceCtrl = TextEditingController(
+      text: product.price.toStringAsFixed(2),
+    );
+    String? errorText;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.price_change_rounded,
+                      color: _kGreenDark, size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Hızlı Fiyat Düzenle',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: _kText,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Mevcut Fiyat: ₺${product.price.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 12, color: _kTextSecondary),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Yeni Satış Fiyatı',
+                    prefixText: '₺ ',
+                    errorText: errorText,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _kGreen, width: 2),
+                    ),
+                  ),
+                  onChanged: (val) {
+                    if (errorText != null) {
+                      setDialogState(() => errorText = null);
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Vazgeç',
+                    style: TextStyle(color: _kTextSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () async {
+                  final text = priceCtrl.text.replaceAll(',', '.').trim();
+                  final newPrice = double.tryParse(text);
+                  if (newPrice == null || newPrice < 0) {
+                    setDialogState(() {
+                      errorText = 'Geçerli bir fiyat girin.';
+                    });
+                    return;
+                  }
+
+                  final messenger = ScaffoldMessenger.of(context);
+                  Navigator.pop(ctx);
+                  try {
+                    final updated = product.copyWith(price: newPrice);
+                    await ref
+                        .read(productsControllerProvider.notifier)
+                        .updateProduct(updated);
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            '${product.name} fiyatı ₺${newPrice.toStringAsFixed(2)} olarak güncellendi.'),
+                        backgroundColor: _kGreen,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('Fiyat güncellenirken bir hata oluştu: $e'),
+                        backgroundColor: _kRed,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Kaydet'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildProductCard(ProductEntity product, bool isSelected) {
     final isLowStock = product.quantity <= product.minStock;
     final isOutOfStock = product.quantity <= 0;
@@ -629,19 +768,33 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: _kGreenLight,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '₺${product.price.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                            color: _kGreenDark,
+                      InkWell(
+                        onTap: () => _showQuickPriceDialog(product),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _kGreenLight,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: _kGreen.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '₺${product.price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  color: _kGreenDark,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              const Icon(Icons.edit_outlined,
+                                  size: 11, color: _kGreenDark),
+                            ],
                           ),
                         ),
                       ),

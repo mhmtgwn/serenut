@@ -499,7 +499,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       `INSERT INTO users (id, company_id, name, email, username, password_hash, is_active, email_verified_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [userId, companyId, name, normalizedEmail, normalizedUsername, passwordHash,
-        !emailVerificationRequired, emailVerificationRequired ? null : new Date()]
+        true, emailVerificationRequired ? null : new Date()]
     );
     registeredUserId = userId;
     recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
@@ -533,7 +533,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     // Starter trial contract; the clock begins on first device activation.
       await CommercialLifecycleService.provisionPendingTrial(client, { companyId });
 
-      if (emailVerificationRequired) {
+      if (emailDeliveryEnabled) {
         verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
         await client.query(

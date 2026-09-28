@@ -314,8 +314,32 @@ class DatabaseSchema {
         'CREATE INDEX IF NOT EXISTS idx_products_active_lookup ON products(is_deleted, is_active, category)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_customers_active_lookup ON customers(is_deleted, is_active)');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cash_expenses (
+        id TEXT PRIMARY KEY,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL DEFAULT 'genel',
+        description TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_sales_active_lookup ON sales(is_deleted, status, created_at)');
+        'CREATE INDEX IF NOT EXISTS idx_cash_expenses_date ON cash_expenses(created_at, is_deleted)');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cash_counts (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL UNIQUE,
+        opening_balance REAL NOT NULL DEFAULT 0.0,
+        counted_cash REAL NOT NULL DEFAULT 0.0,
+        expected_cash REAL NOT NULL DEFAULT 0.0,
+        difference REAL NOT NULL DEFAULT 0.0,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
 
     // Create financial ledger view
     await db.execute('''

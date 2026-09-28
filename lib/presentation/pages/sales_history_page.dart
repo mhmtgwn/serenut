@@ -41,6 +41,18 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctrl = ref.read(salesHistoryControllerProvider.notifier);
+      setState(() {
+        _paymentFilter = ctrl.paymentMethod;
+        _statusFilter = ctrl.status;
+        _searchQuery = ctrl.searchQuery ?? '';
+        if (_searchQuery.isNotEmpty) {
+          _searchController.text = _searchQuery;
+        }
+      });
+    });
   }
 
   void _onScroll() {
@@ -184,22 +196,41 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 }
 
                 final filteredSales = cachedSales ?? const <SaleEntity>[];
+                final hasActiveFilter = _searchQuery.isNotEmpty ||
+                    _paymentFilter != null ||
+                    _statusFilter != null;
 
                 if (filteredSales.isEmpty) {
                   return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.history_rounded,
-                            size: 64, color: Colors.grey[300]),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Kayıtlı satış bulunamadı.',
-                          style: TextStyle(
-                              color: _kTextSecondary,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.history_rounded,
+                              size: 64, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          Text(
+                            hasActiveFilter
+                                ? 'Seçili filtrelere uygun satış bulunamadı.'
+                                : 'Kayıtlı satış bulunamadı.',
+                            style: const TextStyle(
+                                color: _kTextSecondary,
+                                fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (hasActiveFilter) ...[
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              onPressed: _clearAllFilters,
+                              icon: const Icon(Icons.filter_alt_off_rounded,
+                                  size: 16, color: _kGreen),
+                              label: const Text('Filtreleri Temizle',
+                                  style: TextStyle(color: _kGreen)),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   );
                 }
@@ -481,5 +512,15 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           paymentMethod: paymentMethod,
           status: status,
         );
+  }
+
+  void _clearAllFilters() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _paymentFilter = null;
+      _statusFilter = null;
+    });
+    ref.read(salesHistoryControllerProvider.notifier).resetFilters();
   }
 }

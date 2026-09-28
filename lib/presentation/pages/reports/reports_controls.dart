@@ -458,6 +458,8 @@ class _ReportTabs extends StatelessWidget {
           _tab(Icons.account_balance_wallet_outlined,
               compact ? 'Alacak' : 'Alacaklar'),
           _tab(Icons.insights_rounded, 'Analiz'),
+          _tab(Icons.night_shelter_outlined,
+              compact ? 'Gün Sonu' : 'Gün Sonu'),
         ],
       ),
     );

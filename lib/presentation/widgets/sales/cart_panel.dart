@@ -41,6 +41,38 @@ class CartPanel extends StatelessWidget {
     required this.checkoutSectionWidget,
   });
 
+  void _confirmClearCart(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Sepeti Temizle',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: const Text('Sepetteki tüm ürünler kaldırılacak. Emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onClearCart();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Evet, Temizle',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartCount = cartQuantities.entries.fold(
@@ -98,7 +130,7 @@ class CartPanel extends StatelessWidget {
                 ),
                 if (cartQuantities.isNotEmpty)
                   InkWell(
-                    onTap: onClearCart,
+                    onTap: () => _confirmClearCart(context),
                     borderRadius: BorderRadius.circular(8),
                     child: Ink(
                       padding: const EdgeInsets.symmetric(
@@ -413,49 +445,76 @@ class _CartItemState extends State<_CartItem>
 
   void _showQtyEditDialog(BuildContext context) {
     final controller = TextEditingController(text: '${widget.quantity}');
+    final maxStock = widget.product.quantity;
+    String? errorText;
+
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text(widget.product.name,
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Stok Adedi: ${widget.product.quantity}',
-                  style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
-              const SizedBox(height: 10),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Miktar',
-                  border: OutlineInputBorder(),
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            title: Text(widget.product.name,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  maxStock > 0
+                      ? 'Stokta: $maxStock adet'
+                      : 'Stok bilgisi yok',
+                  style: const TextStyle(color: _kTextSecondary, fontSize: 12),
                 ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Miktar',
+                    border: const OutlineInputBorder(),
+                    errorText: errorText,
+                    helperText:
+                        maxStock > 0 ? 'Maksimum: $maxStock' : null,
+                  ),
+                  onChanged: (val) {
+                    final n = int.tryParse(val) ?? 0;
+                    setDialogState(() {
+                      if (n <= 0) {
+                        errorText = 'En az 1 olmalı';
+                      } else if (maxStock > 0 && n > maxStock) {
+                        errorText = 'Stok yetersiz (max $maxStock)';
+                      } else {
+                        errorText = null;
+                      }
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('İptal'),
+              ),
+              ElevatedButton(
+                onPressed: errorText != null
+                    ? null
+                    : () {
+                        final newQty =
+                            int.tryParse(controller.text) ?? widget.quantity;
+                        widget.onQtyChanged(newQty);
+                        Navigator.pop(dialogCtx);
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: _kGreen),
+                child: const Text('Güncelle',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final newQty = int.tryParse(controller.text) ?? widget.quantity;
-                widget.onQtyChanged(newQty);
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _kGreen),
-              child:
-                  const Text('Güncelle', style: TextStyle(color: Colors.white)),
-            ),
-          ],
         );
       },
     );
