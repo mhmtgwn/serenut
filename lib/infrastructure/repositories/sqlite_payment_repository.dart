@@ -462,6 +462,7 @@ class SqliteFinancialTransactionRepository
         'paid_amount': entity.paidAmount,
         'debt_amount': entity.debtAmount,
         'reference_id': entity.referenceId,
+        'payment_method': entity.paymentMethod ?? 'cash',
         'metadata':
             entity.metadata != null ? jsonEncode(entity.metadata) : null,
         'created_at': entity.date.toIso8601String(),

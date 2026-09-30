@@ -212,6 +212,32 @@ class SyncV4Service {
         await DatabaseManager.retryOnLock(() async {
           await db.transaction((txn) async {
             if (acknowledged.isNotEmpty) {
+              final ackSet = acknowledged.toSet();
+              for (final row in orderedPending) {
+                final mutId = row['mutation_id']?.toString();
+                if (mutId != null && ackSet.contains(mutId)) {
+                  final entityType = row['entity_type']?.toString();
+                  final entityId = row['entity_id']?.toString();
+                  if (entityId != null && entityId.isNotEmpty) {
+                    final domainTable = switch (entityType) {
+                      'financial_transaction' => 'financial_transactions',
+                      'product' => 'products',
+                      'customer' => 'customers',
+                      'order' => 'orders',
+                      'sale' => 'sales',
+                      _ => null,
+                    };
+                    if (domainTable != null) {
+                      await txn.update(
+                        domainTable,
+                        {'is_synced': 1},
+                        where: 'id = ?',
+                        whereArgs: [entityId],
+                      );
+                    }
+                  }
+                }
+              }
               await txn.delete('sync_outbox_v4',
                   where:
                       'mutation_id IN (${List.filled(acknowledged.length, '?').join(',')})',
@@ -668,6 +694,7 @@ class SyncV4Service {
               WHERE o.entity_type = 'financial_transaction'
                 AND o.entity_id = ft.id
             )
+          LIMIT 100
         ''');
         for (final row in unsynced) {
           final id = row['id']?.toString();
@@ -842,6 +869,8 @@ class SyncV4Service {
             prev['customer_id']?.toString() != row['customer_id']?.toString();
         if (amountChanged || paidChanged || debtChanged || customerChanged) {
           await db.update(table, row, where: 'id = ?', whereArgs: [id]);
+        } else if ((prev['is_synced'] as num?)?.toInt() != 1) {
+          await db.update(table, {'is_synced': 1}, where: 'id = ?', whereArgs: [id]);
         }
         return;
       }

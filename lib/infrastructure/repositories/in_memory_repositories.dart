@@ -841,6 +841,7 @@ class InMemoryFinancialTransactionRepository
       metadata: entity.metadata,
       logicalClock: nextClock,
       deviceId: txDeviceId,
+      paymentMethod: entity.paymentMethod,
     );
 
     InMemoryDb.transactions.add(storedTx);
@@ -879,6 +880,7 @@ class InMemoryFinancialTransactionRepository
       metadata: oldTx.metadata,
       logicalClock: oldTx.logicalClock,
       deviceId: oldTx.deviceId,
+      paymentMethod: oldTx.paymentMethod,
     );
 
     InMemoryDb.transactions[idx] = updatedTx;

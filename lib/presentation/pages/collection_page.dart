@@ -372,11 +372,15 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                               fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          '₺${_balanceAfter.toStringAsFixed(2)}',
+                          _balanceAfter.abs() < 0.01
+                              ? '₺0.00 (Bakiye Kapanır)'
+                              : (_balanceAfter < 0
+                                  ? '₺${_balanceAfter.abs().toStringAsFixed(2)} Borç Kalır'
+                                  : '₺${_balanceAfter.toStringAsFixed(2)} Fazla Ödeme (Alacak)'),
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
-                              color: _balanceAfter >= 0 ? _kGreenDark : _kRed),
+                              color: _balanceAfter >= -0.009 ? _kGreenDark : _kRed),
                         ),
                       ],
                     ),

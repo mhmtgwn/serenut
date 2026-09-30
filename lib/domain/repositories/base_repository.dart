@@ -654,6 +654,7 @@ class FinancialTransactionEntity {
   final Map<String, dynamic>? metadata;
   final int logicalClock;
   final String? deviceId;
+  final String? paymentMethod;
 
   FinancialTransactionEntity({
     required this.id,
@@ -667,6 +668,7 @@ class FinancialTransactionEntity {
     this.metadata,
     this.logicalClock = 0,
     this.deviceId,
+    this.paymentMethod,
   });
 
   Map<String, dynamic> toMap() => {
@@ -681,6 +683,7 @@ class FinancialTransactionEntity {
         'metadata': metadata,
         'logical_clock': logicalClock,
         'device_id': deviceId,
+        'payment_method': paymentMethod,
       };
 
   factory FinancialTransactionEntity.fromMap(Map<String, dynamic> map) =>
@@ -709,6 +712,36 @@ class FinancialTransactionEntity {
             ? (map['logical_clock'] as num).toInt()
             : (int.tryParse((map['logical_clock'] ?? '0').toString()) ?? 0),
         deviceId: map['device_id']?.toString(),
+        paymentMethod: map['payment_method']?.toString(),
+      );
+
+  FinancialTransactionEntity copyWith({
+    String? id,
+    String? type,
+    String? customerId,
+    double? amount,
+    double? paidAmount,
+    double? debtAmount,
+    DateTime? date,
+    String? referenceId,
+    Map<String, dynamic>? metadata,
+    int? logicalClock,
+    String? deviceId,
+    String? paymentMethod,
+  }) =>
+      FinancialTransactionEntity(
+        id: id ?? this.id,
+        type: type ?? this.type,
+        customerId: customerId ?? this.customerId,
+        amount: amount ?? this.amount,
+        paidAmount: paidAmount ?? this.paidAmount,
+        debtAmount: debtAmount ?? this.debtAmount,
+        date: date ?? this.date,
+        referenceId: referenceId ?? this.referenceId,
+        metadata: metadata ?? this.metadata,
+        logicalClock: logicalClock ?? this.logicalClock,
+        deviceId: deviceId ?? this.deviceId,
+        paymentMethod: paymentMethod ?? this.paymentMethod,
       );
 }
 

@@ -480,12 +480,12 @@ class CustomerDetailsPage extends ConsumerWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _StatCard(
-            label: 'Toplam Borç',
+            label: 'Toplam İşlem',
             value: '₺${(details['totalDebt'] ?? 0).toStringAsFixed(2)}',
-            sub: 'Vadeli satışlar',
+            sub: 'Alışveriş & Borç',
             bg: _kAmberLight,
             fg: _kAmber,
-            icon: Icons.warning_amber_rounded,
+            icon: Icons.shopping_bag_outlined,
           ),
         ),
         const SizedBox(width: 10),
@@ -493,7 +493,7 @@ class CustomerDetailsPage extends ConsumerWidget {
           child: _StatCard(
             label: 'Toplam Ödeme',
             value: '₺${(details['totalPaid'] ?? 0).toStringAsFixed(2)}',
-            sub: 'Tahsilatlar',
+            sub: 'Tahsilat & Peşin',
             bg: _kGreenLight,
             fg: _kGreenDark,
             icon: Icons.check_circle_rounded,
@@ -792,9 +792,65 @@ class _TransactionRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final _TxnStyle style = _txnStyle(txn.type);
-    final isCredit = txn.type == 'collection' || txn.type == 'payment';
+    final _TxnStyle style = _txnStyle(txn);
+    final isCashSale = txn.type == 'sale' && txn.debtAmount <= 0.009;
+    final isCancellation = txn.type == 'cancellation';
+    final isRefundToBalance = txn.type == 'refund' && txn.paidAmount <= 0.009;
+    final isCashRefund = txn.type == 'refund' && txn.paidAmount > 0.009;
+    final isCredit = txn.type == 'collection' ||
+        txn.type == 'payment' ||
+        isCancellation ||
+        isRefundToBalance;
     final itemsVal = ref.watch(transactionItemsProvider(txn));
+
+    final String sign;
+    final Color amountColor;
+    final String displayAmount;
+
+    if (isCancellation) {
+      sign = '+';
+      amountColor = _kGreenDark;
+      displayAmount = (txn.debtAmount > 0 ? txn.debtAmount : txn.amount).toStringAsFixed(2);
+    } else if (isRefundToBalance) {
+      sign = '+';
+      amountColor = _kGreenDark;
+      displayAmount = txn.amount.toStringAsFixed(2);
+    } else if (isCashRefund) {
+      sign = '';
+      amountColor = _kAmber;
+      displayAmount = txn.amount.toStringAsFixed(2);
+    } else if (isCashSale) {
+      sign = '';
+      amountColor = _kText;
+      displayAmount = txn.amount.toStringAsFixed(2);
+    } else if (isCredit) {
+      sign = '+';
+      amountColor = _kGreenDark;
+      displayAmount = txn.amount.toStringAsFixed(2);
+    } else {
+      sign = '-';
+      amountColor = _kRed;
+      displayAmount = txn.amount.toStringAsFixed(2);
+    }
+
+    String? subText;
+    Color subTextColor = _kTextSecondary;
+    if (isCashSale) {
+      subText = 'Peşin Ödendi';
+      subTextColor = _kGreenDark;
+    } else if (isCancellation) {
+      subText = 'Borç İptal Edildi';
+      subTextColor = _kGreenDark;
+    } else if (isRefundToBalance) {
+      subText = 'Bakiyeye İade';
+      subTextColor = _kGreenDark;
+    } else if (isCashRefund) {
+      subText = 'Nakit İade';
+      subTextColor = _kAmber;
+    } else if (txn.debtAmount > 0) {
+      subText = 'Kalan Borç: ₺${txn.debtAmount.toStringAsFixed(2)}';
+      subTextColor = _kRed.withValues(alpha: 0.8);
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -858,17 +914,19 @@ class _TransactionRow extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${isCredit ? '+' : '-'}₺${txn.amount.toStringAsFixed(2)}',
+                    '$sign₺$displayAmount',
                     style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 14,
-                        color: isCredit ? _kGreenDark : _kRed),
+                        color: amountColor),
                   ),
-                  if (txn.debtAmount > 0)
+                  if (subText != null)
                     Text(
-                      'Borç: ₺${txn.debtAmount.toStringAsFixed(2)}',
+                      subText,
                       style: TextStyle(
-                          fontSize: 10, color: _kRed.withValues(alpha: 0.7)),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: subTextColor),
                     ),
                 ],
               ),
@@ -972,14 +1030,15 @@ class _TransactionRow extends ConsumerWidget {
     return qty.toString();
   }
 
-  _TxnStyle _txnStyle(String type) {
-    switch (type) {
+  _TxnStyle _txnStyle(FinancialTransactionEntity txn) {
+    switch (txn.type) {
       case 'sale':
-        return const _TxnStyle(
+        final isPesin = txn.debtAmount <= 0.009;
+        return _TxnStyle(
             icon: Icons.shopping_cart_rounded,
-            label: 'Vadeli Satış',
-            bgColor: _kRedLight,
-            fgColor: _kRed);
+            label: isPesin ? 'Peşin Satış' : 'Vadeli Satış',
+            bgColor: isPesin ? const Color(0xFFF1F5F9) : _kRedLight,
+            fgColor: isPesin ? _kText : _kRed);
       case 'manual_debt':
         return const _TxnStyle(
             icon: Icons.add_card_rounded,
@@ -1000,15 +1059,15 @@ class _TransactionRow extends ConsumerWidget {
             bgColor: _kAmberLight,
             fgColor: _kAmber);
       case 'cancellation':
-        return _TxnStyle(
+        return const _TxnStyle(
             icon: Icons.cancel_rounded,
-            label: 'İptal',
-            bgColor: Colors.grey[100]!,
+            label: 'Satış İptali',
+            bgColor: Color(0xFFF1F5F9),
             fgColor: _kTextSecondary);
       default:
         return _TxnStyle(
             icon: Icons.receipt_rounded,
-            label: type,
+            label: txn.type,
             bgColor: Colors.grey[100]!,
             fgColor: _kTextSecondary);
     }

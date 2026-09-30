@@ -11,10 +11,20 @@ class DatabaseTriggers {
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_update');
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_delete');
 
-    // Block updates to ensure ledger immutability
+    // Block updates to ensure ledger immutability (financial fields cannot be altered)
     await db.execute('''
       CREATE TRIGGER trg_ft_block_update BEFORE UPDATE ON financial_transactions
       WHEN (SELECT active FROM ledger_bypass_flag LIMIT 1) = 0
+       AND (
+         OLD.id != NEW.id OR
+         OLD.type != NEW.type OR
+         OLD.customer_id != NEW.customer_id OR
+         OLD.amount != NEW.amount OR
+         OLD.paid_amount != NEW.paid_amount OR
+         OLD.debt_amount != NEW.debt_amount OR
+         OLD.reference_id IS NOT NEW.reference_id OR
+         OLD.created_at != NEW.created_at
+       )
       BEGIN
         SELECT RAISE(ABORT, 'Kritik Hata: Finansal defter kayıtları değiştirilemez (Ledger Immutability).');
       END;
@@ -67,7 +77,7 @@ class DatabaseTriggers {
     ''');
 
     await db.execute('''
-      CREATE TRIGGER trg_ft_update AFTER UPDATE ON financial_transactions
+      CREATE TRIGGER trg_ft_update AFTER UPDATE OF type, customer_id, amount, paid_amount, debt_amount ON financial_transactions
       BEGIN
         -- Reverse the OLD transaction effect
         UPDATE customers

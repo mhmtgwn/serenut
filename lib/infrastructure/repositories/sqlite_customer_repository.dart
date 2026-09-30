@@ -354,6 +354,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       "  WHEN type = 'sale' THEN amount "
       "  WHEN type = 'manual_debt' THEN debt_amount "
       "  WHEN type = 'cancellation' THEN -amount "
+      "  WHEN type = 'refund' THEN -amount "
       '  ELSE 0 '
       'END), 0.0) as total '
       'FROM financial_transactions WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',
@@ -371,6 +372,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       "  WHEN type = 'payment' THEN paid_amount "
       "  WHEN type = 'collection' THEN paid_amount "
       "  WHEN type = 'cancellation' THEN -paid_amount "
+      "  WHEN type = 'refund' THEN -paid_amount "
       '  ELSE 0 '
       'END), 0.0) as total '
       'FROM financial_transactions WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',

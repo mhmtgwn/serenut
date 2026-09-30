@@ -1201,7 +1201,7 @@ router.post("/push", async (req, res) => {
         [user.company_id, `${mutation.entity_type}:${mutation.entity_id}`],
       );
       const entity = await client.query(
-        `SELECT is_deleted, updated_revision FROM sync_v4_entities
+        `SELECT is_deleted, updated_revision, payload FROM sync_v4_entities
           WHERE tenant_id = $1 AND entity_type = $2 AND entity_id = $3 FOR UPDATE`,
         [user.company_id, mutation.entity_type, mutation.entity_id],
       );
@@ -1227,6 +1227,27 @@ router.post("/push", async (req, res) => {
           );
           conflicts.push({ mutation_id: mutation.mutation_id, entity_type: mutation.entity_type,
             entity_id: mutation.entity_id, server_revision: currentRevision });
+          continue;
+        }
+      }
+      if (
+        mutation.operation === "UPSERT" &&
+        entity.rowCount &&
+        currentRevision > 0 &&
+        !entity.rows[0].is_deleted
+      ) {
+        const existingPayload = entity.rows[0].payload as Record<string, unknown> | null;
+        const isIdentical =
+          existingPayload != null &&
+          (JSON.stringify(existingPayload) === JSON.stringify(mutation.payload) ||
+            (mutation.entity_type === "financial_transaction" &&
+              Number(existingPayload.amount) === Number(mutation.payload.amount) &&
+              Number(existingPayload.paid_amount) === Number(mutation.payload.paid_amount) &&
+              Number(existingPayload.debt_amount) === Number(mutation.payload.debt_amount) &&
+              String(existingPayload.customer_id ?? "") === String(mutation.payload.customer_id ?? "")));
+
+        if (isIdentical) {
+          results.push({ mutation_id: mutation.mutation_id, revision: currentRevision });
           continue;
         }
       }

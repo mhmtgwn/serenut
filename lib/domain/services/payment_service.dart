@@ -86,6 +86,7 @@ class PaymentService {
         date: DateTime.now(),
         referenceId: saleId,
         metadata: terminalMetadata,
+        paymentMethod: paymentMethod,
       ),
     );
 
@@ -141,6 +142,7 @@ class PaymentService {
         debtAmount: remainingDebt,
         date: DateTime.now(),
         referenceId: saleId,
+        paymentMethod: method,
         metadata: {
           if (overpayment > 0) 'overpayment': overpayment,
           ...?terminalMetadata,
@@ -277,6 +279,7 @@ class PaymentService {
         paidAmount: amount,
         debtAmount: 0,
         date: DateTime.now(),
+        paymentMethod: method,
         metadata: {
           if (notes != null) 'notes': notes,
           ...?terminalMetadata,
@@ -373,6 +376,7 @@ class PaymentService {
         debtAmount: 0,
         date: DateTime.now(),
         referenceId: saleId,
+        paymentMethod: refundMethod,
       ),
     );
   }

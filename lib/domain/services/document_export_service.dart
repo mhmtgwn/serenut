@@ -21,6 +21,84 @@ Future<List<int>> _buildCustomerStatementPdf(Map<String, dynamic> args) async {
   final currency = args['currency'] as String;
   final txList = (args['transactions'] as List).cast<Map<String, dynamic>>();
 
+  final sortedList = List<Map<String, dynamic>>.from(txList)
+    ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
+
+  double runningBalance = 0.0;
+  final rows = <List<String>>[];
+
+  for (final t in sortedList) {
+    final type = (t['type'] ?? '').toString();
+    final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+    final paid = (t['paidAmount'] as num?)?.toDouble() ?? 0.0;
+    final debt = (t['debtAmount'] as num?)?.toDouble() ?? 0.0;
+
+    double borc = 0.0;
+    double alacak = 0.0;
+    String islemAdi = type;
+
+    if (type == 'sale') {
+      final isPesin = debt <= 0.009;
+      islemAdi = isPesin ? 'Pesin Satis' : 'Vadeli Satis';
+      borc = amount;
+      alacak = paid;
+      runningBalance -= (debt > 0 ? debt : (amount - paid));
+    } else if (type == 'manual_debt') {
+      islemAdi = 'Elle Eklenen Borc';
+      borc = amount;
+      alacak = 0.0;
+      runningBalance -= (debt > 0 ? debt : amount);
+    } else if (type == 'collection') {
+      islemAdi = 'Tahsilat';
+      borc = 0.0;
+      alacak = paid > 0 ? paid : amount;
+      runningBalance += alacak;
+    } else if (type == 'payment') {
+      islemAdi = 'Odeme';
+      borc = 0.0;
+      alacak = paid > 0 ? paid : amount;
+      runningBalance += alacak;
+    } else if (type == 'cancellation') {
+      islemAdi = 'Satis Iptali';
+      borc = 0.0;
+      alacak = debt > 0 ? debt : (amount - paid);
+      runningBalance += alacak;
+    } else if (type == 'refund') {
+      if (paid <= 0.009) {
+        islemAdi = 'Iade (Bakiyeye)';
+        borc = 0.0;
+        alacak = amount;
+        runningBalance += amount;
+      } else {
+        islemAdi = 'Iade (Nakit)';
+        borc = amount;
+        alacak = amount;
+      }
+    } else {
+      borc = amount;
+      alacak = paid;
+      runningBalance += (alacak - borc);
+    }
+
+    String bakiyeStr;
+    if (runningBalance.abs() < 0.01) {
+      bakiyeStr = '0.00 $currency';
+    } else if (runningBalance < -0.009) {
+      bakiyeStr = '${runningBalance.abs().toStringAsFixed(2)} $currency (B)';
+    } else {
+      bakiyeStr = '${runningBalance.toStringAsFixed(2)} $currency (A)';
+    }
+
+    rows.add([
+      DateFormat('dd.MM.yyyy HH:mm')
+          .format(DateTime.parse(t['date'] as String)),
+      islemAdi,
+      borc > 0 ? '${borc.toStringAsFixed(2)} $currency' : '-',
+      alacak > 0 ? '${alacak.toStringAsFixed(2)} $currency' : '-',
+      bakiyeStr,
+    ]);
+  }
+
   final pdf = pw.Document();
   pdf.addPage(
     pw.MultiPage(
@@ -58,11 +136,14 @@ Future<List<int>> _buildCustomerStatementPdf(Map<String, dynamic> args) async {
               pw.Text(
                   'E-posta: ${customerEmail.isNotEmpty ? customerEmail : '-'}'),
               pw.Text(
-                'Mevcut Bakiye: ${customerBalance.abs().toStringAsFixed(2)} $currency (${customerBalance < 0 ? 'Borclu' : 'Alacakli'})',
+                'Mevcut Bakiye: ${customerBalance.abs().toStringAsFixed(2)} $currency (${customerBalance.abs() < 0.01 ? 'Bakiye Yok' : (customerBalance < 0 ? 'Borclu' : 'Alacakli')})',
                 style: pw.TextStyle(
                     fontWeight: pw.FontWeight.bold,
-                    color:
-                        customerBalance < 0 ? PdfColors.red : PdfColors.green),
+                    color: customerBalance.abs() < 0.01
+                        ? PdfColors.grey700
+                        : (customerBalance < 0
+                            ? PdfColors.red
+                            : PdfColors.green)),
               ),
             ],
           ),
@@ -72,25 +153,8 @@ Future<List<int>> _buildCustomerStatementPdf(Map<String, dynamic> args) async {
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
         pw.SizedBox(height: 8),
         pw.TableHelper.fromTextArray(
-          headers: ['Tarih', 'Islem Tipi', 'Tutar', 'Odenen', 'Kalan Borc'],
-          data: txList.map((t) {
-            final isCredit =
-                t['type'] == 'collection' || t['type'] == 'payment';
-            return [
-              DateFormat('dd.MM.yyyy HH:mm')
-                  .format(DateTime.parse(t['date'] as String)),
-              t['type'] == 'sale'
-                  ? 'Satis'
-                  : t['type'] == 'collection'
-                      ? 'Tahsilat'
-                      : t['type'] == 'payment'
-                          ? 'Odeme'
-                          : t['type'],
-              '${isCredit ? '' : '-'}${(t['amount'] as num).toStringAsFixed(2)} $currency',
-              '${(t['paidAmount'] as num).toStringAsFixed(2)} $currency',
-              '${(t['debtAmount'] as num).toStringAsFixed(2)} $currency',
-            ];
-          }).toList(),
+          headers: ['Tarih', 'Islem Tipi', 'Borc', 'Alacak / Tahsilat', 'Bakiye'],
+          data: rows,
           headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold, color: PdfColors.white),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.green700),
@@ -115,6 +179,9 @@ Future<List<int>> _buildCustomerStatementExcel(
   final currency = args['currency'] as String;
   final txList = (args['transactions'] as List).cast<Map<String, dynamic>>();
 
+  final sortedList = List<Map<String, dynamic>>.from(txList)
+    ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
+
   final excel = ex.Excel.createExcel();
   final sheet = excel['Cari Ekstre'];
   excel.delete('Sheet1');
@@ -125,27 +192,89 @@ Future<List<int>> _buildCustomerStatementExcel(
     ex.TextCellValue(
         'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now())}')
   ]);
+  final bakiyeDurum = customerBalance.abs() < 0.01
+      ? 'Bakiye Yok'
+      : (customerBalance < 0 ? 'Borclu' : 'Alacakli');
   sheet.appendRow([
-    ex.TextCellValue('Bakiye: ${customerBalance.toStringAsFixed(2)} $currency')
+    ex.TextCellValue(
+        'Mevcut Bakiye: ${customerBalance.abs().toStringAsFixed(2)} $currency ($bakiyeDurum)')
   ]);
   sheet.appendRow([]);
   sheet.appendRow([
     ex.TextCellValue('Tarih'),
     ex.TextCellValue('Islem Tipi'),
-    ex.TextCellValue('Tutar ($currency)'),
-    ex.TextCellValue('Odenen ($currency)'),
-    ex.TextCellValue('Kalan Borc ($currency)'),
+    ex.TextCellValue('Borc ($currency)'),
+    ex.TextCellValue('Alacak / Tahsilat ($currency)'),
+    ex.TextCellValue('Bakiye ($currency)'),
+    ex.TextCellValue('Durum'),
   ]);
-  for (final t in txList) {
-    final isCredit = t['type'] == 'collection' || t['type'] == 'payment';
+
+  double runningBalance = 0.0;
+  for (final t in sortedList) {
+    final type = (t['type'] ?? '').toString();
+    final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+    final paid = (t['paidAmount'] as num?)?.toDouble() ?? 0.0;
+    final debt = (t['debtAmount'] as num?)?.toDouble() ?? 0.0;
+
+    double borc = 0.0;
+    double alacak = 0.0;
+    String islemAdi = type;
+
+    if (type == 'sale') {
+      final isPesin = debt <= 0.009;
+      islemAdi = isPesin ? 'Pesin Satis' : 'Vadeli Satis';
+      borc = amount;
+      alacak = paid;
+      runningBalance -= (debt > 0 ? debt : (amount - paid));
+    } else if (type == 'manual_debt') {
+      islemAdi = 'Elle Eklenen Borc';
+      borc = amount;
+      alacak = 0.0;
+      runningBalance -= (debt > 0 ? debt : amount);
+    } else if (type == 'collection') {
+      islemAdi = 'Tahsilat';
+      borc = 0.0;
+      alacak = paid > 0 ? paid : amount;
+      runningBalance += alacak;
+    } else if (type == 'payment') {
+      islemAdi = 'Odeme';
+      borc = 0.0;
+      alacak = paid > 0 ? paid : amount;
+      runningBalance += alacak;
+    } else if (type == 'cancellation') {
+      islemAdi = 'Satis Iptali';
+      borc = 0.0;
+      alacak = debt > 0 ? debt : (amount - paid);
+      runningBalance += alacak;
+    } else if (type == 'refund') {
+      if (paid <= 0.009) {
+        islemAdi = 'Iade (Bakiyeye)';
+        borc = 0.0;
+        alacak = amount;
+        runningBalance += amount;
+      } else {
+        islemAdi = 'Iade (Nakit)';
+        borc = amount;
+        alacak = amount;
+      }
+    } else {
+      borc = amount;
+      alacak = paid;
+      runningBalance += (alacak - borc);
+    }
+
+    final durum = runningBalance.abs() < 0.01
+        ? 'Dengede'
+        : (runningBalance < -0.009 ? 'Borclu' : 'Alacakli');
+
     sheet.appendRow([
       ex.TextCellValue(DateFormat('dd.MM.yyyy HH:mm')
           .format(DateTime.parse(t['date'] as String))),
-      ex.TextCellValue(t['type'] as String),
-      ex.DoubleCellValue(double.parse(
-          '${isCredit ? '' : '-'}${(t['amount'] as num).toStringAsFixed(2)}')),
-      ex.DoubleCellValue((t['paidAmount'] as num).toDouble()),
-      ex.DoubleCellValue((t['debtAmount'] as num).toDouble()),
+      ex.TextCellValue(islemAdi),
+      ex.DoubleCellValue(borc),
+      ex.DoubleCellValue(alacak),
+      ex.DoubleCellValue(runningBalance.abs()),
+      ex.TextCellValue(durum),
     ]);
   }
   return excel.save()?.toList() ?? [];
