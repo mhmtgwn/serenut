@@ -58,6 +58,12 @@ class ProductInventorySummary {
 
 /// Product repository
 abstract class IProductRepository implements BaseRepository<ProductEntity> {
+  /// Typed lookup by product ID/barcode
+  Future<ProductEntity?> findProductById(String id);
+
+  /// Typed soft delete by product ID
+  Future<int> deleteProduct(String id);
+
   @override
   Future<int> update(ProductEntity entity, {String? oldId});
 

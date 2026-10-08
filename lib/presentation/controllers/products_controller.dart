@@ -75,12 +75,15 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     }
   }
 
-  /// Returns the complete repository-backed result set for bulk operations.
+  /// Returns the bounded repository-backed result set for bulk operations.
+  /// Defaults to a safe limit of 500 items to prevent out-of-memory errors on large catalogs.
   /// This does not mutate or exhaust the paginated UI state.
-  Future<List<ProductEntity>> findAllMatching() {
+  Future<List<ProductEntity>> findAllMatching({int? limit = 500, int? offset}) {
     return _repository.findFiltered(
       searchQuery: ref.read(productSearchQueryProvider),
       category: ref.read(productCategoryFilterProvider),
+      limit: limit,
+      offset: offset,
     );
   }
 

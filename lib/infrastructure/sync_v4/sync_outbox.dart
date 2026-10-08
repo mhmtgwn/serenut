@@ -60,6 +60,17 @@ class SyncOutboxV4 {
     });
   }
 
+  /// Returns the number of mutations currently pending or in-flight in the outbox.
+  static Future<int> getPendingCount(Object db) async {
+    final executor = _asExecutor(db);
+    await _ensureSchema(executor);
+    final rows = await executor.rawQuery(
+      "SELECT COUNT(*) as count FROM sync_outbox_v4 WHERE state = 'PENDING' OR state = 'SENDING'",
+    );
+    if (rows.isEmpty) return 0;
+    return (rows.first['count'] as num?)?.toInt() ?? 0;
+  }
+
   static DbExecutor _asExecutor(Object db) {
     if (db is DbExecutor) return db;
     if (db is DatabaseExecutor) return _SqfliteExecutor(db);

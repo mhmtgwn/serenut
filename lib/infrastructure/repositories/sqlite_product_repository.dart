@@ -151,8 +151,13 @@ class SqliteProductRepository implements IProductRepository {
   }
 
   @override
+  Future<ProductEntity?> findProductById(String id) => findById(id);
+
+  @override
   Future<ProductEntity?> findById(dynamic id) async {
-    final candidates = BarcodeStandard.lookupCandidates(id.toString());
+    final cleanId = id?.toString().trim() ?? '';
+    if (cleanId.isEmpty) return null;
+    final candidates = BarcodeStandard.lookupCandidates(cleanId);
     final placeholders = List.filled(candidates.length, '?').join(',');
     final list = await _queryProducts(
       where: 'id IN ($placeholders) AND is_active = 1',
@@ -454,7 +459,12 @@ class SqliteProductRepository implements IProductRepository {
   }
 
   @override
+  Future<int> deleteProduct(String id) => delete(id);
+
+  @override
   Future<int> delete(dynamic id) async {
+    final cleanId = id?.toString().trim() ?? '';
+    if (cleanId.isEmpty) return 0;
     // Soft delete
     return _gateway.transaction(() async {
       final payload = {
@@ -465,10 +475,10 @@ class SqliteProductRepository implements IProductRepository {
         'is_synced': 0,
       };
       final result = await _executor
-          .update('products', payload, where: 'id = ?', whereArgs: [id]);
+          .update('products', payload, where: 'id = ?', whereArgs: [cleanId]);
       await SyncOutboxV4.enqueue(_executor,
           entityType: 'product',
-          entityId: id.toString(),
+          entityId: cleanId,
           operation: 'DELETE',
           payload: payload);
       return result;

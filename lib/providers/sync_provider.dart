@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:serenutos/infrastructure/sync_v4/sync_v4_service.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 import 'package:serenutos/domain/services/sync_state_machine.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -30,26 +31,36 @@ class SyncState {
   final SyncStatus status;
   final int? lastSyncedCount;
   final String? lastError;
+  final String? userFriendlyError;
   final DateTime? lastSyncAt;
+  final int pendingOutboxCount;
 
   const SyncState({
     this.status = SyncStatus.idle,
     this.lastSyncedCount,
     this.lastError,
+    this.userFriendlyError,
     this.lastSyncAt,
+    this.pendingOutboxCount = 0,
   });
 
   SyncState copyWith({
     SyncStatus? status,
     int? lastSyncedCount,
     String? lastError,
+    String? userFriendlyError,
+    bool clearError = false,
     DateTime? lastSyncAt,
+    int? pendingOutboxCount,
   }) {
     return SyncState(
       status: status ?? this.status,
       lastSyncedCount: lastSyncedCount ?? this.lastSyncedCount,
-      lastError: lastError ?? this.lastError,
+      lastError: clearError ? null : (lastError ?? this.lastError),
+      userFriendlyError:
+          clearError ? null : (userFriendlyError ?? this.userFriendlyError),
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      pendingOutboxCount: pendingOutboxCount ?? this.pendingOutboxCount,
     );
   }
 }
@@ -81,6 +92,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         catalogSourceResetter: () =>
             _ref.read(datasetLoaderServiceProvider).unmountActiveVersion(),
       );
+      await refreshPendingCount();
       await triggerSync();
       _periodicSyncTimer ??= Timer.periodic(
         const Duration(seconds: 15),
@@ -91,6 +103,44 @@ class SyncNotifier extends StateNotifier<SyncState>
       TelemetryService().logError(e, st,
           context: 'SyncNotifier.initSync', level: LogLevel.warning);
     }
+  }
+
+  /// Refreshes the count of pending outbox records from SQLite.
+  Future<void> refreshPendingCount() async {
+    if (kIsWeb) return;
+    try {
+      final db = await DatabaseManager().getDatabase();
+      final count = await SyncOutboxV4.getPendingCount(db);
+      state = state.copyWith(pendingOutboxCount: count);
+    } catch (_) {}
+  }
+
+  /// Translates low-level technical sync errors into actionable Turkish messages for cashiers.
+  String _humanizeSyncError(String rawError) {
+    final lower = rawError.toLowerCase();
+    if (lower.contains('socketexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('connection refused') ||
+        lower.contains('clientexception') ||
+        lower.contains('connection timed out') ||
+        lower.contains('os error: no address associated with hostname')) {
+      return 'Sunucuya ulaşılamıyor. Satışlarınız ve işlemleriniz cihazda güvende saklanıyor; bağlantı geldiğinde otomatik eşitlenecek.';
+    }
+    if (lower.contains('active_device_activation_required') ||
+        lower.contains('cihaz aktivasyonu')) {
+      return 'Cihaz aktivasyonu veya lisans onayı gerekiyor.';
+    }
+    if (lower.contains('unauthorized') || lower.contains('401')) {
+      return 'Oturum süresi doldu. Lütfen tekrar giriş yapın.';
+    }
+    if (lower.contains('conflict')) {
+      return 'Farklı bir cihazdaki son kayıtlarla senkronizasyon çakışması tespit edildi.';
+    }
+    if (rawError.trim().isEmpty) {
+      return 'Bilinmeyen bir senkronizasyon uyarısı.';
+    }
+    return rawError;
   }
 
   /// Force a full re-sync from server by clearing the last sync timestamp cursor.
@@ -244,11 +294,14 @@ class SyncNotifier extends StateNotifier<SyncState>
         );
       }
 
+      const err =
+          'active_device_activation_required: Cihaz aktivasyonu veya lisansı gerekli.';
       state = state.copyWith(
         status: SyncStatus.error,
-        lastError:
-            'active_device_activation_required: Cihaz aktivasyonu veya lisansı gerekli.',
+        lastError: err,
+        userFriendlyError: _humanizeSyncError(err),
       );
+      await refreshPendingCount();
       return;
     }
 
@@ -329,7 +382,7 @@ class SyncNotifier extends StateNotifier<SyncState>
           status: SyncStatus.success,
           lastSyncedCount: result.synced,
           lastSyncAt: DateTime.now(),
-          lastError: null,
+          clearError: true,
         );
         unawaited(_ref.read(whatsappNotificationOutboxProvider).flush());
       } else {
@@ -344,10 +397,12 @@ class SyncNotifier extends StateNotifier<SyncState>
             'failed': result.failed,
           },
         );
+        final err =
+            result.errors.isNotEmpty ? result.errors.first : 'Sync failed';
         state = state.copyWith(
           status: SyncStatus.error,
-          lastError:
-              result.errors.isNotEmpty ? result.errors.first : 'Sync failed',
+          lastError: err,
+          userFriendlyError: _humanizeSyncError(err),
         );
       }
     } catch (e, st) {
@@ -357,11 +412,14 @@ class SyncNotifier extends StateNotifier<SyncState>
         context: 'SyncNotifier.triggerSync',
         correlationId: _machine?.sessionId,
       );
+      final rawErr = e.toString();
       state = state.copyWith(
         status: SyncStatus.error,
-        lastError: e.toString(),
+        lastError: rawErr,
+        userFriendlyError: _humanizeSyncError(rawErr),
       );
     } finally {
+      await refreshPendingCount();
       if (_syncRequestedWhileRunning) {
         _syncRequestedWhileRunning = false;
         unawaited(Future<void>.microtask(triggerSync));

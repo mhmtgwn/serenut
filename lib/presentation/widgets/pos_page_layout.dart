@@ -7,6 +7,7 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
+import 'package:serenutos/presentation/widgets/sync_status_badge.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
@@ -24,6 +25,7 @@ class PosHeader extends StatelessWidget {
   final bool showRefresh;
   final VoidCallback? onRefresh;
   final bool showStatusIndicator;
+  final bool showSyncBadge;
 
   const PosHeader({
     super.key,
@@ -39,6 +41,7 @@ class PosHeader extends StatelessWidget {
     this.showRefresh = false,
     this.onRefresh,
     this.showStatusIndicator = false,
+    this.showSyncBadge = true,
   });
 
   @override
@@ -89,6 +92,10 @@ class PosHeader extends StatelessWidget {
                           icon: const Icon(Icons.refresh_rounded),
                           tooltip: 'Yenile',
                         ),
+                      if (showSyncBadge) ...[
+                        const SyncStatusBadge(compact: true),
+                        const SizedBox(width: AppSpacing.xs),
+                      ],
                       if (showStatusIndicator) ...[
                         const RealtimeStatusIndicator(compact: true),
                         const SizedBox(width: AppSpacing.sm),
@@ -119,6 +126,7 @@ class PosHeader extends StatelessWidget {
                       showRefresh: showRefresh,
                       onRefresh: onRefresh,
                       showStatusIndicator: showStatusIndicator,
+                      showSyncBadge: showSyncBadge,
                       showSettings: showSettings,
                     ),
                   ),
@@ -189,6 +197,7 @@ class _HeaderActions extends StatelessWidget {
     required this.showRefresh,
     required this.onRefresh,
     required this.showStatusIndicator,
+    required this.showSyncBadge,
     required this.showSettings,
   });
 
@@ -199,6 +208,7 @@ class _HeaderActions extends StatelessWidget {
   final bool showRefresh;
   final VoidCallback? onRefresh;
   final bool showStatusIndicator;
+  final bool showSyncBadge;
   final bool showSettings;
 
   @override
@@ -221,6 +231,10 @@ class _HeaderActions extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Yenile',
           ),
+        if (showSyncBadge) ...[
+          const SyncStatusBadge(compact: false),
+          const SizedBox(width: AppSpacing.sm),
+        ],
         if (showStatusIndicator) ...[
           const RealtimeStatusIndicator(compact: true),
           const SizedBox(width: AppSpacing.sm),
@@ -257,6 +271,7 @@ class PosPageLayout extends StatelessWidget {
   final bool showRefresh;
   final VoidCallback? onRefresh;
   final bool showStatusIndicator;
+  final bool showSyncBadge;
 
   const PosPageLayout({
     super.key,
@@ -274,6 +289,7 @@ class PosPageLayout extends StatelessWidget {
     this.showRefresh = false,
     this.onRefresh,
     this.showStatusIndicator = false,
+    this.showSyncBadge = true,
   });
 
   @override
@@ -295,6 +311,7 @@ class PosPageLayout extends StatelessWidget {
               showRefresh: showRefresh,
               onRefresh: onRefresh,
               showStatusIndicator: showStatusIndicator,
+              showSyncBadge: showSyncBadge,
             ),
             const Divider(height: 1),
             if (showStatusIndicator)

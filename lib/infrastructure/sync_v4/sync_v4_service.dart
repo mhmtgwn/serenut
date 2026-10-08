@@ -12,6 +12,7 @@ import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_v4_dtos.dart';
 import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 import 'package:serenutos/infrastructure/services/product_image_peer_service.dart';
 
@@ -198,20 +199,23 @@ class SyncV4Service {
                   .toList(),
             },
             idempotencyKey: 'sync-v4-${orderedPending.first['mutation_id']}');
-        final body = Map<String, dynamic>.from(response.json as Map);
-        final acknowledged = ((body['results'] as List?) ?? [])
-            .map((r) => (r as Map)['mutation_id'])
+        final pushDto = SyncPushResponseDto.fromJson(
+            Map<String, dynamic>.from(response.json as Map));
+        final acknowledged = pushDto.results
+            .map((r) => r.mutationId)
+            .where((id) => id.isNotEmpty)
             .toList();
-        final conflicts = ((body['conflicts'] as List?) ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
+        final conflicts = pushDto.conflicts;
+        final conflicted = conflicts
+            .map((r) => r.mutationId)
+            .where((id) => id.isNotEmpty)
             .toList();
-        final conflicted =
-            conflicts.map((r) => r['mutation_id']).whereType<String>().toList();
-        final rejected = ((body['rejected'] as List?) ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
+        final rejected = pushDto.rejected;
+        final rejectedIds = rejected
+            .map((r) => r.mutationId)
+            .whereType<String>()
+            .where((id) => id.isNotEmpty)
             .toList();
-        final rejectedIds =
-            rejected.map((r) => r['mutation_id']).whereType<String>().toList();
         await DatabaseManager.retryOnLock(() async {
           await db.transaction((txn) async {
             if (acknowledged.isNotEmpty) {
@@ -254,13 +258,7 @@ class SyncV4Service {
               for (final conflict in conflicts) {
                 await txn.insert(
                     'sync_conflicts_v4',
-                    {
-                      'mutation_id': conflict['mutation_id'],
-                      'entity_type': conflict['entity_type'],
-                      'entity_id': conflict['entity_id'],
-                      'server_revision': conflict['server_revision'],
-                      'detected_at': DateTime.now().toUtc().toIso8601String(),
-                    },
+                    conflict.toDbRow(),
                     conflictAlgorithm: ConflictAlgorithm.replace);
               }
               failed += conflicted.length;
@@ -277,7 +275,7 @@ class SyncV4Service {
               failed += rejectedIds.length;
               for (final rejection in rejected) {
                 errors.add(
-                    '${rejection['mutation_id']}: ${rejection['error'] ?? 'mutation_failed'}');
+                    '${rejection.mutationId ?? "bilinmeyen"}: ${rejection.error}');
               }
             }
           });
@@ -343,17 +341,18 @@ class SyncV4Service {
       final response = await _api.get(
         '/api/v4/sync/pull?cursor=$cursor&limit=200&device_activation_id=$deviceActivationId&device_id=$deviceId',
       );
-      final pullBody = Map<String, dynamic>.from(response.json as Map);
+      final pullDto = SyncPullResponseDto.fromJson(
+        Map<String, dynamic>.from(response.json as Map),
+        cursor,
+      );
       final changes = _dependencyOrder(
-        ((pullBody['changes'] as List?) ?? const [])
-            .map((value) => Map<String, dynamic>.from(value as Map))
-            .toList(),
+        pullDto.changes.map((c) => c.toMap()).toList(),
       );
       productImagesNeedCleanup =
           productImagesNeedCleanup || changes.any(_isProductImageReset);
       catalogSourceNeedsReset =
           catalogSourceNeedsReset || changes.any(_isCatalogReset);
-      final next = _syncInt(pullBody['next_cursor'], cursor);
+      final next = pullDto.nextCursor;
       await DatabaseManager.retryOnLock(() async {
         await db.transaction((txn) async {
           for (final raw in changes.cast<Map>()) {

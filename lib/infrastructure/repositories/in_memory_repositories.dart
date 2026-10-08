@@ -123,8 +123,13 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
+  Future<ProductEntity?> findProductById(String id) => findById(id);
+
+  @override
   Future<ProductEntity?> findById(dynamic id) async {
-    final candidates = BarcodeStandard.lookupCandidates(id.toString());
+    final cleanId = id?.toString().trim() ?? '';
+    if (cleanId.isEmpty) return null;
+    final candidates = BarcodeStandard.lookupCandidates(cleanId);
     try {
       return InMemoryDb.products.firstWhere((p) => candidates.contains(p.id));
     } catch (_) {
@@ -157,8 +162,13 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
+  Future<int> deleteProduct(String id) => delete(id);
+
+  @override
   Future<int> delete(dynamic id) async {
-    final idx = InMemoryDb.products.indexWhere((p) => p.id == id);
+    final cleanId = id?.toString().trim() ?? '';
+    if (cleanId.isEmpty) return 0;
+    final idx = InMemoryDb.products.indexWhere((p) => p.id == cleanId);
     if (idx != -1) {
       InMemoryDb.products.removeAt(idx);
       return 1;
