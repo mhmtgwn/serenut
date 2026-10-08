@@ -265,34 +265,54 @@ class SyncNotifier extends StateNotifier<SyncState>
       // after a remote pull so open screens immediately show changes made on another device.
       // Do not invalidate on local push only, as local writes are already applied.
       if (result.pulled > 0 || result.reconciled > 0) {
-        _ref.invalidate(settingsProvider);
-        _ref.invalidate(settingsNotifierProvider);
-        _ref.invalidate(productRepositoryProvider);
-        _ref.invalidate(customerRepositoryProvider);
-        _ref.invalidate(saleRepositoryProvider);
-        _ref.invalidate(financialTransactionRepositoryProvider);
-        _ref.invalidate(orderRepositoryProvider);
-        _ref.invalidate(ordersControllerProvider);
-        _ref.invalidate(salesControllerProvider);
-        _ref.invalidate(salesHistoryControllerProvider);
-        _ref.invalidate(customersControllerProvider);
-        _ref.invalidate(customerBalanceSummaryProvider);
-        _ref.invalidate(customerLookupMapProvider);
-        _ref.invalidate(salesCustomersControllerProvider);
-        _ref.invalidate(ordersCustomersControllerProvider);
-        _ref.invalidate(collectionCustomersControllerProvider);
-        _ref.invalidate(productsControllerProvider);
-        _ref.invalidate(salesProductsControllerProvider);
-        _ref.invalidate(ordersProductsControllerProvider);
-        _ref.invalidate(allProductsProvider);
-        _ref.invalidate(allCustomersProvider);
-        _ref.invalidate(allSalesProvider);
-        _ref.invalidate(todayRevenueProvider);
-        _ref.invalidate(lowStockProductsProvider);
-        _ref.invalidate(productInventorySummaryProvider);
-        _ref.invalidate(debtorsProvider);
-        _ref.invalidate(reportRepositoryProvider);
-        _ref.invalidate(dashboardRepositoryProvider);
+        final types = result.pulledEntityTypes;
+        final invalidateAll = types.isEmpty;
+
+        if (invalidateAll || types.contains('settings') || types.contains('company')) {
+          _ref.invalidate(settingsProvider);
+          _ref.invalidate(settingsNotifierProvider);
+        }
+
+        if (invalidateAll || types.contains('product')) {
+          _ref.invalidate(productRepositoryProvider);
+          _ref.invalidate(productsControllerProvider);
+          _ref.invalidate(salesProductsControllerProvider);
+          _ref.invalidate(ordersProductsControllerProvider);
+          _ref.invalidate(allProductsProvider);
+          _ref.invalidate(lowStockProductsProvider);
+          _ref.invalidate(productInventorySummaryProvider);
+        }
+
+        if (invalidateAll || types.contains('customer') || result.reconciled > 0) {
+          _ref.invalidate(customerRepositoryProvider);
+          _ref.invalidate(customersControllerProvider);
+          _ref.invalidate(customerBalanceSummaryProvider);
+          _ref.invalidate(customerLookupMapProvider);
+          _ref.invalidate(salesCustomersControllerProvider);
+          _ref.invalidate(ordersCustomersControllerProvider);
+          _ref.invalidate(collectionCustomersControllerProvider);
+          _ref.invalidate(allCustomersProvider);
+          _ref.invalidate(debtorsProvider);
+        }
+
+        if (invalidateAll || types.contains('order')) {
+          _ref.invalidate(orderRepositoryProvider);
+          _ref.invalidate(ordersControllerProvider);
+          _ref.invalidate(ordersCustomersControllerProvider);
+          _ref.invalidate(ordersProductsControllerProvider);
+          _ref.invalidate(customerLookupMapProvider);
+        }
+
+        if (invalidateAll || types.contains('sale') || types.contains('financial_transaction')) {
+          _ref.invalidate(saleRepositoryProvider);
+          _ref.invalidate(financialTransactionRepositoryProvider);
+          _ref.invalidate(salesControllerProvider);
+          _ref.invalidate(salesHistoryControllerProvider);
+          _ref.invalidate(allSalesProvider);
+          _ref.invalidate(todayRevenueProvider);
+          _ref.invalidate(reportRepositoryProvider);
+          _ref.invalidate(dashboardRepositoryProvider);
+        }
       }
 
       try {

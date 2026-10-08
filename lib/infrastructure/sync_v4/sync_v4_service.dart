@@ -28,17 +28,20 @@ double _syncDouble(Object? value, [double fallback = 0]) {
 }
 
 class SyncV4Result {
-  const SyncV4Result(
-      {required this.pushed,
-      required this.pulled,
-      this.reconciled = 0,
-      this.failed = 0,
-      this.errors = const []});
+  const SyncV4Result({
+    required this.pushed,
+    required this.pulled,
+    this.reconciled = 0,
+    this.failed = 0,
+    this.errors = const [],
+    this.pulledEntityTypes = const {},
+  });
   final int pushed;
   final int pulled;
   final int reconciled;
   final int failed;
   final List<String> errors;
+  final Set<String> pulledEntityTypes;
   int get synced => pushed;
   bool get success => failed == 0 && errors.isEmpty;
 }
@@ -265,10 +268,12 @@ class SyncV4Service {
                   '${conflicted.length} kayıt başka bir aygıttaki daha yeni değişiklikle çakıştı.');
             }
             if (rejectedIds.isNotEmpty) {
-              await txn.update('sync_outbox_v4', {'state': 'REJECTED'},
-                  where:
-                      'mutation_id IN (${List.filled(rejectedIds.length, '?').join(',')})',
-                  whereArgs: rejectedIds);
+              await txn.rawUpdate('''
+                UPDATE sync_outbox_v4
+                   SET state = CASE WHEN attempts >= 4 THEN 'DEAD_LETTER' ELSE 'REJECTED' END,
+                       attempts = attempts + 1
+                 WHERE mutation_id IN (${List.filled(rejectedIds.length, '?').join(',')})
+              ''', rejectedIds);
               failed += rejectedIds.length;
               for (final rejection in rejected) {
                 errors.add(
@@ -294,6 +299,8 @@ class SyncV4Service {
         where: 'key = ?', whereArgs: ['global'], limit: 1);
     var cursor = state.isEmpty ? 0 : _syncInt(state.first['cursor']);
     var pulled = companyChanged ? 1 : 0;
+    final pulledEntityTypes = <String>{};
+    if (companyChanged) pulledEntityTypes.add('settings');
     var reconciled = 0;
     var productImagesNeedCleanup = false;
     var catalogSourceNeedsReset = false;
@@ -316,6 +323,10 @@ class SyncV4Service {
       await DatabaseManager.retryOnLock(() async {
         await db.transaction((txn) async {
           for (final raw in snapshot) {
+            final entityType = raw['entity_type']?.toString();
+            if (entityType != null && entityType.isNotEmpty) {
+              pulledEntityTypes.add(entityType);
+            }
             await _apply(txn, raw);
           }
           reconciled += await _reconcileCustomerBalances(txn);
@@ -346,7 +357,12 @@ class SyncV4Service {
       await DatabaseManager.retryOnLock(() async {
         await db.transaction((txn) async {
           for (final raw in changes.cast<Map>()) {
-            await _apply(txn, Map<String, dynamic>.from(raw));
+            final rowMap = Map<String, dynamic>.from(raw);
+            final entityType = rowMap['entity_type']?.toString();
+            if (entityType != null && entityType.isNotEmpty) {
+              pulledEntityTypes.add(entityType);
+            }
+            await _apply(txn, rowMap);
           }
           if (changes.isNotEmpty) {
             reconciled += await _reconcileCustomerBalances(txn);
@@ -383,6 +399,7 @@ class SyncV4Service {
       reconciled: reconciled,
       failed: failed,
       errors: errors,
+      pulledEntityTypes: pulledEntityTypes,
     );
   }
 
@@ -681,8 +698,16 @@ class SyncV4Service {
     await DatabaseManager.retryOnLock(() async {
       await db.rawUpdate('''
         UPDATE sync_outbox_v4
-           SET state = 'PENDING', attempts = 0
+           SET state = 'DEAD_LETTER'
          WHERE state = 'REJECTED'
+           AND attempts >= 5
+      ''');
+
+      await db.rawUpdate('''
+        UPDATE sync_outbox_v4
+           SET state = 'PENDING'
+         WHERE state = 'REJECTED'
+           AND attempts < 5
       ''');
 
       await db.transaction((txn) async {

@@ -311,18 +311,12 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
   const items = Array.isArray(payload.items) ? payload.items : [];
   const discountAmount = numberValue(payload, "discount_amount", 0);
 
-  const customerExists = await client.query(
-    "SELECT id FROM customers WHERE id = $1 AND company_id = $2",
-    [customerId, companyId],
+  await client.query(
+    `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
+     ON CONFLICT (id) DO NOTHING`,
+    [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
   );
-  if (!customerExists.rowCount) {
-    await client.query(
-      `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
-       VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
-       ON CONFLICT (id) DO NOTHING`,
-      [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
-    );
-  }
 
   await client.query(
     `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, discount_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
@@ -345,6 +339,26 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
       stringValue(payload, "notes") || null, stringValue(payload, "created_at") || null,
       stringValue(payload, "created_by") || null],
   );
+
+  // Ensure all distinct products exist atomically to prevent foreign key errors without N+1 queries
+  const distinctProducts = new Map<string, string>();
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const pId = stringValue(row, "product_id");
+    if (pId && !distinctProducts.has(pId)) {
+      distinctProducts.set(pId, stringValue(row, "product_name") || `Ürün (${pId})`);
+    }
+  }
+  for (const [prodId, prodName] of distinctProducts.entries()) {
+    await client.query(
+      `INSERT INTO products (id, company_id, name, price, quantity, status, is_deleted, created_at, updated_at)
+       VALUES ($1, $2, $3, 0, 0, 'active', false, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [prodId, companyId, prodName],
+    );
+  }
+
   await client.query("DELETE FROM customer_order_items WHERE order_id = $1 AND company_id = $2", [id, companyId]);
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
@@ -352,19 +366,6 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
     const row = item as Record<string, unknown>;
     const productId = stringValue(row, "product_id");
     if (!productId) throw new Error("invalid_mutation");
-
-    const productExists = await client.query(
-      "SELECT id FROM products WHERE id = $1 AND company_id = $2",
-      [productId, companyId],
-    );
-    if (!productExists.rowCount) {
-      await client.query(
-        `INSERT INTO products (id, company_id, name, price, quantity, status, is_deleted, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 0, 'active', false, NOW(), NOW())
-         ON CONFLICT (id) DO NOTHING`,
-        [productId, companyId, stringValue(row, "product_name") || `Ürün (${productId})`, numberValue(row, "unit_price", 0)],
-      );
-    }
 
     await client.query(
       `INSERT INTO customer_order_items (id, order_id, product_id, product_name, quantity, unit_price, company_id, created_at)
