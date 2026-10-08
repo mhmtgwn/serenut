@@ -120,11 +120,11 @@ void main() {
       expect(response.json['auth_header'],
           startsWith('Bearer jwt_mock_admin_id_'));
 
-      // Validate SharedPreferences storage
+      // Validate secure encrypted token storage
+      expect(authService.getJwtToken(), startsWith('jwt_mock_admin_id_'));
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.containsKey('auth_jwt_token'), true);
-      expect(
-          prefs.getString('auth_jwt_token'), startsWith('jwt_mock_admin_id_'));
+      expect(prefs.containsKey('sec_auth_jwt_token'), true);
+      expect(prefs.containsKey('auth_jwt_token'), false);
     });
 
     test('Rejects online login when server denies device activation', () async {

@@ -13,6 +13,7 @@ import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
+import 'package:serenutos/infrastructure/security/secure_token_storage.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, debugPrint, listEquals, kDebugMode;
 import 'package:serenutos/domain/services/telemetry_service.dart';
@@ -45,9 +46,13 @@ class AuthService {
   final DeviceFingerprintService? _deviceFingerprintService;
   final Future<void> Function(Map<String, dynamic> company)?
       _cacheCompanyProfile;
+  final SecureTokenStorage? _injectedTokenStorage;
+  late SecureTokenStorage _tokenStorage;
   late SharedPreferences _prefs;
   AuthUser? _currentUser;
   Future<bool>? _activeRefreshFuture;
+
+  SecureTokenStorage get tokenStorage => _tokenStorage;
 
   AuthService({
     required IUserRepository userRepository,
@@ -57,17 +62,22 @@ class AuthService {
     DeviceFingerprintService? deviceFingerprintService,
     Future<void> Function(Map<String, dynamic> company)? cacheCompanyProfile,
     ApiClient? apiClient,
+    SecureTokenStorage? tokenStorage,
   })  : _userRepository = userRepository,
         _hashService = hashService,
         _deviceManager = deviceManager,
         _licenseService = licenseService,
         _deviceFingerprintService = deviceFingerprintService,
         _cacheCompanyProfile = cacheCompanyProfile,
-        _apiClient = apiClient;
+        _apiClient = apiClient,
+        _injectedTokenStorage = tokenStorage;
 
   /// Initialize service (call once on app startup)
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    _tokenStorage = _injectedTokenStorage ?? SecureTokenStorage(_prefs);
+    await _tokenStorage.initialize();
+
     _lastLogoutReason = _prefs.getString(_lastLogoutReasonKey);
     _lastLogoutCode = _prefs.getString(_lastLogoutCodeKey);
     _lastLogoutDetails = _prefs.getString(_lastLogoutDetailsKey);
@@ -78,7 +88,7 @@ class AuthService {
     await _loadStoredUser();
 
     // Restore JWT token to ApiClient if exists
-    final savedToken = _prefs.getString('auth_jwt_token');
+    final savedToken = _tokenStorage.getJwtToken();
     _apiClient?.setJwtToken(savedToken);
 
     if (_apiClient != null) {
@@ -134,8 +144,7 @@ class AuthService {
 
   Future<void> _clearStoredSession() async {
     await _prefs.remove(_userStorageKey);
-    await _prefs.remove('auth_jwt_token');
-    await _prefs.remove('auth_refresh_token');
+    await _tokenStorage.clearAll();
     _apiClient?.setJwtToken(null);
     _currentUser = null;
   }
@@ -187,8 +196,8 @@ class AuthService {
                 'Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
           }
 
-          await _prefs.setString('auth_jwt_token', token);
-          await _prefs.setString('auth_refresh_token', refreshToken);
+          await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, token);
+          await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, refreshToken);
           _apiClient!.setJwtToken(token);
 
           // Synchronize trial starting date from server (AC 1.2)
@@ -478,12 +487,12 @@ class AuthService {
 
   /// Get the current JWT token
   String? getJwtToken() {
-    return _prefs.getString('auth_jwt_token');
+    return _tokenStorage.getJwtToken();
   }
 
   /// Get the current Refresh token
   String? getRefreshToken() {
-    return _prefs.getString('auth_refresh_token');
+    return _tokenStorage.getRefreshToken();
   }
 
   /// Refresh the access token using the saved refresh token (Mutex guarded against RTR replay races)
@@ -513,8 +522,8 @@ class AuthService {
         final token = data['access_token'] as String;
         final newRToken = data['refresh_token'] as String;
 
-        await _prefs.setString('auth_jwt_token', token);
-        await _prefs.setString('auth_refresh_token', newRToken);
+        await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, token);
+        await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, newRToken);
         _apiClient!.setJwtToken(token);
         return true;
       }
@@ -541,7 +550,7 @@ class AuthService {
     String? details,
   }) async {
     await recordLogoutReason(reason, code: code, details: details);
-    final refreshToken = _prefs.getString('auth_refresh_token');
+    final refreshToken = _tokenStorage.getRefreshToken();
     final api = _apiClient;
     // Revoke local authority synchronously before any network wait. Session
     // expiry/deactivation callers must not retain access while logout is in
@@ -818,7 +827,7 @@ class AuthService {
   /// and potentially triggers sync resumption.
   Future<bool> refreshEntitlement() async {
     if (_apiClient == null) return false;
-    final refreshToken = _prefs.getString('auth_refresh_token');
+    final refreshToken = _tokenStorage.getRefreshToken();
     if (refreshToken == null) return false;
 
     try {
@@ -832,12 +841,12 @@ class AuthService {
         final newRefreshToken = data['refresh_token'] as String?;
         final subscription = data['subscription'] as Map<String, dynamic>?;
 
-        if (newAccessToken != null) {
-          await _prefs.setString('auth_jwt_token', newAccessToken);
+        if (newAccessToken != null && newAccessToken.isNotEmpty) {
+          await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, newAccessToken);
           _apiClient!.setJwtToken(newAccessToken);
         }
-        if (newRefreshToken != null) {
-          await _prefs.setString('auth_refresh_token', newRefreshToken);
+        if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+          await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, newRefreshToken);
         }
 
         if (subscription != null) {

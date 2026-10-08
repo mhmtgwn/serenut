@@ -69,7 +69,10 @@ void main() async {
   await SentryFlutter.init(
     (options) {
       options.dsn = envConfig.sentryDsn ?? '';
-      options.tracesSampleRate = 1.0;
+      // Optimize sampling in production: 10% trace sampling reduces overhead/quota usage,
+      // while crash & exception reporting remains 100% active.
+      options.tracesSampleRate = kReleaseMode ? 0.1 : 1.0;
+      options.profilesSampleRate = kReleaseMode ? 0.05 : 1.0;
       options.environment = kReleaseMode ? 'production' : 'development';
       options.attachStacktrace = true;
       options.enableAutoSessionTracking = true;

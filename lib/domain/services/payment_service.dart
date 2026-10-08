@@ -354,16 +354,25 @@ class PaymentService {
     ));
   }
 
-  /// Processes refund for returned items.
-  /// Credites customer balance or cash refund transaction.
+  /// Processes refund for returned items or order cancellations.
+  /// Credits customer balance or records a cash refund transaction with duplicate protection.
   Future<void> processRefund({
     required String saleId,
     required String customerId,
     required double refundTotal,
     required String refundMethod,
+    String? refundId,
   }) async {
     if (refundTotal <= 0 || !refundTotal.isFinite) {
       return;
+    }
+
+    final refKey = (refundId != null && refundId.trim().isNotEmpty)
+        ? refundId.trim()
+        : 'refund-$saleId';
+    if (await _isDuplicateTransaction(refKey, 'refund')) {
+      debugPrint('[PaymentService] 🛡️ Duplicate refund ignored for ref: $refKey');
+      return; // Idempotency check: Already processed
     }
 
     await _transactionRepository.create(
@@ -375,7 +384,7 @@ class PaymentService {
         paidAmount: refundMethod == 'cash' ? refundTotal : 0,
         debtAmount: 0,
         date: DateTime.now(),
-        referenceId: saleId,
+        referenceId: refKey,
         paymentMethod: refundMethod,
       ),
     );

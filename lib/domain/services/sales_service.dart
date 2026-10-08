@@ -9,6 +9,7 @@ import 'package:serenutos/domain/services/payment_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:serenutos/infrastructure/security/secure_token_storage.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 
 export 'package:serenutos/domain/services/inventory_service.dart'
@@ -148,7 +149,9 @@ class SalesService {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final jwtSnapshot = prefs.getString('auth_jwt_token');
+    final tokenStorage = SecureTokenStorage(prefs);
+    await tokenStorage.initialize();
+    final jwtSnapshot = tokenStorage.getJwtToken() ?? prefs.getString('auth_jwt_token');
 
     // Create sale entity with idempotent Uuid v4
     const uuid = Uuid();
