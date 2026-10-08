@@ -264,7 +264,7 @@ class SyncNotifier extends StateNotifier<SyncState>
       // Repository consumers keep their own AsyncNotifier caches. Rebuild them
       // after a remote pull so open screens immediately show changes made on another device.
       // Do not invalidate on local push only, as local writes are already applied.
-      if (result.pulled > 0) {
+      if (result.pulled > 0 || result.reconciled > 0) {
         _ref.invalidate(settingsProvider);
         _ref.invalidate(settingsNotifierProvider);
         _ref.invalidate(productRepositoryProvider);
@@ -277,6 +277,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(salesHistoryControllerProvider);
         _ref.invalidate(customersControllerProvider);
         _ref.invalidate(customerBalanceSummaryProvider);
+        _ref.invalidate(customerLookupMapProvider);
         _ref.invalidate(salesCustomersControllerProvider);
         _ref.invalidate(ordersCustomersControllerProvider);
         _ref.invalidate(collectionCustomersControllerProvider);

@@ -116,30 +116,14 @@ class _OrderCard extends StatelessWidget {
 
                 // ── Sol Dikey Renk Vurgusu ──────────────────────────────────
                 Container(
-                  width: 5,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: meta.color,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // ── Sol Kısım: Durum Avatarı ─────────────────────────────────
-                Container(
-                  width: 44,
+                  width: 4,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: meta.bg,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    meta.icon,
                     color: meta.color,
-                    size: 20,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
 
                 // ── Orta Kısım: Müşteri Bilgisi & Durum ────────────────────────
                 Expanded(
@@ -161,11 +145,15 @@ class _OrderCard extends StatelessWidget {
                         children: [
                           _StatusBadge(status: order.status),
                           const SizedBox(width: 8),
-                          Text(
-                            '$itemCount kalem • $dateStr',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _kTextSecondary,
+                          Flexible(
+                            child: Text(
+                              '$itemCount kalem • $dateStr',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: _kTextSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -256,12 +244,6 @@ class _OrderCard extends StatelessWidget {
                               color: meta.amountColor,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: _kTextSecondary,
-                          size: 18,
                         ),
                       ],
                     ),

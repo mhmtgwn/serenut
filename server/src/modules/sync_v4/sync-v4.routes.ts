@@ -257,32 +257,37 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
   }
   const clientTotal = numberValue(payload, "total_amount", Number.NaN);
   const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
-  if (!Number.isFinite(clientTotal) || Math.abs(clientTotal - computedTotal) > 0.01 ||
-      !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > computedTotal) {
+  const discountAmount = numberValue(payload, "discount_amount", 0);
+  const expectedTotal = Math.max(0, Number((computedTotal - discountAmount).toFixed(2)));
+
+  if (!Number.isFinite(clientTotal) || Math.abs(clientTotal - expectedTotal) > 0.05 ||
+      !Number.isFinite(paidAmount) || paidAmount < 0) {
     throw new Error("sale_total_mismatch");
   }
   if ((paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") && paidAmount !== 0) {
     throw new Error("invalid_credit_payment");
   }
-  if ((paymentMethod === "cash" || paymentMethod === "card") &&
-      Math.abs(paidAmount-computedTotal)>0.01) {
+  if (paymentMethod === "card" && Math.abs(paidAmount - expectedTotal) > 0.05) {
     throw new Error("invalid_full_payment");
   }
+  if (paymentMethod === "cash" && paidAmount < expectedTotal - 0.05) {
+    throw new Error("invalid_full_payment");
+  }
+
+  const effectivePaidAmount = Math.min(paidAmount, expectedTotal);
   await client.query(
-    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,'completed','completed',$7,COALESCE($8::timestamptz,NOW()),NOW(),false,$9)`,
-    [id, companyId, customerId, computedTotal, paidAmount, paymentMethod,
+    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, discount_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'completed','completed',$8,COALESCE($9::timestamptz,NOW()),NOW(),false,$10)`,
+    [id, companyId, customerId, clientTotal, effectivePaidAmount, discountAmount, paymentMethod,
       stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
       stringValue(payload, "created_by") || null],
   );
   for (const row of normalizedItems) {
-    const stock = await client.query(
+    await client.query(
       `UPDATE products SET quantity = quantity - $1, updated_at = NOW()
-       WHERE id = $2 AND company_id = $3 AND is_deleted = false AND quantity >= $1
-       RETURNING id`,
+       WHERE id = $2 AND company_id = $3 AND is_deleted = false`,
       [row.quantity, row.productId, companyId],
     );
-    if (!stock.rowCount) throw new Error("insufficient_stock");
     await client.query(
       `INSERT INTO inventory_movements(id,company_id,product_id,movement_type,quantity_delta,reference_type,reference_id,created_by)
        VALUES($1,$2,$3,'sale',$4,'sale',$5,$6)`,
@@ -304,9 +309,24 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
   const rawOrderNumber = stringValue(payload, "order_number");
   const orderNumber = rawOrderNumber || `SYNC-${id}`;
   const items = Array.isArray(payload.items) ? payload.items : [];
+  const discountAmount = numberValue(payload, "discount_amount", 0);
+
+  const customerExists = await client.query(
+    "SELECT id FROM customers WHERE id = $1 AND company_id = $2",
+    [customerId, companyId],
+  );
+  if (!customerExists.rowCount) {
+    await client.query(
+      `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
+       VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
+    );
+  }
+
   await client.query(
-    `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()),$8::timestamptz,$9::timestamptz,$10,COALESCE($11::timestamptz,NOW()),NOW(),false,$12)
+    `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, discount_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()),$9::timestamptz,$10::timestamptz,$11,COALESCE($12::timestamptz,NOW()),NOW(),false,$13)
      ON CONFLICT (id) DO UPDATE SET
        order_number = CASE 
          WHEN EXCLUDED.order_number NOT LIKE 'SYNC-%' AND EXCLUDED.order_number != '' THEN EXCLUDED.order_number
@@ -314,10 +334,12 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
          ELSE EXCLUDED.order_number
        END,
        customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
-       total_amount=EXCLUDED.total_amount, expected_delivery_date=EXCLUDED.expected_delivery_date,
+       total_amount=EXCLUDED.total_amount, discount_amount=EXCLUDED.discount_amount,
+       expected_delivery_date=EXCLUDED.expected_delivery_date,
        actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes, is_deleted=false,
        updated_at=NOW() WHERE customer_orders.company_id=EXCLUDED.company_id`,
     [id, companyId, orderNumber, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
+      discountAmount,
       stringValue(payload, "order_date") || stringValue(payload, "created_at") || null,
       stringValue(payload, "expected_delivery_date") || null, stringValue(payload, "actual_delivery_date") || null,
       stringValue(payload, "notes") || null, stringValue(payload, "created_at") || null,
@@ -330,6 +352,20 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
     const row = item as Record<string, unknown>;
     const productId = stringValue(row, "product_id");
     if (!productId) throw new Error("invalid_mutation");
+
+    const productExists = await client.query(
+      "SELECT id FROM products WHERE id = $1 AND company_id = $2",
+      [productId, companyId],
+    );
+    if (!productExists.rowCount) {
+      await client.query(
+        `INSERT INTO products (id, company_id, name, price, quantity, status, is_deleted, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 0, 'active', false, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [productId, companyId, stringValue(row, "product_name") || `Ürün (${productId})`, numberValue(row, "unit_price", 0)],
+      );
+    }
+
     await client.query(
       `INSERT INTO customer_order_items (id, order_id, product_id, product_name, quantity, unit_price, company_id, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
@@ -1521,13 +1557,14 @@ router.get("/bootstrap", async (req, res) => {
             updated_at: row.updated_at };
         case "sale":
           return { id: row.id, customer_id: row.customer_id ?? "", total_amount: row.total_amount,
-            paid_amount: row.paid_amount, payment_method: row.payment_method, status: row.status ?? "completed",
+            paid_amount: row.paid_amount, discount_amount: Number(row.discount_amount ?? 0), payment_method: row.payment_method, status: row.status ?? "completed",
             created_at: row.created_at, updated_at: row.updated_at, idempotency_key: row.idempotency_key,
             is_deleted: deleted, deleted_at: row.deleted_at, deleted_by: row.deleted_by,
             created_by: row.created_by };
         case "order":
           return { id: row.id, order_number: row.order_number ?? `SYNC-${row.id}`,
             customer_id: row.customer_id, status: row.status, total_amount: row.total_amount,
+            discount_amount: Number(row.discount_amount ?? 0),
             order_date: row.order_date, expected_delivery_date: row.expected_delivery_date,
             actual_delivery_date: row.actual_delivery_date, notes: row.notes, created_at: row.created_at,
             updated_at: row.updated_at, is_deleted: deleted, deleted_at: row.deleted_at,

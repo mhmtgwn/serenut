@@ -159,7 +159,7 @@ class SyncV4Service {
     }
     await _snapshotPreV4DataOnce(db);
     await _recoverUnsyncedImportedProductsOnce(db);
-    await _recoverRejectedFinancialTransactions(db);
+    await _recoverUnsyncedAndRejectedEntities(db);
     await DatabaseManager.retryOnLock(() async {
       await db.rawUpdate(
           "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
@@ -674,38 +674,64 @@ class SyncV4Service {
     await prefs.setBool(_unsyncedProductRecoveryKey, true);
   }
 
-  /// Retries previously rejected financial transactions and enqueues any unsynced
-  /// ledger rows so order-backed or transiently failed transactions converge.
-  Future<void> _recoverRejectedFinancialTransactions(Database db) async {
+  /// Retries previously rejected outbox mutations across all entity types
+  /// (e.g. sales rejected due to discount/stock calculation bugs) and enqueues
+  /// any unsynced local rows so both PC and mobile devices converge completely.
+  Future<void> _recoverUnsyncedAndRejectedEntities(Database db) async {
     await DatabaseManager.retryOnLock(() async {
       await db.rawUpdate('''
         UPDATE sync_outbox_v4
            SET state = 'PENDING', attempts = 0
          WHERE state = 'REJECTED'
-           AND entity_type = 'financial_transaction'
       ''');
 
       await db.transaction((txn) async {
-        final unsynced = await txn.rawQuery('''
-          SELECT ft.* FROM financial_transactions ft
-          WHERE COALESCE(ft.is_synced, 0) = 0
-            AND NOT EXISTS (
-              SELECT 1 FROM sync_outbox_v4 o
-              WHERE o.entity_type = 'financial_transaction'
-                AND o.entity_id = ft.id
-            )
-          LIMIT 100
-        ''');
-        for (final row in unsynced) {
-          final id = row['id']?.toString();
-          if (id == null || id.isEmpty) continue;
-          await SyncOutboxV4.enqueue(
-            txn,
-            entityType: 'financial_transaction',
-            entityId: id,
-            operation: 'UPSERT',
-            payload: Map<String, dynamic>.from(row),
-          );
+        const entityTables = <String, String>{
+          'product': 'products',
+          'customer': 'customers',
+          'sale': 'sales',
+          'order': 'orders',
+          'financial_transaction': 'financial_transactions',
+        };
+
+        for (final entry in entityTables.entries) {
+          final entityType = entry.key;
+          final tableName = entry.value;
+
+          final unsynced = await txn.rawQuery('''
+            SELECT t.* FROM $tableName t
+            WHERE COALESCE(t.is_synced, 0) = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM sync_outbox_v4 o
+                WHERE o.entity_type = '$entityType'
+                  AND o.entity_id = t.id
+              )
+            LIMIT 100
+          ''');
+
+          for (final row in unsynced) {
+            final id = row['id']?.toString();
+            if (id == null || id.isEmpty) continue;
+            final payload = Map<String, dynamic>.from(row);
+            if (entityType == 'sale' || entityType == 'order') {
+              final itemTable =
+                  entityType == 'sale' ? 'sale_items' : 'order_items';
+              final parentCol =
+                  entityType == 'sale' ? 'sale_id' : 'order_id';
+              payload['items'] = await txn.query(
+                itemTable,
+                where: '$parentCol = ?',
+                whereArgs: [id],
+              );
+            }
+            await SyncOutboxV4.enqueue(
+              txn,
+              entityType: entityType,
+              entityId: id,
+              operation: row['is_deleted'] == 1 ? 'DELETE' : 'UPSERT',
+              payload: payload,
+            );
+          }
         }
       });
     });
@@ -840,6 +866,37 @@ class SyncV4Service {
     if (type == 'order') {
       await _disambiguateOrderNumber(db, row, id);
     }
+    if ((type == 'order' || type == 'sale') && row['customer_id'] != null) {
+      final customerId = row['customer_id'].toString().trim();
+      if (customerId.isNotEmpty) {
+        final existingCust = await db.query(
+          'customers',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [customerId],
+          limit: 1,
+        );
+        if (existingCust.isEmpty) {
+          final now = DateTime.now().toUtc().toIso8601String();
+          final customerName = (payload['customer_name'] as String?)?.trim();
+          final customerPhone = (payload['customer_phone'] as String?)?.trim();
+          await db.insert(
+            'customers',
+            {
+              'id': customerId,
+              'name': customerName?.isNotEmpty == true
+                  ? customerName!
+                  : 'Müşteri ($customerId)',
+              'phone': customerPhone,
+              'created_at': now,
+              'updated_at': now,
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+      }
+    }
     if (type == 'customer') {
       // Server balance is a cache and uses the opposite sign convention.
       // The immutable local ledger is the sole source for this projection.
@@ -888,8 +945,37 @@ class SyncV4Service {
       await db.delete(itemTable, where: '$parentColumn = ?', whereArgs: [id]);
       for (var index = 0; index < items.length; index++) {
         final source = Map<String, dynamic>.from(items[index] as Map);
-        final productId = source['product_id']?.toString();
+        final productId = source['product_id']?.toString().trim();
         if (productId == null || productId.isEmpty) continue;
+
+        final existingProd = await db.query(
+          'products',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [productId],
+          limit: 1,
+        );
+        if (existingProd.isEmpty) {
+          final now = DateTime.now().toUtc().toIso8601String();
+          final prodName = (source['product_name'] as String?)?.trim();
+          await db.insert(
+            'products',
+            {
+              'id': productId,
+              'name': prodName?.isNotEmpty == true
+                  ? prodName!
+                  : 'Ürün ($productId)',
+              'price': _syncDouble(source['unit_price']),
+              'quantity': 0,
+              'category': 'Genel',
+              'created_at': now,
+              'updated_at': now,
+              'is_synced': 1,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+
         final quantity = _syncDouble(source['quantity']);
         final unitPrice = _syncDouble(source['unit_price']);
         await db.insert(

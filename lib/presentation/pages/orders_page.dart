@@ -179,6 +179,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(ordersControllerProvider, (_, next) {
+      if (next.hasValue) {
+        _refreshCounts();
+      }
+    });
+
     final ordersAsync = ref.watch(ordersControllerProvider);
     final customerMapVal = ref.watch(customerLookupMapProvider);
     final isLoadingMore = ref.watch(ordersLoadingMoreProvider);

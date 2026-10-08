@@ -134,6 +134,8 @@ class SqliteOrderRepository implements IOrderRepository {
         'id': entity.id,
         'order_number': orderNumber,
         'customer_id': entity.customerId,
+        'customer_name': entity.customerName,
+        'customer_phone': entity.customerPhone,
         'status': entity.status,
         'total_amount': totalAmount,
         'discount_amount': entity.discountAmount,
@@ -147,7 +149,10 @@ class SqliteOrderRepository implements IOrderRepository {
         'is_synced': 0,
         'items': entity.items,
       };
-      final rowPayload = Map<String, dynamic>.from(payload)..remove('items');
+      final rowPayload = Map<String, dynamic>.from(payload)
+        ..remove('items')
+        ..remove('customer_name')
+        ..remove('customer_phone');
       final rowId = await _executor.insert('orders', rowPayload);
       int index = 0;
       for (final item in entity.items) {
