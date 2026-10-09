@@ -144,6 +144,18 @@ export const passwordResetLimiter = createRedisLimiter({
   message: 'Çok fazla şifre sıfırlama denemesi yapıldı. 15 dakika bekleyin.'
 });
 
+// Sync V4 clients send device_id in the body (push) or query string
+// (pull/bootstrap); they do not have to duplicate it in a header. Falling
+// back directly to `shared-pull` makes every terminal in one company consume
+// the same quota and can block healthy devices with HTTP 429.
+export function syncRateLimitKey(req: Request): string {
+  const companyId = (req as AuthenticatedRequest).user?.company_id;
+  const deviceId =
+    req.header('x-device-id') ||
+    String(req.body?.device_id || req.query?.device_id || 'shared-pull');
+  return `${companyId ?? 'unknown'}:${deviceId}`;
+}
+
 // ── SENKRONİZASYON (SYNC) LİMİTER ────────────────────────────────────────────
 export const syncLimiter = createRedisLimiter({
   scope: 'sync',
@@ -153,11 +165,7 @@ export const syncLimiter = createRedisLimiter({
   max: 240,
   error: 'sync_rate_limit_exceeded',
   message: 'Çok fazla senkronizasyon isteği gönderildi. Lütfen 1 dakika bekleyin.',
-  key: (req) => {
-    const companyId = (req as AuthenticatedRequest).user?.company_id;
-    const deviceId = req.header('x-device-id') || 'shared-pull';
-    return `${companyId ?? 'unknown'}:${deviceId}`;
-  },
+  key: syncRateLimitKey,
 });
 
 // ── WEBHOOK LİMİTER ──────────────────────────────────────────────────────────
