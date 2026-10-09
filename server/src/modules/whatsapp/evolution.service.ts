@@ -7,6 +7,8 @@
 //
 // Dökümantasyon: https://doc.evolution-api.com
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { logger } from '../../config/logger';
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -404,6 +406,34 @@ export function normalizeEvolutionPhone(phone: string): string {
 }
 
 /**
+ * Alıcının WhatsApp LID (Linked ID) eşleşmesi olup olmadığını kontrol eder.
+ * WhatsApp, 1:1 sohbetlerde gizlilik ve şifreleme için LID (@lid) mimarisine geçmiştir.
+ * Eğer kişinin oturumunda bir LID eşleşmesi varsa (lid-mapping-*.json), mesaj doğrudan
+ * bu LID'ye gönderilmelidir; aksi halde WhatsApp sunucusu standart JID mesajını sessizce düşürür.
+ */
+export function resolveRecipientJid(companyId: string, normalizedPhone: string): string {
+  try {
+    const instancesDir = process.env.EVOLUTION_INSTANCES_DIR || '/evolution/instances';
+    if (fs.existsSync(instancesDir)) {
+      const dirs = fs.readdirSync(instancesDir);
+      for (const dir of dirs) {
+        const lidFile = path.join(instancesDir, dir, `lid-mapping-${normalizedPhone}.json`);
+        if (fs.existsSync(lidFile)) {
+          const raw = fs.readFileSync(lidFile, 'utf8').trim().replace(/["']/g, '');
+          if (raw && /^\d+$/.test(raw)) {
+            logger.info(`[Evolution] Phone ${normalizedPhone} resolved to LID: ${raw}@lid`);
+            return `${raw}@lid`;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn(`[Evolution] LID resolution warning for ${normalizedPhone}: ${(err as Error).message}`);
+  }
+  return normalizedPhone;
+}
+
+/**
  * Evolution API üzerinden metin mesajı gönderir.
  * Şablon onayı gerektirmez. Müşteri serbest metin alır.
  *
@@ -421,14 +451,15 @@ export async function sendTextMessage(
 
   // Numara normalizasyonu: Ülke kodu ile E.164 standardına getirilir (örn: 0542... -> 90542...)
   const normalizedPhone = normalizeEvolutionPhone(phone);
+  const targetNumber = resolveRecipientJid(companyId, normalizedPhone);
 
-  logger.info(`[Evolution] sendTextMessage: ${name} → ${normalizedPhone}`);
+  logger.info(`[Evolution] sendTextMessage: ${name} → ${targetNumber} (normalized: ${normalizedPhone})`);
 
   const response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
     'POST',
     `/message/sendText/${name}`,
     {
-      number: normalizedPhone,
+      number: targetNumber,
       text,
       delay: 0, // Anında gönderim
     },
