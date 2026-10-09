@@ -23,7 +23,7 @@ bool _isCatalogReset(Map<String, dynamic> change) {
 extension SyncV4Recovery on SyncV4Service {
   Future<void> _snapshotPreV4DataOnce(Database db) async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_legacySnapshotKey) == true) return;
+    if (prefs.getBool(SyncV4Service._legacySnapshotKey) == true) return;
 
     await db.transaction((txn) async {
       const entityTables = <String, String>{
@@ -67,7 +67,7 @@ extension SyncV4Recovery on SyncV4Service {
         }
       }
     });
-    await prefs.setBool(_legacySnapshotKey, true);
+    await prefs.setBool(SyncV4Service._legacySnapshotKey, true);
   }
 
   /// Catalog imports in releases before 1.2.0+42 wrote products with
@@ -75,7 +75,9 @@ extension SyncV4Recovery on SyncV4Service {
   /// exactly once; the normal import path now enqueues mutations atomically.
   Future<void> _recoverUnsyncedImportedProductsOnce(Database db) async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_unsyncedProductRecoveryKey) == true) return;
+    if (prefs.getBool(SyncV4Service._unsyncedProductRecoveryKey) == true) {
+      return;
+    }
 
     await db.transaction((txn) async {
       final rows = await txn.rawQuery('''
@@ -99,7 +101,7 @@ extension SyncV4Recovery on SyncV4Service {
         );
       }
     });
-    await prefs.setBool(_unsyncedProductRecoveryKey, true);
+    await prefs.setBool(SyncV4Service._unsyncedProductRecoveryKey, true);
   }
 
   /// Retries previously rejected outbox mutations across all entity types

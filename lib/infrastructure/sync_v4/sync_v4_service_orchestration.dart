@@ -326,9 +326,9 @@ extension SyncV4Orchestration on SyncV4Service {
         if (patch.isSuccess && patch.json != null) {
           final canonical = Map<String, dynamic>.from(patch.json as Map);
           final newVer = _syncInt(canonical['version']);
-          await prefs.setInt(_companyVersionKey, newVer);
+          await prefs.setInt(SyncV4Service._companyVersionKey, newVer);
           await prefs.setString(
-              _companySyncedAtKey,
+              SyncV4Service._companySyncedAtKey,
               canonical['updated_at']?.toString() ??
                   DateTime.now().toUtc().toIso8601String());
           await prefs.setBool('sync_v4_company_dirty', false);
@@ -349,7 +349,7 @@ extension SyncV4Orchestration on SyncV4Service {
     if (!response.isSuccess || response.json == null) return false;
     final remote = Map<String, dynamic>.from(response.json as Map);
     final remoteVersion = _syncInt(remote['version']);
-    final knownVersion = prefs.getInt(_companyVersionKey);
+    final knownVersion = prefs.getInt(SyncV4Service._companyVersionKey);
 
     final localName = rows.first['business_name']?.toString() ?? '';
     final localIsDefault = (localName.isEmpty || localName == 'Serenut OS');
@@ -363,7 +363,7 @@ extension SyncV4Orchestration on SyncV4Service {
       if (knownVersion == null) {
         // Record remote version so we track future changes without clobbering existing local customization
         if (remoteVersion > 0) {
-          await prefs.setInt(_companyVersionKey, remoteVersion);
+          await prefs.setInt(SyncV4Service._companyVersionKey, remoteVersion);
         }
         return false;
       }
@@ -408,9 +408,10 @@ extension SyncV4Orchestration on SyncV4Service {
       where: 'id = ?',
       whereArgs: [rows.first['id']],
     );
-    await prefs.setInt(_companyVersionKey, remoteVersion);
+    await prefs.setInt(SyncV4Service._companyVersionKey, remoteVersion);
     await prefs.setString(
-        _companySyncedAtKey, remote['updated_at']?.toString() ?? now);
+        SyncV4Service._companySyncedAtKey,
+        remote['updated_at']?.toString() ?? now);
     await prefs.setBool('sync_v4_company_dirty', false);
     return true;
   }
