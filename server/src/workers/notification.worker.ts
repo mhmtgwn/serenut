@@ -204,10 +204,35 @@ async function dispatchEmail(to: string, subject: string, body: string): Promise
 
 async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
   const existing = await runBypassingRLS(
-    `SELECT provider_message_id FROM notification_queue WHERE id=$1 AND company_id=$2 AND channel='whatsapp'`,
+    `SELECT provider_message_id, status FROM notification_queue WHERE id=$1 AND company_id=$2 AND channel='whatsapp'`,
     [data.notification_id, data.company_id],
   );
-  if (existing.rows[0]?.provider_message_id) return true;
+  const existingRow = existing.rows[0];
+  if (existingRow?.provider_message_id || existingRow?.status === 'sent' || existingRow?.status === 'delivered') {
+    return true;
+  }
+
+  // Evolution API v2.3.7 istemci tarafından belirlenen idempotency messageId'yi DESTEKLEMIYOR.
+  // messageId yalnızca başarılı gönderim sonrasında yanıtta döner.
+  //
+  // Senaryo B/C (ağ bölünmesi): API başarılı → yanıt kayboldu → provider_message_id DB'ye yazılmadı.
+  // Bu durumda BullMQ'nun otomatik retry yapması mükerrer gönderime yol açar.
+  //
+  // Çözüm — 3 adımlı uçuş protokolü:
+  //   1. API çağrısından ÖNCE satırı 'reconciliation_required' olarak işaretle.
+  //      Bu durum, "bir gönderim uçuşta — otomatik yeniden deneme yapma" anlamına gelir.
+  //   2. API çağrısı başarılı olursa messageId'yi kaydet, provider_status='accepted' yaz.
+  //   3. API çağrısı başarısız olursa 'pending' geri çevir; retry güvenlidir.
+  //
+  // 'reconciliation_required' kalırsa: webhook DELIVERY_ACK geldiğinde
+  // provider_message_id eşleşirse otomatik çözülür. Eşleşmezse ops müdahalesi.
+  if (existingRow?.status === 'reconciliation_required') {
+    logger.warn('[WhatsApp] reconciliation_required: Önceki deneme belirsiz sona erdi, mükerrer gönderim engellendi', {
+      notificationId: data.notification_id,
+      companyId: data.company_id,
+    });
+    return true; // BullMQ'ya başarı bildir; uzlaştırma webhook veya ops tarafından yapılır
+  }
 
   const connection = await runBypassingRLS(
     `SELECT gateway_type, evolution_instance_id, evolution_status, status
@@ -220,8 +245,33 @@ async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
     throw new Error('evolution_whatsapp_not_connected');
   }
 
-  const messageId = await sendEvolutionTextMessage(data.company_id, data.recipient, data.body);
+  // Uçuş öncesi işaretleme: API çağrısından önce 'reconciliation_required' yaz.
+  // Eşzamanlı worker çakışmasını ve açık Senaryo B/C'yi kapatır.
+  await runBypassingRLS(
+    `UPDATE notification_queue
+     SET status='reconciliation_required', updated_at=NOW()
+     WHERE id=$1 AND company_id=$2 AND channel='whatsapp'
+       AND status NOT IN ('sent', 'delivered', 'reconciliation_required')`,
+    [data.notification_id, data.company_id],
+  );
 
+  let messageId: string;
+  try {
+    messageId = await sendEvolutionTextMessage(data.company_id, data.recipient, data.body);
+  } catch (sendError) {
+    // API çağrısı başlamadan veya başlayıp hata aldı.
+    // Mesaj gitmedi → 'pending' geri çevir; BullMQ güvenle retry yapabilir.
+    await runBypassingRLS(
+      `UPDATE notification_queue
+       SET status='pending', updated_at=NOW()
+       WHERE id=$1 AND company_id=$2 AND channel='whatsapp'
+         AND status='reconciliation_required'`,
+      [data.notification_id, data.company_id],
+    );
+    throw sendError; // BullMQ exponential backoff ile retry yapar
+  }
+
+  // API başarılı ve messageId elimizde — güvenle kaydet.
   await runBypassingRLS(
     `UPDATE notification_queue
      SET provider_message_id=$1, provider_status='accepted', provider_error_code=NULL, updated_at=NOW()
@@ -262,14 +312,21 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
 }
 
 async function markSent(notificationId: string, companyId: string, channel: string) {
+  // WhatsApp mesajlarında HTTP 200 yanıtı yalnızca API kabulünü (accepted/sent) gösterir;
+  // gerçek teslimat (delivered) ve delivered_at zamanı webhook olayı gelince doldurulur.
+  const isWhatsApp = channel === 'whatsapp';
   await runBypassingRLS(
     `WITH marked AS (
-       UPDATE notification_queue SET status='sent',delivered_at=NOW(),error_message=NULL,updated_at=NOW()
-       WHERE id=$1 AND status<>'sent' RETURNING id
+       UPDATE notification_queue
+       SET status='sent',
+           delivered_at=CASE WHEN $2 = true THEN NULL ELSE NOW() END,
+           error_message=NULL,
+           updated_at=NOW()
+       WHERE id=$1 AND status NOT IN ('sent', 'delivered') RETURNING id
      )
      UPDATE notification_credit_reservations SET status='consumed',consumed_at=NOW()
      WHERE notification_id=$1 AND status='reserved' AND EXISTS(SELECT 1 FROM marked)`,
-    [notificationId]
+    [notificationId, isWhatsApp]
   );
   await invalidateCreditCache(companyId, channel);
 }

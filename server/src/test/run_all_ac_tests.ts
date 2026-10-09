@@ -60,6 +60,7 @@ const testFiles = [
   'sync_v4_domain_materialization.test.ts',
   'sync_rate_limit_key.test.ts',
   'evolution_api_contract.test.ts',
+  'whatsapp_evolution_delivery.test.ts',
   'payment_lifecycle.test.ts',
   'refund_lifecycle.test.ts',
   'notification_credit_reservation.test.ts',

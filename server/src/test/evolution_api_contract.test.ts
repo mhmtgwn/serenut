@@ -29,7 +29,13 @@ async function main(): Promise<void> {
       url: 'https://api.serenut.com/api/v1/whatsapp/webhook',
       byEvents: true,
       base64: false,
-      events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'STATUS_INSTANCE'],
+      events: [
+        'QRCODE_UPDATED',
+        'CONNECTION_UPDATE',
+        'STATUS_INSTANCE',
+        'MESSAGES_UPDATE',
+        'SEND_MESSAGE',
+      ],
     });
 
     const messageId = await sendTextMessage('company-1', '0555 123 4567', 'test');

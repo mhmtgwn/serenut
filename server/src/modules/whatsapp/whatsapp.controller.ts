@@ -13,6 +13,9 @@ import {
   deleteInstance as evolutionDeleteInstance,
   getConnectionStatus as evolutionGetStatus,
   getQRCode as evolutionGetQR,
+  setWebhook as evolutionSetWebhook,
+  normalizeEvolutionPhone,
+  normalizeEvolutionMessageStatus,
   EvolutionApiError,
 } from './evolution.service';
 
@@ -60,11 +63,19 @@ const supportedEvents = new Set([
   'balance_reminder',
 ]);
 
-// Evolution API callback is authenticated by its API key, not a Serenut JWT.
-router.post('/evolution/webhook', async (req: Request, res: Response) => {
+function isAuthorizedWebhook(req: Request): boolean {
   const apiKey = process.env.EVOLUTION_API_KEY;
   const incomingKey = req.headers['apikey'] as string | undefined;
-  if (!apiKey || incomingKey !== apiKey) {
+  if (!apiKey || !incomingKey) return false;
+  const bufExpected = Buffer.from(apiKey, 'utf8');
+  const bufIncoming = Buffer.from(incomingKey, 'utf8');
+  if (bufExpected.length !== bufIncoming.length) return false;
+  return crypto.timingSafeEqual(bufExpected, bufIncoming);
+}
+
+// Evolution API callback is authenticated by its API key, not a Serenut JWT.
+router.post('/evolution/webhook', async (req: Request, res: Response) => {
+  if (!isAuthorizedWebhook(req)) {
     logger.warn('[Evolution] Webhook yetkisiz istek', { ip: req.ip });
     return res.status(401).json({ error: 'unauthorized' });
   }
@@ -72,35 +83,118 @@ router.post('/evolution/webhook', async (req: Request, res: Response) => {
   const body = req.body as {
     event?: string;
     instance?: string;
-    data?: { state?: string; qrcode?: string };
+    data?: any;
   };
-  if (body.event !== 'CONNECTION_UPDATE' || !body.instance) {
+
+  if (!body.instance || typeof body.instance !== 'string') {
     return res.status(200).json({ received: true });
   }
 
   try {
+    // 1. Şirket İzolasyonu: body.instance üzerinden yetkili şirketi doğrula
     const connection = await runBypassingRls(
       "SELECT company_id FROM company_whatsapp_connections WHERE evolution_instance_id=$1 AND gateway_type='evolution'",
       [body.instance],
     );
     const companyId = connection.rows[0]?.company_id;
-    if (!companyId) return res.status(200).json({ received: true });
+    if (!companyId) {
+      // Bilinmeyen veya kayıtlı olmayan instance: hiçbir veritabanı kaydı güncellenmez!
+      logger.warn('[Evolution] Webhook: Kayıtlı şirket bulunamadı (bilinmeyen instance)', { instance: body.instance });
+      return res.status(200).json({ received: true });
+    }
 
-    const state = body.data?.state;
-    const dbStatus = state === 'open' ? 'active' : state === 'close' ? 'disconnected' : 'qr_pending';
-    const evolutionStatus = state === 'open' ? 'open' : state === 'close' ? 'close' : 'connecting';
-    await runBypassingRls(
-      `UPDATE company_whatsapp_connections
-       SET evolution_status=$2,status=$3,
-           disconnected_at=CASE WHEN $3='disconnected' THEN NOW() ELSE disconnected_at END,
-           last_verified_at=CASE WHEN $3='active' THEN NOW() ELSE last_verified_at END,
-           updated_at=NOW()
-       WHERE company_id=$1 AND gateway_type='evolution'`,
-      [companyId, evolutionStatus, dbStatus],
-    );
+    const rawEvent = String(body.event || '').toUpperCase().replace(/[._]/g, '');
+
+    // 2. CONNECTION_UPDATE / STATUS_INSTANCE
+    if (rawEvent.includes('CONNECTION') || rawEvent.includes('STATUS')) {
+      const state = body.data?.state || body.data?.status;
+      const dbStatus = state === 'open' ? 'active' : state === 'close' ? 'disconnected' : 'qr_pending';
+      const evolutionStatus = state === 'open' ? 'open' : state === 'close' ? 'close' : 'connecting';
+      await runBypassingRls(
+        `UPDATE company_whatsapp_connections
+         SET evolution_status=$2,status=$3,
+             disconnected_at=CASE WHEN $3='disconnected' THEN NOW() ELSE disconnected_at END,
+             last_verified_at=CASE WHEN $3='active' THEN NOW() ELSE last_verified_at END,
+             updated_at=NOW()
+         WHERE company_id=$1 AND gateway_type='evolution'`,
+        [companyId, evolutionStatus, dbStatus],
+      );
+      return res.status(200).json({ received: true });
+    }
+
+    // 3. MESSAGES_UPDATE / SEND_MESSAGE (Teslimat ve durum güncellemeleri)
+    if (rawEvent.includes('MESSAGE')) {
+      const items = Array.isArray(body.data) ? body.data : [body.data];
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+
+        // Yalnızca işletmenin gönderdiği (giden) mesajlar işlenir; gelen müşteri mesajları atlanır
+        if (item.key && item.key.fromMe === false) continue;
+
+        // Mesaj ID çıkarımı: Baileys key.id veya Evolution REST id/keyId
+        const messageId = item.key?.id || item.id || item.keyId;
+        if (!messageId || typeof messageId !== 'string') continue;
+
+        // Durum çıkarımı: Baileys update.status veya Evolution REST status/messageStatus
+        const rawStatus = item.update?.status ?? item.status ?? item.messageStatus;
+        const normalized = normalizeEvolutionMessageStatus(rawStatus);
+
+        if (normalized.category === 'delivered') {
+          // Gerçek teslimat doğrulaması: delivered_at yalnızca doğrulanmış teslimatta mühürlenir
+          const updateResult = await runBypassingRls(
+            `UPDATE notification_queue
+             SET status='delivered',
+                 delivered_at=COALESCE(delivered_at, NOW()),
+                 provider_status=$1,
+                 updated_at=NOW()
+             WHERE provider_message_id=$2
+               AND company_id=$3
+               AND channel='whatsapp'
+               AND (status <> 'delivered' OR delivered_at IS NULL)
+             RETURNING id`,
+            [normalized.providerStatus, messageId, companyId],
+          );
+          if (updateResult.rowCount) {
+            logger.info('[Evolution] Mesaj teslimatı doğrulandı', { messageId, status: normalized.providerStatus });
+          }
+        } else if (normalized.category === 'failed') {
+          // Teslim edilmiş mesaj sonradan gelen gecikmiş hata nedeniyle bozulamaz (status NOT IN ('delivered'))
+          const errorReason = item.reason || item.error || item.update?.error || 'delivery_error';
+          await runBypassingRls(
+            `UPDATE notification_queue
+             SET status='failed',
+                 provider_status='failed',
+                 provider_error_code=$1,
+                 error_message=COALESCE(error_message, 'whatsapp_delivery_failed'),
+                 updated_at=NOW()
+             WHERE provider_message_id=$2
+               AND company_id=$3
+               AND channel='whatsapp'
+               AND status NOT IN ('delivered')`,
+            [errorReason, messageId, companyId],
+          );
+          logger.warn('[Evolution] Mesaj teslimat hatası bildirildi', { messageId });
+        } else if (normalized.category === 'server_ack') {
+          // SERVER_ACK (tek gri tik) yalnızca sunucu kabulüdür, cihaz teslimatı sayılmaz!
+          await runBypassingRls(
+            `UPDATE notification_queue
+             SET provider_status='server_ack',
+                 updated_at=NOW()
+             WHERE provider_message_id=$1
+               AND company_id=$2
+               AND channel='whatsapp'
+               AND status NOT IN ('delivered')`,
+            [messageId, companyId],
+          );
+        }
+        // normalized.category === 'unknown' veya 'pending' durumlarında DB değiştirilmez
+      }
+      return res.status(200).json({ received: true });
+    }
   } catch (error) {
     logger.error('[Evolution] Webhook DB güncelleme hatası', { error: String(error) });
   }
+
   return res.status(200).json({ received: true });
 });
 
@@ -119,12 +213,10 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(503).json({ error: 'whatsapp_channel_disabled', message: 'WhatsApp bildirim kanalı etkin değil.' });
   }
 
-  let recipient = rawRecipient.replace(/\D/g, '');
-  const defaultCountryCode = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '90').replace(/\D/g, '');
-  if (recipient.startsWith('00')) recipient = recipient.slice(2);
-  if (recipient.startsWith('0')) recipient = `${defaultCountryCode}${recipient.slice(1)}`;
-  if (recipient.length === 10) recipient = `${defaultCountryCode}${recipient}`;
-  if (recipient.length < 8 || recipient.length > 15) {
+  let recipient: string;
+  try {
+    recipient = normalizeEvolutionPhone(rawRecipient);
+  } catch (_) {
     return res.status(400).json({ error: 'recipient_invalid', message: 'Alıcı telefon numarası geçersiz.' });
   }
 
@@ -208,6 +300,11 @@ router.get(
           [companyId, `serenut_${companyId.replace(/[^a-zA-Z0-9]/g, '_')}`, status.phone ?? null, status.name ?? null],
         );
 
+        const webhookUrl = process.env.EVOLUTION_WEBHOOK_URL || 'http://backend:3000/api/v1/whatsapp/evolution/webhook';
+        void evolutionSetWebhook(companyId, webhookUrl).catch((err: any) => {
+          logger.warn(`[Evolution] Otomatik webhook kaydı uyarısı: ${err?.message || err}`);
+        });
+
         return res.json({
           already_connected: true,
           status: 'open',
@@ -288,6 +385,11 @@ router.get(
                  updated_at=NOW()`,
           [companyId, `serenut_${companyId.replace(/[^a-zA-Z0-9]/g, '_')}`, status.phone ?? null, status.name ?? null],
         );
+
+        const webhookUrl = process.env.EVOLUTION_WEBHOOK_URL || 'http://backend:3000/api/v1/whatsapp/evolution/webhook';
+        void evolutionSetWebhook(companyId, webhookUrl).catch((err: any) => {
+          logger.warn(`[Evolution] Otomatik webhook kaydı uyarısı: ${err?.message || err}`);
+        });
       }
 
       return res.json(status);

@@ -7,8 +7,6 @@
 //
 // Dökümantasyon: https://doc.evolution-api.com
 
-import * as fs from 'fs';
-import * as path from 'path';
 import { logger } from '../../config/logger';
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -386,6 +384,8 @@ export async function setWebhook(companyId: string, webhookUrl: string): Promise
         'QRCODE_UPDATED',
         'CONNECTION_UPDATE',
         'STATUS_INSTANCE',
+        'MESSAGES_UPDATE',
+        'SEND_MESSAGE',
       ],
     },
   });
@@ -394,51 +394,139 @@ export async function setWebhook(companyId: string, webhookUrl: string): Promise
 // ── MESAJ GÖNDERİMİ ──────────────────────────────────────────────────────────
 
 /**
- * Belirtilen telefon numarasına ülkeye özel normalizasyon uygular.
+ * Loglarda KVKK ve güvenlik gereği telefon numarasını maskeler (örn: 9055****67).
+ */
+export function maskPhoneForLog(phone: string): string {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length <= 4) return '****';
+  if (digits.length <= 7) return `${digits.slice(0, 2)}****${digits.slice(-2)}`;
+  return `${digits.slice(0, 4)}****${digits.slice(-2)}`;
+}
+
+export type NormalizedEvolutionStatusCategory = 'delivered' | 'server_ack' | 'failed' | 'pending' | 'unknown';
+
+export interface NormalizedEvolutionStatus {
+  category: NormalizedEvolutionStatusCategory;
+  providerStatus: string;
+}
+
+/**
+ * Evolution API v2.3.7 ve Baileys tarafından iletilen durum kodlarını ve metinlerini normalize eder.
+ *
+ * Baileys WAMessageStatus:
+ * 0 -> ERROR (failed)
+ * 1 -> PENDING (pending)
+ * 2 -> SERVER_ACK (server_ack — tek gri tik, teslimat SAYILMAZ)
+ * 3 -> DELIVERY_ACK (delivered — çift gri tik)
+ * 4 -> READ (delivered — çift mavi tik)
+ * 5 -> PLAYED (delivered — sesli mesaj dinlendi)
+ *
+ * Metinsel karşılıklar:
+ * 'DELIVERY_ACK', 'DELIVERED', 'READ', 'PLAYED' -> category: 'delivered'
+ * 'SERVER_ACK', 'SENT' -> category: 'server_ack'
+ * 'ERROR', 'FAILED' -> category: 'failed'
+ * 'PENDING' -> category: 'pending'
+ * Bilinmeyen tüm durumlar -> category: 'unknown' (asla delivered sayılmaz)
+ */
+export function normalizeEvolutionMessageStatus(rawStatus: unknown): NormalizedEvolutionStatus {
+  if (rawStatus === null || rawStatus === undefined) {
+    return { category: 'unknown', providerStatus: 'unknown' };
+  }
+
+  if (typeof rawStatus === 'number') {
+    switch (rawStatus) {
+      case 0:
+        return { category: 'failed', providerStatus: 'error' };
+      case 1:
+        return { category: 'pending', providerStatus: 'pending' };
+      case 2:
+        return { category: 'server_ack', providerStatus: 'server_ack' };
+      case 3:
+        return { category: 'delivered', providerStatus: 'delivery_ack' };
+      case 4:
+        return { category: 'delivered', providerStatus: 'read' };
+      case 5:
+        return { category: 'delivered', providerStatus: 'played' };
+      default:
+        return { category: 'unknown', providerStatus: String(rawStatus) };
+    }
+  }
+
+  const str = String(rawStatus).trim().toUpperCase();
+  if (/^\d+$/.test(str)) {
+    return normalizeEvolutionMessageStatus(parseInt(str, 10));
+  }
+
+  if (str === 'DELIVERY_ACK' || str === 'DELIVERED') {
+    return { category: 'delivered', providerStatus: 'delivery_ack' };
+  }
+  if (str === 'READ' || str === 'PLAYED') {
+    return { category: 'delivered', providerStatus: str.toLowerCase() };
+  }
+  if (str === 'SERVER_ACK' || str === 'SENT') {
+    return { category: 'server_ack', providerStatus: 'server_ack' };
+  }
+  if (str === 'ERROR' || str === 'FAILED') {
+    return { category: 'failed', providerStatus: 'failed' };
+  }
+  if (str === 'PENDING') {
+    return { category: 'pending', providerStatus: 'pending' };
+  }
+
+  return { category: 'unknown', providerStatus: str.toLowerCase() };
+}
+
+/**
+ * Belirtilen telefon numarasına ülkeye özel normalizasyon ve E.164 format doğrulaması uygular.
+ * Desteklenen girdiler:
+ * - "+905551234567"
+ * - "00905551234567"
+ * - "05551234567"
+ * - "5551234567"
+ * - "905551234567"
+ * - Parantez, boşluk veya tire içeren formatlar: "(0555) 123-4567"
+ *
+ * Geçersiz, boş veya E.164 sınırları (8-15 basamak) dışındaki numaralarda EvolutionApiError fırlatır.
  */
 export function normalizeEvolutionPhone(phone: string): string {
-  let digits = String(phone || '').replace(/\D/g, '');
+  if (!phone || typeof phone !== 'string') {
+    throw new EvolutionApiError('Alıcı telefon numarası boş veya geçersiz.', 400, 'invalid_phone');
+  }
+
+  let digits = phone.replace(/\D/g, '');
+  if (!digits) {
+    throw new EvolutionApiError('Alıcı telefon numarası rakam içermelidir.', 400, 'invalid_phone');
+  }
+
   const defaultCountryCode = (process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '90').replace(/\D/g, '');
   if (digits.startsWith('00')) digits = digits.slice(2);
   if (digits.startsWith('0')) digits = `${defaultCountryCode}${digits.slice(1)}`;
   if (digits.length === 10) digits = `${defaultCountryCode}${digits}`;
-  return digits;
-}
 
-/**
- * Alıcının WhatsApp LID (Linked ID) eşleşmesi olup olmadığını kontrol eder.
- * WhatsApp, 1:1 sohbetlerde gizlilik ve şifreleme için LID (@lid) mimarisine geçmiştir.
- * Eğer kişinin oturumunda bir LID eşleşmesi varsa (lid-mapping-*.json), mesaj doğrudan
- * bu LID'ye gönderilmelidir; aksi halde WhatsApp sunucusu standart JID mesajını sessizce düşürür.
- */
-export function resolveRecipientJid(companyId: string, normalizedPhone: string): string {
-  try {
-    const instancesDir = process.env.EVOLUTION_INSTANCES_DIR || '/evolution/instances';
-    if (fs.existsSync(instancesDir)) {
-      const dirs = fs.readdirSync(instancesDir);
-      for (const dir of dirs) {
-        const lidFile = path.join(instancesDir, dir, `lid-mapping-${normalizedPhone}.json`);
-        if (fs.existsSync(lidFile)) {
-          const raw = fs.readFileSync(lidFile, 'utf8').trim().replace(/["']/g, '');
-          if (raw && /^\d+$/.test(raw)) {
-            logger.info(`[Evolution] Phone ${normalizedPhone} resolved to LID: ${raw}@lid`);
-            return `${raw}@lid`;
-          }
-        }
-      }
-    }
-  } catch (err) {
-    logger.warn(`[Evolution] LID resolution warning for ${normalizedPhone}: ${(err as Error).message}`);
+  // ITU-T E.164 standardı: en az 8, en fazla 15 basamak
+  if (digits.length < 8 || digits.length > 15) {
+    throw new EvolutionApiError(
+      `Alıcı telefon numarası geçersiz basamak sayısına sahip (${digits.length} basamak, beklenen: 8-15).`,
+      400,
+      'invalid_phone',
+    );
   }
-  return normalizedPhone;
+
+  return digits;
 }
 
 /**
  * Evolution API üzerinden metin mesajı gönderir.
  * Şablon onayı gerektirmez. Müşteri serbest metin alır.
  *
+ * Güvenlik ve Mimari İlkeleri:
+ * 1. Alıcı kimliği olarak doğrulanmış ve normalleştirilmiş E.164 telefon numarası kullanılır.
+ * 2. Evolution API v2 `/message/sendText` uç noktasına doğrudan E.164 formatında gönderilir.
+ * 3. Loglarda telefon numaraları maskelenir; mesaj içeriği veya hassas veriler loglanmaz.
+ * 4. Mükerrer gönderim yapılmaz; 800ms bekleme veya ikinci gönderim kaldırılmıştır.
+ *
  * @param companyId - Şirket ID'si (tenant)
- * @param phone - Alıcı telefon numarası (örn: "05551234567", "5551234567" veya "905551234567")
+ * @param phone - Alıcı telefon numarası
  * @param text - Gönderilecek mesaj metni
  * @returns Evolution API mesaj ID'si
  */
@@ -449,41 +537,30 @@ export async function sendTextMessage(
 ): Promise<string> {
   const name = instanceId(companyId);
 
-  // Numara normalizasyonu: Ülke kodu ile E.164 standardına getirilir (örn: 0542... -> 90542...)
+  // Numara normalizasyonu ve doğrulama
   const normalizedPhone = normalizeEvolutionPhone(phone);
-  let targetNumber = resolveRecipientJid(companyId, normalizedPhone);
+  const maskedPhone = maskPhoneForLog(normalizedPhone);
 
-  logger.info(`[Evolution] sendTextMessage: ${name} → ${targetNumber} (normalized: ${normalizedPhone})`);
+  logger.info(`[Evolution] sendTextMessage: ${name} → ${maskedPhone}`);
 
-  let response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
+  const response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
     'POST',
     `/message/sendText/${name}`,
     {
-      number: targetNumber,
+      number: normalizedPhone,
       text,
       delay: 0, // Anında gönderim
     },
   );
 
-  // Eğer ilk denemede LID bilinmiyorduysa, Baileys'in ilk istekte yaptığı USync protokolü
-  // sonucunda diske lid-mapping dosyası düşmüş olabilir. Kontrol et ve gerekirse LID ile iletimi garantile.
-  if (targetNumber === normalizedPhone) {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const discoveredLid = resolveRecipientJid(companyId, normalizedPhone);
-    if (discoveredLid !== normalizedPhone) {
-      logger.info(`[Evolution] Yeni keşfedilen LID üzerinden kesinleştiriliyor: ${name} → ${discoveredLid}`);
-      response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
-        'POST',
-        `/message/sendText/${name}`,
-        {
-          number: discoveredLid,
-          text,
-          delay: 0,
-        },
-      );
-    }
+  const messageId = response?.key?.id ?? response?.messageId;
+  if (!messageId) {
+    throw new EvolutionApiError(
+      'Evolution API geçerli bir mesaj kimliği (messageId) döndürmedi.',
+      502,
+      'missing_message_id',
+    );
   }
 
-  const messageId = response?.key?.id ?? response?.messageId ?? 'unknown';
   return messageId;
 }
