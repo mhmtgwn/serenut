@@ -392,7 +392,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         );
         for (final item in list) {
           item['sms_enabled'] ??= item['enabled'] == true;
-          item['whatsapp_enabled'] ??= false;
+          item['whatsapp_enabled'] ??= true; // Eski şablonlarda varsayılan: açık
           item['enabled'] = item['sms_enabled'] == true;
           item['sms_template'] ??= item['template'];
           final currentWa = item['whatsapp_template']?.toString().trim();

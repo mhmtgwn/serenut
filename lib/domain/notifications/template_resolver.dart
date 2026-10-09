@@ -327,8 +327,11 @@ class TemplateResolver {
         if (id == null || !candidateIds.contains(id)) continue;
 
         if (channel == NotificationTemplateChannel.whatsapp) {
+          // null → henüz ayarlanmamış (eski şablon) = izin ver
+          // false → kullanıcı açıkça kapattı = bloke et
+          // true  → açık = izin ver
           final enabled = item['whatsapp_enabled'];
-          if (enabled != true) return null;
+          if (enabled == false) return null;
 
           final customWa = item['whatsapp_template']?.toString().trim();
           final smsTpl =
