@@ -47,7 +47,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 56;
+  static const int databaseVersion = 57;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -670,6 +670,9 @@ class DatabaseManager {
   /// Handle database upgrades
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     await DatabaseMigrations.onUpgrade(db, oldVersion, newVersion);
+    // Trigger self-healing previously checked only for presence, so an older
+    // blanket immutability trigger could survive upgrades and block sync acks.
+    await DatabaseTriggers.createTriggers(db);
   }
 
   /// Insert default/seed data (first install only)

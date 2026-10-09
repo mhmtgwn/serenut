@@ -1057,6 +1057,15 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 57 && newVersion >= 57) {
+          // Rebuild ledger triggers after upgrade. The current definition
+          // permits sync metadata updates (is_synced) while protecting money.
+          await txn.insert('app_migration_history', {
+            'version': 57,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

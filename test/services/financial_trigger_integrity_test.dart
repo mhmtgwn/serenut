@@ -113,6 +113,33 @@ void main() {
       );
     });
 
+    test(
+        'Sync acknowledgement can update is_synced without changing ledger data',
+        () async {
+      await transactionRepo.create(FinancialTransactionEntity(
+        id: 'tx-sync-ack',
+        type: 'sale',
+        customerId: custId,
+        amount: 200.0,
+        paidAmount: 50.0,
+        debtAmount: 150.0,
+        date: DateTime.now(),
+        referenceId: 'sale-sync-ack',
+      ));
+
+      await db.rawUpdate(
+        'UPDATE financial_transactions SET is_synced = ? WHERE id = ?',
+        [1, 'tx-sync-ack'],
+      );
+
+      final row = await db.query('financial_transactions',
+          columns: ['is_synced', 'amount'],
+          where: 'id = ?',
+          whereArgs: ['tx-sync-ack']);
+      expect(row.single['is_synced'], 1);
+      expect(row.single['amount'], 200.0);
+    });
+
     test('Deleting transaction throws DatabaseException and is blocked',
         () async {
       // 1. Insert collection of 80 TL
