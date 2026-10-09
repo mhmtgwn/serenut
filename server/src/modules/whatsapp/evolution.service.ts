@@ -451,11 +451,11 @@ export async function sendTextMessage(
 
   // Numara normalizasyonu: Ülke kodu ile E.164 standardına getirilir (örn: 0542... -> 90542...)
   const normalizedPhone = normalizeEvolutionPhone(phone);
-  const targetNumber = resolveRecipientJid(companyId, normalizedPhone);
+  let targetNumber = resolveRecipientJid(companyId, normalizedPhone);
 
   logger.info(`[Evolution] sendTextMessage: ${name} → ${targetNumber} (normalized: ${normalizedPhone})`);
 
-  const response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
+  let response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
     'POST',
     `/message/sendText/${name}`,
     {
@@ -464,6 +464,25 @@ export async function sendTextMessage(
       delay: 0, // Anında gönderim
     },
   );
+
+  // Eğer ilk denemede LID bilinmiyorduysa, Baileys'in ilk istekte yaptığı USync protokolü
+  // sonucunda diske lid-mapping dosyası düşmüş olabilir. Kontrol et ve gerekirse LID ile iletimi garantile.
+  if (targetNumber === normalizedPhone) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const discoveredLid = resolveRecipientJid(companyId, normalizedPhone);
+    if (discoveredLid !== normalizedPhone) {
+      logger.info(`[Evolution] Yeni keşfedilen LID üzerinden kesinleştiriliyor: ${name} → ${discoveredLid}`);
+      response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
+        'POST',
+        `/message/sendText/${name}`,
+        {
+          number: discoveredLid,
+          text,
+          delay: 0,
+        },
+      );
+    }
+  }
 
   const messageId = response?.key?.id ?? response?.messageId ?? 'unknown';
   return messageId;
