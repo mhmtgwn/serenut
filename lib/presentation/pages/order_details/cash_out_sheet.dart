@@ -34,8 +34,7 @@ Future<void> triggerOrderDeliveryPrint(
       } catch (_) {}
     }
 
-    final cachedProducts =
-        read(productsControllerProvider).valueOrNull ?? [];
+    final cachedProducts = read(productsControllerProvider).valueOrNull ?? [];
     final prodMap = {for (final p in cachedProducts) p.id: p.name};
 
     final receiptItems = order.items.map((item) {
@@ -68,15 +67,16 @@ Future<void> triggerOrderDeliveryPrint(
 
     try {
       await read(printingApplicationServiceProvider).queueOrderReceipt(
-            order,
-            receiptItems,
-            effectiveCustomer,
-            settings,
-            paidAmount: paidAmount,
-            notes: order.notes?.trim(),
-          );
+        order,
+        receiptItems,
+        effectiveCustomer,
+        settings,
+        paidAmount: paidAmount,
+        notes: order.notes?.trim(),
+      );
     } catch (queueErr) {
-      debugPrint('Queue receipt print error, trying direct fallback: $queueErr');
+      debugPrint(
+          'Queue receipt print error, trying direct fallback: $queueErr');
       final printerService = read(printerServiceProvider);
       await printerService.printOrderReceipt(
         order,
@@ -170,8 +170,22 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     super.dispose();
   }
 
-  double get _remainingAmount =>
-      (widget.saleTx.amount - widget.totalPaid).clamp(0.0, double.infinity);
+  double get _remainingAmount {
+    final rawRemaining =
+        (widget.saleTx.amount - widget.totalPaid).clamp(0.0, double.infinity);
+    if (widget.order.customerId.isNotEmpty) {
+      final cust =
+          ref.read(customerDetailProvider(widget.order.customerId)).valueOrNull;
+      if (cust != null) {
+        if (cust.balance >= -0.01) {
+          return 0.0;
+        } else {
+          return math.min(rawRemaining, cust.balance.abs());
+        }
+      }
+    }
+    return rawRemaining;
+  }
 
   double get _karmaCash =>
       double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ?? 0.0;
@@ -192,7 +206,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
   Future<void> _submitPayment() async {
     final container = ProviderScope.containerOf(context);
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     setState(() {
@@ -304,14 +317,15 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               ? 'Sipariş vadeli olarak teslim edildi ve teslimat fişi yazdırıldı.'
               : 'Sipariş vadeli borç olarak kaydedildi.';
         } else if (canMarkDelivered) {
-          msg = 'Ödeme alındı, sipariş teslim edildi ve teslimat fişi yazdırıldı.';
+          msg =
+              'Ödeme alındı, sipariş teslim edildi ve teslimat fişi yazdırıldı.';
         } else if (_selectedMethod == 'karma' && _karmaDebt > 0.01) {
           msg = 'Kısmi ödeme alındı, kalan borç kaydedildi ve fiş yazdırıldı.';
         } else {
           msg = 'Ödeme başarıyla alındı ve fiş yazdırıldı.';
         }
 
-        messenger.showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(msg),
             backgroundColor: _kGreenDark,
@@ -350,7 +364,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
             if (settings == null) {
               try {
-                final repo = await container.read(settingsRepositoryProvider.future);
+                final repo =
+                    await container.read(settingsRepositoryProvider.future);
                 settings = await repo.getSettings();
               } catch (_) {}
             }
@@ -368,7 +383,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               final receiptItems = orderRef.items.map((item) {
                 var name = (item['product_name'] ?? item['name'])?.toString();
                 final productId = item['product_id']?.toString() ?? '';
-                name = (name != null && name.isNotEmpty && name != productId) ? name : 'Ürün';
+                name = (name != null && name.isNotEmpty && name != productId)
+                    ? name
+                    : 'Ürün';
                 return {
                   'product_id': productId,
                   'product_name': name,
@@ -378,17 +395,18 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 };
               }).toList();
 
-              final effectiveCustomer = customer != null && customer.id.isNotEmpty
-                  ? customer
-                  : (orderRef.customerName?.isNotEmpty == true
-                      ? CustomerEntity(
-                          id: orderRef.customerId,
-                          name: orderRef.customerName!,
-                          email: '',
-                          phone: orderRef.customerPhone ?? '',
-                          balance: 0,
-                          createdAt: DateTime.now())
-                      : null);
+              final effectiveCustomer =
+                  customer != null && customer.id.isNotEmpty
+                      ? customer
+                      : (orderRef.customerName?.isNotEmpty == true
+                          ? CustomerEntity(
+                              id: orderRef.customerId,
+                              name: orderRef.customerName!,
+                              email: '',
+                              phone: orderRef.customerPhone ?? '',
+                              balance: 0,
+                              createdAt: DateTime.now())
+                          : null);
 
               try {
                 await container
@@ -411,7 +429,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                       copies: printCopies,
                     );
               } catch (queueErr) {
-                debugPrint('Queue receipt print error in cash out, fallback to direct printer: $queueErr');
+                debugPrint(
+                    'Queue receipt print error in cash out, fallback to direct printer: $queueErr');
                 try {
                   final printerService = container.read(printerServiceProvider);
                   await printerService.printOrderReceipt(
@@ -429,12 +448,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             }
           }
         } catch (e, st) {
-          unawaited(TelemetryService().logError(e, st, context: 'order_cashout_bg'));
+          unawaited(
+              TelemetryService().logError(e, st, context: 'order_cashout_bg'));
           debugPrint('Background task error in cash out: $e');
         }
       }());
     } catch (e, st) {
-      unawaited(TelemetryService().logError(e, st, context: 'order_cashout_payment'));
+      unawaited(
+          TelemetryService().logError(e, st, context: 'order_cashout_payment'));
       if (cardPayment != null) {
         await ref
             .read(physicalCardPaymentServiceProvider)
@@ -444,7 +465,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         setState(() {
           _isSubmitting = false;
         });
-        messenger.showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata oluştu: $e'),
             backgroundColor: _kRed,
@@ -557,6 +578,34 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         // Karma Split Input Fields
         if (isKarma) ...[
           _buildKarmaFields(remaining, karmaValid, karmaRemaining),
+          const SizedBox(height: 12),
+        ],
+        if (remaining <= 0.01) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline_rounded,
+                    color: Colors.green.shade800, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Müşterinin cari hesabı kapalıdır (kalan borcu bulunmamaktadır). Ek ödeme almadan siparişi teslim edebilirsiniz.',
+                    style: TextStyle(
+                      color: Colors.green.shade900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
         ],
         // Payment Button Grid

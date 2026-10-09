@@ -87,6 +87,21 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     );
   }
 
+  /// Loads only product identifiers in bounded pages for bulk selection.
+  /// This keeps large catalog selection from materializing every ProductEntity.
+  Future<Set<String>> findAllMatchingIds() async {
+    const pageSize = 500;
+    final ids = <String>{};
+    var offset = 0;
+    while (true) {
+      final page = await findAllMatching(limit: pageSize, offset: offset);
+      ids.addAll(page.map((product) => product.id));
+      if (page.length < pageSize) break;
+      offset += page.length;
+    }
+    return ids;
+  }
+
   Future<void> addProduct(ProductEntity product) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

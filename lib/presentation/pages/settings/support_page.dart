@@ -8,6 +8,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class SupportPage extends ConsumerStatefulWidget {
   const SupportPage({super.key});
 
@@ -58,7 +60,7 @@ class _SupportPageState extends ConsumerState<SupportPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text(
                 '✅ Destek talebiniz yönetici ekibine iletildi. En kısa sürede dönüş yapılacaktır.'),
@@ -70,7 +72,7 @@ class _SupportPageState extends ConsumerState<SupportPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Talebiniz iletilirken hata oluştu: $e'),
             backgroundColor: POSColors.red,

@@ -405,51 +405,12 @@ function errorView(error, retry) {
   box.append(title, message, button); document.getElementById('embed-content').replaceChildren(box);
 }
 
-let facebookSdkPromise;
-function loadFacebookSdk(config) {
-  if (window.FB) {
-    window.FB.init({appId:config.appId,autoLogAppEvents:true,xfbml:false,version:config.graphVersion});
-    return Promise.resolve();
+let whatsappConnectionPollTimer;
+function stopWhatsAppConnectionPoll() {
+  if (whatsappConnectionPollTimer) {
+    clearInterval(whatsappConnectionPollTimer);
+    whatsappConnectionPollTimer = null;
   }
-  if (!facebookSdkPromise) {
-    facebookSdkPromise = new Promise((resolve,reject)=>{
-      window.fbAsyncInit=()=>{window.FB.init({appId:config.appId,autoLogAppEvents:true,xfbml:false,version:config.graphVersion});resolve();};
-      const script=document.createElement('script');script.async=true;script.defer=true;script.crossOrigin='anonymous';script.src='https://connect.facebook.net/tr_TR/sdk.js';script.onerror=()=>reject(new Error('Meta bağlantı ekranı yüklenemedi.'));document.head.appendChild(script);
-    });
-  }
-  return facebookSdkPromise;
-}
-
-async function launchWhatsAppEmbeddedSignup(config) {
-  await loadFacebookSdk(config);
-  return new Promise((resolve,reject)=>{
-    let authCode='';let sessionData=null;let settled=false;
-    const cleanup=()=>{window.removeEventListener('message',messageHandler);clearTimeout(timeout);};
-    const fail=message=>{if(settled)return;settled=true;cleanup();reject(new Error(message));};
-    const finish=()=>{if(settled||!authCode||!sessionData)return;settled=true;cleanup();resolve({code:authCode,...sessionData});};
-    const messageHandler=event=>{
-      if(!['https://www.facebook.com','https://web.facebook.com'].includes(event.origin))return;
-      let data=event.data;try{if(typeof data==='string')data=JSON.parse(data);}catch(_){return;}
-      if(data?.type!=='WA_EMBEDDED_SIGNUP')return;
-      if(data.event==='FINISH'){
-        const info=data.data||{};
-        if(!info.waba_id||!info.phone_number_id)return fail('Meta, WhatsApp hesap bilgilerini döndürmedi.');
-        sessionData={waba_id:String(info.waba_id),phone_number_id:String(info.phone_number_id),meta_business_id:info.business_id?String(info.business_id):null};finish();
-      } else if(data.event==='CANCEL') fail('WhatsApp bağlantısı iptal edildi.');
-      else if(data.event==='ERROR') fail(data.data?.error_message||'Meta WhatsApp bağlantısı tamamlanamadı.');
-    };
-    window.addEventListener('message',messageHandler);
-    const timeout=setTimeout(()=>fail('WhatsApp bağlantı işlemi zaman aşımına uğradı.'),10*60*1000);
-    window.FB.login(response=>{
-      if(response?.authResponse?.code){authCode=response.authResponse.code;finish();}
-      else fail('Meta yetkilendirmesi tamamlanmadı.');
-    },{
-      config_id:config.configId,
-      response_type:'code',
-      override_default_response_type:true,
-      extras:{setup:{},sessionInfoVersion:'3'}
-    });
-  });
 }
 
 const loaders = {
@@ -464,17 +425,89 @@ const loaders = {
     document.getElementById('sms-gateway-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{await apiFetch('/notifications/sms-gateway',{method:'PUT',body:{device_id:document.getElementById('sms-gateway-device').value}});await loaders['sales-operations']();}catch(x){notice(x.message)}finally{b.disabled=false}};
   },
   'notification-channels': async () => {
-    const [result,templates]=await Promise.all([apiFetch('/whatsapp/connection'),apiFetch('/whatsapp/templates')]);const connection=result.connection;const active=connection?.status==='active';const approvedTemplates=templates.filter(item=>item.status==='approved');
-    set(`<div class="section-heading"><div><h3>Bildirim Kanalları</h3><p>SMS, Android ana cihazın SIM kartından; WhatsApp bildirimleri şirketinizin Meta Business hesabından gönderilir.</p></div></div>
-      <div class="metrics-grid">${metric('WhatsApp',active?'Bağlı':connection?.status?tr(connection.status):'Bağlı değil')}${metric('Bağlı Numara',connection?.display_phone_number||'—')}${metric('İşletme Adı',connection?.business_display_name||'—')}${metric('Son Doğrulama',connection?.last_verified_at?date(connection.last_verified_at):'—')}</div>
-      ${!result.configured?'<div class="attention-strip"><strong>Sunucu yapılandırması eksik</strong><span>Meta uygulama bilgileri tamamlanmadan WhatsApp bağlantısı başlatılamaz.</span></div>':''}
-      ${connection?.last_error_message?`<div class="attention-strip"><strong>Son bağlantı hatası</strong><span>${esc(connection.last_error_message)}</span></div>`:''}
-      <section class="customer-create-panel" style="padding:20px"><h3>WhatsApp Business</h3><p>${active?`${esc(connection.display_phone_number||'Numara')} Serenut bildirim kanalına bağlıdır.`:'Firma sahibi, kendi WhatsApp Business hesabını Meta’nın güvenli ekranında bir kez bağlar.'}</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="whatsapp-connect" type="button" ${!result.configured?'disabled':''}>${active?'Yeniden Bağla':'WhatsApp Business’ı Bağla'}</button>${active?'<button class="btn btn-secondary" id="whatsapp-template-sync" type="button">Şablon Durumlarını Yenile</button>':''}${connection&&!['disconnected'].includes(connection.status)?'<button class="btn btn-secondary" id="whatsapp-disconnect" type="button">Bağlantıyı Kaldır</button>':''}</div><p id="whatsapp-connect-state" class="diagnostic-result-note"></p></section>
-      ${active?`<div class="section-heading spaced"><div><h3>Bildirim Şablonları</h3><p>Yalnız Meta tarafından onaylanan şablonlar otomatik gönderilir.</p></div></div>${table([{label:'Olay',key:'event_key'},{label:'Meta Şablonu',key:'meta_template_name'},{label:'Dil',key:'language_code'},{label:'Durum',render:item=>badge(tr(item.status))},{label:'Son Kontrol',render:item=>esc(date(item.last_synced_at))}],templates)}<section class="customer-create-panel" style="padding:20px"><h3>Onaylı Şablonla Test</h3>${approvedTemplates.length?`<form class="customer-form-grid" id="whatsapp-test-form"><label>Alıcı telefonu<input id="whatsapp-test-recipient" required placeholder="905551112233"></label><label>Onaylı şablon<select id="whatsapp-test-template">${approvedTemplates.map(item=>`<option value="${esc(item.meta_template_name)}" data-language="${esc(item.language_code)}">${esc(item.event_key)}</option>`).join('')}</select></label><label class="wide-field">Parametreler <small>Her satıra bir değer</small><textarea id="whatsapp-test-parameters" rows="4" placeholder="Ayşe Yılmaz&#10;SIP-1024&#10;Hazır&#10;Örnek İşletme"></textarea></label><button class="btn btn-primary" type="submit">Test Bildirimini Kuyruğa Al</button></form>`:'<p>Henüz onaylanmış şablon yok. Meta incelemesi tamamlandıktan sonra “Şablon Durumlarını Yenile” düğmesini kullanın.</p>'}</section>`:''}`);
-    const connect=document.getElementById('whatsapp-connect');if(connect)connect.onclick=async()=>{connect.disabled=true;const state=document.getElementById('whatsapp-connect-state');state.textContent='Meta bağlantı ekranı hazırlanıyor…';try{const config=await apiFetch('/whatsapp/onboarding/start',{method:'POST',body:{}});const completed=await launchWhatsAppEmbeddedSignup(config);state.textContent='Hesap doğrulanıyor ve güvenli şekilde kaydediliyor…';await apiFetch('/whatsapp/onboarding/complete',{method:'POST',body:{state:config.state,...completed}});notice('WhatsApp Business hesabı bağlandı.');await loaders['notification-channels']();}catch(error){state.textContent=error.message||'Bağlantı tamamlanamadı.';connect.disabled=false;}};
-    const disconnect=document.getElementById('whatsapp-disconnect');if(disconnect)disconnect.onclick=async()=>{if(!confirm('WhatsApp bildirim bağlantısı kaldırılacak. Devam edilsin mi?'))return;disconnect.disabled=true;try{await apiFetch('/whatsapp/connection',{method:'DELETE'});await loaders['notification-channels']();}catch(error){notice(error.message||'Bağlantı kaldırılamadı.');disconnect.disabled=false;}};
-    const sync=document.getElementById('whatsapp-template-sync');if(sync)sync.onclick=async()=>{sync.disabled=true;try{await apiFetch('/whatsapp/templates/sync',{method:'POST',body:{}});await loaders['notification-channels']();}catch(error){notice(error.message||'Şablonlar yenilenemedi.');sync.disabled=false;}};
-    const testForm=document.getElementById('whatsapp-test-form');if(testForm)testForm.onsubmit=async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{const parameters=document.getElementById('whatsapp-test-parameters').value.split('\n').map(value=>value.trim()).filter(Boolean);const template=document.getElementById('whatsapp-test-template');const selected=template.options[template.selectedIndex];const queued=await apiFetch('/whatsapp/test',{method:'POST',body:{recipient:document.getElementById('whatsapp-test-recipient').value.trim(),provider_payload:{template_name:template.value,language_code:selected.dataset.language||'tr',parameters}}});notice(`Test bildirimi kuyruğa alındı: ${queued.queue_id}`);}catch(error){notice(error.message||'Test bildirimi oluşturulamadı.');}finally{button.disabled=false;}};
+    stopWhatsAppConnectionPoll();
+    const status = await apiFetch('/whatsapp/evolution/status');
+    const active = status.status === 'open';
+    const phone = status.phone || status.name || '—';
+    set(`<div class="section-heading"><div><h3>Bildirim Kanalları</h3><p>SMS, Android ana cihazın SIM kartından; WhatsApp bildirimleri bağlı Evolution API hesabından gönderilir.</p></div></div>
+      <div class="metrics-grid">${metric('WhatsApp API',active?'Bağlı':status.status==='connecting'?'Bağlanıyor':'Bağlı değil')}${metric('Bağlı Numara',active?esc(phone):'—')}</div>
+      <section class="customer-create-panel" style="padding:20px"><h3>Evolution API — WhatsApp</h3>
+        <p>${active?`${esc(phone)} WhatsApp bildirim kanalına bağlı.`:'Firma WhatsApp hesabını QR kod ile bağlayın. Telefonunuzdaki WhatsApp → Bağlı Cihazlar bölümünü kullanın.'}</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="whatsapp-connect" type="button">${active?'Bağlantıyı Yenile':'QR Kod ile Bağlan'}</button>
+          ${active?'<button class="btn btn-secondary" id="whatsapp-disconnect" type="button">Bağlantıyı Kes</button>':''}
+        </div>
+        <p id="whatsapp-connect-state" class="diagnostic-result-note"></p>
+        <div id="whatsapp-qr" style="margin-top:12px"></div>
+      </section>
+      ${active?'<section class="customer-create-panel" style="padding:20px"><h3>WhatsApp Test Mesajı</h3><form class="customer-form-grid" id="whatsapp-test-form"><label>Alıcı telefonu<input id="whatsapp-test-recipient" required placeholder="905551112233"></label><label class="wide-field">Mesaj<textarea id="whatsapp-test-body" required rows="3" maxlength="4096" placeholder="Serenut WhatsApp test mesajı"></textarea></label><button class="btn btn-primary" type="submit">Test Mesajını Kuyruğa Al</button></form></section>':''}`);
+
+    const connect = document.getElementById('whatsapp-connect');
+    if (connect) connect.onclick = async () => {
+      connect.disabled = true;
+      const state = document.getElementById('whatsapp-connect-state');
+      const qrPanel = document.getElementById('whatsapp-qr');
+      state.textContent = 'Evolution API bağlantısı hazırlanıyor…';
+      try {
+        const result = await apiFetch('/whatsapp/evolution/qr');
+        if (result.already_connected || result.status === 'open') {
+          notice('WhatsApp zaten bağlı.');
+          await loaders['notification-channels']();
+          return;
+        }
+        if (!result.qrcode) throw new Error('Evolution API QR kodu döndürmedi.');
+        qrPanel.innerHTML = `<img src="${esc(result.qrcode)}" alt="WhatsApp bağlantı QR kodu" style="display:block;width:min(280px,100%);height:auto;margin:auto"><p>QR kodu WhatsApp uygulamasındaki Bağlı Cihazlar ekranından tarayın.</p>`;
+        state.textContent = 'WhatsApp bağlantısı bekleniyor…';
+        whatsappConnectionPollTimer = setInterval(async () => {
+          try {
+            const current = await apiFetch('/whatsapp/evolution/status');
+            if (current.status === 'open') {
+              stopWhatsAppConnectionPoll();
+              notice('WhatsApp API bağlantısı kuruldu.');
+              await loaders['notification-channels']();
+            }
+          } catch (error) {
+            state.textContent = error.message || 'Bağlantı durumu kontrol edilemedi.';
+          }
+        }, 2500);
+      } catch (error) {
+        state.textContent = error.message || 'Evolution API bağlantısı başlatılamadı.';
+        connect.disabled = false;
+      }
+    };
+
+    const disconnect = document.getElementById('whatsapp-disconnect');
+    if (disconnect) disconnect.onclick = async () => {
+      if (!confirm('WhatsApp API bağlantısı kesilecek. Devam edilsin mi?')) return;
+      disconnect.disabled = true;
+      try {
+        await apiFetch('/whatsapp/evolution/disconnect', {method:'POST',body:{}});
+        await loaders['notification-channels']();
+      } catch (error) {
+        notice(error.message || 'WhatsApp bağlantısı kesilemedi.');
+        disconnect.disabled = false;
+      }
+    };
+
+    const testForm = document.getElementById('whatsapp-test-form');
+    if (testForm) testForm.onsubmit = async event => {
+      event.preventDefault();
+      const button = event.submitter;
+      button.disabled = true;
+      try {
+        const queued = await apiFetch('/notifications/send-direct', {method:'POST',body:{
+          channel:'whatsapp',
+          recipient:document.getElementById('whatsapp-test-recipient').value.trim(),
+          title:'Serenut WhatsApp testi',
+          body:document.getElementById('whatsapp-test-body').value.trim(),
+        }});
+        notice(`Test mesajı kuyruğa alındı: ${queued.queue_id}`);
+      } catch (error) {
+        notice(error.message || 'Test mesajı kuyruğa alınamadı.');
+      } finally {
+        button.disabled = false;
+      }
+    };
   },
   'company-stores': async () => {
     const stores=await apiFetch('/portal/stores');

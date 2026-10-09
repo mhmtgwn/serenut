@@ -5,7 +5,6 @@ import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
 import { isNotificationChannelEnabled } from './notification_channels';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
-import { parseTemplatePayload, WhatsAppProviderError } from '../whatsapp/whatsapp.service';
 
 const router = Router();
 
@@ -116,7 +115,7 @@ async function hasSufficientCredits(companyId: string, channel: string): Promise
  */
 router.post('/send-direct', enforceNotificationRateLimit, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { channel, recipient, title, body, template_name, template_payload, provider_payload, scheduled_at } = req.body;
+  const { channel, recipient, title, body, template_name, template_payload, scheduled_at } = req.body;
 
   if (!channel || !recipient) {
     return res.status(400).json({ error: 'missing_fields', message: 'Kanal ve alıcı bilgileri zorunludur.' });
@@ -129,6 +128,22 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
   }
 
   try {
+    if (channel === 'whatsapp') {
+      const connection = await runWithTenantContext(
+        user.company_id,
+        `SELECT status,evolution_status FROM company_whatsapp_connections
+         WHERE company_id=$1 AND gateway_type='evolution'`,
+        [user.company_id],
+      );
+      const row = connection.rows[0];
+      if (!row || row.status !== 'active' || row.evolution_status !== 'open') {
+        return res.status(409).json({
+          error: 'whatsapp_not_connected',
+          message: 'WhatsApp Evolution API bağlantısı açık değil.',
+        });
+      }
+    }
+
     // 1. Verify credits
     const hasCredit = await hasSufficientCredits(user.company_id, channel);
     if (!hasCredit) {
@@ -155,10 +170,6 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
       return res.status(400).json({ error: 'empty_message', message: 'Mesaj içeriği boş olamaz.' });
     }
 
-    const finalProviderPayload = channel === 'whatsapp'
-      ? parseTemplatePayload(provider_payload)
-      : null;
-
     // 3. Insert into queue
     const id = `notif-${Date.now()}-${Math.floor(Math.random()*1000)}`;
     const parsedScheduledAt = scheduled_at ? new Date(scheduled_at) : new Date();
@@ -169,14 +180,11 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
          (id, company_id, channel, recipient, title, body, provider_payload, scheduled_at, created_by_user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
       [id, user.company_id, channel, recipient, title || null, finalBody,
-        finalProviderPayload ? JSON.stringify(finalProviderPayload) : null, parsedScheduledAt, user.id]
+        null, parsedScheduledAt, user.id]
     );
 
     return res.status(201).json({ success: true, queue_id: id });
   } catch (err) {
-    if (err instanceof WhatsAppProviderError) {
-      return res.status(err.httpStatus).json({ error: err.code, message: err.message });
-    }
     logger.error('Failed direct notify queue push:', err);
     return res.status(500).json({ error: 'server_error' });
   }

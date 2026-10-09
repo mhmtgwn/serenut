@@ -140,7 +140,7 @@ extension _SettingsPageUiHelpers on _SettingsPageState {
       await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Ayarlar güncellenirken hata oluştu: $e'),
           backgroundColor: _kPink,

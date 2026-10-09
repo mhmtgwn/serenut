@@ -9,6 +9,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
 
@@ -81,7 +83,9 @@ class AccountPage extends ConsumerWidget {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
-              await ref.read(authNotifierProvider.notifier).logout('Kullanıcı değiştirildi.');
+              await ref
+                  .read(authNotifierProvider.notifier)
+                  .logout('Kullanıcı değiştirildi.');
               if (context.mounted) context.go(AppRoutes.login);
             },
           ),
@@ -94,7 +98,8 @@ class AccountPage extends ConsumerWidget {
           _AccountAction(
             icon: Icons.history_rounded,
             title: 'Oturum & Çıkış Geçmişi',
-            subtitle: 'Son oturum sonlandırma ve otomatik çıkış nedenlerini inceleyin',
+            subtitle:
+                'Son oturum sonlandırma ve otomatik çıkış nedenlerini inceleyin',
             onTap: () => _showLogoutHistoryDialog(context, ref),
           ),
           const SizedBox(height: 12),
@@ -107,7 +112,9 @@ class AccountPage extends ConsumerWidget {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
               }
-              await ref.read(authNotifierProvider.notifier).logout('Kullanıcı oturumu kapattı.');
+              await ref
+                  .read(authNotifierProvider.notifier)
+                  .logout('Kullanıcı oturumu kapattı.');
               if (context.mounted) context.go(AppRoutes.login);
             },
             icon: const Icon(Icons.logout_rounded),
@@ -160,9 +167,10 @@ class AccountPage extends ConsumerWidget {
                   .read(authNotifierProvider.notifier)
                   .updateProfileName(newName);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                AppNotificationHost.show(
                   SnackBar(
-                    content: Text('Kasiyer ismi "$newName" olarak güncellendi.'),
+                    content:
+                        Text('Kasiyer ismi "$newName" olarak güncellendi.'),
                     backgroundColor: POSColors.green,
                   ),
                 );
@@ -335,10 +343,10 @@ class AccountPage extends ConsumerWidget {
 
                             if (context.mounted) {
                               Navigator.pop(dialogCtx);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              AppNotificationHost.show(
                                 const SnackBar(
-                                  content: Text(
-                                      'Şifreniz başarıyla güncellendi.'),
+                                  content:
+                                      Text('Şifreniz başarıyla güncellendi.'),
                                   backgroundColor: POSColors.green,
                                 ),
                               );
@@ -586,8 +594,10 @@ class _ProfileCard extends ConsumerWidget {
                   icon: const Icon(Icons.edit_outlined,
                       size: 18, color: POSColors.green),
                   tooltip: 'Kasiyer / Kullanıcı İsmini Değiştir',
-                  onPressed: () => (context.findAncestorWidgetOfExactType<AccountPage>() ?? const AccountPage())
-                      ._showEditNameDialog(context, ref, user.name),
+                  onPressed: () =>
+                      (context.findAncestorWidgetOfExactType<AccountPage>() ??
+                              const AccountPage())
+                          ._showEditNameDialog(context, ref, user.name),
                 ),
               ],
             ),

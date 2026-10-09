@@ -116,7 +116,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
         openAppSettings();
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             const SnackBar(
               content: Text('Rehbere erişim izni reddedildi.'),
               backgroundColor: _kPink,
@@ -127,7 +127,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       }
     } on MissingPluginException catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text(
                 'Bu platform rehber erişimini desteklemiyor (VCF içe aktarma seçeneğini kullanabilirsiniz).'),
@@ -360,7 +360,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('${parsed.length} kişi dosyadan yüklendi.'),
             backgroundColor: _kGreen,
@@ -828,7 +828,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
 
                         if (context.mounted) {
                           Navigator.pop(context); // Close the ContactImportPage
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             SnackBar(
                               content: Text(
                                 importedCount > 0

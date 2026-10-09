@@ -24,7 +24,7 @@ abstract class BaseRepository<T> {
   Future<List<T>> findAll();
 
   /// Get by ID
-  Future<T?> findById(dynamic id);
+  Future<T?> findById(String id);
 
   /// Create new record
   Future<int> create(T entity);
@@ -33,13 +33,13 @@ abstract class BaseRepository<T> {
   Future<int> update(T entity);
 
   /// Delete by ID (soft delete with last_modified_at)
-  Future<int> delete(dynamic id);
+  Future<int> delete(String id);
 
   /// Count total records
   Future<int> count();
 
   /// Check if exists
-  Future<bool> exists(dynamic id);
+  Future<bool> exists(String id);
 }
 
 class ProductInventorySummary {
@@ -201,7 +201,8 @@ class CustomerPhoneConflictException implements Exception {
   final String message;
   final CustomerEntity conflictingCustomer;
 
-  CustomerPhoneConflictException(this.message, {required this.conflictingCustomer});
+  CustomerPhoneConflictException(this.message,
+      {required this.conflictingCustomer});
 
   @override
   String toString() => message;
@@ -828,8 +829,8 @@ class OrderEntity {
         id: (map['id'] ?? '').toString(),
         orderNumber: (map['order_number'] ?? '').toString(),
         customerId: (map['customer_id'] ?? '').toString(),
-        customerName: map['customer_name']?.toString() ??
-            map['customerName']?.toString(),
+        customerName:
+            map['customer_name']?.toString() ?? map['customerName']?.toString(),
         customerPhone: map['customer_phone']?.toString() ??
             map['customerPhone']?.toString(),
         status: (map['status'] ?? 'created').toString(),

@@ -64,7 +64,7 @@ class SqliteOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<OrderEntity?> findById(dynamic id) async {
+  Future<OrderEntity?> findById(String id) async {
     final rows = await _executor.rawQuery('''
       SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
       FROM orders o
@@ -102,7 +102,8 @@ class SqliteOrderRepository implements IOrderRepository {
             FROM orders
             WHERE order_number LIKE 'SP-%'
           ''');
-          if (maxOrderRows.isNotEmpty && maxOrderRows.first['max_num'] != null) {
+          if (maxOrderRows.isNotEmpty &&
+              maxOrderRows.first['max_num'] != null) {
             final maxExisting = (maxOrderRows.first['max_num'] as num).toInt();
             if (maxExisting >= nextValue) {
               nextValue = maxExisting + 1;
@@ -186,10 +187,15 @@ class SqliteOrderRepository implements IOrderRepository {
         whereArgs: [entity.id],
         limit: 1,
       );
-      final existingNum = existing.isNotEmpty ? (existing.first['order_number']?.toString() ?? '') : '';
-      final orderNumber = entity.orderNumber.isNotEmpty && !entity.orderNumber.startsWith('SYNC-')
+      final existingNum = existing.isNotEmpty
+          ? (existing.first['order_number']?.toString() ?? '')
+          : '';
+      final orderNumber = entity.orderNumber.isNotEmpty &&
+              !entity.orderNumber.startsWith('SYNC-')
           ? entity.orderNumber
-          : (existingNum.isNotEmpty && !existingNum.startsWith('SYNC-') ? existingNum : entity.orderNumber);
+          : (existingNum.isNotEmpty && !existingNum.startsWith('SYNC-')
+              ? existingNum
+              : entity.orderNumber);
 
       final payload = {
         'id': entity.id,
@@ -235,7 +241,7 @@ class SqliteOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     // Soft delete order, keep order_items intact so we can restore!
     return _gateway.transaction(() async {
       final payload = {
@@ -263,7 +269,7 @@ class SqliteOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final result = await _executor.query('orders',
         where: 'id = ?', whereArgs: [id], limit: 1);
     return result.isNotEmpty;
@@ -394,7 +400,8 @@ class SqliteOrderRepository implements IOrderRepository {
       final normalizedQuery = trimmed.normalizeTurkish;
       final qPattern = '%$normalizedQuery%';
       final rawPattern = '%$trimmed%';
-      conditions.add('(o.id LIKE ? OR o.order_number LIKE ? OR o.notes LIKE ? OR o.customer_id IN '
+      conditions.add(
+          '(o.id LIKE ? OR o.order_number LIKE ? OR o.notes LIKE ? OR o.customer_id IN '
           '(SELECT id FROM customers WHERE ${sqliteTurkishFold('name')} LIKE ? OR phone LIKE ?))');
       args.addAll([
         rawPattern,

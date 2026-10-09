@@ -29,6 +29,7 @@ import 'package:serenutos/infrastructure/repositories/sqlite_order_repository.da
 import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
 import 'package:serenutos/domain/services/demo_data_seeder.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // Step wrappers — GoRouter route builder'larında kullanılan widget'lar
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +187,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
               onPressed: () {
                 Clipboard.setData(
                     ClipboardData(text: recoveryCodes.join('\n')));
-                ScaffoldMessenger.of(context).showSnackBar(
+                AppNotificationHost.show(
                   const SnackBar(
                     content: Text('Kurtarma kodları panoya kopyalandı!'),
                     backgroundColor: POSColors.green,
@@ -206,7 +207,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       if (mounted) context.go('/onboarding/success');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Kayıt hatası: $e'),
             backgroundColor: Colors.red,

@@ -50,16 +50,19 @@ class OrderCancellationService {
       }
       customerId = order.customerId;
       items = order.items;
-      totalAmount = MathEngine.calculateMappedItemsTotal(order.items);
       final transactions =
           await _transactionRepository.getByCustomerId(order.customerId);
       final relatedTransactions = transactions.where(
         (tx) => tx.referenceId == order.id && (tx.type == 'sale' || tx.type == 'payment'),
       );
-      paidAmount = relatedTransactions.fold<double>(
-        0.0,
-        (sum, tx) => sum + tx.paidAmount,
-      );
+      final saleTx = relatedTransactions.where((tx) => tx.type == 'sale').firstOrNull;
+      totalAmount = saleTx?.amount ?? order.totalAmount;
+      final saleDebt = saleTx?.debtAmount ?? (totalAmount - order.discountAmount).clamp(0.0, double.infinity);
+      final subsequentPayments = relatedTransactions.where((tx) => tx.type == 'payment' || tx.type == 'collection');
+      final subsequentPaid = subsequentPayments.fold<double>(0.0, (sum, tx) => sum + tx.paidAmount);
+      final actualOrderDebt = (saleDebt - subsequentPaid).clamp(0.0, double.infinity);
+      final actualMoneyPaid = (saleTx?.paidAmount ?? 0.0) + subsequentPaid;
+      paidAmount = (totalAmount - actualOrderDebt).clamp(0.0, totalAmount);
       await _orderRepository.updateStatus(id, 'cancelled');
 
       // 2. Restore stock
@@ -95,11 +98,11 @@ class OrderCancellationService {
       );
 
       // 3.1 Sipariş için daha önce fiilen ödeme/tahsilat yapılmışsa, para müşterinin cari hesabına alacak olarak iade edilir
-      if (paidAmount > 0.009 && customerId.isNotEmpty) {
+      if (actualMoneyPaid > 0.009 && customerId.isNotEmpty) {
         await _paymentService.processRefund(
           saleId: id,
           customerId: customerId,
-          refundTotal: paidAmount,
+          refundTotal: actualMoneyPaid,
           refundMethod: 'balance',
         );
       }

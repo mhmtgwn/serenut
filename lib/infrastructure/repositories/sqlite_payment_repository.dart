@@ -80,7 +80,7 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<SaleEntity?> findById(dynamic id) async {
+  Future<SaleEntity?> findById(String id) async {
     final rows = await _executor.query(
       'sales',
       where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
@@ -270,7 +270,7 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     return _gateway.transaction(() async {
       final payload = {
         'is_deleted': 1,
@@ -296,7 +296,7 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final result = await _executor.query(
       'sales',
       where: 'id = ?',
@@ -410,7 +410,7 @@ class SqliteFinancialTransactionRepository
   }
 
   @override
-  Future<FinancialTransactionEntity?> findById(dynamic id) async {
+  Future<FinancialTransactionEntity?> findById(String id) async {
     final rows = await _executor.query(
       'financial_transactions',
       where: 'id = ?',
@@ -559,7 +559,7 @@ class SqliteFinancialTransactionRepository
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     throw UnsupportedError(
         'Finansal defter kayıtları silinemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.');
   }
@@ -572,7 +572,7 @@ class SqliteFinancialTransactionRepository
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final result = await _executor.query(
       'financial_transactions',
       where: 'id = ?',

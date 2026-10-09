@@ -14,12 +14,7 @@ import { pgPool, redisClient } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
 import { assertNotificationChannelEnabled } from '../modules/notification/notification_channels';
-import {
-  decryptAccessToken,
-  parseTemplatePayload,
-  sendTemplateMessage,
-  WhatsAppProviderError,
-} from '../modules/whatsapp/whatsapp.service';
+import { sendTextMessage as sendEvolutionTextMessage } from '../modules/whatsapp/evolution.service';
 
 // ── REDIS BAĞLANTI AYARLARI ──────────────────────────────────────────────────
 // BullMQ kendi ioredis bağlantısını yönetir.
@@ -214,30 +209,18 @@ async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
   );
   if (existing.rows[0]?.provider_message_id) return true;
 
-  const gateway = process.env.WHATSAPP_GATEWAY ?? 'meta';
-
-  if (gateway === 'evolution') {
-    return dispatchWhatsAppEvolution(data);
-  }
-  return dispatchWhatsAppMeta(data);
-}
-
-/** Evolution API (QR tabanlı) ile WhatsApp mesajı gönderir. Şablon gerektirmez. */
-async function dispatchWhatsAppEvolution(data: NotificationJobData): Promise<boolean> {
-  const { sendTextMessage: evolutionSend } = await import('../modules/whatsapp/evolution.service');
-
   const connection = await runBypassingRLS(
-    `SELECT evolution_instance_id, evolution_status, status
+    `SELECT gateway_type, evolution_instance_id, evolution_status, status
      FROM company_whatsapp_connections
-     WHERE company_id=$1 AND gateway_type='evolution'`,
+     WHERE company_id=$1`,
     [data.company_id],
   );
   const row = connection.rows[0];
-  if (!row || row.status !== 'active' || row.evolution_status !== 'open') {
+  if (!row || row.gateway_type !== 'evolution' || row.status !== 'active' || row.evolution_status !== 'open') {
     throw new Error('evolution_whatsapp_not_connected');
   }
 
-  const messageId = await evolutionSend(data.company_id, data.recipient, data.body);
+  const messageId = await sendEvolutionTextMessage(data.company_id, data.recipient, data.body);
 
   await runBypassingRLS(
     `UPDATE notification_queue
@@ -253,53 +236,6 @@ async function dispatchWhatsAppEvolution(data: NotificationJobData): Promise<boo
     [data.company_id],
   );
 
-  return true;
-}
-
-/** Meta Cloud API (şablon tabanlı) ile WhatsApp mesajı gönderir. */
-async function dispatchWhatsAppMeta(data: NotificationJobData): Promise<boolean> {
-  const connection = await runBypassingRLS(
-    `SELECT phone_number_id,encrypted_access_token,status
-     FROM company_whatsapp_connections WHERE company_id=$1 AND gateway_type='meta'`,
-    [data.company_id],
-  );
-  const row = connection.rows[0];
-  if (!row || row.status !== 'active') {
-    throw new Error('whatsapp_connection_not_active');
-  }
-
-  const payload = parseTemplatePayload(data.provider_payload);
-  let providerMessageId: string;
-  try {
-    providerMessageId = await sendTemplateMessage({
-      accessToken: decryptAccessToken(row.encrypted_access_token),
-      phoneNumberId: row.phone_number_id,
-      recipient: data.recipient,
-      payload,
-    });
-  } catch (error) {
-    const providerError = error instanceof WhatsAppProviderError ? error : null;
-    const requiresAuthorization = providerError?.code === '190' || providerError?.httpStatus === 401;
-    await runBypassingRLS(
-      `UPDATE company_whatsapp_connections
-       SET status=CASE WHEN $1 THEN 'reauthorization_required' ELSE status END,
-           last_error_code=$2,last_error_message=$3,updated_at=NOW()
-       WHERE company_id=$4`,
-      [requiresAuthorization, providerError?.code || 'send_failed', error instanceof Error ? error.message : String(error), data.company_id],
-    );
-    throw error;
-  }
-  await runBypassingRLS(
-    `WITH message_update AS (
-       UPDATE notification_queue
-       SET provider_message_id=$1,provider_status='accepted',provider_error_code=NULL,updated_at=NOW()
-       WHERE id=$2 AND company_id=$3 AND channel='whatsapp' RETURNING id
-     )
-     UPDATE company_whatsapp_connections
-     SET last_verified_at=NOW(),last_error_code=NULL,last_error_message=NULL,updated_at=NOW()
-     WHERE company_id=$3 AND EXISTS(SELECT 1 FROM message_update)`,
-    [providerMessageId, data.notification_id, data.company_id],
-  );
   return true;
 }
 
@@ -431,7 +367,7 @@ async function markFailed(notificationId: string, companyId: string, channel: st
 }
 
 export async function reserveNotificationCredit(notificationId: string, companyId: string, channel: string): Promise<boolean> {
-  if (channel === 'push' || (channel === 'whatsapp' && process.env.WHATSAPP_GATEWAY === 'evolution')) return true;
+  if (channel === 'push' || channel === 'whatsapp') return true;
   const creditCol = creditColumn(channel);
   const client = await pgPool.connect();
   let allowed = false;
@@ -565,11 +501,32 @@ export function startNotificationWorker(): void {
 
   logger.info('[NotificationWorker] ✅ BullMQ worker başlatıldı (concurrency=5)');
 
-  void dispatchNotificationOutboxBatch();
+  void recoverEvolutionWhatsAppNotifications()
+    .then(() => dispatchNotificationOutboxBatch())
+    .catch((error) => {
+      logger.error('[NotificationWorker] WhatsApp recovery failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   outboxDispatcher = setInterval(() => {
     void dispatchNotificationOutboxBatch();
   }, 2_000);
   outboxDispatcher.unref();
+}
+
+async function recoverEvolutionWhatsAppNotifications(): Promise<void> {
+  const result = await runBypassingRLS(
+    `UPDATE notification_queue
+     SET status='queued', retry_count=0, next_retry_at=NULL,
+         error_message=NULL, updated_at=NOW()
+     WHERE channel='whatsapp' AND status='failed'
+       AND error_message='evolution_recovery_pending'
+       AND provider_message_id IS NULL
+     RETURNING id`,
+  );
+  if (result.rowCount) {
+    logger.info(`[NotificationWorker] ${result.rowCount} eski WhatsApp bildirimi Evolution için kuyruğa alındı`);
+  }
 }
 
 // ── YARDIMCI: Kuyruğa Bildirim Ekle ─────────────────────────────────────────

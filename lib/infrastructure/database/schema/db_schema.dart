@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:serenutos/infrastructure/database/product_search_index.dart';
 
 class DatabaseSchema {
   static Future<void> createTables(Database db) async {
@@ -532,6 +533,7 @@ class DatabaseSchema {
         'CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
 
     await _createPrintingV2Tables(db);
+    await ProductSearchIndex.ensure(db, rebuild: true);
 
     // Audit Events table
     await db.execute('''

@@ -9,6 +9,8 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class CatalogSettingsPage extends ConsumerWidget {
   const CatalogSettingsPage({super.key});
 
@@ -168,7 +170,7 @@ class CatalogSettingsPage extends ConsumerWidget {
     final rate = vatText.isEmpty ? null : int.tryParse(vatText);
     if (newName.isEmpty ||
         (vatText.isNotEmpty && (rate == null || rate < 0 || rate > 100))) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
             content: Text(
                 'Lütfen geçerli bir kategori adı ve 0-100 arasında bir KDV oranı girin.')),

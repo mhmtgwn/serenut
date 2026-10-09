@@ -15,6 +15,8 @@ import 'package:serenutos/presentation/pages/sale_details_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class QrOrderScannerDialog extends ConsumerStatefulWidget {
   const QrOrderScannerDialog({super.key});
 
@@ -148,12 +150,13 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
 
       // ── 4. Ürün Barkodu Kontrolü (Satış ekranına yönlendirme) ──
       final productRepo = await ref.read(productRepositoryProvider.future);
-      final products = await productRepo.findFiltered(searchQuery: clean, limit: 1);
+      final products =
+          await productRepo.findFiltered(searchQuery: clean, limit: 1);
       if (products.isNotEmpty) {
         final product = products.first;
         if (!mounted) return;
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             behavior: SnackBarBehavior.floating,
             content: Text(
@@ -209,7 +212,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
       if (direct != null) return direct;
 
       // 2. Filtreli ara (Sipariş no veya ID kısmi eşleşmesi)
-      final filtered = await orderRepo.findFiltered(searchQuery: query, limit: 1);
+      final filtered =
+          await orderRepo.findFiltered(searchQuery: query, limit: 1);
       if (filtered.isNotEmpty) return filtered.first;
     } catch (_) {}
     return null;
@@ -250,7 +254,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
         color: Colors.transparent,
         child: Container(
           width: isDesktop ? 540 : size.width * 0.92,
-          constraints: BoxConstraints(maxHeight: isDesktop ? 680 : size.height * 0.88),
+          constraints:
+              BoxConstraints(maxHeight: isDesktop ? 680 : size.height * 0.88),
           decoration: BoxDecoration(
             color: POSColors.card,
             borderRadius: BorderRadius.circular(24),
@@ -335,7 +340,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
           IconButton(
             tooltip: 'Kapat',
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded, color: POSColors.textSecondary),
+            icon:
+                const Icon(Icons.close_rounded, color: POSColors.textSecondary),
           ),
         ],
       ),
@@ -400,7 +406,9 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
                   tooltip: _isTorchOn ? 'Feneri Kapat' : 'Feneri Aç',
                   onPressed: _toggleTorch,
                   icon: Icon(
-                    _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                    _isTorchOn
+                        ? Icons.flash_on_rounded
+                        : Icons.flash_off_rounded,
                     color: _isTorchOn ? Colors.amber : Colors.white,
                     size: 18,
                   ),
@@ -458,7 +466,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.barcode_reader, size: 36, color: POSColors.green.withValues(alpha: 0.8)),
+          Icon(Icons.barcode_reader,
+              size: 36, color: POSColors.green.withValues(alpha: 0.8)),
           const SizedBox(width: 14),
           const Expanded(
             child: Column(
@@ -543,8 +552,10 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
                   enabled: !_isResolving,
                   decoration: InputDecoration(
                     hintText: 'Sipariş No, Fiş No veya Barkod…',
-                    hintStyle: const TextStyle(fontSize: 13, color: POSColors.textSecondary),
-                    prefixIcon: const Icon(Icons.keyboard_alt_outlined, size: 20),
+                    hintStyle: const TextStyle(
+                        fontSize: 13, color: POSColors.textSecondary),
+                    prefixIcon:
+                        const Icon(Icons.keyboard_alt_outlined, size: 20),
                     suffixIcon: _inputController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
@@ -569,7 +580,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: POSColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: POSColors.green, width: 1.5),
                     ),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -584,7 +596,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: POSColors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

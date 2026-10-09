@@ -10,6 +10,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_state.dart';
 import 'package:serenutos/presentation/pages/onboarding/widgets/step_indicator.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 // İşletme türleri
 const List<_BusinessType> _businessTypes = [
   _BusinessType(icon: Icons.eco_rounded, label: 'Fındıkçı'),
@@ -125,7 +127,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_data.businessType.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Lütfen işletme türünü seçin'),
           behavior: SnackBarBehavior.floating,

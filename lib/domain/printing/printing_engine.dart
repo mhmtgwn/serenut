@@ -146,28 +146,30 @@ class PrintQueueCoordinator {
             retryable: false,
           );
         }
-        final observation = await transport.single.send(
-          bytes: rendered.bytes,
-          copies: job.copies,
-          configuration: Map<String, Object?>.from(
-            snapshot['config'] as Map? ?? const {},
-          ),
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () => throw const PrintTransportException(
-            code: 'transport_timeout',
-            message: 'Yazıcı yanıt vermedi (15 saniye zaman aşımı).',
-            retryable: true,
-          ),
-        );
+        final observation = await transport.single
+            .send(
+              bytes: rendered.bytes,
+              copies: job.copies,
+              configuration: Map<String, Object?>.from(
+                snapshot['config'] as Map? ?? const {},
+              ),
+            )
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw const PrintTransportException(
+                code: 'transport_timeout',
+                message: 'Yazıcı yanıt vermedi (15 saniye zaman aşımı).',
+                retryable: true,
+              ),
+            );
         await repository.markDelivered(job.id, observation.toJson());
         _emit(job, PrintCoordinatorEventType.delivered,
             'İş yazıcıya teslim edildi.');
       } on PrintTransportException catch (error) {
         if (error.deliveryUncertain) {
           await repository.markDeliveryUncertain(job.id, error.message);
-          _emit(job, PrintCoordinatorEventType.awaitingUserCheck,
-              'Fiziksel çıktı doğrulanmalı.');
+          _emit(
+              job, PrintCoordinatorEventType.awaitingUserCheck, error.message);
         } else {
           await repository.markAttemptFailed(
             job.id,

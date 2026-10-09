@@ -9,6 +9,8 @@ import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.d
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class BackupManagePage extends ConsumerStatefulWidget {
   const BackupManagePage({super.key});
 
@@ -35,7 +37,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(content: Text('Yedekler listelenirken hata oluştu: $e')),
         );
       }
@@ -49,7 +51,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
     try {
       final path = await ref.read(backupServiceProvider).backupDatabase();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text(
                   'Yeni yedek başarıyla oluşturuldu: ${path.split(Platform.pathSeparator).last}')),
@@ -58,7 +60,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
       _refreshBackups();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(content: Text('Yedek alınırken hata oluştu: $e')),
         );
       }
@@ -130,7 +132,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             SnackBar(content: Text('Geri yükleme başarısız: $e')),
           );
         }

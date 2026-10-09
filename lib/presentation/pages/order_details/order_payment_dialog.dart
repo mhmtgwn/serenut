@@ -151,7 +151,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
   Future<void> _submitPayment() async {
     final amount = _effectiveAmount;
     if (amount <= 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Lütfen geçerli bir ödeme tutarı girin.'),
           backgroundColor: _kRed,
@@ -162,7 +162,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
     }
 
     if (amount > _remainingDebt + 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text(
               'Girilen tutar (₺${amount.toStringAsFixed(2)}) kalan borçtan (₺${_remainingDebt.toStringAsFixed(2)}) fazla olamaz.'),
@@ -174,7 +174,6 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
     }
 
     final container = ProviderScope.containerOf(context);
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     setState(() => _isSubmitting = true);
@@ -287,7 +286,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
             var safeSettings = settings;
             if (safeSettings == null) {
               try {
-                final repo = await container.read(settingsRepositoryProvider.future);
+                final repo =
+                    await container.read(settingsRepositoryProvider.future);
                 safeSettings = await repo.getSettings();
               } catch (_) {}
             }
@@ -351,7 +351,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       if (mounted) {
         navigator.pop();
         final remaining = _newRemainingDebt;
-        messenger.showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(
               remaining <= 0.01
@@ -373,7 +373,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       }
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Ödeme kaydedilemedi: $e'),
             backgroundColor: _kRed,
@@ -565,8 +565,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*[\.,]?\d{0,2}')),
@@ -736,9 +736,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                                     hintText: '0.00',
                                     filled: true,
                                     fillColor: Colors.white,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 10),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                       borderSide: const BorderSide(
@@ -781,9 +780,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                                     hintText: '0.00',
                                     filled: true,
                                     fillColor: Colors.white,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 10),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                       borderSide: const BorderSide(
@@ -803,8 +801,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                               ActionChip(
                                 label: const Text('Eşit Böl (50 / 50)'),
                                 backgroundColor: Colors.white,
-                                side: const BorderSide(
-                                    color: Color(0xFFD8B4FE)),
+                                side:
+                                    const BorderSide(color: Color(0xFFD8B4FE)),
                                 labelStyle: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -822,8 +820,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                               ActionChip(
                                 label: const Text('Kalanı Nakite Tamamla'),
                                 backgroundColor: Colors.white,
-                                side: const BorderSide(
-                                    color: Color(0xFF86EFAC)),
+                                side:
+                                    const BorderSide(color: Color(0xFF86EFAC)),
                                 labelStyle: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -839,8 +837,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                               ActionChip(
                                 label: const Text('Kalanı Karta Tamamla'),
                                 backgroundColor: Colors.white,
-                                side: const BorderSide(
-                                    color: Color(0xFF93C5FD)),
+                                side:
+                                    const BorderSide(color: Color(0xFF93C5FD)),
                                 labelStyle: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -929,8 +927,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
 
                   // ── Fiş Yazdırma Ayarı ────────────────────────────────────
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: _kSurface,
                       borderRadius: BorderRadius.circular(10),
@@ -983,7 +981,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: (_isSubmitting || !isValid) ? null : _submitPayment,
+                  onPressed:
+                      (_isSubmitting || !isValid) ? null : _submitPayment,
                   icon: _isSubmitting
                       ? const SizedBox(
                           width: 20,

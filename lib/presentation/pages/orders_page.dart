@@ -21,7 +21,7 @@ import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
-
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'orders/components/orders_status_meta.dart';
 part 'orders/components/order_card.dart';
 part 'orders/components/orders_views.dart';
@@ -75,8 +75,6 @@ List<OrderDayGroup> _groupOrdersByDay(List<OrderEntity> orders) {
   }).toList();
 }
 
-
-
 // ── Ana Sayfa ─────────────────────────────────────────────────────────────────
 class OrdersPage extends ConsumerStatefulWidget {
   final String? initialStatusFilter;
@@ -111,8 +109,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     _scrollController.addListener(_onScroll);
     // Load initial status counts and apply filter if passed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initialStatusFilter != null && widget.initialStatusFilter != 'all') {
-        ref.read(ordersControllerProvider.notifier).applyFilter(widget.initialStatusFilter!);
+      if (widget.initialStatusFilter != null &&
+          widget.initialStatusFilter != 'all') {
+        ref
+            .read(ordersControllerProvider.notifier)
+            .applyFilter(widget.initialStatusFilter!);
       }
       _refreshCounts();
     });
@@ -175,8 +176,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     _refreshCounts();
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     ref.listen(ordersControllerProvider, (_, next) {
@@ -215,401 +214,386 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     final counts = _statusCounts;
 
     return PosPageLayout(
-          title: 'Siparişler',
-          isSearching: _isSearching,
-          onSearchToggled: (val) => setState(() => _isSearching = val),
-          searchController: _searchController,
-          searchHint: 'Sipariş veya müşteri ara...',
-          onSearchChanged: (val) {
-            _searchDebounce?.cancel();
-            _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                ref.read(ordersControllerProvider.notifier).applySearch(val);
-                _refreshCounts();
-              }
-            });
-          },
-          filterWidget: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWideScreen = constraints.maxWidth >= 960;
-              final filterBar = PosFilterBar(
-                padding: EdgeInsets.zero,
-                selectedId: _statusFilter,
-                onSelected: (newFilter) {
-                  setState(() => _statusFilter = newFilter);
-                  ref
-                      .read(ordersControllerProvider.notifier)
-                      .applyFilter(newFilter);
-                },
-                items: [
-                  PosFilterChipData(
-                    id: 'all',
-                    label: 'Tümü',
-                    count: counts['all'] ?? 0,
-                    icon: Icons.grid_view_rounded,
-                    color: const Color(0xFF64748B),
-                  ),
-                  PosFilterChipData(
-                    id: 'created',
-                    label: 'Yeni',
-                    count: counts['created'] ?? 0,
-                    icon: Icons.fiber_new_rounded,
-                    color: const Color(0xFF3B82F6),
-                  ),
-                  PosFilterChipData(
-                    id: 'preparing',
-                    label: 'Hazırlanıyor',
-                    count: counts['preparing'] ?? 0,
-                    icon: Icons.soup_kitchen_rounded,
-                    color: const Color(0xFFFF9500),
-                  ),
-                  PosFilterChipData(
-                    id: 'ready',
-                    label: 'Hazır',
-                    count: counts['ready'] ?? 0,
-                    icon: Icons.check_circle_rounded,
-                    color: const Color(0xFF16A34A),
-                  ),
-                  PosFilterChipData(
-                    id: 'delivered',
-                    label: 'Teslim Edildi',
-                    count: counts['delivered'] ?? 0,
-                    icon: Icons.task_alt_rounded,
-                    color: const Color(0xFF475569),
-                  ),
-                  PosFilterChipData(
-                    id: 'cancelled',
-                    label: 'İptal',
-                    count: counts['cancelled'] ?? 0,
-                    icon: Icons.cancel_rounded,
-                    color: const Color(0xFFEF4444),
-                  ),
+      title: 'Siparişler',
+      isSearching: _isSearching,
+      onSearchToggled: (val) => setState(() => _isSearching = val),
+      searchController: _searchController,
+      searchHint: 'Sipariş veya müşteri ara...',
+      onSearchChanged: (val) {
+        _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            ref.read(ordersControllerProvider.notifier).applySearch(val);
+            _refreshCounts();
+          }
+        });
+      },
+      filterWidget: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWideScreen = constraints.maxWidth >= 960;
+          final filterBar = PosFilterBar(
+            padding: EdgeInsets.zero,
+            selectedId: _statusFilter,
+            onSelected: (newFilter) {
+              setState(() => _statusFilter = newFilter);
+              ref
+                  .read(ordersControllerProvider.notifier)
+                  .applyFilter(newFilter);
+            },
+            items: [
+              PosFilterChipData(
+                id: 'all',
+                label: 'Tümü',
+                count: counts['all'] ?? 0,
+                icon: Icons.grid_view_rounded,
+                color: const Color(0xFF64748B),
+              ),
+              PosFilterChipData(
+                id: 'created',
+                label: 'Yeni',
+                count: counts['created'] ?? 0,
+                icon: Icons.fiber_new_rounded,
+                color: const Color(0xFF3B82F6),
+              ),
+              PosFilterChipData(
+                id: 'preparing',
+                label: 'Hazırlanıyor',
+                count: counts['preparing'] ?? 0,
+                icon: Icons.soup_kitchen_rounded,
+                color: const Color(0xFFFF9500),
+              ),
+              PosFilterChipData(
+                id: 'ready',
+                label: 'Hazır',
+                count: counts['ready'] ?? 0,
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF16A34A),
+              ),
+              PosFilterChipData(
+                id: 'delivered',
+                label: 'Teslim Edildi',
+                count: counts['delivered'] ?? 0,
+                icon: Icons.task_alt_rounded,
+                color: const Color(0xFF475569),
+              ),
+              PosFilterChipData(
+                id: 'cancelled',
+                label: 'İptal',
+                count: counts['cancelled'] ?? 0,
+                icon: Icons.cancel_rounded,
+                color: const Color(0xFFEF4444),
+              ),
+            ],
+          );
+
+          if (_isSelecting && _selectedIds.isNotEmpty) {
+            if (isWideScreen) {
+              return Row(
+                children: [
+                  Expanded(child: filterBar),
+                  const SizedBox(width: 12),
+                  _buildQuickActionBar(),
                 ],
               );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                filterBar,
+                const SizedBox(height: 8),
+                _buildQuickActionBar(),
+              ],
+            );
+          }
 
-              if (_isSelecting && _selectedIds.isNotEmpty) {
-                if (isWideScreen) {
-                  return Row(
-                    children: [
-                      Expanded(child: filterBar),
-                      const SizedBox(width: 12),
-                      _buildQuickActionBar(),
-                    ],
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    filterBar,
-                    const SizedBox(height: 8),
-                    _buildQuickActionBar(),
-                  ],
-                );
-              }
-
-              return filterBar;
+          return filterBar;
+        },
+      ),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            color: _kGreen,
+            onRefresh: () async {
+              await ref.read(ordersControllerProvider.notifier).refresh();
+              await _refreshCounts();
             },
-          ),
-          body: Stack(
-            children: [
-              RefreshIndicator(
-                color: _kGreen,
-                onRefresh: () async {
-                  await ref.read(ordersControllerProvider.notifier).refresh();
-                  await _refreshCounts();
-                },
-                child: filtered.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.sizeOf(context).height * .55,
-                            child: _EmptyView(
-                              icon: Icons.receipt_long_rounded,
-                              message: _statusFilter == 'all'
-                                  ? 'Henüz sipariş oluşturulmamış.'
-                                  : 'Bu kategoride sipariş yok.',
-                              action: TextButton.icon(
-                                onPressed: () => _showOrderForm(context),
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text('Sipariş Oluştur'),
-                                style:
-                                    TextButton.styleFrom(foregroundColor: _kGreen),
-                              ),
-                            ),
+            child: filtered.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * .55,
+                        child: _EmptyView(
+                          icon: Icons.receipt_long_rounded,
+                          message: _statusFilter == 'all'
+                              ? 'Henüz sipariş oluşturulmamış.'
+                              : 'Bu kategoride sipariş yok.',
+                          action: TextButton.icon(
+                            onPressed: () => _showOrderForm(context),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Sipariş Oluştur'),
+                            style:
+                                TextButton.styleFrom(foregroundColor: _kGreen),
                           ),
-                        ],
-                      )
-                    : NotificationListener<ScrollNotification>(
-                        onNotification: (scrollInfo) {
-                          if (scrollInfo.metrics.pixels >=
-                              scrollInfo.metrics.maxScrollExtent - 400) {
-                            final notifier =
-                                ref.read(ordersControllerProvider.notifier);
-                            final loadingMore =
-                                ref.read(ordersLoadingMoreProvider);
-                            if (notifier.hasMore && !loadingMore) {
-                              notifier.loadNextPage();
-                            }
-                          }
-                          return false;
-                        },
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isWide = constraints.maxWidth >= 720;
-                            final dayGroups = _groupOrdersByDay(filtered);
-
-                            return CustomScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              controller: _scrollController,
-                              slivers: [
-                                for (final group in dayGroups) ...[
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16),
-                                      child: _OrderDateGroupHeader(
-                                        group: group,
-                                        isSelecting: _isSelecting,
-                                        isAllSelected: group
-                                                .selectableIds.isNotEmpty &&
-                                            group.selectableIds.every((id) =>
-                                                _selectedIds.contains(id)),
-                                        onToggleSelectAll: () {
-                                          final selectable =
-                                              group.selectableIds;
-                                          final allSelected = selectable
-                                                  .isNotEmpty &&
-                                              selectable.every((id) =>
-                                                  _selectedIds.contains(id));
-                                          setState(() {
-                                            if (allSelected) {
-                                              _selectedIds
-                                                  .removeAll(selectable);
-                                              if (_selectedIds.isEmpty) {
-                                                _isSelecting = false;
-                                              }
-                                            } else {
-                                              _selectedIds.addAll(selectable);
-                                              _isSelecting = true;
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                  if (isWide)
-                                    SliverPadding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          16, 4, 16, 12),
-                                      sliver: SliverGrid(
-                                        gridDelegate:
-                                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                                          maxCrossAxisExtent: 520,
-                                          mainAxisExtent: 110,
-                                          crossAxisSpacing: 12,
-                                          mainAxisSpacing: 12,
-                                        ),
-                                        delegate:
-                                            SliverChildBuilderDelegate(
-                                          (context, index) {
-                                            final order =
-                                                group.orders[index];
-                                            final customerName =
-                                                (order.customerName != null &&
-                                                        order.customerName!
-                                                            .trim()
-                                                            .isNotEmpty)
-                                                    ? order.customerName!.trim()
-                                                    : (order.customerId.isEmpty
-                                                        ? 'Genel Müşteri'
-                                                        : (customerMapVal
-                                                                .valueOrNull?[
-                                                            order
-                                                                .customerId] ??
-                                                            (customerMapVal
-                                                                    .isLoading
-                                                                ? '...'
-                                                                : 'Bilinmeyen Müşteri')));
-                                            final isDelivered =
-                                                order.status.toLowerCase() ==
-                                                    'delivered';
-                                            final isSelected = _selectedIds
-                                                .contains(order.id);
-                                            return _OrderCard(
-                                              order: order,
-                                              customerName: customerName,
-                                              isGrid: true,
-                                              isSelecting: _isSelecting,
-                                              isSelected: isSelected,
-                                              isSelectable: !isDelivered,
-                                              onSelectChanged: (val) {
-                                                setState(() {
-                                                  if (val == true) {
-                                                    _selectedIds.add(order.id);
-                                                  } else {
-                                                    _selectedIds
-                                                        .remove(order.id);
-                                                  }
-                                                });
-                                              },
-                                              onLongPress: () {
-                                                if (!isDelivered) {
-                                                  setState(() {
-                                                    _isSelecting = true;
-                                                    _selectedIds.add(order.id);
-                                                  });
-                                                }
-                                              },
-                                              onDetail: () {
-                                                OrderDetailsPage.show(context,
-                                                        orderId: order.id)
-                                                    .then((_) {
-                                                  if (mounted) _refreshCounts();
-                                                });
-                                              },
-                                            );
-                                          },
-                                          childCount: group.orders.length,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    SliverPadding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          16, 4, 16, 12),
-                                      sliver: SliverList(
-                                        delegate:
-                                            SliverChildBuilderDelegate(
-                                          (context, index) {
-                                            final order =
-                                                group.orders[index];
-                                            final customerName =
-                                                (order.customerName != null &&
-                                                        order.customerName!
-                                                            .trim()
-                                                            .isNotEmpty)
-                                                    ? order.customerName!.trim()
-                                                    : (order.customerId.isEmpty
-                                                        ? 'Genel Müşteri'
-                                                        : (customerMapVal
-                                                                .valueOrNull?[
-                                                            order
-                                                                .customerId] ??
-                                                            (customerMapVal
-                                                                    .isLoading
-                                                                ? '...'
-                                                                : 'Bilinmeyen Müşteri')));
-                                            final isDelivered =
-                                                order.status.toLowerCase() ==
-                                                    'delivered';
-                                            final isSelected = _selectedIds
-                                                .contains(order.id);
-                                            return _OrderCard(
-                                              order: order,
-                                              customerName: customerName,
-                                              isGrid: false,
-                                              isSelecting: _isSelecting,
-                                              isSelected: isSelected,
-                                              isSelectable: !isDelivered,
-                                              onSelectChanged: (val) {
-                                                setState(() {
-                                                  if (val == true) {
-                                                    _selectedIds.add(order.id);
-                                                  } else {
-                                                    _selectedIds
-                                                        .remove(order.id);
-                                                  }
-                                                });
-                                              },
-                                              onLongPress: () {
-                                                if (!isDelivered) {
-                                                  setState(() {
-                                                    _isSelecting = true;
-                                                    _selectedIds.add(order.id);
-                                                  });
-                                                }
-                                              },
-                                              onDetail: () {
-                                                OrderDetailsPage.show(context,
-                                                        orderId: order.id)
-                                                    .then((_) {
-                                                  if (mounted) _refreshCounts();
-                                                });
-                                              },
-                                            );
-                                          },
-                                          childCount: group.orders.length,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                                if (isLoadingMore)
-                                  const SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 16),
-                                      child: Center(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor:
-                                                AlwaysStoppedAnimation(_kGreen),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            );
-                          },
                         ),
                       ),
-              ),
-              if (ordersAsync.isLoading && filtered.isEmpty)
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: LinearProgressIndicator(
-                    minHeight: 2.5,
-                    valueColor: AlwaysStoppedAnimation(_kGreen),
-                    backgroundColor: Colors.transparent,
+                    ],
+                  )
+                : NotificationListener<ScrollNotification>(
+                    onNotification: (scrollInfo) {
+                      if (scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 400) {
+                        final notifier =
+                            ref.read(ordersControllerProvider.notifier);
+                        final loadingMore = ref.read(ordersLoadingMoreProvider);
+                        if (notifier.hasMore && !loadingMore) {
+                          notifier.loadNextPage();
+                        }
+                      }
+                      return false;
+                    },
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 720;
+                        final dayGroups = _groupOrdersByDay(filtered);
+
+                        return CustomScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          controller: _scrollController,
+                          slivers: [
+                            for (final group in dayGroups) ...[
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: _OrderDateGroupHeader(
+                                    group: group,
+                                    isSelecting: _isSelecting,
+                                    isAllSelected: group
+                                            .selectableIds.isNotEmpty &&
+                                        group.selectableIds.every(
+                                            (id) => _selectedIds.contains(id)),
+                                    onToggleSelectAll: () {
+                                      final selectable = group.selectableIds;
+                                      final allSelected =
+                                          selectable.isNotEmpty &&
+                                              selectable.every((id) =>
+                                                  _selectedIds.contains(id));
+                                      setState(() {
+                                        if (allSelected) {
+                                          _selectedIds.removeAll(selectable);
+                                          if (_selectedIds.isEmpty) {
+                                            _isSelecting = false;
+                                          }
+                                        } else {
+                                          _selectedIds.addAll(selectable);
+                                          _isSelecting = true;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                              if (isWide)
+                                SliverPadding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                  sliver: SliverGrid(
+                                    gridDelegate:
+                                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                                      maxCrossAxisExtent: 520,
+                                      mainAxisExtent: 110,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 12,
+                                    ),
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, index) {
+                                        final order = group.orders[index];
+                                        final customerName = (order
+                                                        .customerName !=
+                                                    null &&
+                                                order.customerName!
+                                                    .trim()
+                                                    .isNotEmpty)
+                                            ? order.customerName!.trim()
+                                            : (order.customerId.isEmpty
+                                                ? 'Genel Müşteri'
+                                                : (customerMapVal.valueOrNull?[
+                                                        order.customerId] ??
+                                                    (customerMapVal.isLoading
+                                                        ? '...'
+                                                        : 'Bilinmeyen Müşteri')));
+                                        final isDelivered =
+                                            order.status.toLowerCase() ==
+                                                'delivered';
+                                        final isSelected =
+                                            _selectedIds.contains(order.id);
+                                        return _OrderCard(
+                                          order: order,
+                                          customerName: customerName,
+                                          isGrid: true,
+                                          isSelecting: _isSelecting,
+                                          isSelected: isSelected,
+                                          isSelectable: !isDelivered,
+                                          onSelectChanged: (val) {
+                                            setState(() {
+                                              if (val == true) {
+                                                _selectedIds.add(order.id);
+                                              } else {
+                                                _selectedIds.remove(order.id);
+                                              }
+                                            });
+                                          },
+                                          onLongPress: () {
+                                            if (!isDelivered) {
+                                              setState(() {
+                                                _isSelecting = true;
+                                                _selectedIds.add(order.id);
+                                              });
+                                            }
+                                          },
+                                          onDetail: () {
+                                            OrderDetailsPage.show(context,
+                                                    orderId: order.id)
+                                                .then((_) {
+                                              if (mounted) _refreshCounts();
+                                            });
+                                          },
+                                        );
+                                      },
+                                      childCount: group.orders.length,
+                                    ),
+                                  ),
+                                )
+                              else
+                                SliverPadding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                  sliver: SliverList(
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, index) {
+                                        final order = group.orders[index];
+                                        final customerName = (order
+                                                        .customerName !=
+                                                    null &&
+                                                order.customerName!
+                                                    .trim()
+                                                    .isNotEmpty)
+                                            ? order.customerName!.trim()
+                                            : (order.customerId.isEmpty
+                                                ? 'Genel Müşteri'
+                                                : (customerMapVal.valueOrNull?[
+                                                        order.customerId] ??
+                                                    (customerMapVal.isLoading
+                                                        ? '...'
+                                                        : 'Bilinmeyen Müşteri')));
+                                        final isDelivered =
+                                            order.status.toLowerCase() ==
+                                                'delivered';
+                                        final isSelected =
+                                            _selectedIds.contains(order.id);
+                                        return _OrderCard(
+                                          order: order,
+                                          customerName: customerName,
+                                          isGrid: false,
+                                          isSelecting: _isSelecting,
+                                          isSelected: isSelected,
+                                          isSelectable: !isDelivered,
+                                          onSelectChanged: (val) {
+                                            setState(() {
+                                              if (val == true) {
+                                                _selectedIds.add(order.id);
+                                              } else {
+                                                _selectedIds.remove(order.id);
+                                              }
+                                            });
+                                          },
+                                          onLongPress: () {
+                                            if (!isDelivered) {
+                                              setState(() {
+                                                _isSelecting = true;
+                                                _selectedIds.add(order.id);
+                                              });
+                                            }
+                                          },
+                                          onDetail: () {
+                                            OrderDetailsPage.show(context,
+                                                    orderId: order.id)
+                                                .then((_) {
+                                              if (mounted) _refreshCounts();
+                                            });
+                                          },
+                                        );
+                                      },
+                                      childCount: group.orders.length,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            if (isLoadingMore)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation(_kGreen),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                ),
-            ],
           ),
-          floatingActionButton: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isDesktop = MediaQuery.of(context).size.width >= 900;
-                    if (isDesktop) {
-                      return FloatingActionButton.extended(
-                        heroTag: 'fab_orders',
-                        tooltip: 'Yeni sipariş oluştur',
-                        onPressed: () => _showOrderForm(context),
-                        backgroundColor: _kGreen,
-                        foregroundColor: Colors.white,
-                        elevation: 3,
-                        icon: const Icon(Icons.add_shopping_cart_rounded),
-                        label: const Text('Yeni Sipariş',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 13)),
-                      );
-                    }
-                    return FloatingActionButton(
-                      heroTag: 'fab_orders',
-                      tooltip: 'Yeni sipariş',
-                      onPressed: () => _showOrderForm(context),
-                      backgroundColor: _kGreen,
-                      foregroundColor: Colors.white,
-                      elevation: 3,
-                      child: const Icon(Icons.add_shopping_cart_rounded),
-                    );
-                  },
-                ),
-        );
+          if (ordersAsync.isLoading && filtered.isEmpty)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                minHeight: 2.5,
+                valueColor: AlwaysStoppedAnimation(_kGreen),
+                backgroundColor: Colors.transparent,
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = MediaQuery.of(context).size.width >= 900;
+          if (isDesktop) {
+            return FloatingActionButton.extended(
+              heroTag: 'fab_orders',
+              tooltip: 'Yeni sipariş oluştur',
+              onPressed: () => _showOrderForm(context),
+              backgroundColor: _kGreen,
+              foregroundColor: Colors.white,
+              elevation: 3,
+              icon: const Icon(Icons.add_shopping_cart_rounded),
+              label: const Text('Yeni Sipariş',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            );
+          }
+          return FloatingActionButton(
+            heroTag: 'fab_orders',
+            tooltip: 'Yeni sipariş',
+            onPressed: () => _showOrderForm(context),
+            backgroundColor: _kGreen,
+            foregroundColor: Colors.white,
+            elevation: 3,
+            child: const Icon(Icons.add_shopping_cart_rounded),
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildQuickActionBar() {
@@ -753,7 +737,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
 
   Future<void> _handleBulkDirectStatusChange(String targetStatus) async {
     if (_selectedIds.isEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
     final container = ProviderScope.containerOf(context);
 
     try {
@@ -772,7 +755,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
         }
       }
 
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text(targetStatus == 'delivered'
               ? '$count sipariş teslim edildi ve teslimat fişleri yazdırıldı.'
@@ -787,9 +770,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
       });
       await _refreshCounts();
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_page_bulk_direct_status');
+      TelemetryService()
+          .logError(e, st, context: 'orders_page_bulk_direct_status');
       if (!mounted) return;
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Durum güncellenemedi: $e'),
           backgroundColor: _kRed,
@@ -828,14 +812,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     );
 
     if (confirmed != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
       final count = await ref
           .read(ordersControllerProvider.notifier)
           .bulkCancelOrders(_selectedIds);
       if (!mounted) return;
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('$count sipariş başarıyla iptal edildi.'),
           backgroundColor: _kGreen,
@@ -849,7 +831,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     } catch (e, st) {
       TelemetryService().logError(e, st, context: 'orders_page_bulk_cancel');
       if (!mounted) return;
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Siparişler iptal edilemedi: $e'),
           backgroundColor: _kRed,
@@ -886,14 +868,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     );
 
     if (confirmed != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
       final count = await ref
           .read(ordersControllerProvider.notifier)
           .bulkDeleteOrders(_selectedIds);
       if (!mounted) return;
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('$count sipariş başarıyla silindi.'),
           backgroundColor: _kGreen,
@@ -907,7 +887,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     } catch (e, st) {
       TelemetryService().logError(e, st, context: 'orders_page_bulk_delete');
       if (!mounted) return;
-      messenger.showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Siparişler silinemedi: $e'),
           backgroundColor: _kRed,

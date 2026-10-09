@@ -34,6 +34,7 @@ class SyncState {
   final String? userFriendlyError;
   final DateTime? lastSyncAt;
   final int pendingOutboxCount;
+  final int unresolvedConflictCount;
 
   const SyncState({
     this.status = SyncStatus.idle,
@@ -42,6 +43,7 @@ class SyncState {
     this.userFriendlyError,
     this.lastSyncAt,
     this.pendingOutboxCount = 0,
+    this.unresolvedConflictCount = 0,
   });
 
   SyncState copyWith({
@@ -52,6 +54,7 @@ class SyncState {
     bool clearError = false,
     DateTime? lastSyncAt,
     int? pendingOutboxCount,
+    int? unresolvedConflictCount,
   }) {
     return SyncState(
       status: status ?? this.status,
@@ -61,6 +64,8 @@ class SyncState {
           clearError ? null : (userFriendlyError ?? this.userFriendlyError),
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
       pendingOutboxCount: pendingOutboxCount ?? this.pendingOutboxCount,
+      unresolvedConflictCount:
+          unresolvedConflictCount ?? this.unresolvedConflictCount,
     );
   }
 }
@@ -111,7 +116,19 @@ class SyncNotifier extends StateNotifier<SyncState>
     try {
       final db = await DatabaseManager().getDatabase();
       final count = await SyncOutboxV4.getPendingCount(db);
-      state = state.copyWith(pendingOutboxCount: count);
+      var conflictCount = 0;
+      try {
+        final conflicts = await db.rawQuery(
+          'SELECT COUNT(*) AS count FROM sync_conflicts_v4 WHERE resolved_at IS NULL',
+        );
+        conflictCount = (conflicts.first['count'] as num?)?.toInt() ?? 0;
+      } catch (_) {
+        // Older/recovered databases may not have the conflict table yet.
+      }
+      state = state.copyWith(
+        pendingOutboxCount: count,
+        unresolvedConflictCount: conflictCount,
+      );
     } catch (_) {}
   }
 
@@ -321,7 +338,9 @@ class SyncNotifier extends StateNotifier<SyncState>
         final types = result.pulledEntityTypes;
         final invalidateAll = types.isEmpty;
 
-        if (invalidateAll || types.contains('settings') || types.contains('company')) {
+        if (invalidateAll ||
+            types.contains('settings') ||
+            types.contains('company')) {
           _ref.invalidate(settingsProvider);
           _ref.invalidate(settingsNotifierProvider);
         }
@@ -336,7 +355,9 @@ class SyncNotifier extends StateNotifier<SyncState>
           _ref.invalidate(productInventorySummaryProvider);
         }
 
-        if (invalidateAll || types.contains('customer') || result.reconciled > 0) {
+        if (invalidateAll ||
+            types.contains('customer') ||
+            result.reconciled > 0) {
           _ref.invalidate(customerRepositoryProvider);
           _ref.invalidate(customersControllerProvider);
           _ref.invalidate(customerBalanceSummaryProvider);
@@ -356,7 +377,9 @@ class SyncNotifier extends StateNotifier<SyncState>
           _ref.invalidate(customerLookupMapProvider);
         }
 
-        if (invalidateAll || types.contains('sale') || types.contains('financial_transaction')) {
+        if (invalidateAll ||
+            types.contains('sale') ||
+            types.contains('financial_transaction')) {
           _ref.invalidate(saleRepositoryProvider);
           _ref.invalidate(financialTransactionRepositoryProvider);
           _ref.invalidate(salesControllerProvider);
@@ -472,5 +495,3 @@ final syncMachineStateProvider = Provider<SyncState?>((ref) {
   // Expose the current SyncState for UI consumption
   return ref.watch(syncProvider);
 });
-
-

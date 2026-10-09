@@ -14,6 +14,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
@@ -116,8 +118,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       color: Color(0xFFE11D48), size: 28),
                   SizedBox(width: 10),
                   Text('Müşteri Zaten Kayıtlı',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ],
               ),
               content: Text(
@@ -155,8 +157,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
         await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               children: [
                 Icon(Icons.warning_amber_rounded,
@@ -164,8 +166,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text('Telefon Numarası Kayıtlı',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
               ],
             ),
@@ -210,7 +212,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
 
       if (mounted) {
         context.pop();
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(
               widget.isEditing
@@ -224,7 +226,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: $e'),
             backgroundColor: _kRed,
@@ -316,8 +318,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                         widget.isEditing
                             ? 'Müşteri bilgilerini düzenleyin'
                             : 'Yeni müşteri hesabı oluşturun',
-                        style:
-                            const TextStyle(color: _kTextSecondary, fontSize: 13),
+                        style: const TextStyle(
+                            color: _kTextSecondary, fontSize: 13),
                       ),
                     ],
                   ),
@@ -336,8 +338,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       icon: Icons.person_rounded,
                       textCapitalization: TextCapitalization.characters,
                       nextFocus: _phoneFocus,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Ad zorunludur'
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     _buildField(
@@ -397,7 +400,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                             ? Icons.save_rounded
                             : Icons.person_add_rounded),
                     label: Text(
-                      widget.isEditing ? 'Değişiklikleri Kaydet' : 'Müşteri Ekle',
+                      widget.isEditing
+                          ? 'Değişiklikleri Kaydet'
+                          : 'Müşteri Ekle',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 15),
                     ),
@@ -420,8 +425,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                   child: Container(
                     constraints:
                         const BoxConstraints(maxWidth: 620, maxHeight: 760),
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),

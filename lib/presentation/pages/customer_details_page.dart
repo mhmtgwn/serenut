@@ -17,6 +17,8 @@ import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
@@ -107,7 +109,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                           Navigator.pop(dialogContext);
                         }
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             const SnackBar(
                               content: Text('Borç hareketi eklendi.'),
                               backgroundColor: _kGreen,
@@ -117,7 +119,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                       } catch (error) {
                         if (dialogContext.mounted) {
                           setDialogState(() => saving = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             SnackBar(content: Text('Borç eklenemedi: $error')),
                           );
                         }
@@ -218,233 +220,243 @@ class CustomerDetailsPage extends ConsumerWidget {
 
         return Scaffold(
           backgroundColor: _kSurface,
-      body: CustomScrollView(
-        slivers: [
-          // ── Hero AppBar + Gradient Card ─────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 200,
-            pinned: true,
-            backgroundColor: isDebt
-                ? _kRed
-                : (isClear ? const Color(0xFF334155) : _kGreen),
-            iconTheme: const IconThemeData(color: Colors.white),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_rounded, color: Colors.white),
-                tooltip: 'Düzenle',
-                onPressed: () => context.push('/customers/edit/${customer.id}',
-                    extra: customer),
-              ),
-              if (customer.id.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      color: Colors.white),
-                  tooltip: 'Sil',
-                  onPressed: () => _confirmDelete(context, ref, customer),
-                ),
-              // ── WhatsApp Bakiye Bildirimi ──
-              if (customer.phone.trim().isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.chat_bubble_rounded, color: Colors.white),
-                  tooltip: 'WhatsApp ile Bakiye Gönder',
-                  onPressed: () => _sendWhatsAppBalance(context, customer),
-                ),
-              // ── Phase 4: PDF / Excel / SMS Export Button ──
-              IconButton(
-                icon: const Icon(Icons.upload_rounded, color: Colors.white),
-                tooltip: 'Dışa Aktar',
-                onPressed: () {
-                  final txs = transactionsVal.maybeWhen(
-                    data: (list) => list,
-                    orElse: () => <FinancialTransactionEntity>[],
-                  );
-                  ExportBottomSheet.show(
-                    context,
-                    customer: customer,
-                    transactions: txs,
-                  );
-                },
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDebt
-                        ? [const Color(0xFFDC2626), const Color(0xFFB91C1C)]
-                        : isClear
-                            ? [const Color(0xFF334155), const Color(0xFF1E293B)]
-                            : [const Color(0xFF16A34A), const Color(0xFF15803D)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+          body: CustomScrollView(
+            slivers: [
+              // ── Hero AppBar + Gradient Card ─────────────────────────────────────
+              SliverAppBar(
+                expandedHeight: 200,
+                pinned: true,
+                backgroundColor: isDebt
+                    ? _kRed
+                    : (isClear ? const Color(0xFF334155) : _kGreen),
+                iconTheme: const IconThemeData(color: Colors.white),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                    tooltip: 'Düzenle',
+                    onPressed: () => context.push(
+                        '/customers/edit/${customer.id}',
+                        extra: customer),
+                  ),
+                  if (customer.id.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: Colors.white),
+                      tooltip: 'Sil',
+                      onPressed: () => _confirmDelete(context, ref, customer),
+                    ),
+                  // ── WhatsApp Bakiye Bildirimi ──
+                  if (customer.phone.trim().isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_rounded,
+                          color: Colors.white),
+                      tooltip: 'WhatsApp ile Bakiye Gönder',
+                      onPressed: () => _sendWhatsAppBalance(context, customer),
+                    ),
+                  // ── Phase 4: PDF / Excel / SMS Export Button ──
+                  IconButton(
+                    icon: const Icon(Icons.upload_rounded, color: Colors.white),
+                    tooltip: 'Dışa Aktar',
+                    onPressed: () {
+                      final txs = transactionsVal.maybeWhen(
+                        data: (list) => list,
+                        orElse: () => <FinancialTransactionEntity>[],
+                      );
+                      ExportBottomSheet.show(
+                        context,
+                        customer: customer,
+                        transactions: txs,
+                      );
+                    },
+                  ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDebt
+                            ? [const Color(0xFFDC2626), const Color(0xFFB91C1C)]
+                            : isClear
+                                ? [
+                                    const Color(0xFF334155),
+                                    const Color(0xFF1E293B)
+                                  ]
+                                : [
+                                    const Color(0xFF16A34A),
+                                    const Color(0xFF15803D)
+                                  ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 32),
+                          // Avatar
+                          CircleAvatar(
+                            radius: 34,
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.2),
+                            child: Text(
+                              customer.name.isNotEmpty
+                                  ? customer.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 28),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            customer.name.toTurkishUpperCase,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            customer.phone.isNotEmpty
+                                ? formatPhoneForDisplay(customer.phone)
+                                : customer.email.isNotEmpty
+                                    ? customer.email
+                                    : 'Kayıt: ${DateFormat('dd.MM.yyyy').format(customer.createdAt)}',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              ),
+
+              // ── Bakiye Özet Satırı ───────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: balanceVal.when(
+                    skipLoadingOnReload: true,
+                    loading: () => const SizedBox(
+                        height: 80,
+                        child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2))),
+                    error: (e, _) => Text('Bakiye yüklenemedi: $e',
+                        style: const TextStyle(color: _kRed)),
+                    data: (details) => _buildBalanceRow(customer, details),
+                  ),
+                ),
+              ),
+
+              // ── Tahsilat Butonu ──────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Row(
                     children: [
-                      const SizedBox(height: 32),
-                      // Avatar
-                      CircleAvatar(
-                        radius: 34,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: Text(
-                          customer.name.isNotEmpty
-                              ? customer.name[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 28),
+                      Expanded(
+                        child: SizedBox(
+                          height: 54,
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                context.push('/customers/$customerId/collect'),
+                            icon:
+                                const Icon(Icons.price_check_rounded, size: 20),
+                            label: const Text('Tahsilat Yap'),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        customer.name.toTurkishUpperCase,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        customer.phone.isNotEmpty
-                            ? formatPhoneForDisplay(customer.phone)
-                            : customer.email.isNotEmpty
-                                ? customer.email
-                                : 'Kayıt: ${DateFormat('dd.MM.yyyy').format(customer.createdAt)}',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 13),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SizedBox(
+                          height: 54,
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                _showManualDebtDialog(context, ref, customer),
+                            icon: const Icon(Icons.add_card_rounded, size: 20),
+                            label: const Text('Borç Ekle'),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // ── Bakiye Özet Satırı ───────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: balanceVal.when(
-                skipLoadingOnReload: true,
-                loading: () => const SizedBox(
-                    height: 80,
-                    child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2))),
-                error: (e, _) => Text('Bakiye yüklenemedi: $e',
-                    style: const TextStyle(color: _kRed)),
-                data: (details) => _buildBalanceRow(customer, details),
-              ),
-            ),
-          ),
-
-          // ── Tahsilat Butonu ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 54,
-                      child: ElevatedButton.icon(
-                        onPressed: () =>
-                            context.push('/customers/$customerId/collect'),
-                        icon: const Icon(Icons.price_check_rounded, size: 20),
-                        label: const Text('Tahsilat Yap'),
+              // ── Banka Ekstresi: İşlem Geçmişi ───────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            color: _kGreenLight,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: const Icon(Icons.receipt_long_rounded,
+                            size: 14, color: _kGreenDark),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SizedBox(
-                      height: 54,
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _showManualDebtDialog(context, ref, customer),
-                        icon: const Icon(Icons.add_card_rounded, size: 20),
-                        label: const Text('Borç Ekle'),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Hareket Geçmişi',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: _kText),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // ── Banka Ekstresi: İşlem Geçmişi ───────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                        color: _kGreenLight,
-                        borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.receipt_long_rounded,
-                        size: 14, color: _kGreenDark),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Hareket Geçmişi',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                        color: _kText),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          transactionsVal.when(
-            skipLoadingOnReload: true,
-            loading: () => const SliverToBoxAdapter(
-              child: Center(
-                  child: Padding(
-                padding: EdgeInsets.all(32),
-                child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation(_kGreen)),
-              )),
-            ),
-            error: (e, _) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Hareketler yüklenemedi: $e',
-                    style: const TextStyle(color: _kRed)),
-              ),
-            ),
-            data: (txns) {
-              if (txns.isEmpty) {
-                return SliverToBoxAdapter(child: _buildEmptyState());
-              }
-              // Group by month
-              final grouped = _groupByMonth(txns);
-              final months = grouped.keys.toList();
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, idx) {
-                    final month = months[idx];
-                    final items = grouped[month]!;
-                    return _buildMonthGroup(month, items);
-                  },
-                  childCount: months.length,
                 ),
-              );
-            },
-          ),
+              ),
 
-          // Bottom padding
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-        ],
-      ),
-    );
+              transactionsVal.when(
+                skipLoadingOnReload: true,
+                loading: () => const SliverToBoxAdapter(
+                  child: Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(_kGreen)),
+                  )),
+                ),
+                error: (e, _) => SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('Hareketler yüklenemedi: $e',
+                        style: const TextStyle(color: _kRed)),
+                  ),
+                ),
+                data: (txns) {
+                  if (txns.isEmpty) {
+                    return SliverToBoxAdapter(child: _buildEmptyState());
+                  }
+                  // Group by month
+                  final grouped = _groupByMonth(txns);
+                  final months = grouped.keys.toList();
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, idx) {
+                        final month = months[idx];
+                        final items = grouped[month]!;
+                        return _buildMonthGroup(month, items);
+                      },
+                      childCount: months.length,
+                    ),
+                  );
+                },
+              ),
+
+              // Bottom padding
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          ),
+        );
       },
     );
   }
@@ -461,15 +473,11 @@ class CustomerDetailsPage extends ConsumerWidget {
           child: _StatCard(
             label: 'Net Bakiye',
             value: '₺${customer.balance.abs().toStringAsFixed(2)}',
-            sub: isClear
-                ? 'Bakiye Yok'
-                : (isDebt ? 'Borçlu' : 'Alacaklı'),
+            sub: isClear ? 'Bakiye Yok' : (isDebt ? 'Borçlu' : 'Alacaklı'),
             bg: isClear
                 ? const Color(0xFFF1F5F9)
                 : (isDebt ? _kRedLight : _kGreenLight),
-            fg: isClear
-                ? _kTextSecondary
-                : (isDebt ? _kRed : _kGreenDark),
+            fg: isClear ? _kTextSecondary : (isDebt ? _kRed : _kGreenDark),
             icon: isClear
                 ? Icons.check_circle_outline_rounded
                 : (isDebt
@@ -589,7 +597,7 @@ class CustomerDetailsPage extends ConsumerWidget {
   void _confirmDelete(
       BuildContext context, WidgetRef ref, CustomerEntity customer) {
     if (customer.balance.abs() > 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text(
             customer.balance < 0
@@ -638,9 +646,11 @@ class CustomerDetailsPage extends ConsumerWidget {
                   if (state.hasError) {
                     if (context.mounted) {
                       final errorMsg = state.error != null
-                          ? state.error.toString().replaceFirst('Bad state: ', '')
+                          ? state.error
+                              .toString()
+                              .replaceFirst('Bad state: ', '')
                           : 'Müşteri silinemedi: Bu müşteriye ait satış veya işlem kayıtları bulunmaktadır.';
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      AppNotificationHost.show(
                         SnackBar(
                           content: Text(errorMsg),
                           backgroundColor: _kRed,
@@ -668,7 +678,7 @@ class CustomerDetailsPage extends ConsumerWidget {
       BuildContext context, CustomerEntity customer) async {
     final phone = customer.phone.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Müşterinin kayıtlı telefon numarası bulunmuyor.'),
           behavior: SnackBarBehavior.floating,
@@ -702,7 +712,7 @@ Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             const SnackBar(
               content: Text('WhatsApp başlatılamadı.'),
               behavior: SnackBarBehavior.floating,
@@ -712,7 +722,7 @@ Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: $e'),
             behavior: SnackBarBehavior.floating,
@@ -810,7 +820,8 @@ class _TransactionRow extends ConsumerWidget {
     if (isCancellation) {
       sign = '+';
       amountColor = _kGreenDark;
-      displayAmount = (txn.debtAmount > 0 ? txn.debtAmount : txn.amount).toStringAsFixed(2);
+      displayAmount =
+          (txn.debtAmount > 0 ? txn.debtAmount : txn.amount).toStringAsFixed(2);
     } else if (isRefundToBalance) {
       sign = '+';
       amountColor = _kGreenDark;
@@ -885,11 +896,14 @@ class _TransactionRow extends ConsumerWidget {
                       style:
                           const TextStyle(fontSize: 11, color: _kTextSecondary),
                     ),
-                    if (txn.metadata?['notes']?.toString().trim().isNotEmpty == true ||
-                        txn.metadata?['note']?.toString().trim().isNotEmpty == true) ...[
+                    if (txn.metadata?['notes']?.toString().trim().isNotEmpty ==
+                            true ||
+                        txn.metadata?['note']?.toString().trim().isNotEmpty ==
+                            true) ...[
                       const SizedBox(height: 3),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(4),
@@ -964,9 +978,12 @@ class _TransactionRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     ...items.map((item) {
-                      final name = (item['name'] ?? item['product_name'] ?? 'Ürün').toString();
+                      final name =
+                          (item['name'] ?? item['product_name'] ?? 'Ürün')
+                              .toString();
                       final qty = item['quantity'];
-                      final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+                      final price =
+                          (item['unit_price'] as num?)?.toDouble() ?? 0.0;
                       final qtyStr = _formatQuantity(qty);
 
                       return Padding(

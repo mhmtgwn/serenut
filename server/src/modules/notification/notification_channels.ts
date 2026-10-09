@@ -8,15 +8,14 @@ const knownChannels = new Set<NotificationChannel>([
 ]);
 
 /**
- * A channel is usable only when it is explicitly enabled for this deployment.
- * SMS and email are the production defaults; WhatsApp and push stay disabled
- * until their real providers are configured and deployed.
+ * WhatsApp is served only through the Evolution API. Push remains disabled
+ * until its provider is configured and deployed.
  */
 export function isNotificationChannelEnabled(channel: unknown): channel is NotificationChannel {
   if (typeof channel !== 'string' || !knownChannels.has(channel as NotificationChannel)) {
     return false;
   }
-  const enabled = (process.env.NOTIFICATION_ENABLED_CHANNELS || 'sms,email')
+  const enabled = (process.env.NOTIFICATION_ENABLED_CHANNELS || 'sms,email,whatsapp')
     .split(',')
     .map((value) => value.trim().toLowerCase());
   return enabled.includes(channel);

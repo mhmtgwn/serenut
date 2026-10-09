@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/infrastructure/database/product_search_index.dart';
 
 class DatabaseMigrations {
   /// Handle database upgrades
@@ -1042,6 +1043,16 @@ class DatabaseMigrations {
           }
           await txn.insert('app_migration_history', {
             'version': 55,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 56 && newVersion >= 56) {
+          // FTS5 is optional on some device SQLite builds. If unavailable,
+          // ProductRepository continues with the existing LIKE search.
+          await ProductSearchIndex.ensure(txn, rebuild: true);
+          await txn.insert('app_migration_history', {
+            'version': 56,
             'migrated_at': DateTime.now().toIso8601String(),
             'status': 'success'
           });

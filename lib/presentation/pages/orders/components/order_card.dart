@@ -70,7 +70,7 @@ class _OrderCard extends StatelessWidget {
                   if (isSelectable) {
                     onSelectChanged?.call(!isSelected);
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    AppNotificationHost.show(
                       const SnackBar(
                         content: Text(
                             'Teslim edilmiş siparişler toplu işlemden etkilenmez.'),

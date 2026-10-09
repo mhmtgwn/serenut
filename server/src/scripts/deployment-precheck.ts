@@ -76,7 +76,7 @@ async function runPrecheck() {
   } else if ((process.env.NOTIFICATION_ENABLED_CHANNELS || '').split(',').map(v => v.trim()).includes('whatsapp')) {
     console.log('✅ [PASS] WhatsApp configuration: all required production values are present.');
   } else {
-    console.log('ℹ️ WhatsApp configuration: channel remains disabled pending Meta approval.');
+    console.log('ℹ️ WhatsApp configuration: channel remains disabled until Evolution API is configured.');
   }
 
   // 2. Database Connectivity & Migration Version Check

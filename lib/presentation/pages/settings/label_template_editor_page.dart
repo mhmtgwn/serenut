@@ -13,6 +13,8 @@ import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class LabelTemplateEditorPage extends ConsumerStatefulWidget {
   const LabelTemplateEditorPage({super.key});
 
@@ -144,7 +146,7 @@ class _LabelTemplateEditorPageState
       ref.invalidate(printDesignProfilesProvider(PrintDocumentKind.orderLabel));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Etiket tasarımları başarıyla kaydedildi.'),
             backgroundColor: POSColors.green,
@@ -154,7 +156,7 @@ class _LabelTemplateEditorPageState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Kaydetme hatası: $e'),
             backgroundColor: POSColors.red,

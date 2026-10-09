@@ -40,6 +40,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'data_transfer/import_progress_dialog.dart';
 part 'data_transfer/export_progress_dialog.dart';
 part 'data_transfer/contact_import_page.dart';
@@ -544,7 +545,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
           if (mounted) Navigator.pop(context);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppNotificationHost.show(
               const SnackBar(
                 content: Text(
                     'Operasyonel veriler başarıyla sıfırlandı. Ayarlar korundu.'),
@@ -586,7 +587,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
           if (mounted) Navigator.pop(context);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppNotificationHost.show(
               const SnackBar(
                 content: Text(
                     'Tüm veriler silindi. Sistem ilk kuruluma hazırlanıyor...'),
@@ -602,7 +603,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
       } catch (e) {
         if (mounted) Navigator.pop(context);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             SnackBar(
               content: Text('Sıfırlama hatası: $e'),
               backgroundColor: _kPink,
@@ -667,7 +668,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           ref.read(productCategoriesStateProvider.notifier).state = [];
           if (mounted) Navigator.pop(context);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppNotificationHost.show(
               const SnackBar(
                 content: Text(
                     'Ürün kataloğu sunucudan ve bağlı cihazlardan temizlendi.'),
@@ -679,7 +680,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
         } catch (e) {
           if (mounted) Navigator.pop(context);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppNotificationHost.show(
               SnackBar(
                 content: Text('Temizleme tamamlanamadı: $e'),
                 backgroundColor: _kPink,

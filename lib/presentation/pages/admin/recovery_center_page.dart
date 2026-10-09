@@ -13,6 +13,8 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class RecoveryCenterPage extends ConsumerStatefulWidget {
   const RecoveryCenterPage({super.key});
 
@@ -107,7 +109,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         _invalidateControllerForType(type);
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text('$name başarıyla kurtarıldı.'),
               backgroundColor: const Color(0xFF10B981)),
@@ -115,7 +117,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         _loadDeletedItems();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text('Kurtarma hatası: $e'),
               backgroundColor: Colors.redAccent),
@@ -148,7 +150,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         _invalidateControllerForType(type);
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text('$name kalıcı olarak silindi (Purged).'),
               backgroundColor: Colors.orangeAccent),
@@ -156,7 +158,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         _loadDeletedItems();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text('Silme hatası: $e'),
               backgroundColor: Colors.redAccent),
@@ -224,7 +226,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
             icon: const Icon(Icons.cloud_download_rounded,
                 color: Color(0xFF10B981)),
             onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
+              AppNotificationHost.show(
                 const SnackBar(
                   content: Text('Tüm veriler sunucudan çekiliyor...'),
                   duration: Duration(seconds: 3),

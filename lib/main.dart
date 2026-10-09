@@ -41,6 +41,7 @@ import 'package:serenutos/presentation/pages/force_update_page.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 import 'package:serenutos/presentation/observers/telemetry_provider_observer.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
@@ -134,19 +135,22 @@ void main() async {
         cacheCompanyProfile: (company) async {
           final prefs = await SharedPreferences.getInstance();
           if (prefs.getBool('sync_v4_company_dirty') == true) {
-            debugPrint('[Auth] Local company changes are dirty; preserving local profile.');
+            debugPrint(
+                '[Auth] Local company changes are dirty; preserving local profile.');
             return;
           }
           final current = await settingsRepository.getSettings();
           final localIsCustomized = current.businessName.isNotEmpty &&
               current.businessName != 'Serenut OS';
           if (localIsCustomized) {
-            debugPrint('[Auth] Local business profile is customized ("${current.businessName}"); preserving against unversioned bootstrap.');
+            debugPrint(
+                '[Auth] Local business profile is customized ("${current.businessName}"); preserving against unversioned bootstrap.');
             return;
           }
 
           final rawName = company['name']?.toString().trim();
-          final remoteName = (rawName != null && rawName.isNotEmpty) ? rawName : '';
+          final remoteName =
+              (rawName != null && rawName.isNotEmpty) ? rawName : '';
           if (remoteName.isNotEmpty && remoteName != 'Serenut OS') {
             final phone = company['phone']?.toString().trim();
             final address = company['address']?.toString().trim();
@@ -157,13 +161,27 @@ void main() async {
             final district = company['district']?.toString().trim();
             await settingsRepository.updateSettings(current.copyWith(
               businessName: remoteName,
-              businessPhone: (phone != null && phone.isNotEmpty) ? phone : current.businessPhone,
-              businessAddress: (address != null && address.isNotEmpty) ? address : current.businessAddress,
-              businessTaxId: (taxNum != null && taxNum.isNotEmpty) ? taxNum : current.businessTaxId,
-              ownerName: (owner != null && owner.isNotEmpty) ? owner : current.ownerName,
-              businessEmail: (email != null && email.isNotEmpty) ? email : current.businessEmail,
-              businessCity: (city != null && city.isNotEmpty) ? city : current.businessCity,
-              businessDistrict: (district != null && district.isNotEmpty) ? district : current.businessDistrict,
+              businessPhone: (phone != null && phone.isNotEmpty)
+                  ? phone
+                  : current.businessPhone,
+              businessAddress: (address != null && address.isNotEmpty)
+                  ? address
+                  : current.businessAddress,
+              businessTaxId: (taxNum != null && taxNum.isNotEmpty)
+                  ? taxNum
+                  : current.businessTaxId,
+              ownerName: (owner != null && owner.isNotEmpty)
+                  ? owner
+                  : current.ownerName,
+              businessEmail: (email != null && email.isNotEmpty)
+                  ? email
+                  : current.businessEmail,
+              businessCity: (city != null && city.isNotEmpty)
+                  ? city
+                  : current.businessCity,
+              businessDistrict: (district != null && district.isNotEmpty)
+                  ? district
+                  : current.businessDistrict,
             ));
           }
         },
@@ -271,11 +289,14 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     try {
       final settings = ref.read(settingsNotifierProvider).value;
       if (settings == null || !settings.smsAutoDebtReminderEnabled) return;
-      final reminderService = await ref.read(debtReminderServiceProvider.future);
+      final reminderService =
+          await ref.read(debtReminderServiceProvider.future);
       await reminderService.runAutoDebtReminderCheck(
         settings: settings,
         onSettingsUpdate: (updated) async {
-          await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+          await ref
+              .read(settingsNotifierProvider.notifier)
+              .updateSettings(updated);
         },
       );
     } catch (e) {
@@ -593,6 +614,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       theme: AppTheme.light,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       routerConfig: router,
+      builder: (context, child) => AppNotificationHost(
+        key: AppNotificationHost.hostKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

@@ -59,11 +59,14 @@ class TcpPrintTransport implements PrintTransport {
     } on PrintTransportException {
       rethrow;
     } catch (error) {
+      final uncertain = deliveryStarted;
       throw PrintTransportException(
-        code: deliveryStarted ? 'tcp_delivery_uncertain' : 'tcp_connect_failed',
-        message: error.toString(),
+        code: uncertain ? 'tcp_delivery_uncertain' : 'tcp_connect_failed',
+        message: uncertain
+            ? 'Yazıcıya veri gönderildi ancak onay alınamadı. Fiş çıkmış olabilir; yeniden yazdırmadan önce kontrol edin.'
+            : 'Yazıcıya bağlanılamadı. IP adresini ve ağ bağlantısını kontrol edin.',
         retryable: true,
-        deliveryUncertain: deliveryStarted,
+        deliveryUncertain: uncertain,
       );
     } finally {
       try {

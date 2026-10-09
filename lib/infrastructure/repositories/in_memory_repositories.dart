@@ -126,8 +126,8 @@ class InMemoryProductRepository implements IProductRepository {
   Future<ProductEntity?> findProductById(String id) => findById(id);
 
   @override
-  Future<ProductEntity?> findById(dynamic id) async {
-    final cleanId = id?.toString().trim() ?? '';
+  Future<ProductEntity?> findById(String id) async {
+    final cleanId = id.trim();
     if (cleanId.isEmpty) return null;
     final candidates = BarcodeStandard.lookupCandidates(cleanId);
     try {
@@ -165,8 +165,8 @@ class InMemoryProductRepository implements IProductRepository {
   Future<int> deleteProduct(String id) => delete(id);
 
   @override
-  Future<int> delete(dynamic id) async {
-    final cleanId = id?.toString().trim() ?? '';
+  Future<int> delete(String id) async {
+    final cleanId = id.trim();
     if (cleanId.isEmpty) return 0;
     final idx = InMemoryDb.products.indexWhere((p) => p.id == cleanId);
     if (idx != -1) {
@@ -182,7 +182,7 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final candidates = BarcodeStandard.lookupCandidates(id.toString());
     return InMemoryDb.products.any((p) => candidates.contains(p.id));
   }
@@ -339,7 +339,7 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  Future<CustomerEntity?> findById(dynamic id) async {
+  Future<CustomerEntity?> findById(String id) async {
     try {
       return InMemoryDb.customers.firstWhere((c) => c.id == id);
     } catch (_) {
@@ -364,8 +364,8 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
-    if (id == null || id == '') return 0;
+  Future<int> delete(String id) async {
+    if (id.isEmpty) return 0;
     final idx = InMemoryDb.customers.indexWhere((c) => c.id == id);
     if (idx != -1) {
       InMemoryDb.customers.removeAt(idx);
@@ -380,7 +380,7 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     return InMemoryDb.customers.any((c) => c.id == id);
   }
 
@@ -553,7 +553,8 @@ class InMemoryCustomerRepository implements ICustomerRepository {
     final hasValidPhone = normPhone.length >= 7;
 
     final candidates = InMemoryDb.customers
-        .where((c) => c.id.isNotEmpty && (excludeId == null || c.id != excludeId))
+        .where(
+            (c) => c.id.isNotEmpty && (excludeId == null || c.id != excludeId))
         .toList();
 
     CustomerEntity? phoneConflictCustomer;
@@ -621,7 +622,7 @@ class InMemorySaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<SaleEntity?> findById(dynamic id) async {
+  Future<SaleEntity?> findById(String id) async {
     try {
       return InMemoryDb.sales.firstWhere((s) => s.id == id);
     } catch (_) {
@@ -679,7 +680,7 @@ class InMemorySaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     final idx = InMemoryDb.sales.indexWhere((s) => s.id == id);
     if (idx != -1) {
       InMemoryDb.sales.removeAt(idx);
@@ -694,7 +695,7 @@ class InMemorySaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     return InMemoryDb.sales.any((s) => s.id == id);
   }
 
@@ -777,7 +778,7 @@ class InMemoryFinancialTransactionRepository
   }
 
   @override
-  Future<FinancialTransactionEntity?> findById(dynamic id) async {
+  Future<FinancialTransactionEntity?> findById(String id) async {
     try {
       return InMemoryDb.transactions.firstWhere((t) => t.id == id);
     } catch (_) {
@@ -908,7 +909,7 @@ class InMemoryFinancialTransactionRepository
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     throw UnsupportedError(
         'Kritik Hata: Finansal defter kayıtları silinemez (Ledger Immutability).');
   }
@@ -952,7 +953,7 @@ class InMemoryFinancialTransactionRepository
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     return InMemoryDb.transactions.any((t) => t.id == id);
   }
 
@@ -1032,7 +1033,7 @@ class InMemoryOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<OrderEntity?> findById(dynamic id) async {
+  Future<OrderEntity?> findById(String id) async {
     try {
       return InMemoryDb.orders.firstWhere((o) => o.id == id);
     } catch (_) {
@@ -1074,7 +1075,7 @@ class InMemoryOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     final idx = InMemoryDb.orders.indexWhere((o) => o.id == id);
     if (idx != -1) {
       InMemoryDb.orders.removeAt(idx);
@@ -1089,7 +1090,7 @@ class InMemoryOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     return InMemoryDb.orders.any((o) => o.id == id);
   }
 
@@ -1742,9 +1743,8 @@ class InMemoryDashboardRepository implements IDashboardRepository {
     final list = List<OrderEntity>.from(InMemoryDb.orders);
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list.take(limit).map((o) {
-      final customer = InMemoryDb.customers
-          .where((c) => c.id == o.customerId)
-          .firstOrNull;
+      final customer =
+          InMemoryDb.customers.where((c) => c.id == o.customerId).firstOrNull;
       return DashboardRecentOrder(
         id: o.id,
         orderNumber: o.orderNumber,
@@ -1790,7 +1790,7 @@ class InMemoryUserRepository implements IUserRepository {
   }
 
   @override
-  Future<AuthUser?> findById(dynamic id) async {
+  Future<AuthUser?> findById(String id) async {
     try {
       return InMemoryDb.users.firstWhere((u) => u.id == id);
     } catch (_) {
@@ -1873,7 +1873,7 @@ class InMemoryUserRepository implements IUserRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     InMemoryDb.users.removeWhere((u) => u.id == id);
     _passwordHashes.remove(id);
     _passwordHashes.remove('${id}_pin');
@@ -1884,7 +1884,7 @@ class InMemoryUserRepository implements IUserRepository {
   Future<int> count() async => InMemoryDb.users.length;
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     return InMemoryDb.users.any((u) => u.id == id);
   }
 

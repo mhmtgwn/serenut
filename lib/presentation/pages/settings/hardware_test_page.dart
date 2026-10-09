@@ -13,6 +13,7 @@ import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'widgets/device_editor_sheet.dart';
 
 class HardwareTestPage extends ConsumerWidget {
@@ -127,7 +128,7 @@ class HardwareTestPage extends ConsumerWidget {
           .read(hardwareDevicesProvider.notifier)
           .activateSharedPrinter(selected);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('${selected.name} varsayılan ortak yazıcı oldu.'),
           backgroundColor: kGreen,
@@ -135,7 +136,7 @@ class HardwareTestPage extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(content: Text(error.toString()), backgroundColor: kPink),
       );
     }
@@ -145,7 +146,7 @@ class HardwareTestPage extends ConsumerWidget {
     try {
       await ref.read(hardwareDevicesProvider.notifier).refreshConnections();
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Cihaz bağlantıları yenilendi.'),
           backgroundColor: kGreen,
@@ -153,7 +154,7 @@ class HardwareTestPage extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Bağlantılar yenilenemedi: $error'),
           backgroundColor: kPink,
@@ -220,7 +221,7 @@ class HardwareTestPage extends ConsumerWidget {
     }
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppNotificationHost.show(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -277,7 +278,7 @@ class HardwareTestPage extends ConsumerWidget {
     try {
       await ref.read(hardwareDevicesProvider.notifier).remove(device);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('${device.name} kaldırıldı.'),
           backgroundColor: kGreen,
@@ -285,7 +286,7 @@ class HardwareTestPage extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Cihaz kaldırılamadı: $error'),
           backgroundColor: kPink,
@@ -302,7 +303,7 @@ class HardwareTestPage extends ConsumerWidget {
     try {
       await ref.read(hardwareDevicesProvider.notifier).activate(device);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('${device.name} aktif cihaz oldu.'),
           backgroundColor: kGreen,
@@ -310,7 +311,7 @@ class HardwareTestPage extends ConsumerWidget {
       );
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('Cihaz aktifleştirilemedi: $error'),
           backgroundColor: kPink,
@@ -452,8 +453,6 @@ class _DeviceListState extends State<_DeviceList> {
       _DeviceFilter.printers => allPrinters,
       _DeviceFilter.salesHardware => salesHardware,
     };
-
-
 
     return CustomScrollView(
       slivers: [
@@ -682,9 +681,7 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? color.withValues(alpha: .1)
-              : Colors.white,
+          color: selected ? color.withValues(alpha: .1) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? color.withValues(alpha: .5) : kBorderColor,
@@ -700,15 +697,13 @@ class _FilterChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight:
-                    selected ? FontWeight.w800 : FontWeight.w500,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                 color: activeColor,
               ),
             ),
             const SizedBox(width: 6),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
                 color: selected
                     ? color.withValues(alpha: .15)
@@ -805,8 +800,7 @@ class _SectionHeader extends StatelessWidget {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 11, color: kTextSecondary),
+                  style: const TextStyle(fontSize: 11, color: kTextSecondary),
                 ),
               ],
             ),
@@ -844,8 +838,7 @@ class _EmptyCloudNotice extends StatelessWidget {
               color: kTeal.withValues(alpha: .1),
               borderRadius: BorderRadius.circular(11),
             ),
-            child:
-                const Icon(Icons.cloud_outlined, color: kTeal, size: 22),
+            child: const Icon(Icons.cloud_outlined, color: kTeal, size: 22),
           ),
           const SizedBox(width: 14),
           const Expanded(
@@ -863,7 +856,8 @@ class _EmptyCloudNotice extends StatelessWidget {
                 SizedBox(height: 2),
                 Text(
                   'Aynı işletmedeki diğer terminallerin paylaştığı yazıcılara bağlanabilirsiniz.',
-                  style: TextStyle(fontSize: 11, color: kTextSecondary, height: 1.4),
+                  style: TextStyle(
+                      fontSize: 11, color: kTextSecondary, height: 1.4),
                 ),
               ],
             ),
@@ -873,8 +867,7 @@ class _EmptyCloudNotice extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: kTeal.withValues(alpha: .1),
               foregroundColor: kTeal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1042,8 +1035,8 @@ class _HardwareHero extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: kGreen,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(
@@ -1211,10 +1204,8 @@ class _DeviceCard extends StatelessWidget {
                                           label: activeFor
                                               .map((k) => switch (k) {
                                                     'receipt' => 'Fiş',
-                                                    'productLabel' =>
-                                                      'Etiket',
-                                                    'orderLabel' =>
-                                                      'Sipariş',
+                                                    'productLabel' => 'Etiket',
+                                                    'orderLabel' => 'Sipariş',
                                                     _ => k,
                                                   })
                                               .join('+'),
@@ -1383,8 +1374,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: color.withValues(alpha: .07),
           borderRadius: BorderRadius.circular(8),
@@ -1496,7 +1486,6 @@ class _DeviceStatusPill extends StatelessWidget {
   }
 }
 
-
 // ── YENİ BOŞ DURUM EKRANI ───────────────────────────────────────────────────
 class _EmptyDevices extends StatelessWidget {
   final VoidCallback onAdd;
@@ -1506,24 +1495,9 @@ class _EmptyDevices extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quickTypes = [
-      (
-        Icons.print_rounded,
-        kBlue,
-        'Fiş Yazıcısı',
-        'Kasa fişi, mutfak çıktısı'
-      ),
-      (
-        Icons.label_rounded,
-        kTeal,
-        'Etiket Yazıcısı',
-        'Ürün ve raf etiketi'
-      ),
-      (
-        Icons.scale_rounded,
-        kGreen,
-        'Terazi',
-        'Canlı tartım → satış'
-      ),
+      (Icons.print_rounded, kBlue, 'Fiş Yazıcısı', 'Kasa fişi, mutfak çıktısı'),
+      (Icons.label_rounded, kTeal, 'Etiket Yazıcısı', 'Ürün ve raf etiketi'),
+      (Icons.scale_rounded, kGreen, 'Terazi', 'Canlı tartım → satış'),
       (
         Icons.credit_card_rounded,
         kOrange,
@@ -1563,7 +1537,8 @@ class _EmptyDevices extends StatelessWidget {
             const Text(
               'Aşağıdaki cihaz türlerinden birini ekleyerek başlayın.\nUSB barkod okuyucular otomatik algılanır.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: kTextSecondary, fontSize: 13, height: 1.5),
+              style:
+                  TextStyle(color: kTextSecondary, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 24),
             // Hızlı cihaz tipi kartları
@@ -1650,8 +1625,7 @@ class _EmptyDevices extends StatelessWidget {
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: const Text(
                   'Yeni Cihaz Ekle',
-                  style:
-                      TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                 ),
               ),
             ),
@@ -1793,7 +1767,6 @@ String _networkCandidateLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.paymentTerminal => 'POS Bridge adayı',
       HardwareDeviceType.barcodeScanner => 'Okuyucu adayı',
     };
-
 
 IconData _typeIcon(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => Icons.print_rounded,

@@ -30,13 +30,13 @@ class SqliteCustomerRepository implements ICustomerRepository {
     return {
       for (final r in rows)
         if (r['id'] != null)
-          (r['id'] as String):
-              ((r['name'] as String?)?.toTurkishUpperCase ?? 'Bilinmeyen Müşteri'),
+          (r['id'] as String): ((r['name'] as String?)?.toTurkishUpperCase ??
+              'Bilinmeyen Müşteri'),
     };
   }
 
   @override
-  Future<CustomerEntity?> findById(dynamic id) async {
+  Future<CustomerEntity?> findById(String id) async {
     final rows = await _executor.query(
       'customers',
       where: 'id = ? AND is_active = 1',
@@ -89,8 +89,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
-    if (id == null || id == '') return 0;
+  Future<int> delete(String id) async {
+    if (id.isEmpty) return 0;
     return _gateway.transaction(() async {
       final payload = {
         'is_active': 0,
@@ -119,7 +119,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final result = await _executor.query(
       'customers',
       where: 'id = ? AND is_active = 1',

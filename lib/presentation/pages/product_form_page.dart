@@ -22,6 +22,8 @@ import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kAmber = POSColors.amber;
@@ -135,7 +137,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Lütfen bir kategori seçiniz.'),
           backgroundColor: _kRed,
@@ -165,7 +167,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 _purchasePriceCtrl.text.trim().replaceAll(',', '.')) ??
             0,
         quantity: num.parse(_qtyCtrl.text.trim().replaceAll(',', '.')),
-        minStock: num.tryParse(_minStockCtrl.text.trim().replaceAll(',', '.')) ?? 5,
+        minStock:
+            num.tryParse(_minStockCtrl.text.trim().replaceAll(',', '.')) ?? 5,
         brand: widget.existingProduct?.brand ?? '',
         unit: _saleType == 'weighed' ? (_unit == 'gr' ? 'gr' : 'kg') : _unit,
         shelfCode: widget.existingProduct?.shelfCode ?? '',
@@ -228,7 +231,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       ref.invalidate(dashboardProvider);
       if (mounted) {
         context.pop();
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(widget.isEditing
                 ? '${product.name} güncellendi.'
@@ -246,7 +249,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         level: LogLevel.error,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(widget.isEditing
                 ? '${_nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : 'Ürün'} güncellenemedi. Bilgileri kontrol edin.'
@@ -322,7 +325,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                               horizontal: 16, vertical: 8),
                         ),
                         child: Text(widget.isEditing ? 'Kaydet' : 'Ekle',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                       ),
               ),
             ],
@@ -356,16 +360,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           children: [
                             OutlinedButton.icon(
                               onPressed: _chooseProductImageSource,
-                              icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+                              icon: const Icon(Icons.add_a_photo_rounded,
+                                  size: 18),
                               label: Text(_imageUrl == null
                                   ? 'Fotoğraf Ekle'
                                   : 'Fotoğrafı Değiştir'),
                             ),
                             if (_imageUrl != null)
                               TextButton(
-                                onPressed: () => setState(() => _imageUrl = null),
+                                onPressed: () =>
+                                    setState(() => _imageUrl = null),
                                 child: const Text('Fotoğrafı Kaldır',
-                                    style: TextStyle(color: _kRed, fontSize: 12)),
+                                    style:
+                                        TextStyle(color: _kRed, fontSize: 12)),
                               ),
                           ],
                         ),
@@ -417,8 +424,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       ),
                       filled: true,
                       fillColor: _kSurface,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                     ),
                   ),
                 ]),
@@ -439,7 +446,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         _saleType == 'weighed'
                             ? Icons.scale_rounded
                             : Icons.straighten_rounded,
-                        color: _saleType == 'weighed' ? _kGreen : _kTextSecondary,
+                        color:
+                            _saleType == 'weighed' ? _kGreen : _kTextSecondary,
                       ),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10)),
@@ -453,8 +461,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       ),
                       filled: true,
                       fillColor: _kSurface,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                     ),
                     items: const [
                       DropdownMenuItem(
@@ -512,11 +520,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (_saleType == 'weighed') ...[
                     const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: _kGreen.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _kGreen.withValues(alpha: 0.2)),
+                        border:
+                            Border.all(color: _kGreen.withValues(alpha: 0.2)),
                       ),
                       child: const Row(
                         children: [
@@ -567,19 +577,23 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       Expanded(
                         child: _buildField(
                           controller: _priceCtrl,
-                          label: _saleType == 'weighed' ? 'Kg Satış Fiyatı *' : 'Satış Fiyatı *',
+                          label: _saleType == 'weighed'
+                              ? 'Kg Satış Fiyatı *'
+                              : 'Satış Fiyatı *',
                           icon: Icons.sell_rounded,
                           prefix: '₺',
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[\d\.,]'))
                           ],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
                               return 'Lütfen bir satış fiyatı giriniz.';
                             }
-                            if (double.tryParse(v.trim().replaceAll(',', '.')) ==
+                            if (double.tryParse(
+                                    v.trim().replaceAll(',', '.')) ==
                                 null) {
                               return 'Lütfen geçerli bir satış fiyatı giriniz.';
                             }
@@ -594,10 +608,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           label: 'Alış / Maliyet Fiyatı',
                           icon: Icons.store_rounded,
                           prefix: '₺',
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[\d\.,]'))
                           ],
                         ),
                       ),
@@ -636,11 +651,17 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       Expanded(
                         child: _buildField(
                           controller: _qtyCtrl,
-                          label: _saleType == 'weighed' ? 'Mevcut Stok (Kg) *' : 'Mevcut Stok Miktarı *',
+                          label: _saleType == 'weighed'
+                              ? 'Mevcut Stok (Kg) *'
+                              : 'Mevcut Stok Miktarı *',
                           icon: Icons.inventory_rounded,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: _saleType == 'weighed'
-                              ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                              ? [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'^\d*[.,]?\d*'))
+                                ]
                               : [FilteringTextInputFormatter.digitsOnly],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
@@ -660,9 +681,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           controller: _minStockCtrl,
                           label: 'Kritik Stok Uyarısı (Min)',
                           icon: Icons.warning_amber_rounded,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           inputFormatters: _saleType == 'weighed'
-                              ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*'))]
+                              ? [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'^\d*[.,]?\d*'))
+                                ]
                               : [FilteringTextInputFormatter.digitsOnly],
                         ),
                       ),
@@ -693,7 +718,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                             ? Icons.save_rounded
                             : Icons.add_box_rounded),
                     label: Text(
-                      widget.isEditing ? 'Değişiklikleri Kaydet' : 'Ürünü Kaydet',
+                      widget.isEditing
+                          ? 'Değişiklikleri Kaydet'
+                          : 'Ürünü Kaydet',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 15),
                     ),
@@ -716,8 +743,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   child: Container(
                     constraints:
                         const BoxConstraints(maxWidth: 720, maxHeight: 860),
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -929,7 +956,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: _kGreen, width: 2),
+                          borderSide:
+                              const BorderSide(color: _kGreen, width: 2),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 12),
@@ -964,10 +992,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                             _canonicalName(searchQuery);
                                         Navigator.pop(context, canonical);
                                       },
-                                      icon: const Icon(Icons.add,
-                                          color: _kGreen),
-                                      label: Text(
-                                          '"$searchQuery" olarak ekle',
+                                      icon:
+                                          const Icon(Icons.add, color: _kGreen),
+                                      label: Text('"$searchQuery" olarak ekle',
                                           style:
                                               const TextStyle(color: _kGreen)),
                                     ),
@@ -992,9 +1019,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                       fontWeight: isSelected
                                           ? FontWeight.bold
                                           : FontWeight.normal,
-                                      color: isSelected
-                                          ? _kGreen
-                                          : _kText,
+                                      color: isSelected ? _kGreen : _kText,
                                     ),
                                   ),
                                   trailing: isSelected
@@ -1030,8 +1055,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         _selectedCategory = canonical;
         final match = parsedVatCategories.firstWhere(
           (item) =>
-              item['name']?.toString().toLowerCase() ==
-              canonical.toLowerCase(),
+              item['name']?.toString().toLowerCase() == canonical.toLowerCase(),
           orElse: () => <String, dynamic>{},
         );
         if (match.isNotEmpty && match['rate'] != null) {

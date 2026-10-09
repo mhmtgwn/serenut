@@ -33,6 +33,7 @@ import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.
 import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
 part 'steps/step_cart.dart';
@@ -61,7 +62,8 @@ class OrderCreationDialog extends ConsumerStatefulWidget {
 
   /// Opens the OrderCreationDialog as a centered modal dialog on desktop
   /// or full-screen on mobile devices.
-  static Future<T?> show<T>(BuildContext context, {OrderEntity? existingOrder}) {
+  static Future<T?> show<T>(BuildContext context,
+      {OrderEntity? existingOrder}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
     if (isDesktop) {
@@ -70,7 +72,8 @@ class OrderCreationDialog extends ConsumerStatefulWidget {
         barrierDismissible: false,
         builder: (context) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: 920,
@@ -87,7 +90,8 @@ class OrderCreationDialog extends ConsumerStatefulWidget {
       return Navigator.push<T>(
         context,
         MaterialPageRoute(
-          builder: (context) => OrderCreationDialog(existingOrder: existingOrder),
+          builder: (context) =>
+              OrderCreationDialog(existingOrder: existingOrder),
           fullscreenDialog: true,
         ),
       );
@@ -103,10 +107,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
     with BarcodeScannerMixin<OrderCreationDialog> {
   int _activeStep = 0;
 
-
   // Step 1: Customer Selection
   CustomerEntity? _selectedCustomer;
-
 
   // Step 2: Product Catalog
   final Map<ProductEntity, double> _cart = {};
@@ -173,7 +175,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
 
   @override
   void onBarcodeScanned(String barcode) {
-
     _productSearchController.clear();
     ref.read(productsControllerProvider).whenData((productsList) {
       _handleBarcodeSubmit(barcode, productsList);
@@ -240,9 +241,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
       final repo =
           await ref.read(financialTransactionRepositoryProvider.future);
       final transactions = await repo.getByReferenceId(order.id);
-      FinancialTransactionEntity? orderTx = transactions
-          .where((t) => t.type == 'sale')
-          .firstOrNull;
+      FinancialTransactionEntity? orderTx =
+          transactions.where((t) => t.type == 'sale').firstOrNull;
 
       // Fallback if not found by referenceId
       if (orderTx == null && order.customerId.isNotEmpty) {
@@ -286,7 +286,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
           .read(printingRepositoryProvider)
           .getRoute(PrintDocumentKind.orderLabel);
       final hasActiveRoute = route != null && route.deviceId.isNotEmpty;
-      final isEnabled = hasActiveRoute || (settings?.labelPrinterEnabled ?? false);
+      final isEnabled =
+          hasActiveRoute || (settings?.labelPrinterEnabled ?? false);
       if (mounted) {
         setState(() {
           _printLabel = isEnabled || (settings?.labelPrinterEnabled ?? true);
@@ -426,12 +427,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
       Duration duration = const Duration(milliseconds: 1800)}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppNotificationHost.show(
       SnackBar(
         content: Row(
           children: [
             Icon(
-              isError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+              isError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_rounded,
               color: Colors.white,
               size: 18,
             ),
@@ -439,7 +442,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
             ),
           ],
@@ -504,7 +508,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
                 // Top Bar: Close button & compact stepper header
                 Container(
                   color: _kSurface,
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                   child: Row(
                     children: [
                       IconButton(
@@ -520,7 +525,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
                       Expanded(
                         child: buildStepperHeader(),
                       ),
-
                     ],
                   ),
                 ),
@@ -529,7 +533,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
                 Expanded(
                   child: buildStepBody(),
                 ),
-
               ],
             ),
           ),
@@ -550,8 +553,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
             backgroundColor: Colors.black.withValues(alpha: 0.45),
             body: Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 920, maxHeight: 820),
-                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                constraints:
+                    const BoxConstraints(maxWidth: 920, maxHeight: 820),
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [

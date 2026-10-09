@@ -17,6 +17,8 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
@@ -133,508 +135,519 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         final isWide = constraints.maxWidth > 800;
         final Widget innerScaffold = Scaffold(
           backgroundColor: _kSurface,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: _kText),
-          onPressed: () => context.pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Tahsilat Yap',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, color: _kText, fontSize: 16),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded, color: _kText),
+              onPressed: () => context.pop(),
             ),
-            Text(
-              customer.name.toTurkishUpperCase,
-              style: const TextStyle(color: _kTextSecondary, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // ── Müşteri Özet Kartı ────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDebt
-                      ? [const Color(0xFFDC2626), const Color(0xFFB91C1C)]
-                      : [const Color(0xFF16A34A), const Color(0xFF15803D)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tahsilat Yap',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: _kText, fontSize: 16),
                 ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    child: Text(
-                      customer.name.isNotEmpty
-                          ? customer.name[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20),
+                Text(
+                  customer.name.toTurkishUpperCase,
+                  style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          body: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                // ── Müşteri Özet Kartı ────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDebt
+                          ? [const Color(0xFFDC2626), const Color(0xFFB91C1C)]
+                          : [const Color(0xFF16A34A), const Color(0xFF15803D)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                        Text(
-                          customer.name.toTurkishUpperCase,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        child: Text(
+                          customer.name.isNotEmpty
+                              ? customer.name[0].toUpperCase()
+                              : '?',
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 15),
+                              fontSize: 20),
                         ),
-                        if (customer.phone.isNotEmpty)
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              customer.name.toTurkishUpperCase,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15),
+                            ),
+                            if (customer.phone.isNotEmpty)
+                              Text(
+                                customer.phone,
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 12),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
                           Text(
-                            customer.phone,
+                            isDebt ? 'Toplam Borç' : 'Alacak',
                             style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 12),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600),
                           ),
+                          Text(
+                            '₺${customer.balance.abs().toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 20),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Tahsilat Tutarı ────────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.payments_rounded,
+                              size: 16, color: _kGreenDark),
+                          SizedBox(width: 8),
+                          Text('Tahsil Edilen Tutar',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: _kText)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                        ],
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: _kGreenDark),
+                        decoration: InputDecoration(
+                          hintText: '0.00',
+                          hintStyle: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w300,
+                              color: _kBorder),
+                          prefixText: '₺ ',
+                          prefixStyle: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: _kGreenDark),
+                          filled: true,
+                          fillColor: _kGreenLight.withValues(alpha: 0.3),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: _kBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                                color: _kGreen.withValues(alpha: 0.3)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: _kGreen, width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty)
+                            return 'Tutar giriniz';
+                          final d =
+                              double.tryParse(v.trim().replaceAll(',', '.'));
+                          if (d == null || d <= 0) {
+                            return 'Geçerli bir pozitif tutar giriniz';
+                          }
+                          return null;
+                        },
+                      ),
+                      // Tüm borcu al
+                      if (isDebt && debt > 0) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _amountController.text = debt.toStringAsFixed(2);
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _kGreenLight,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Tamamını Al: ₺${debt.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: _kGreenDark,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // ── Bakiye Önizleme ────────────────────────────────────────────
+                if (_enteredAmount > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _balanceAfter >= 0 ? _kGreenLight : _kRedLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _balanceAfter >= 0
+                            ? _kGreen.withValues(alpha: 0.3)
+                            : _kRed.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _balanceAfter >= 0
+                              ? Icons.check_circle_rounded
+                              : Icons.info_rounded,
+                          size: 18,
+                          color: _balanceAfter >= 0 ? _kGreenDark : _kRed,
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tahsilat Sonrası Bakiye',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      _balanceAfter >= 0 ? _kGreenDark : _kRed,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              _balanceAfter.abs() < 0.01
+                                  ? '₺0.00 (Bakiye Kapanır)'
+                                  : (_balanceAfter < 0
+                                      ? '₺${_balanceAfter.abs().toStringAsFixed(2)} Borç Kalır'
+                                      : '₺${_balanceAfter.toStringAsFixed(2)} Fazla Ödeme (Alacak)'),
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: _balanceAfter >= -0.009
+                                      ? _kGreenDark
+                                      : _kRed),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        isDebt ? 'Toplam Borç' : 'Alacak',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        '₺${customer.balance.abs().toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Tahsilat Tutarı ────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.payments_rounded,
-                          size: 16, color: _kGreenDark),
-                      SizedBox(width: 8),
-                      Text('Tahsil Edilen Tutar',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: _kText)),
-                    ],
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
-                    ],
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: _kGreenDark),
-                    decoration: InputDecoration(
-                      hintText: '0.00',
-                      hintStyle: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w300,
-                          color: _kBorder),
-                      prefixText: '₺ ',
-                      prefixStyle: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: _kGreenDark),
-                      filled: true,
-                      fillColor: _kGreenLight.withValues(alpha: 0.3),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: _kBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: _kGreen.withValues(alpha: 0.3)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: _kGreen, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 16),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Tutar giriniz';
-                      final d = double.tryParse(v.trim().replaceAll(',', '.'));
-                      if (d == null || d <= 0) {
-                        return 'Geçerli bir pozitif tutar giriniz';
-                      }
-                      return null;
-                    },
-                  ),
-                  // Tüm borcu al
-                  if (isDebt && debt > 0) ...[
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _amountController.text = debt.toStringAsFixed(2);
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _kGreenLight,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Tamamını Al: ₺${debt.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                              color: _kGreenDark,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
-              ),
-            ),
-            const SizedBox(height: 14),
 
-            // ── Bakiye Önizleme ────────────────────────────────────────────
-            if (_enteredAmount > 0) ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _balanceAfter >= 0 ? _kGreenLight : _kRedLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _balanceAfter >= 0
-                        ? _kGreen.withValues(alpha: 0.3)
-                        : _kRed.withValues(alpha: 0.3),
+                // ── Ödeme Yöntemi ──────────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.credit_card_rounded,
+                              size: 16, color: _kTextSecondary),
+                          SizedBox(width: 8),
+                          Text('Tahsilat Yöntemi',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: _kText)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _MethodToggle(
+                            label: 'Nakit',
+                            icon: Icons.payments_rounded,
+                            selected: _selectedMethod == 'cash',
+                            color: _kGreen,
+                            lightColor: _kGreenLight,
+                            onTap: () =>
+                                setState(() => _selectedMethod = 'cash'),
+                          ),
+                          const SizedBox(width: 10),
+                          _MethodToggle(
+                            label: 'Kart',
+                            icon: Icons.credit_card_rounded,
+                            selected: _selectedMethod == 'card',
+                            color: _kBlue,
+                            lightColor: _kBlueLight,
+                            onTap: () =>
+                                setState(() => _selectedMethod = 'card'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _balanceAfter >= 0
-                          ? Icons.check_circle_rounded
-                          : Icons.info_rounded,
-                      size: 18,
-                      color: _balanceAfter >= 0 ? _kGreenDark : _kRed,
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Tahsilat Sonrası Bakiye',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: _balanceAfter >= 0 ? _kGreenDark : _kRed,
-                              fontWeight: FontWeight.w600),
+                const SizedBox(height: 14),
+
+                // ── Açıklama ───────────────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.notes_rounded,
+                              size: 16, color: _kTextSecondary),
+                          SizedBox(width: 8),
+                          Text('Açıklama (Opsiyonel)',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: _kText)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _noteController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: 'İşlem açıklaması...',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: _kBorder)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: _kBorder)),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide:
+                                  const BorderSide(color: _kGreen, width: 2)),
+                          filled: true,
+                          fillColor: _kSurface,
+                          contentPadding: const EdgeInsets.all(12),
                         ),
-                        Text(
-                          _balanceAfter.abs() < 0.01
-                              ? '₺0.00 (Bakiye Kapanır)'
-                              : (_balanceAfter < 0
-                                  ? '₺${_balanceAfter.abs().toStringAsFixed(2)} Borç Kalır'
-                                  : '₺${_balanceAfter.toStringAsFixed(2)} Fazla Ödeme (Alacak)'),
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: _balanceAfter >= -0.009 ? _kGreenDark : _kRed),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-            ],
+                const SizedBox(height: 14),
 
-            // ── Ödeme Yöntemi ──────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.credit_card_rounded,
-                          size: 16, color: _kTextSecondary),
-                      SizedBox(width: 8),
-                      Text('Tahsilat Yöntemi',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: _kText)),
-                    ],
+                // ── Yazıcı Ayarları ve Fiş Seçeneği ────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorder),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _MethodToggle(
-                        label: 'Nakit',
-                        icon: Icons.payments_rounded,
-                        selected: _selectedMethod == 'cash',
-                        color: _kGreen,
-                        lightColor: _kGreenLight,
-                        onTap: () => setState(() => _selectedMethod = 'cash'),
+                      Row(
+                        children: [
+                          Icon(
+                            _printReceipt
+                                ? Icons.print_rounded
+                                : Icons.print_disabled_rounded,
+                            size: 16,
+                            color:
+                                _printReceipt ? _kGreenDark : _kTextSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Yazıcı Ayarları',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _kText),
+                          ),
+                          const Spacer(),
+                          Switch.adaptive(
+                            value: _printReceipt,
+                            activeColor: _kGreen,
+                            onChanged: (val) =>
+                                setState(() => _printReceipt = val),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      _MethodToggle(
-                        label: 'Kart',
-                        icon: Icons.credit_card_rounded,
-                        selected: _selectedMethod == 'card',
-                        color: _kBlue,
-                        lightColor: _kBlueLight,
-                        onTap: () => setState(() => _selectedMethod = 'card'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
+                      const SizedBox(height: 8),
+                      // Info about the active printer configuration
+                      Builder(
+                        builder: (context) {
+                          final activeDevice = ref.watch(
+                              activePrinterDeviceProvider(
+                                  PrintDocumentKind.receipt));
+                          final device = activeDevice.value;
 
-            // ── Açıklama ───────────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.notes_rounded,
-                          size: 16, color: _kTextSecondary),
-                      SizedBox(width: 8),
-                      Text('Açıklama (Opsiyonel)',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: _kText)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _noteController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: 'İşlem açıklaması...',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: _kBorder)),
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: _kBorder)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: _kGreen, width: 2)),
-                      filled: true,
-                      fillColor: _kSurface,
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
+                          if (device == null) {
+                            return GestureDetector(
+                              onTap: () {
+                                context.push('/settings');
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _kRedLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: _kRed.withValues(alpha: 0.3)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        size: 16, color: _kRed),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Aktif yazıcı bulunamadı! Ayarlamak için dokunun.',
+                                        style: TextStyle(
+                                            color: _kRed,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    Icon(Icons.chevron_right_rounded,
+                                        size: 16, color: _kRed),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
 
-            // ── Yazıcı Ayarları ve Fiş Seçeneği ────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _printReceipt
-                            ? Icons.print_rounded
-                            : Icons.print_disabled_rounded,
-                        size: 16,
-                        color: _printReceipt ? _kGreenDark : _kTextSecondary,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Yazıcı Ayarları',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: _kText),
-                      ),
-                      const Spacer(),
-                      Switch.adaptive(
-                        value: _printReceipt,
-                        activeColor: _kGreen,
-                        onChanged: (val) => setState(() => _printReceipt = val),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Info about the active printer configuration
-                  Builder(
-                    builder: (context) {
-                      final activeDevice = ref.watch(
-                          activePrinterDeviceProvider(
-                              PrintDocumentKind.receipt));
-                      final device = activeDevice.value;
+                          final printerInfo = 'Yazıcı: ${device.name}';
 
-                      if (device == null) {
-                        return GestureDetector(
-                          onTap: () {
-                            context.push('/settings');
-                          },
-                          child: Container(
+                          return Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: _kRedLight,
+                              color: _kGreenLight.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                  color: _kRed.withValues(alpha: 0.3)),
+                                  color: _kGreen.withValues(alpha: 0.2)),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded,
-                                    size: 16, color: _kRed),
-                                SizedBox(width: 8),
+                                const Icon(Icons.check_circle_outline_rounded,
+                                    size: 16, color: _kGreenDark),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Aktif yazıcı bulunamadı! Ayarlamak için dokunun.',
-                                    style: TextStyle(
-                                        color: _kRed,
+                                    printerInfo,
+                                    style: const TextStyle(
+                                        color: _kGreenDark,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600),
                                   ),
                                 ),
-                                Icon(Icons.chevron_right_rounded,
-                                    size: 16, color: _kRed),
                               ],
                             ),
-                          ),
-                        );
-                      }
-
-                      final printerInfo = 'Yazıcı: ${device.name}';
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _kGreenLight.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: _kGreen.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle_outline_rounded,
-                                size: 16, color: _kGreenDark),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                printerInfo,
-                                style: const TextStyle(
-                                    color: _kGreenDark,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
+                ),
+                const SizedBox(height: 28),
 
-            // ── Kaydet Butonu ─────────────────────────────────────────────
-            SizedBox(
-              height: 58,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                // ── Kaydet Butonu ─────────────────────────────────────────────
+                SizedBox(
+                  height: 58,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.price_check_rounded, size: 22),
+                    label: const Text(
+                      'Tahsilatı Kaydet',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
                 ),
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.price_check_rounded, size: 22),
-                label: const Text(
-                  'Tahsilatı Kaydet',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
 
         if (isWide) {
           return Scaffold(
@@ -648,8 +661,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   child: Container(
                     constraints:
                         const BoxConstraints(maxWidth: 620, maxHeight: 760),
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -756,7 +769,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       ref.invalidate(dashboardProvider);
       if (mounted) {
         context.pop();
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Tahsilat başarıyla kaydedildi.'),
             backgroundColor: _kGreen,
@@ -771,7 +784,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             .markUnreconciled(cardPayment, e);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: $e'),
             backgroundColor: _kRed,

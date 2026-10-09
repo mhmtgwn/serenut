@@ -568,9 +568,8 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                     }
                     widget.pageState._loadAdminPin();
                     if (!context.mounted) return;
-                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
-                    messenger.showSnackBar(
+                    AppNotificationHost.show(
                       const SnackBar(
                         content: Text(
                           'Yönetici PIN kodu başarıyla güncellendi.',

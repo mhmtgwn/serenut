@@ -32,6 +32,7 @@ import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/gib_settings_dialog.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
 part 'settings/widgets/user_form_dialogs.dart';

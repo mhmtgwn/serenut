@@ -24,6 +24,7 @@ import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/router.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // Sayfa
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,7 +327,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               onPressed: () {
                 Clipboard.setData(
                     ClipboardData(text: recoveryCodes.join('\n')));
-                ScaffoldMessenger.of(context).showSnackBar(
+                AppNotificationHost.show(
                   const SnackBar(
                     content: Text('Kurtarma kodları panoya kopyalandı!'),
                     backgroundColor: POSColors.green,

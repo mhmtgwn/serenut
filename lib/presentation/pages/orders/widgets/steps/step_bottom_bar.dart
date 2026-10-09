@@ -111,8 +111,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       final inventoryService = await ref.read(inventoryServiceProvider.future);
       final inventoryCheckItems = _cart.entries.map((e) {
         final rawQty = e.value;
-        final intQty =
-            rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
+        final intQty = rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
         return SaleItemInput(
           productId: e.key.id,
           productName: e.key.name,
@@ -242,7 +241,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           ref.read(ordersCustomersControllerProvider.notifier);
 
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text(isEdit
               ? 'Sipariş başarıyla güncellendi.'
@@ -359,7 +358,8 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
               existingCustId != null &&
               customer?.id != existingCustId) {
             container.invalidate(customerTransactionsProvider(existingCustId));
-            container.invalidate(customerBalanceDetailsProvider(existingCustId));
+            container
+                .invalidate(customerBalanceDetailsProvider(existingCustId));
             container.invalidate(customerDetailProvider(existingCustId));
           }
           container.invalidate(productsControllerProvider);
@@ -379,7 +379,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       }
       updateState(() => _isSubmitting = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
               content: Text('Sipariş kaydedilirken hata: $e'),
               backgroundColor: _kRed),
@@ -388,4 +388,3 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
     }
   }
 }
-

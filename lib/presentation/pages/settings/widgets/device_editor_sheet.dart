@@ -89,7 +89,9 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _vendor = config['vendor']?.toString() ??
         (_type == HardwareDeviceType.paymentTerminal ? 'pax' : 'generic');
     _protocol = config['protocol']?.toString() ??
-        (_type == HardwareDeviceType.paymentTerminal ? 'pax_d230' : 'vendor_sdk');
+        (_type == HardwareDeviceType.paymentTerminal
+            ? 'pax_d230'
+            : 'vendor_sdk');
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
     _stopBits = int.tryParse(config['stopBits']?.toString() ?? '') ?? 1;
     _parity = config['parity']?.toString() ?? 'none';
@@ -824,7 +826,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Protokol'),
             items: const [
-              DropdownMenuItem(value: 'pax_d230', child: Text('PAX POSLink / ECR')),
+              DropdownMenuItem(
+                  value: 'pax_d230', child: Text('PAX POSLink / ECR')),
               DropdownMenuItem(value: 'ecr', child: Text('BKM TechPOS / ECR')),
               DropdownMenuItem(value: 'gmp3', child: Text('GMP-3')),
               DropdownMenuItem(value: 'vendor_sdk', child: Text('Üretici SDK')),
@@ -974,7 +977,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           : '${result.message}\n${result.technicalDetail ?? ''}'.trim();
     });
     if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(content: Text(result.message), backgroundColor: kGreen),
       );
     }

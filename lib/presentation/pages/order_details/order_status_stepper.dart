@@ -9,8 +9,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
       BuildContext context, WidgetRef ref, OrderEntity order) {
     final isCancelled = order.status == 'cancelled';
     final isDelivered = order.status == 'delivered';
-    final currentIndex =
-        isCancelled ? -1 : OrderDetailsPage._statusFlow.indexOf(order.status.toLowerCase());
+    final currentIndex = isCancelled
+        ? -1
+        : OrderDetailsPage._statusFlow.indexOf(order.status.toLowerCase());
 
     return Container(
       decoration: BoxDecoration(
@@ -88,8 +89,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value:
-                currentIndex < 0 ? 0 : (currentIndex + 1) / OrderDetailsPage._statusFlow.length,
+            value: currentIndex < 0
+                ? 0
+                : (currentIndex + 1) / OrderDetailsPage._statusFlow.length,
             minHeight: 6,
             backgroundColor: _kBorder,
             valueColor: const AlwaysStoppedAnimation(_kGreen),
@@ -116,7 +118,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                             .read(ordersControllerProvider.notifier)
                             .updateStatus(order.id, status);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             SnackBar(
                               content: Text(
                                   '📱 Durum güncellendi: ${OrderDetailsPage._statusLabels[status]} (SMS bildirimi tetiklendi)'),
@@ -128,7 +130,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             SnackBar(
                               content: Text('Durum güncellenemedi: $e'),
                               backgroundColor: Colors.red,
@@ -265,8 +267,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
     ];
   }
 
-  void _confirmCancel(
-      BuildContext context, WidgetRef ref, OrderEntity order) {
+  void _confirmCancel(BuildContext context, WidgetRef ref, OrderEntity order) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -287,7 +288,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     .read(ordersControllerProvider.notifier)
                     .updateStatus(order.id, 'cancelled');
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  AppNotificationHost.show(
                     const SnackBar(
                         content: Text('Sipariş iptal edildi.'),
                         backgroundColor: Colors.red),
@@ -295,7 +296,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  AppNotificationHost.show(
                     SnackBar(
                         content: Text('Sipariş iptal edilemedi: $e'),
                         backgroundColor: Colors.red),
@@ -312,8 +313,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
     );
   }
 
-  void _confirmDelete(
-      BuildContext context, WidgetRef ref, OrderEntity order) {
+  void _confirmDelete(BuildContext context, WidgetRef ref, OrderEntity order) {
     if (order.status == 'delivered') {
       showDialog(
         context: context,
@@ -322,8 +322,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange, size: 28),
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
               SizedBox(width: 8),
               Text('Teslim Edilmiş Sipariş'),
             ],
@@ -381,7 +380,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 Navigator.pop(context);
               }
 
-              rootScaffoldMessengerKey.currentState?.showSnackBar(
+              AppNotificationHost.show(
                 const SnackBar(
                   content: Text('Sipariş siliniyor...'),
                   duration: Duration(milliseconds: 1500),
@@ -412,7 +411,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 unawaited(
                     ref.read(customersControllerProvider.notifier).refresh());
 
-                rootScaffoldMessengerKey.currentState?.showSnackBar(
+                AppNotificationHost.show(
                   const SnackBar(
                     content: Text('Sipariş başarıyla silindi.'),
                     backgroundColor: Colors.red,
@@ -422,7 +421,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
               } catch (e, st) {
                 unawaited(TelemetryService()
                     .logError(e, st, context: 'order_delete'));
-                rootScaffoldMessengerKey.currentState?.showSnackBar(
+                AppNotificationHost.show(
                   SnackBar(
                     content: Text('Sipariş silinemedi: $e'),
                     backgroundColor: Colors.red,
@@ -542,8 +541,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
           );
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               children: [
                 Icon(Icons.undo_rounded, color: _kOrange),
@@ -566,9 +565,12 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     ...returnItems.map((item) {
                       final pId = item['productId'] as String;
                       final name = productNameMap[pId] ?? pId;
-                      final maxQty = (item['maxQty'] as num?)?.toDouble() ?? 0.0;
-                      final currentQty = (item['returnQty'] as num?)?.toDouble() ?? 0.0;
-                      final price = (item['unitPrice'] as num?)?.toDouble() ?? 0.0;
+                      final maxQty =
+                          (item['maxQty'] as num?)?.toDouble() ?? 0.0;
+                      final currentQty =
+                          (item['returnQty'] as num?)?.toDouble() ?? 0.0;
+                      final price =
+                          (item['unitPrice'] as num?)?.toDouble() ?? 0.0;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 6),
@@ -672,8 +674,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                       ),
-                      onChanged: (val) =>
-                          setDialog(() => reason = val.trim()),
+                      onChanged: (val) => setDialog(() => reason = val.trim()),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
@@ -694,7 +695,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       items: [
                         const DropdownMenuItem(
                           value: 'cash',
-                          child: Text('💵 Kasadan Nakit İade (Elden Para Verildi)'),
+                          child: Text(
+                              '💵 Kasadan Nakit İade (Elden Para Verildi)'),
                         ),
                         if (hasCustomer)
                           const DropdownMenuItem(
@@ -717,7 +719,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.info_outline, size: 18, color: Color(0xFFB45309)),
+                            Icon(Icons.info_outline,
+                                size: 18, color: Color(0xFFB45309)),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -753,7 +756,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     ? () async {
                         Navigator.pop(ctx);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             const SnackBar(
                               content: Text('İade işlemi yapılıyor...'),
                               duration: Duration(milliseconds: 1500),
@@ -762,16 +765,21 @@ extension _StatusStepperMixin on OrderDetailsPage {
                         }
                         try {
                           final itemsToRefund = returnItems
-                              .where((ri) => ((ri['returnQty'] as num?)?.toDouble() ?? 0.0) > 0)
+                              .where((ri) =>
+                                  ((ri['returnQty'] as num?)?.toDouble() ??
+                                      0.0) >
+                                  0)
                               .map((ri) {
-                            final qty = (ri['returnQty'] as num?)?.toDouble() ?? 0.0;
+                            final qty =
+                                (ri['returnQty'] as num?)?.toDouble() ?? 0.0;
                             final intQty =
                                 qty >= 1.0 ? qty.round() : (qty > 0.0 ? 1 : 0);
                             return SaleItemInput(
                               productId: ri['productId'] as String,
                               quantity: intQty,
                               saleQuantity: qty,
-                              unitPrice: (ri['unitPrice'] as num?)?.toDouble() ?? 0.0,
+                              unitPrice:
+                                  (ri['unitPrice'] as num?)?.toDouble() ?? 0.0,
                             );
                           }).toList();
 
@@ -787,7 +795,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                           ref.invalidate(_orderDetailProvider(order.id));
 
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            AppNotificationHost.show(
                               SnackBar(
                                 content: Text(
                                   'Sipariş başarıyla iade alındı. ₺${refundTotal.toStringAsFixed(2)} iade edildi.',
@@ -800,10 +808,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
                           unawaited(TelemetryService()
                               .logError(e, st, context: 'order_refund'));
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            AppNotificationHost.show(
                               SnackBar(
-                                content:
-                                    Text('İade işlemi başarısız oldu: $e'),
+                                content: Text('İade işlemi başarısız oldu: $e'),
                                 backgroundColor: Colors.red,
                               ),
                             );
@@ -820,4 +827,3 @@ extension _StatusStepperMixin on OrderDetailsPage {
     );
   }
 }
-

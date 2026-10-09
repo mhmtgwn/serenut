@@ -15,6 +15,8 @@ import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
 
@@ -211,7 +213,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         },
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text(
                 'Teşhis raporu ve hata kayıtları teknik ekibe başarıyla iletildi.'),
@@ -222,7 +224,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Rapor iletilemedi: $e'),
             backgroundColor: POSColors.red,

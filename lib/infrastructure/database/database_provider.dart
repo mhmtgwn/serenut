@@ -47,7 +47,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 55;
+  static const int databaseVersion = 56;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -57,12 +57,14 @@ class DatabaseManager {
   static Future<void> waitForWriteLock({int timeoutSeconds = 30}) async {
     final bool isTest =
         !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-    final int maxAttempts = isTest ? 2 : (timeoutSeconds * 20); // 50ms intervals
+    final int maxAttempts =
+        isTest ? 2 : (timeoutSeconds * 20); // 50ms intervals
     int attempts = 0;
     while (isWriteLocked) {
       attempts++;
       if (attempts >= maxAttempts) {
-        throw DatabaseLockedException('Database is temporarily locked for backup');
+        throw DatabaseLockedException(
+            'Database is temporarily locked for backup');
       }
       await Future.delayed(const Duration(milliseconds: 50));
     }
@@ -134,6 +136,24 @@ class DatabaseManager {
   /// Reconciles all customer balances against the append-only ledger on database startup.
   Future<void> _reconcileAllCustomerBalances(Database db) async {
     try {
+      // 1. One-time data repair: Invalidate known erroneously generated duplicate/bugged transactions
+      await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
+      try {
+        await db.rawUpdate('''
+          UPDATE financial_transactions
+             SET is_deleted = 1, amount = 0, debt_amount = 0, paid_amount = 0
+           WHERE id IN (
+             'trans-cancel-17908835323535612843',
+             'trans-17912015326941994179',
+             'trans-17912015157808181703',
+             'trans-17913948343510403903'
+           ) AND COALESCE(is_deleted, 0) = 0
+        ''');
+      } finally {
+        await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
+      }
+
+      // 2. Reconcile customer balances with ledger
       await db.rawUpdate('''
         UPDATE customers
            SET balance = COALESCE((

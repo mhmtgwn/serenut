@@ -51,7 +51,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                               final size = await pickedFile.length();
                               if (size > 3 * 1024 * 1024) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  AppNotificationHost.show(
                                     const SnackBar(
                                       content:
                                           Text('Logo en fazla 3 MB olabilir.'),
@@ -67,7 +67,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             }
                           } catch (e) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            AppNotificationHost.show(
                               SnackBar(
                                 content: Text('Logo seçilirken hata: $e'),
                                 backgroundColor: Colors.redAccent,
@@ -263,7 +263,8 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       ],
                       _buildFormTextField(
                         controller: addressCtrl,
-                        label: 'Detaylı İşletme Adresi (Alt satıra geçilebilir)',
+                        label:
+                            'Detaylı İşletme Adresi (Alt satıra geçilebilir)',
                         icon: Icons.location_on_rounded,
                         maxLines: 3,
                         keyboardType: TextInputType.multiline,
@@ -279,9 +280,10 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       _buildModalSaveButton(
                         onTap: () async {
                           if (!formKey.currentState!.validate()) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            AppNotificationHost.show(
                               const SnackBar(
-                                content: Text('Lütfen zorunlu alanları (İşletme Adı, Yetkili, Telefon) doldurun.'),
+                                content: Text(
+                                    'Lütfen zorunlu alanları (İşletme Adı, Yetkili, Telefon) doldurun.'),
                                 backgroundColor: Colors.redAccent,
                               ),
                             );
@@ -307,9 +309,10 @@ extension _SettingsPageDialogs on _SettingsPageState {
                           );
                           await _updateSettingField(updated);
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            AppNotificationHost.show(
                               const SnackBar(
-                                content: Text('İşletme bilgileri başarıyla güncellendi.'),
+                                content: Text(
+                                    'İşletme bilgileri başarıyla güncellendi.'),
                                 backgroundColor: _kGreen,
                               ),
                             );
@@ -439,7 +442,6 @@ extension _SettingsPageDialogs on _SettingsPageState {
     );
   }
 }
-
 
 // �”€�”€ iOS Bölücü �‡izgisi �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
 class _IOSDivider extends StatelessWidget {

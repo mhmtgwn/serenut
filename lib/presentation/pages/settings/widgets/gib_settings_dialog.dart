@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/providers/gib_invoice_providers.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class GibSettingsDialog extends ConsumerStatefulWidget {
   const GibSettingsDialog({super.key});
 
@@ -109,7 +111,7 @@ class _GibSettingsDialogState extends ConsumerState<GibSettingsDialog> {
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('GİB e-Arşiv Portal bilgileri kaydedildi.'),
           backgroundColor: POSColors.green,
@@ -226,7 +228,8 @@ class _GibSettingsDialogState extends ConsumerState<GibSettingsDialog> {
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       labelText: 'GİB Portal Şifresi',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline_rounded, size: 20),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -257,9 +260,12 @@ class _GibSettingsDialogState extends ConsumerState<GibSettingsDialog> {
                           ),
                           items: const [
                             DropdownMenuItem(value: 1.0, child: Text('%1 KDV')),
-                            DropdownMenuItem(value: 10.0, child: Text('%10 KDV')),
-                            DropdownMenuItem(value: 20.0, child: Text('%20 KDV')),
-                            DropdownMenuItem(value: 0.0, child: Text('%0 (İstisna)')),
+                            DropdownMenuItem(
+                                value: 10.0, child: Text('%10 KDV')),
+                            DropdownMenuItem(
+                                value: 20.0, child: Text('%20 KDV')),
+                            DropdownMenuItem(
+                                value: 0.0, child: Text('%0 (İstisna)')),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -321,11 +327,14 @@ class _GibSettingsDialogState extends ConsumerState<GibSettingsDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.electrical_services_rounded,
                                   size: 18),
-                          label: Text(_isTesting ? 'Test Ediliyor...' : 'Bağlantıyı Test Et'),
+                          label: Text(_isTesting
+                              ? 'Test Ediliyor...'
+                              : 'Bağlantıyı Test Et'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             side: const BorderSide(color: POSColors.border),

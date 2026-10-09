@@ -88,7 +88,8 @@ class SyncPushResponseDto {
   factory SyncPushResponseDto.fromJson(Map<String, dynamic> json) {
     final resList = (json['results'] as List?)
             ?.whereType<Map>()
-            .map((r) => SyncPushAckResult.fromJson(Map<String, dynamic>.from(r)))
+            .map(
+                (r) => SyncPushAckResult.fromJson(Map<String, dynamic>.from(r)))
             .toList() ??
         const [];
     final confList = (json['conflicts'] as List?)
@@ -187,14 +188,46 @@ class SyncPullResponseDto {
       [int fallbackCursor = 0]) {
     final changesList = (json['changes'] as List?)
             ?.whereType<Map>()
-            .map((c) =>
-                SyncPullChangeDto.fromJson(Map<String, dynamic>.from(c)))
+            .map(
+                (c) => SyncPullChangeDto.fromJson(Map<String, dynamic>.from(c)))
             .toList() ??
         const [];
     final next = (json['next_cursor'] as num?)?.toInt() ?? fallbackCursor;
     return SyncPullResponseDto(
       changes: changesList,
       nextCursor: next,
+    );
+  }
+}
+
+/// Canonical tenant snapshot returned to a device without a local cursor.
+class SyncBootstrapResponseDto {
+  final List<SyncPullChangeDto> changes;
+  final int nextCursor;
+
+  const SyncBootstrapResponseDto({
+    this.changes = const [],
+    this.nextCursor = 0,
+  });
+
+  factory SyncBootstrapResponseDto.fromJson(Map<String, dynamic> json) {
+    final rawChanges = json['changes'];
+    if (rawChanges != null && rawChanges is! List) {
+      throw const FormatException('Sync bootstrap changes must be a list.');
+    }
+    final changes = (rawChanges as List? ?? const []).map((value) {
+      if (value is! Map) {
+        throw const FormatException('Sync bootstrap change must be an object.');
+      }
+      return SyncPullChangeDto.fromJson(Map<String, dynamic>.from(value));
+    }).toList(growable: false);
+    final cursorValue = json['next_cursor'];
+    if (cursorValue != null && cursorValue is! num) {
+      throw const FormatException('Sync bootstrap cursor must be numeric.');
+    }
+    return SyncBootstrapResponseDto(
+      changes: changes,
+      nextCursor: (cursorValue as num?)?.toInt() ?? 0,
     );
   }
 }

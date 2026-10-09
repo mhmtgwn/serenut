@@ -16,6 +16,8 @@ import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
 const _kGreenLight = POSColors.greenLight;
@@ -51,7 +53,7 @@ class AppShell extends ConsumerWidget {
         final event = next.valueOrNull;
         if (event == null) return;
         if (event.type == PrintCoordinatorEventType.failed) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             SnackBar(
               content: Text('Yazıcı Hatası: ${event.message}'),
               backgroundColor: Colors.red.shade700,
@@ -65,9 +67,9 @@ class AppShell extends ConsumerWidget {
             ),
           );
         } else if (event.type == PrintCoordinatorEventType.awaitingUserCheck) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             SnackBar(
-              content: const Text('Yazıcı çıktısı kontrol edilmeli.'),
+              content: Text(event.message),
               backgroundColor: Colors.orange.shade800,
               action: SnackBarAction(
                 label: 'Doğrula',

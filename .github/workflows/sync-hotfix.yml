@@ -30,22 +30,18 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
-          WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${{ secrets.WHATSAPP_WEBHOOK_VERIFY_TOKEN }}
-          WHATSAPP_CREDENTIAL_ENCRYPTION_KEY: ${{ secrets.WHATSAPP_CREDENTIAL_ENCRYPTION_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          envs: GITHUB_TOKEN,META_APP_SECRET,WHATSAPP_WEBHOOK_VERIFY_TOKEN,WHATSAPP_CREDENTIAL_ENCRYPTION_KEY
+          envs: GITHUB_TOKEN
           script_stop: true
           script: |
             cd /var/www/serenut
             git fetch "https://x-access-token:${GITHUB_TOKEN}@github.com/mhmtgwn/serenut.git" main
             git reset --hard FETCH_HEAD
             cd server
-            printf '%s' "$META_APP_SECRET" | sh scripts/configure_whatsapp_env.sh
             sh scripts/ensure_maintenance_token.sh
             sh scripts/ensure_evolution_env.sh
             docker compose -f docker-compose.prod.yml --env-file .env.production build backend maintenance-agent

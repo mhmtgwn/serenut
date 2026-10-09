@@ -39,11 +39,8 @@ const optionalEnv = [
   'SMTP_API_KEY',
   'RSA_PRIVATE_KEY',
   'APP_SECRET',
-  'META_APP_ID',
-  'META_APP_SECRET',
-  'WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID',
-  'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
-  'WHATSAPP_CREDENTIAL_ENCRYPTION_KEY',
+  'EVOLUTION_API_URL',
+  'EVOLUTION_API_KEY',
 ];
 optionalEnv.forEach(key => {
   if (!process.env[key]) {
@@ -183,13 +180,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://connect.facebook.net"], // Meta Embedded Signup SDK
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"], // Butonlardaki onclick inline handler'ları için
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.serenut.com", "https://graph.facebook.com", "https://www.facebook.com"],
-      frameSrc: ["'self'", "https://www.facebook.com", "https://web.facebook.com"]
+      connectSrc: ["'self'", "https://api.serenut.com"],
+      frameSrc: ["'self'"]
     }
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },

@@ -20,6 +20,7 @@ import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'checkout/cash_dialog.dart';
 import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'checkout/karma_fields.dart';
 part 'checkout/pay_buttons.dart';
 part 'checkout/customer_selection.dart';
@@ -160,7 +161,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       widget.onPaidAmountChanged(widget.total);
     } else if (method == 'debt') {
       if (widget.selectedCustomer == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Vadeli satış için müşteri seçilmesi zorunludur!'),
             backgroundColor: _kRed,
@@ -189,9 +190,10 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
     final rawDebt =
         double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0;
     if (rawDebt > 0 && widget.selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
-          content: Text('Veresiye/Borç kaydı için müşteri seçilmesi zorunludur!'),
+          content:
+              Text('Veresiye/Borç kaydı için müşteri seçilmesi zorunludur!'),
           backgroundColor: _kRed,
           behavior: SnackBarBehavior.floating,
         ),
@@ -199,7 +201,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       return;
     }
     if (!_karmaValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text(
             'Toplam tutar eşleşmiyor. Kalan: ₺${_karmaRemainder.toStringAsFixed(2)}',

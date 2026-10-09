@@ -89,18 +89,35 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       data: (data) {
         final saleTx = data['saleTx'] as FinancialTransactionEntity?;
         final totalPaid = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
+        final customerBalance = (data['customerBalance'] as num?)?.toDouble();
 
         if (saleTx == null) {
           return _infoRow('Ödeme Yöntemi', 'Bilinmiyor', Icons.payment_rounded);
         }
 
         final double totalAmount = saleTx.amount;
-        final double remainingDebt =
+        final double rawRemainingDebt =
             (totalAmount - totalPaid).clamp(0.0, double.infinity);
+
+        // Cari hesap kontrolü: Müşteri cari tahsilat yapmış ve bakiyesi kapanmışsa
+        // sipariş için mükerrer borç gösterme.
+        double remainingDebt = rawRemainingDebt;
+        if (customerBalance != null) {
+          if (customerBalance >= -0.01) {
+            remainingDebt = 0.0;
+          } else {
+            final double customerTotalDebt = customerBalance.abs();
+            remainingDebt = math.min(rawRemainingDebt, customerTotalDebt);
+          }
+        }
 
         String display = '';
         if (remainingDebt <= 0.01) {
-          display = 'Ödendi';
+          display = (customerBalance != null &&
+                  customerBalance >= -0.01 &&
+                  rawRemainingDebt > 0.01)
+              ? 'Cari ile Kapandı'
+              : 'Ödendi';
         } else if (totalPaid <= 0.01) {
           display = 'Vadeli';
         } else {
@@ -195,8 +212,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text('Müşteri',
-                      style:
-                          TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -283,8 +299,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
               const Divider(height: 20),
               _infoRow(
                   'Teslim Tarihi',
-                  DateFormat('dd.MM.yyyy')
-                      .format(order.expectedDeliveryDate!),
+                  DateFormat('dd.MM.yyyy').format(order.expectedDeliveryDate!),
                   Icons.local_shipping_outlined,
                   isOverdue: order.isOverdue),
             ],
@@ -330,8 +345,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(4)),
+                color: Colors.red[50], borderRadius: BorderRadius.circular(4)),
             child: const Text('GECİKMİŞ',
                 style: TextStyle(
                     color: Color(0xFFC2410C),
@@ -397,8 +411,28 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     }
 
     final double totalAmount = saleTx?.amount ?? order.totalAmount;
-    final double remainingDebt =
+    final double rawRemainingDebt =
         (totalAmount - totalPaid).clamp(0.0, double.infinity);
+
+    // Müşterinin cari hesap durumunu kontrol et
+    double remainingDebt = rawRemainingDebt;
+    final customerId = order.customerId.isNotEmpty
+        ? order.customerId
+        : (saleTx?.customerId ?? '');
+    if (customerId.isNotEmpty) {
+      try {
+        final custRepo = await ref.read(customerRepositoryProvider.future);
+        final cust = await custRepo.findById(customerId);
+        if (cust != null) {
+          if (cust.balance >= -0.01) {
+            remainingDebt = 0.0;
+          } else {
+            final double customerTotalDebt = cust.balance.abs();
+            remainingDebt = math.min(rawRemainingDebt, customerTotalDebt);
+          }
+        }
+      } catch (_) {}
+    }
 
     // Kalan borç varsa (vadeli veya kısmi ödenmiş sipariş) -> Ödeme ekranını aç!
     if (remainingDebt > 0.01) {
@@ -419,17 +453,18 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
       return;
     }
 
-    // Kalan borç yoksa (tamamı ödenmiş) -> Doğrudan teslim edildi işaretle ve fiş bas
+    // Kalan borç yoksa (tamamı ödenmiş veya cari tahsilatla kapanmış) -> Doğrudan teslim edildi işaretle ve fiş bas
     try {
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');
       ref.invalidate(_orderDetailProvider(order.id));
 
-      unawaited(triggerOrderDeliveryPrint(container, order, paidAmount: totalPaid));
+      unawaited(
+          triggerOrderDeliveryPrint(container, order, paidAmount: totalPaid));
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Sipariş teslim edildi ve teslimat fişi yazdırıldı.'),
             backgroundColor: _kGreen,
@@ -440,7 +475,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
     } catch (e, st) {
       unawaited(TelemetryService().logError(e, st, context: 'order_delivery'));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Durum güncellenemedi: $e'),
             backgroundColor: Colors.red,

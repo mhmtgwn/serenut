@@ -11,6 +11,8 @@ import 'package:serenutos/domain/services/document_export_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 // ── Design Constants ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF10B981);
 const _kBlue = Color(0xFF3B82F6);
@@ -286,7 +288,7 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('SMS kuyruğa alındı: ${widget.customer.phone}'),
             backgroundColor: _kBlue,
@@ -308,7 +310,7 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppNotificationHost.show(
       SnackBar(
         content: Text(message),
         backgroundColor: _kRed,

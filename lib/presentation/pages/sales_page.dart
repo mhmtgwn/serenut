@@ -28,6 +28,7 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'sales/animated_cart_tab.dart';
 
 const _kGreen = POSColors.green;
@@ -45,8 +46,6 @@ class SalesPage extends ConsumerStatefulWidget {
 
 class _SalesPageState extends ConsumerState<SalesPage>
     with BarcodeScannerMixin<SalesPage> {
-
-
   Future<void> _handleProductSelected(ProductEntity product) async {
     if (!product.isWeighed) {
       ref.read(salesFlowProvider.notifier).addToCart(product);
@@ -114,7 +113,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
   }
 
   void _showErrorSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppNotificationHost.show(
       SnackBar(
         content: Text(msg),
         backgroundColor: _kRed,
@@ -149,7 +148,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
       } else {
         ref.read(salesFlowProvider.notifier).addToCart(matched);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             SnackBar(
               content: Text('${matched.name} sepete eklendi.'),
               backgroundColor: _kGreen,
@@ -298,7 +297,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(
               'Satış kaydedildi (₺${createdSale.totalAmount.toStringAsFixed(2)})',
@@ -340,8 +339,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
     }
   }
 
-  Future<void> _printReceipt(
-      SaleEntity sale, CustomerEntity? selectedCustomer,
+  Future<void> _printReceipt(SaleEntity sale, CustomerEntity? selectedCustomer,
       {Map<String, dynamic>? paymentBreakdown}) async {
     final settingsAsync = ref.read(settingsNotifierProvider);
     var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
@@ -396,7 +394,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
           );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Yazdırma işlemi sıraya eklendi.'),
           backgroundColor: _kGreen,

@@ -23,6 +23,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class EvolutionQRDialog extends ConsumerStatefulWidget {
   const EvolutionQRDialog({super.key});
 
@@ -86,9 +88,8 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
 
         final qrDataUrl = body['qrcode'] as String?;
         if (qrDataUrl != null && qrDataUrl.isNotEmpty) {
-          final base64Part = qrDataUrl.contains(',')
-              ? qrDataUrl.split(',').last
-              : qrDataUrl;
+          final base64Part =
+              qrDataUrl.contains(',') ? qrDataUrl.split(',').last : qrDataUrl;
           final imageBytes = base64Decode(base64Part);
 
           if (!mounted) return;
@@ -169,7 +170,8 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('WhatsApp Bağlantısını Kes'),
-        content: const Text('Bağlantı kesilecek ve WhatsApp bildirimleri devre dışı kalacak. Devam etmek istiyor musunuz?'),
+        content: const Text(
+            'Bağlantı kesilecek ve WhatsApp bildirimleri devre dışı kalacak. Devam etmek istiyor musunuz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -194,7 +196,7 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isDisconnecting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: ${_friendlyError(e)}'),
             backgroundColor: POSColors.red,
@@ -470,7 +472,8 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
         if (!_isDisconnecting)
           TextButton.icon(
             onPressed: _disconnect,
-            icon: const Icon(Icons.link_off_rounded, size: 16, color: POSColors.red),
+            icon: const Icon(Icons.link_off_rounded,
+                size: 16, color: POSColors.red),
             label: const Text(
               'Bağlantıyı Kes',
               style: TextStyle(color: POSColors.red, fontSize: 12),
@@ -500,7 +503,8 @@ class _EvolutionQRDialogState extends ConsumerState<EvolutionQRDialog> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF25D366),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
         const SizedBox(height: 20),

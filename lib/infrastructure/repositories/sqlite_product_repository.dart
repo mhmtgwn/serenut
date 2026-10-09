@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/barcode_standard.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
@@ -19,6 +20,22 @@ class SqliteProductRepository implements IProductRepository {
   bool get _hasDataset =>
       _datasetLoader != null && _datasetLoader!.activeDb != null;
   String get _market => _datasetLoader?.selectedMarket ?? 'Migros';
+  bool? _productFtsAvailable;
+  DateTime? _lastSlowSearchTelemetryAt;
+
+  Future<bool> _hasProductSearchIndex() async {
+    final cached = _productFtsAvailable;
+    if (cached != null) return cached;
+    try {
+      final rows = await _executor.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='product_search_fts' LIMIT 1",
+      );
+      _productFtsAvailable = rows.isNotEmpty;
+    } catch (_) {
+      _productFtsAvailable = false;
+    }
+    return _productFtsAvailable!;
+  }
 
   Future<List<ProductEntity>> _queryProducts(
       {String? where, List<Object?>? whereArgs, String? orderBy}) async {
@@ -154,8 +171,8 @@ class SqliteProductRepository implements IProductRepository {
   Future<ProductEntity?> findProductById(String id) => findById(id);
 
   @override
-  Future<ProductEntity?> findById(dynamic id) async {
-    final cleanId = id?.toString().trim() ?? '';
+  Future<ProductEntity?> findById(String id) async {
+    final cleanId = id.trim();
     if (cleanId.isEmpty) return null;
     final candidates = BarcodeStandard.lookupCandidates(cleanId);
     final placeholders = List.filled(candidates.length, '?').join(',');
@@ -191,7 +208,8 @@ class SqliteProductRepository implements IProductRepository {
     final candidates = BarcodeStandard.lookupCandidates(product.id);
     final placeholders = List.filled(candidates.length, '?').join(',');
     final hasDeleted = await _checkHasIsDeletedColumn();
-    final deletedClause = hasDeleted ? ' AND (is_deleted = 0 OR is_deleted IS NULL)' : '';
+    final deletedClause =
+        hasDeleted ? ' AND (is_deleted = 0 OR is_deleted IS NULL)' : '';
     final duplicates = await _executor.query(
       'products',
       where: 'id IN ($placeholders)$deletedClause AND is_active = 1',
@@ -262,9 +280,10 @@ class SqliteProductRepository implements IProductRepository {
           whereArgs: [oldId],
           limit: 1,
         );
-        final createdAt = oldRows.isNotEmpty && oldRows.first['created_at'] != null
-            ? oldRows.first['created_at']!.toString()
-            : DateTime.now().toIso8601String();
+        final createdAt =
+            oldRows.isNotEmpty && oldRows.first['created_at'] != null
+                ? oldRows.first['created_at']!.toString()
+                : DateTime.now().toIso8601String();
 
         // 1. Insert the product under the new barcode/ID first so child table foreign keys are satisfied
         await _executor.insert(
@@ -462,8 +481,8 @@ class SqliteProductRepository implements IProductRepository {
   Future<int> deleteProduct(String id) => delete(id);
 
   @override
-  Future<int> delete(dynamic id) async {
-    final cleanId = id?.toString().trim() ?? '';
+  Future<int> delete(String id) async {
+    final cleanId = id.trim();
     if (cleanId.isEmpty) return 0;
     // Soft delete
     return _gateway.transaction(() async {
@@ -499,7 +518,7 @@ class SqliteProductRepository implements IProductRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final candidates = BarcodeStandard.lookupCandidates(id.toString());
     final placeholders = List.filled(candidates.length, '?').join(',');
     if (_hasDataset) {
@@ -663,6 +682,8 @@ class SqliteProductRepository implements IProductRepository {
     int? limit,
     int? offset,
   }) async {
+    final queryStopwatch = Stopwatch()..start();
+    var usedFts = false;
     final List<String> whereClauses = ['is_active = 1'];
     final List<dynamic> whereArgs = [];
 
@@ -682,25 +703,43 @@ class SqliteProductRepository implements IProductRepository {
         candidates.add(strippedZero);
       }
       final barcodePlaceholders = List.filled(candidates.length, '?').join(',');
-
-      whereClauses.add('''
-        (
-          id IN ($barcodePlaceholders)
-          OR id LIKE ?
-          OR sku LIKE ?
-          OR ${sqliteTurkishFold('name')} LIKE ?
-          OR ${sqliteTurkishFold('description')} LIKE ?
-          OR ${sqliteTurkishFold('brand')} LIKE ?
-          OR ${sqliteTurkishFold('shelf_code')} LIKE ?
-        )
-      ''');
-      whereArgs.addAll(candidates);
-      whereArgs.add(rawPattern);
-      whereArgs.add(rawPattern);
-      whereArgs.add(qPattern);
-      whereArgs.add(qPattern);
-      whereArgs.add(qPattern);
-      whereArgs.add(qPattern);
+      final useFts = !_hasDataset &&
+          normalizedQuery.runes.length >= 3 &&
+          await _hasProductSearchIndex();
+      usedFts = useFts;
+      if (useFts) {
+        final escaped = normalizedQuery.replaceAll('"', '""');
+        whereClauses.add('''
+          (
+            id IN ($barcodePlaceholders)
+            OR id IN (
+              SELECT id FROM product_search_fts
+              WHERE product_search_fts MATCH ?
+            )
+          )
+        ''');
+        whereArgs.addAll(candidates);
+        whereArgs.add('"$escaped"');
+      } else {
+        whereClauses.add('''
+          (
+            id IN ($barcodePlaceholders)
+            OR id LIKE ?
+            OR sku LIKE ?
+            OR ${sqliteTurkishFold('name')} LIKE ?
+            OR ${sqliteTurkishFold('description')} LIKE ?
+            OR ${sqliteTurkishFold('brand')} LIKE ?
+            OR ${sqliteTurkishFold('shelf_code')} LIKE ?
+          )
+        ''');
+        whereArgs.addAll(candidates);
+        whereArgs.add(rawPattern);
+        whereArgs.add(rawPattern);
+        whereArgs.add(qPattern);
+        whereArgs.add(qPattern);
+        whereArgs.add(qPattern);
+        whereArgs.add(qPattern);
+      }
     }
     if (stockFilter == 'in_stock') {
       whereClauses.add('quantity > 0');
@@ -720,7 +759,7 @@ class SqliteProductRepository implements IProductRepository {
         '((SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si '
             'JOIN sales s ON s.id = si.sale_id '
             "WHERE si.product_id = products.id AND s.status != 'cancelled') + "
-        '(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi '
+            '(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi '
             'JOIN orders o ON o.id = oi.order_id '
             "WHERE oi.product_id = products.id AND (o.is_deleted = 0 OR o.is_deleted IS NULL) AND o.status != 'cancelled')) DESC, name ASC",
       _ => 'name ASC',
@@ -733,6 +772,27 @@ class SqliteProductRepository implements IProductRepository {
       offset: offset,
       orderBy: orderBy,
     );
+    queryStopwatch.stop();
+    final completedAt = DateTime.now();
+    final lastTelemetryAt = _lastSlowSearchTelemetryAt;
+    if (queryStopwatch.elapsedMilliseconds >= 250 &&
+        (lastTelemetryAt == null ||
+            completedAt.difference(lastTelemetryAt) >=
+                const Duration(minutes: 1))) {
+      _lastSlowSearchTelemetryAt = completedAt;
+      unawaited(TelemetryService().logStructured(
+        event: 'catalog_search_slow',
+        level: LogLevel.warning,
+        metadata: {
+          'duration_ms': queryStopwatch.elapsedMilliseconds,
+          'query_length': searchQuery?.trim().runes.length ?? 0,
+          'result_count': rows.length,
+          'page_limit': limit,
+          'fts_enabled': usedFts,
+          'dataset_catalog': _hasDataset,
+        },
+      ));
+    }
     return rows.map((row) => ProductEntity.fromMap(row)).toList();
   }
 

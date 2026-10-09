@@ -16,6 +16,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/infrastructure/services/cloud_catalog_service.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 const _kPrimary = POSColors.green;
 const _kBackground = POSColors.surface;
 const _kCardBg = POSColors.card;
@@ -191,7 +193,7 @@ class _CatalogImportWizardPageState
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
             content: Text('Dosya seçilemedi: $e'),
             backgroundColor: Colors.redAccent),

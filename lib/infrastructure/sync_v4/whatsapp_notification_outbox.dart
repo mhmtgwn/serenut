@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,6 +15,7 @@ class WhatsappNotificationOutbox {
   static Future<void> _serial = Future<void>.value();
   final ApiClient _api;
   Timer? _periodicTimer;
+  DateTime? _lastFailureLogAt;
 
   /// Starts a background timer that automatically flushes any queued messages.
   /// This ensures offline or failed messages are not stuck waiting for new events.
@@ -44,17 +46,37 @@ class WhatsappNotificationOutbox {
         while (pending.isNotEmpty) {
           final payload = pending.first;
           try {
-            await _api.send(
+            final response = await _api.send(
               'POST',
               '/api/v1/whatsapp/events',
               body: payload,
               idempotencyKey:
                   'wa-event-${payload['client_event_id']?.toString() ?? ''}',
             );
+            final result = response.json;
+            if (result is! Map ||
+                (result['queued'] != true && result['duplicate'] != true)) {
+              final reason = result is Map
+                  ? result['reason']?.toString() ?? result['error']?.toString()
+                  : null;
+              throw ApiException(
+                'WhatsApp bildirimi kuyruğa alınmadı${reason == null ? '' : ': $reason'}',
+                statusCode: response.statusCode,
+                responseBody: response.body,
+              );
+            }
             pending.removeAt(0);
             sent++;
             await _save(prefs, pending);
-          } catch (_) {
+          } catch (error) {
+            final now = DateTime.now();
+            if (_lastFailureLogAt == null ||
+                now.difference(_lastFailureLogAt!) >=
+                    const Duration(minutes: 1)) {
+              debugPrint(
+                  'WhatsApp bildirimi gönderilemedi; kuyrukta tutuluyor: $error');
+              _lastFailureLogAt = now;
+            }
             break;
           }
         }
@@ -82,9 +104,8 @@ class WhatsappNotificationOutbox {
     SharedPreferences prefs,
     List<Map<String, dynamic>> pending,
   ) {
-    final trimmed = pending.length > 500
-        ? pending.sublist(pending.length - 500)
-        : pending;
+    final trimmed =
+        pending.length > 500 ? pending.sublist(pending.length - 500) : pending;
     return prefs.setStringList(
       _storageKey,
       trimmed.map(jsonEncode).toList(),

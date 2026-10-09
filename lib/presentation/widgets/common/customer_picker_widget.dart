@@ -15,6 +15,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 // ─── Renk sabitleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
 const _kGreenDark = Color(0xFF15803D);
@@ -194,7 +196,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
       });
     }
 
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+    AppNotificationHost.show(SnackBar(
       content: Text('${existing.name} seçildi.'),
       backgroundColor: _kGreen,
       behavior: SnackBarBehavior.floating,
@@ -203,7 +205,6 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
 
   Future<void> _saveNewCustomer() async {
     if (!(_addFormKey.currentState?.validate() ?? false)) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
     setState(() => _isSaving = true);
 
     try {
@@ -291,8 +292,8 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text('Telefon Numarası Kayıtlı',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
               ],
             ),
@@ -344,7 +345,9 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
         createdAt: DateTime.now(),
       );
 
-      await widget.config.readController(ref).addCustomer(newCustomer, force: true);
+      await widget.config
+          .readController(ref)
+          .addCustomer(newCustomer, force: true);
 
       _clearSearch();
       await widget.config.readController(ref).refresh();
@@ -364,7 +367,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
         });
       }
 
-      messenger?.showSnackBar(SnackBar(
+      AppNotificationHost.show(SnackBar(
         content: Text('${newCustomer.name} eklendi ve seçildi.'),
         backgroundColor: _kGreen,
         behavior: SnackBarBehavior.floating,
@@ -372,7 +375,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        AppNotificationHost.show(SnackBar(
           content: Text('Müşteri eklenirken hata: $e'),
           backgroundColor: _kRed,
           behavior: SnackBarBehavior.floating,
@@ -427,10 +430,8 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
       controller: _searchController,
       decoration: InputDecoration(
         hintText: 'Müşteri ara (isim veya telefon)...',
-        hintStyle:
-            const TextStyle(color: _kTextSecondary, fontSize: 13),
-        prefixIcon:
-            const Icon(Icons.search_rounded, color: _kTextSecondary),
+        hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 13),
+        prefixIcon: const Icon(Icons.search_rounded, color: _kTextSecondary),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.clear_rounded, size: 18),
@@ -512,15 +513,13 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     if (customersAsync.hasError && customers.isEmpty) {
       return Center(
         child: Text('Müşteriler yüklenemedi: ${customersAsync.error}',
-            style: const TextStyle(color: _kRed),
-            textAlign: TextAlign.center),
+            style: const TextStyle(color: _kRed), textAlign: TextAlign.center),
       );
     }
     if (customers.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.people_outline_rounded,
-              size: 56, color: Colors.grey[300]),
+          Icon(Icons.people_outline_rounded, size: 56, color: Colors.grey[300]),
           const SizedBox(height: 12),
           const Text('Aradığınız müşteri bulunamadı.',
               style: TextStyle(color: _kTextSecondary, fontSize: 14)),
@@ -530,14 +529,13 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
               _isAddingCustomer = true;
               _nameController.text = _searchQuery;
             }),
-            icon:
-                const Icon(Icons.person_add_rounded, color: _kGreen),
+            icon: const Icon(Icons.person_add_rounded, color: _kGreen),
             label: Text(
               _searchQuery.isNotEmpty
                   ? '"$_searchQuery" Ekle'
                   : 'Yeni Müşteri Ekle',
-              style: const TextStyle(
-                  color: _kGreen, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(color: _kGreen, fontWeight: FontWeight.bold),
             ),
           ),
         ]),
@@ -602,8 +600,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
           boxShadow: isSel
               ? [
                   BoxShadow(
-                      color: _kGreen.withValues(alpha: 0.08),
-                      blurRadius: 6)
+                      color: _kGreen.withValues(alpha: 0.08), blurRadius: 6)
                 ]
               : null,
         ),
@@ -611,25 +608,22 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
           dense: true,
           leading: CircleAvatar(
             radius: 18,
-            backgroundColor:
-                isSel ? _kGreen : (isDebt ? const Color(0xFFFEE2E2) : _kGreenLight),
+            backgroundColor: isSel
+                ? _kGreen
+                : (isDebt ? const Color(0xFFFEE2E2) : _kGreenLight),
             foregroundColor:
                 isSel ? Colors.white : (isDebt ? _kRed : _kGreenDark),
             child: Text(
               c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
           title: Text(c.name.toTurkishUpperCase,
               style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _kText,
-                  fontSize: 13)),
+                  fontWeight: FontWeight.w700, color: _kText, fontSize: 13)),
           subtitle: Text(
             c.phone.isNotEmpty ? formatPhoneForDisplay(c.phone) : 'Telefon Yok',
-            style: const TextStyle(
-                color: _kTextSecondary, fontSize: 11),
+            style: const TextStyle(color: _kTextSecondary, fontSize: 11),
           ),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             Text(
@@ -680,11 +674,10 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
               children: [
                 Row(children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                        color: _kGreen,
-                        borderRadius: BorderRadius.circular(4)),
+                        color: _kGreen, borderRadius: BorderRadius.circular(4)),
                     child: const Text('SEÇİLİ MÜŞTERİ',
                         style: TextStyle(
                             color: Colors.white,
@@ -704,9 +697,11 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                 const SizedBox(height: 3),
                 Row(children: [
                   Text(
-                    c.phone.isNotEmpty ? formatPhoneForDisplay(c.phone) : 'Telefon Yok',
-                    style: const TextStyle(
-                        color: _kTextSecondary, fontSize: 12),
+                    c.phone.isNotEmpty
+                        ? formatPhoneForDisplay(c.phone)
+                        : 'Telefon Yok',
+                    style:
+                        const TextStyle(color: _kTextSecondary, fontSize: 12),
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -725,8 +720,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
             icon: const Icon(Icons.close_rounded,
                 size: 16, color: _kTextSecondary),
             label: const Text('Kaldır',
-                style:
-                    TextStyle(color: _kTextSecondary, fontSize: 12)),
+                style: TextStyle(color: _kTextSecondary, fontSize: 12)),
           ),
       ]),
     );
@@ -739,113 +733,102 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
       child: Form(
         key: _addFormKey,
         child: SingleChildScrollView(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        color: _kTextSecondary),
-                    onPressed: () =>
-                        setState(() => _isAddingCustomer = false),
-                  ),
-                  const Text('Yeni Müşteri Ekle',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _kText)),
-                ]),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _nameController,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: 'Müşteri / Firma Adı *',
-                    hintText: 'Ad Soyad veya Firma Ünvanı',
-                    prefixIcon: const Icon(Icons.person_rounded,
-                        color: _kTextSecondary),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _kGreen, width: 2),
-                    ),
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Ad zorunludur'
-                      : null,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded,
+                    color: _kTextSecondary),
+                onPressed: () => setState(() => _isAddingCustomer = false),
+              ),
+              const Text('Yeni Müşteri Ekle',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _kText)),
+            ]),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: 'Müşteri / Firma Adı *',
+                hintText: 'Ad Soyad veya Firma Ünvanı',
+                prefixIcon:
+                    const Icon(Icons.person_rounded, color: _kTextSecondary),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kGreen, width: 2),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-]')),
-                    LengthLimitingTextInputFormatter(16),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: 'Telefon Numarası',
-                    hintText: _selectedCountry.dialCode == '+90'
-                        ? '5xx xxx xx xx'
-                        : '151 12345678',
-                    prefixIcon: CountryCodePrefixWidget(
-                      country: _selectedCountry,
-                      onCountryChanged: (c) =>
-                          setState(() => _selectedCountry = c),
-                    ),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _kGreen, width: 2),
-                    ),
-                  ),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-]')),
+                LengthLimitingTextInputFormatter(16),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Telefon Numarası',
+                hintText: _selectedCountry.dialCode == '+90'
+                    ? '5xx xxx xx xx'
+                    : '151 12345678',
+                prefixIcon: CountryCodePrefixWidget(
+                  country: _selectedCountry,
+                  onCountryChanged: (c) => setState(() => _selectedCountry = c),
                 ),
-                const SizedBox(height: 32),
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isSaving
-                          ? null
-                          : () => setState(
-                              () => _isAddingCustomer = false),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('İptal'),
-                    ),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kGreen, width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isSaving
+                      ? null
+                      : () => setState(() => _isAddingCustomer = false),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveNewCustomer,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kGreen,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white))
-                          : const Text('Kaydet ve Seç',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold)),
-                    ),
+                  child: const Text('İptal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveNewCustomer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                ]),
-              ]),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet ve Seç',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ]),
+          ]),
         ),
       ),
     );

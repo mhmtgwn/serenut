@@ -65,7 +65,7 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Katalog başarıyla dışarı aktarıldı.'),
             backgroundColor: _kGreen,

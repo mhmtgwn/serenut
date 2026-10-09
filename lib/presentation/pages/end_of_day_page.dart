@@ -14,6 +14,8 @@ import 'package:serenutos/presentation/controllers/end_of_day_controller.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class EndOfDayPage extends ConsumerStatefulWidget {
   const EndOfDayPage({super.key});
 
@@ -78,17 +80,18 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
       }
 
       // EndOfDayReport → mevcut ReportSummary DTO'suna dönüştür
-      final debtLine = report.salesBreakdown
-          .firstWhere((l) => l.label.contains('Vadeli'),
-              orElse: () => const PaymentTypeLine(
-                  label: 'Vadeli', count: 0, total: 0));
+      final debtLine = report.salesBreakdown.firstWhere(
+          (l) => l.label.contains('Vadeli'),
+          orElse: () =>
+              const PaymentTypeLine(label: 'Vadeli', count: 0, total: 0));
 
       final range = DateRange.today();
       final summary = ReportSummary(
         totalRevenue: report.totalRevenue,
         totalSales: report.totalSaleCount,
         totalDebt: debtLine.total,
-        totalCollected: report.cashFlow.expectedCash + report.cashFlow.totalPosCard,
+        totalCollected:
+            report.cashFlow.expectedCash + report.cashFlow.totalPosCard,
         avgBasket: report.totalSaleCount == 0
             ? 0
             : report.totalRevenue / report.totalSaleCount,
@@ -121,9 +124,8 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
     }
   }
 
-
   void _snack(String msg, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    AppNotificationHost.show(SnackBar(
       content: Text(msg),
       backgroundColor: error ? POSColors.red : POSColors.green,
       behavior: SnackBarBehavior.floating,
@@ -163,8 +165,7 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Yenile',
-            onPressed: () =>
-                ref.invalidate(endOfDayReportProvider(_dateKey)),
+            onPressed: () => ref.invalidate(endOfDayReportProvider(_dateKey)),
           ),
           // Yazdır
           report.when(
@@ -243,8 +244,8 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(
-        locale: 'tr_TR', symbol: '', decimalDigits: 2);
+    final fmt =
+        NumberFormat.currency(locale: 'tr_TR', symbol: '', decimalDigits: 2);
 
     return RefreshIndicator(
       onRefresh: () async {},
@@ -261,8 +262,8 @@ class _Body extends StatelessWidget {
                 _SectionHeader(
                   icon: Icons.point_of_sale_rounded,
                   label: 'Satış Özeti',
-                  eyebrow: DateFormat('dd MMMM yyyy', 'tr_TR')
-                      .format(report.date),
+                  eyebrow:
+                      DateFormat('dd MMMM yyyy', 'tr_TR').format(report.date),
                 ),
                 const SizedBox(height: 10),
                 _SalesSummaryPanel(report: report, fmt: fmt),
@@ -400,7 +401,9 @@ class _Card extends StatelessWidget {
         border: Border.all(color: POSColors.border),
         boxShadow: const [
           BoxShadow(
-              color: POSColors.shadowColor, blurRadius: 10, offset: Offset(0, 3)),
+              color: POSColors.shadowColor,
+              blurRadius: 10,
+              offset: Offset(0, 3)),
         ],
       ),
       child: child,
@@ -455,9 +458,7 @@ class _SalesSummaryPanel extends StatelessWidget {
           return Wrap(
             spacing: gap,
             runSpacing: gap,
-            children: items
-                .map((m) => SizedBox(width: w, child: m))
-                .toList(),
+            children: items.map((m) => SizedBox(width: w, child: m)).toList(),
           );
         },
       ),
@@ -487,9 +488,7 @@ class _MetricTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: highlighted
-            ? color.withValues(alpha: .08)
-            : POSColors.surface,
+        color: highlighted ? color.withValues(alpha: .08) : POSColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: highlighted ? color.withValues(alpha: .25) : POSColors.border,
@@ -591,7 +590,8 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -614,7 +614,8 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
                                 Expanded(
                                   child: Text(
                                     line.label,
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700),
                                   ),
                                 ),
                                 Text(
@@ -673,13 +674,17 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
             const Divider(height: 1),
             InkWell(
               onTap: () => setState(() => _showSalesList = !_showSalesList),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppRadii.md)),
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(AppRadii.md)),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     Icon(
-                      _showSalesList ? Icons.expand_less : Icons.list_alt_rounded,
+                      _showSalesList
+                          ? Icons.expand_less
+                          : Icons.list_alt_rounded,
                       size: 18,
                       color: POSColors.greenDark,
                     ),
@@ -697,7 +702,9 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
                       ),
                     ),
                     Icon(
-                      _showSalesList ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      _showSalesList
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
                       size: 20,
                       color: POSColors.greenDark,
                     ),
@@ -740,13 +747,16 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
                               Expanded(
                                 child: Text(
                                   s.customerName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               Text(
                                 '${fmt.format(s.totalAmount)} TL',
-                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900, fontSize: 14),
                               ),
                             ],
                           ),
@@ -758,17 +768,20 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
                                 children: [
                                   if (s.cashPortion > 0)
                                     _PaymentBadge(
-                                      label: 'Nakit: ₺${fmt.format(s.cashPortion)}',
+                                      label:
+                                          'Nakit: ₺${fmt.format(s.cashPortion)}',
                                       color: POSColors.green,
                                     ),
                                   if (s.cardPortion > 0)
                                     _PaymentBadge(
-                                      label: 'Kart: ₺${fmt.format(s.cardPortion)}',
+                                      label:
+                                          'Kart: ₺${fmt.format(s.cardPortion)}',
                                       color: POSColors.blue,
                                     ),
                                   if (s.debtPortion > 0.01)
                                     _PaymentBadge(
-                                      label: 'Vadeli: ₺${fmt.format(s.debtPortion)}',
+                                      label:
+                                          'Vadeli: ₺${fmt.format(s.debtPortion)}',
                                       color: POSColors.orange,
                                     ),
                                 ],
@@ -776,7 +789,9 @@ class _PaymentBreakdownPanelState extends State<_PaymentBreakdownPanel> {
                               const Spacer(),
                               Text(
                                 DateFormat('HH:mm').format(s.createdAt),
-                                style: const TextStyle(fontSize: 11, color: POSColors.textDisabled),
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: POSColors.textDisabled),
                               ),
                             ],
                           ),
@@ -844,11 +859,10 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
     }
   }
 
-  double get _expected =>
-      (_openingBalance +
-              widget.report.cashFlow.totalCashInflow -
-              widget.report.cashFlow.totalCashOutflow)
-          .clamp(0.0, double.infinity);
+  double get _expected => (_openingBalance +
+          widget.report.cashFlow.totalCashInflow -
+          widget.report.cashFlow.totalCashOutflow)
+      .clamp(0.0, double.infinity);
 
   double get _diff => _counted - _expected;
   bool get _hasCounted => _counted > 0 || widget.controller.text.isNotEmpty;
@@ -950,7 +964,7 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
             expectedCash: _expected,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Row(
               children: [
@@ -966,7 +980,7 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Sayım kaydedilirken hata oluştu: $e'),
             backgroundColor: POSColors.red,
@@ -1139,8 +1153,7 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
                 if (cashFlow.expensesList.isNotEmpty) ...[
                   const SizedBox(width: 10),
                   InkWell(
-                    onTap: () =>
-                        setState(() => _showExpenses = !_showExpenses),
+                    onTap: () => setState(() => _showExpenses = !_showExpenses),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -1271,7 +1284,8 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
               const Expanded(
                 child: Text(
                   'Banka POS Tahsilatı (Kart - Bilgi Amaçlı)',
-                  style: TextStyle(fontSize: 12, color: POSColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 12, color: POSColors.textSecondary),
                 ),
               ),
               Text(
@@ -1325,7 +1339,8 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
             decoration: InputDecoration(
               hintText: '0,00',
               suffixText: 'TL',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: POSColors.green, width: 2),
@@ -1523,8 +1538,8 @@ class _DenominationSheetState extends State<_DenominationSheet> {
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: POSColors.card,
                       borderRadius: BorderRadius.circular(10),
@@ -1555,7 +1570,8 @@ class _DenominationSheetState extends State<_DenominationSheet> {
                         ),
                         const SizedBox(width: 12),
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, size: 20),
+                          icon:
+                              const Icon(Icons.remove_circle_outline, size: 20),
                           onPressed: () => _decrement(d),
                           color: POSColors.textSecondary,
                         ),
@@ -1628,8 +1644,8 @@ class _DenominationSheetState extends State<_DenominationSheet> {
                             border: OutlineInputBorder(),
                           ),
                           onChanged: (v) {
-                            final p = double.tryParse(v.replaceAll(',', '.')) ??
-                                0.0;
+                            final p =
+                                double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                             setState(() => _extraCoins = p);
                           },
                         ),
@@ -1738,7 +1754,7 @@ class _AddExpenseDialogState extends ConsumerState<_AddExpenseDialog> {
   void _submit() async {
     final amt = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0.0;
     if (amt <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(content: Text('Lütfen geçerli bir tutar girin')),
       );
       return;
@@ -2007,14 +2023,17 @@ class _OrderPanelState extends State<_OrderPanel> {
             const SizedBox(height: 12),
             const Divider(height: 1),
             InkWell(
-              onTap: () => setState(() => _showDeliveredOrders = !_showDeliveredOrders),
+              onTap: () =>
+                  setState(() => _showDeliveredOrders = !_showDeliveredOrders),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     Icon(
-                      _showDeliveredOrders ? Icons.expand_less : Icons.local_shipping_outlined,
+                      _showDeliveredOrders
+                          ? Icons.expand_less
+                          : Icons.local_shipping_outlined,
                       size: 18,
                       color: POSColors.greenDark,
                     ),
@@ -2032,7 +2051,9 @@ class _OrderPanelState extends State<_OrderPanel> {
                       ),
                     ),
                     Icon(
-                      _showDeliveredOrders ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      _showDeliveredOrders
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
                       size: 20,
                       color: POSColors.greenDark,
                     ),
@@ -2062,20 +2083,26 @@ class _OrderPanelState extends State<_OrderPanel> {
                         Row(
                           children: [
                             Text(
-                              o.orderNumber.isNotEmpty ? o.orderNumber : '#${o.id.substring(0, 8)}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                              o.orderNumber.isNotEmpty
+                                  ? o.orderNumber
+                                  : '#${o.id.substring(0, 8)}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 13),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 o.customerName,
-                                style: const TextStyle(color: POSColors.textSecondary, fontSize: 13),
+                                style: const TextStyle(
+                                    color: POSColors.textSecondary,
+                                    fontSize: 13),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             Text(
                               '${fmt.format(o.totalAmount)} TL',
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 14),
                             ),
                           ],
                         ),
@@ -2087,22 +2114,26 @@ class _OrderPanelState extends State<_OrderPanel> {
                               children: [
                                 if (o.previouslyPaid > 0)
                                   _PaymentBadge(
-                                    label: 'Önceki Kapora: ₺${fmt.format(o.previouslyPaid)}',
+                                    label:
+                                        'Önceki Kapora: ₺${fmt.format(o.previouslyPaid)}',
                                     color: Colors.grey.shade700,
                                   ),
                                 if (o.cashPaidToday > 0)
                                   _PaymentBadge(
-                                    label: 'Bugün Nakit: ₺${fmt.format(o.cashPaidToday)}',
+                                    label:
+                                        'Bugün Nakit: ₺${fmt.format(o.cashPaidToday)}',
                                     color: POSColors.green,
                                   ),
                                 if (o.cardPaidToday > 0)
                                   _PaymentBadge(
-                                    label: 'Bugün Kart: ₺${fmt.format(o.cardPaidToday)}',
+                                    label:
+                                        'Bugün Kart: ₺${fmt.format(o.cardPaidToday)}',
                                     color: POSColors.blue,
                                   ),
                                 if (o.debtRemaining > 0.01)
                                   _PaymentBadge(
-                                    label: 'Kalan Vadeli: ₺${fmt.format(o.debtRemaining)}',
+                                    label:
+                                        'Kalan Vadeli: ₺${fmt.format(o.debtRemaining)}',
                                     color: POSColors.orange,
                                   ),
                               ],
@@ -2111,7 +2142,9 @@ class _OrderPanelState extends State<_OrderPanel> {
                             if (o.deliveredAt != null)
                               Text(
                                 DateFormat('HH:mm').format(o.deliveredAt!),
-                                style: const TextStyle(fontSize: 11, color: POSColors.textDisabled),
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: POSColors.textDisabled),
                               ),
                           ],
                         ),
@@ -2164,7 +2197,8 @@ class _OrderHeaderRow extends StatelessWidget {
         const SizedBox(width: 16),
         Text(
           '${fmt.format(total)} TL',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: color),
+          style: TextStyle(
+              fontWeight: FontWeight.w900, fontSize: 16, color: color),
         ),
       ],
     );
@@ -2206,7 +2240,8 @@ class _SubOrderRow extends StatelessWidget {
         ],
         Text(
           '${fmt.format(total)} TL',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color),
+          style: TextStyle(
+              fontWeight: FontWeight.w700, fontSize: 13, color: color),
         ),
       ],
     );
@@ -2244,7 +2279,8 @@ class _StatusChip extends StatelessWidget {
           ),
           Text(
             '$count',
-            style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 16),
+            style: TextStyle(
+                fontWeight: FontWeight.w900, color: color, fontSize: 16),
           ),
         ],
       ),
@@ -2300,7 +2336,8 @@ class _ReceivablesPanelState extends State<_ReceivablesPanel> {
             label: 'Toplam Piyasa Alacağı (Tüm Müşteriler)',
             value: recv.totalReceivables,
             fmt: fmt,
-            color: recv.totalReceivables > 0 ? POSColors.orange : POSColors.green,
+            color:
+                recv.totalReceivables > 0 ? POSColors.orange : POSColors.green,
             icon: Icons.account_balance_wallet_outlined,
             large: true,
           ),
@@ -2317,7 +2354,9 @@ class _ReceivablesPanelState extends State<_ReceivablesPanel> {
                 child: Row(
                   children: [
                     Icon(
-                      _showCollections ? Icons.expand_less : Icons.receipt_long_rounded,
+                      _showCollections
+                          ? Icons.expand_less
+                          : Icons.receipt_long_rounded,
                       size: 18,
                       color: POSColors.greenDark,
                     ),
@@ -2335,7 +2374,9 @@ class _ReceivablesPanelState extends State<_ReceivablesPanel> {
                       ),
                     ),
                     Icon(
-                      _showCollections ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      _showCollections
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
                       size: 20,
                       color: POSColors.greenDark,
                     ),
@@ -2368,13 +2409,17 @@ class _ReceivablesPanelState extends State<_ReceivablesPanel> {
                             children: [
                               Text(
                                 c.customerName,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 13),
                               ),
-                              if (c.description != null && c.description!.isNotEmpty) ...[
+                              if (c.description != null &&
+                                  c.description!.isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   c.description!,
-                                  style: const TextStyle(fontSize: 11, color: POSColors.textSecondary),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: POSColors.textSecondary),
                                 ),
                               ],
                             ],
@@ -2387,12 +2432,14 @@ class _ReceivablesPanelState extends State<_ReceivablesPanel> {
                         const SizedBox(width: 12),
                         Text(
                           '${fmt.format(c.amount)} TL',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           DateFormat('HH:mm').format(c.createdAt),
-                          style: const TextStyle(fontSize: 11, color: POSColors.textDisabled),
+                          style: const TextStyle(
+                              fontSize: 11, color: POSColors.textDisabled),
                         ),
                       ],
                     ),

@@ -44,7 +44,7 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<AuthUser?> findById(dynamic id) async {
+  Future<AuthUser?> findById(String id) async {
     final rows =
         await _executor.query('users', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
@@ -189,7 +189,7 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<int> delete(dynamic id) async {
+  Future<int> delete(String id) async {
     return await _executor.delete('users', where: 'id = ?', whereArgs: [id]);
   }
 
@@ -202,7 +202,7 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<bool> exists(dynamic id) async {
+  Future<bool> exists(String id) async {
     final user = await findById(id);
     return user != null;
   }

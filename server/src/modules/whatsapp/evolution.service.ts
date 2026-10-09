@@ -3,7 +3,7 @@
 //
 // Evolution API, QR kod tabanlı WhatsApp bağlantısı sağlar.
 // Her şirket = Evolution üzerinde 1 ayrı instance.
-// Meta onayı, WABA veya şablon gerektirmez.
+// Şablon onayı gerektirmeden metin mesajları gönderebilir.
 //
 // Dökümantasyon: https://doc.evolution-api.com
 
@@ -436,25 +436,4 @@ export async function sendTextMessage(
 
   const messageId = response?.key?.id ?? response?.messageId ?? 'unknown';
   return messageId;
-}
-
-// ── RUNTIME DOĞRULAMASI ──────────────────────────────────────────────────────
-
-/**
- * Evolution API ayarlarını doğrular.
- * WhatsApp kanalı etkin değilse kontrol yapılmaz.
- */
-export function validateEvolutionConfig(env: NodeJS.ProcessEnv = process.env): string[] {
-  const channels = (env.NOTIFICATION_ENABLED_CHANNELS || 'sms,email')
-    .split(',')
-    .map((c) => c.trim().toLowerCase());
-
-  if (!channels.includes('whatsapp')) return [];
-  if (env.WHATSAPP_GATEWAY !== 'evolution') return [];
-
-  const errors: string[] = [];
-  if (!env.EVOLUTION_API_URL?.trim()) errors.push('EVOLUTION_API_URL is required when WHATSAPP_GATEWAY=evolution');
-  if (!env.EVOLUTION_API_KEY?.trim()) errors.push('EVOLUTION_API_KEY is required when WHATSAPP_GATEWAY=evolution');
-
-  return errors;
 }

@@ -22,6 +22,7 @@ import 'package:serenutos/presentation/pages/settings/widgets/sms_sub_widgets.da
 import 'package:serenutos/presentation/widgets/whatsapp/evolution_qr_dialog.dart';
 import 'package:serenutos/domain/notifications/template_resolver.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
 // ─── WhatsApp Feature Flag ────────────────────────────────────────────────────
 // Evolution API (QR tabanlı WhatsApp gateway) etkin.
@@ -60,7 +61,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   bool whatsappConnected = false;
   String? whatsappPhone;
   String selectedChannel = 'sms';
-
 
   // SIM SMS Specific States
   List<Map<String, dynamic>> simCards = [];
@@ -110,8 +110,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       if (!mounted) return;
       setState(() {
         whatsappConnected = body['status'] == 'open';
-        whatsappPhone = body['phone']?.toString() ??
-            body['name']?.toString();
+        whatsappPhone = body['phone']?.toString() ?? body['name']?.toString();
         whatsappStatusLoading = false;
       });
     } catch (_) {
@@ -184,9 +183,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
-          content: Text('Gönderildi: $sentCount âœ… | Başarısız: $failedCount âŒ'),
+          content:
+              Text('Gönderildi: $sentCount âœ… | Başarısız: $failedCount âŒ'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -207,7 +207,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       await logRepo.updateStatus(log.id, SmsLogStatus.cancelled);
     }
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(
           content: Text('Belirsiz durumdaki SMS kayıtları iptal edildi.'),
           behavior: SnackBarBehavior.floating,
@@ -529,7 +529,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             .toList();
         if (allDebtors.isEmpty) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppNotificationHost.show(
               const SnackBar(
                 content: Text(
                   'Borçlu ve telefon numarası tanımlı müşteri bulunamadı.',
@@ -619,8 +619,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         currentBatchDebtors.map((customer) async {
                           if (isBulkCancelled) return;
                           try {
-                            final res =
-                                await debtReminderService.sendReminderToCustomer(
+                            final res = await debtReminderService
+                                .sendReminderToCustomer(
                               customer: customer,
                               settings: currentSettings,
                               channelOverride: reminderChannel,
@@ -683,7 +683,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     }
 
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      AppNotificationHost.show(
                         SnackBar(
                           content: Text(
                             isBulkCancelled
@@ -744,7 +744,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     } catch (e) {
       isSendingBulk = false;
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: $e'),
             backgroundColor: POSColors.red,
@@ -927,7 +927,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
       if (targets.isEmpty) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppNotificationHost.show(
             const SnackBar(
               content: Text('Telefon numarası tanımlı müşteri bulunamadı.'),
               behavior: SnackBarBehavior.floating,
@@ -988,7 +988,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       }
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text(
               '$sentCount tanıtım ve duyuru mesajı gönderim sırasına alındı.',
@@ -999,7 +999,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(
             content: Text('Hata: $e'),
             backgroundColor: POSColors.red,
@@ -1015,7 +1015,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     final failed = await logRepository.getFailedCampaignLogs();
     if (failed.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           const SnackBar(
             content: Text('Yeniden gönderilecek başarısız SMS bulunmuyor.'),
           ),
@@ -1062,7 +1062,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       await Future<void>.delayed(const Duration(seconds: 1));
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         SnackBar(
           content: Text('$sent / ${failed.length} SMS başarıyla gönderildi.'),
         ),
@@ -1293,9 +1293,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                               ? const Color(0xFF16A34A)
                               : POSColors.textSecondary,
                           fontSize: 12,
-                          fontWeight: isConnected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                          fontWeight:
+                              isConnected ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -1406,7 +1405,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       ),
     );
   }
-
 
   Widget _buildProviderCard({
     required String providerId,
@@ -2257,7 +2255,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 const SizedBox(height: AppSpacing.lg),
               ],
 
-
               // Flexible Templates Header
               Builder(
                 builder: (context) {
@@ -2385,11 +2382,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           final displayedTemplate = isWhatsAppTab
                               ? (tpl['whatsapp_template'] ??
                                   kDefaultWhatsAppTemplates[tpl['id']] ??
-                                  kDefaultWhatsAppTemplates[_canonicalEventId(tpl['id'] ?? '')] ??
+                                  kDefaultWhatsAppTemplates[
+                                      _canonicalEventId(tpl['id'] ?? '')] ??
                                   '')
-                              : (tpl['sms_template'] ??
-                                  tpl['template'] ??
-                                  '');
+                              : (tpl['sms_template'] ?? tpl['template'] ?? '');
 
                           return Container(
                             padding: const EdgeInsets.all(12),
@@ -2500,8 +2496,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                         onChanged: whatsappConnected &&
                                                 whatsappSupported
                                             ? (val) => setState(
-                                                  () => tpl['whatsapp_enabled'] =
-                                                      val,
+                                                  () =>
+                                                      tpl['whatsapp_enabled'] =
+                                                          val,
                                                 )
                                             : null,
                                       ),
@@ -2663,7 +2660,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                       if (context.mounted) Navigator.pop(context);
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           SnackBar(
                             content: Text('Hata: $e'),
                             backgroundColor: POSColors.red,
@@ -2680,7 +2677,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       ),
     );
   }
-
 
   Widget _buildSwitchRow({
     required String title,
@@ -2851,4 +2847,3 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     );
   }
 }
-

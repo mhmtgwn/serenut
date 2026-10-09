@@ -1,8 +1,7 @@
-// lib/presentation/pages/order_details_page.dart
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/config/router.dart' show rootScaffoldMessengerKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
@@ -29,6 +28,7 @@ import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'order_details/cash_out_sheet.dart';
 part 'order_details/order_status_stepper.dart';
 part 'order_details/order_info_card.dart';
@@ -78,9 +78,32 @@ final _orderPaymentInfoProvider = FutureProvider.autoDispose
       }
     }
   }
+
+  String customerId = saleTx?.customerId ?? '';
+  if (customerId.isEmpty) {
+    try {
+      final orderRepo = await ref.watch(orderRepositoryProvider.future);
+      final order = await orderRepo.findById(orderId);
+      if (order != null && order.customerId.isNotEmpty) {
+        customerId = order.customerId;
+      }
+    } catch (_) {}
+  }
+
+  double? customerBalance;
+  if (customerId.isNotEmpty) {
+    try {
+      final custRepo = await ref.watch(customerRepositoryProvider.future);
+      final cust = await custRepo.findById(customerId);
+      customerBalance = cust?.balance;
+    } catch (_) {}
+  }
+
   return {
     'saleTx': saleTx,
     'totalPaid': totalPaid,
+    'customerBalance': customerBalance,
+    'customerId': customerId,
   };
 });
 
@@ -105,7 +128,8 @@ class OrderDetailsPage extends ConsumerWidget {
         barrierDismissible: true,
         builder: (dialogCtx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: 960,
@@ -122,7 +146,8 @@ class OrderDetailsPage extends ConsumerWidget {
       return Navigator.push<T>(
         context,
         MaterialPageRoute(
-          builder: (routeCtx) => OrderDetailsPage(orderId: orderId, isModal: true),
+          builder: (routeCtx) =>
+              OrderDetailsPage(orderId: orderId, isModal: true),
           fullscreenDialog: true,
         ),
       );
@@ -191,16 +216,18 @@ class OrderDetailsPage extends ConsumerWidget {
                     icon: const Icon(Icons.print, color: _kGreen),
                     tooltip: 'Sipariş Fişi Yazdır',
                     onPressed: () async {
-                      var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+                      var settings =
+                          settingsAsync.valueOrNull ?? settingsAsync.value;
                       if (settings == null) {
                         try {
-                          final repo = await ref.read(settingsRepositoryProvider.future);
+                          final repo =
+                              await ref.read(settingsRepositoryProvider.future);
                           settings = await repo.getSettings();
                         } catch (_) {}
                       }
                       if (!context.mounted) return;
                       if (settings == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),
                         );
                         return;
@@ -246,11 +273,12 @@ class OrderDetailsPage extends ConsumerWidget {
                           };
                         }));
 
-                        final effectiveCustomer = customerToUse != null && customerToUse.id.isNotEmpty
-                            ? customerToUse
-                            : (customer != null && customer.id.isNotEmpty
-                                ? customer
-                                : null);
+                        final effectiveCustomer =
+                            customerToUse != null && customerToUse.id.isNotEmpty
+                                ? customerToUse
+                                : (customer != null && customer.id.isNotEmpty
+                                    ? customer
+                                    : null);
 
                         try {
                           await ref
@@ -262,8 +290,10 @@ class OrderDetailsPage extends ConsumerWidget {
                                 settings,
                               );
                         } catch (queueErr) {
-                          debugPrint('Queue print error, fallback to direct printer: $queueErr');
-                          final printerService = ref.read(printerServiceProvider);
+                          debugPrint(
+                              'Queue print error, fallback to direct printer: $queueErr');
+                          final printerService =
+                              ref.read(printerServiceProvider);
                           await printerService.printOrderReceipt(
                             order,
                             receiptItems,
@@ -273,7 +303,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         }
 
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           const SnackBar(
                             content: Text('Sipariş fişi başarıyla yazdırıldı.'),
                             backgroundColor: POSColors.green,
@@ -281,9 +311,10 @@ class OrderDetailsPage extends ConsumerWidget {
                           ),
                         );
                       } catch (e, st) {
-                        unawaited(TelemetryService().logError(e, st, context: 'order_receipt_print'));
+                        unawaited(TelemetryService()
+                            .logError(e, st, context: 'order_receipt_print'));
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           SnackBar(
                             content: Text('Yazdirma hatası: $e'),
                             backgroundColor: Colors.red,
@@ -298,16 +329,18 @@ class OrderDetailsPage extends ConsumerWidget {
                         const Icon(Icons.local_offer_outlined, color: _kGreen),
                     tooltip: 'Sipariş Etiketi Yazdır',
                     onPressed: () async {
-                      var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
+                      var settings =
+                          settingsAsync.valueOrNull ?? settingsAsync.value;
                       if (settings == null) {
                         try {
-                          final repo = await ref.read(settingsRepositoryProvider.future);
+                          final repo =
+                              await ref.read(settingsRepositoryProvider.future);
                           settings = await repo.getSettings();
                         } catch (_) {}
                       }
                       if (!context.mounted) return;
                       if (settings == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           const SnackBar(content: Text('Ayarlar yüklenemedi.')),
                         );
                         return;
@@ -325,7 +358,7 @@ class OrderDetailsPage extends ConsumerWidget {
                       }
                       if (!context.mounted) return;
                       if (!hasLabelPrinter) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           const SnackBar(
                             content: Text(
                               'Lütfen Ayarlar sayfasından bir etiket yazıcısı tanımlayın.',
@@ -347,15 +380,17 @@ class OrderDetailsPage extends ConsumerWidget {
                       }
                       double totalPaid = 0.0;
                       try {
-                        final txRepo = await ref
-                            .read(financialTransactionRepositoryProvider.future);
+                        final txRepo = await ref.read(
+                            financialTransactionRepositoryProvider.future);
                         var txs = await txRepo.getByReferenceId(order.id);
                         if (txs.isEmpty && order.customerId.isNotEmpty) {
                           txs = await txRepo.getByCustomerId(order.customerId);
                         }
                         for (final t in txs) {
                           if (t.referenceId == order.id) {
-                            if (t.type == 'sale' || t.type == 'payment' || t.type == 'collection') {
+                            if (t.type == 'sale' ||
+                                t.type == 'payment' ||
+                                t.type == 'collection') {
                               totalPaid += t.paidAmount;
                             }
                           }
@@ -367,11 +402,9 @@ class OrderDetailsPage extends ConsumerWidget {
                           await Future.wait(order.items.map((item) async {
                         final normalized = Map<String, dynamic>.from(item);
                         final productId = item['product_id']?.toString() ?? '';
-                        var name = (item['product_name'] ?? item['name'])
-                            ?.toString();
-                        if (name == null ||
-                            name.isEmpty ||
-                            name == productId) {
+                        var name =
+                            (item['product_name'] ?? item['name'])?.toString();
+                        if (name == null || name.isEmpty || name == productId) {
                           if (productId.isNotEmpty) {
                             final p = await prodRepo.findById(productId);
                             if (p != null) name = p.name;
@@ -392,8 +425,10 @@ class OrderDetailsPage extends ConsumerWidget {
                                 paidAmount: totalPaid,
                               );
                         } catch (queueErr) {
-                          debugPrint('Queue label print error, fallback to direct printer: $queueErr');
-                          final printerService = ref.read(printerServiceProvider);
+                          debugPrint(
+                              'Queue label print error, fallback to direct printer: $queueErr');
+                          final printerService =
+                              ref.read(printerServiceProvider);
                           await printerService.printOrderLabels(
                             order,
                             items,
@@ -403,7 +438,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         }
 
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           const SnackBar(
                             content: Text(
                               'Sipariş etiketi başarıyla yazdırıldı.',
@@ -413,7 +448,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                       } catch (error) {
                         if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppNotificationHost.show(
                           SnackBar(
                             content: Text('Sipariş etiketi hatası: $error'),
                             backgroundColor: Colors.red,
@@ -491,7 +526,6 @@ class OrderDetailsPage extends ConsumerWidget {
                   _buildActionButtons(context, ref, order)
                 else if (order.status == 'delivered')
                   _buildDeliveredActions(context, ref, order),
-
               ],
             ),
           );

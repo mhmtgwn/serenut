@@ -20,6 +20,8 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -47,6 +49,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
   Timer? _searchDebounce;
   bool _isSearching = false;
   bool _isLabelSelectionMode = false;
+  bool _isSelectingAllLabels = false;
   final Set<String> _selectedLabelProductIds = <String>{};
 
   @override
@@ -112,8 +115,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
     if (_scrollController.hasClients &&
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 400) {
-      final hasMore =
-          ref.read(productsControllerProvider.notifier).hasMoreData;
+      final hasMore = ref.read(productsControllerProvider.notifier).hasMoreData;
       final loadingMore = ref.read(productLoadingMoreProvider);
       if (hasMore && !loadingMore) {
         ref.read(productsControllerProvider.notifier).loadNextPage();
@@ -137,19 +139,32 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
   }
 
   Future<void> _toggleAllMatchingLabels() async {
-    final products =
-        await ref.read(productsControllerProvider.notifier).findAllMatching();
-    if (!mounted) return;
-    setState(() {
-      final ids = products.map((product) => product.id).toSet();
-      final allSelected =
-          ids.isNotEmpty && ids.every(_selectedLabelProductIds.contains);
-      if (allSelected) {
-        _selectedLabelProductIds.removeAll(ids);
-      } else {
-        _selectedLabelProductIds.addAll(ids);
+    if (_isSelectingAllLabels) return;
+    setState(() => _isSelectingAllLabels = true);
+    try {
+      final ids = await ref
+          .read(productsControllerProvider.notifier)
+          .findAllMatchingIds();
+      if (!mounted) return;
+      setState(() {
+        final allSelected =
+            ids.isNotEmpty && ids.every(_selectedLabelProductIds.contains);
+        if (allSelected) {
+          _selectedLabelProductIds.removeAll(ids);
+        } else {
+          _selectedLabelProductIds.addAll(ids);
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        AppNotificationHost.show(
+          const SnackBar(
+              content: Text('Ürünler toplu seçilemedi. Tekrar deneyin.')),
+        );
       }
-    });
+    } finally {
+      if (mounted) setState(() => _isSelectingAllLabels = false);
+    }
   }
 
   Future<void> _queueShelfLabels() async {
@@ -163,31 +178,52 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
     }
     if (settings == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppNotificationHost.show(
         const SnackBar(content: Text('Yazıcı ayarları henüz hazır değil.')),
       );
       return;
     }
-    final matchingProducts =
-        await ref.read(productsControllerProvider.notifier).findAllMatching();
-    if (!mounted) return;
-    final selected = matchingProducts
-        .where((product) => _selectedLabelProductIds.contains(product.id))
-        .toList(growable: false);
-    if (selected.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    final controller = ref.read(productsControllerProvider.notifier);
+    final selectedIds = Set<String>.of(_selectedLabelProductIds);
+    if (selectedIds.isEmpty) {
+      AppNotificationHost.show(
         const SnackBar(content: Text('Etiket basılacak ürünleri seçin.')),
       );
       return;
     }
-    await ref
-        .read(printingApplicationServiceProvider)
-        .queueProductLabels(selected, settings);
+    var offset = 0;
+    var queuedCount = 0;
+    const pageSize = 500;
+    while (true) {
+      final page = await controller.findAllMatching(
+        limit: pageSize,
+        offset: offset,
+      );
+      if (!mounted) return;
+      final selectedPage = page
+          .where((product) => selectedIds.contains(product.id))
+          .toList(growable: false);
+      if (selectedPage.isNotEmpty) {
+        await ref
+            .read(printingApplicationServiceProvider)
+            .queueProductLabels(selectedPage, settings);
+        queuedCount += selectedPage.length;
+      }
+      if (page.length < pageSize) break;
+      offset += page.length;
+    }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    if (queuedCount == 0) {
+      AppNotificationHost.show(
+        const SnackBar(
           content:
-              Text('${selected.length} etiket yazdırma kuyruğuna alındı.')),
+              Text('Seçilen ürünler mevcut arama ve filtrelerle eşleşmiyor.'),
+        ),
+      );
+      return;
+    }
+    AppNotificationHost.show(
+      SnackBar(content: Text('$queuedCount etiket yazdırma kuyruğuna alındı.')),
     );
     _closeLabelSelection();
   }
@@ -220,8 +256,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
         if (_isLabelSelectionMode)
           IconButton(
             tooltip: 'Filtreye uyan tüm ürünleri seç / temizle',
-            onPressed: _toggleAllMatchingLabels,
-            icon: const Icon(Icons.select_all_rounded, color: _kGreen),
+            onPressed: _isSelectingAllLabels ? null : _toggleAllMatchingLabels,
+            icon: _isSelectingAllLabels
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.select_all_rounded, color: _kGreen),
           ),
         IconButton(
           tooltip: _isLabelSelectionMode
@@ -462,7 +504,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                 _isLabelSelectionMode
                     ? '${_selectedLabelProductIds.length} Etiketi Yazdır'
                     : 'Yeni Ürün',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             );
           }
@@ -588,14 +631,13 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                     return;
                   }
 
-                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(ctx);
                   try {
                     final updated = product.copyWith(price: newPrice);
                     await ref
                         .read(productsControllerProvider.notifier)
                         .updateProduct(updated);
-                    messenger.showSnackBar(
+                    AppNotificationHost.show(
                       SnackBar(
                         content: Text(
                             '${product.name} fiyatı ₺${newPrice.toStringAsFixed(2)} olarak güncellendi.'),
@@ -604,7 +646,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                       ),
                     );
                   } catch (e) {
-                    messenger.showSnackBar(
+                    AppNotificationHost.show(
                       SnackBar(
                         content:
                             Text('Fiyat güncellenirken bir hata oluştu: $e'),
@@ -627,15 +669,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
     final isLowStock = product.quantity <= product.minStock;
     final isOutOfStock = product.quantity <= 0;
 
-    final stockColor = isOutOfStock
-        ? _kRed
-        : (isLowStock ? Colors.orange[700]! : _kGreen);
-    final stockBg = isOutOfStock
-        ? _kRedLight
-        : (isLowStock ? _kAmberLight : _kGreenLight);
-    final stockText = isOutOfStock
-        ? 'Tükendi'
-        : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
+    final stockColor =
+        isOutOfStock ? _kRed : (isLowStock ? Colors.orange[700]! : _kGreen);
+    final stockBg =
+        isOutOfStock ? _kRedLight : (isLowStock ? _kAmberLight : _kGreenLight);
+    final stockText =
+        isOutOfStock ? 'Tükendi' : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
 
     final cardBg = isSelected
         ? const Color(0xFFDCFCE7)

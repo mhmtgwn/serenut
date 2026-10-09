@@ -69,9 +69,6 @@ if ! grep -q "^EVOLUTION_REDIS_URL=" "$ENV_FILE"; then
   fi
 fi
 
-# WHATSAPP_GATEWAY: evolution olarak ayarla
-upsert WHATSAPP_GATEWAY "evolution"
-
 # NOTIFICATION_ENABLED_CHANNELS: whatsapp kanalını etkinleştir
 if grep -q "^NOTIFICATION_ENABLED_CHANNELS=" "$ENV_FILE"; then
   current_channels="$(sed -n "s/^NOTIFICATION_ENABLED_CHANNELS=//p" "$ENV_FILE" | tail -n 1)"

@@ -11,6 +11,8 @@ import 'package:serenutos/presentation/widgets/revenue_bar_chart.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class SalesTab extends ConsumerWidget {
   const SalesTab({super.key, required this.range});
 
@@ -169,7 +171,7 @@ class SalesTab extends ConsumerWidget {
     String message, {
     bool warning = false,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppNotificationHost.show(
       SnackBar(
         content: Text(message),
         backgroundColor: warning ? POSColors.orange : POSColors.green,

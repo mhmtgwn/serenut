@@ -12,6 +12,8 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
 
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+
 class SaleDetailsPage extends ConsumerWidget {
   final String saleId;
 
@@ -203,7 +205,9 @@ class SaleDetailsPage extends ConsumerWidget {
     double subtotal = 0;
     for (final item in items) {
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0;
+      final price =
+          ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ??
+              0.0;
       subtotal += qty * price;
     }
     final discount = sale.discountAmount;
@@ -221,8 +225,9 @@ class SaleDetailsPage extends ConsumerWidget {
             final i = entry.key;
             final item = entry.value;
             final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-            final price =
-                ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0;
+            final price = ((item['unit_price'] ?? item['unitPrice']) as num?)
+                    ?.toDouble() ??
+                0.0;
             final productId = item['product_id']?.toString() ?? '';
             final productName = item['product_name']?.toString() ??
                 item['name']?.toString() ??
@@ -392,7 +397,8 @@ class SaleDetailsPage extends ConsumerWidget {
               _paymentRow('İndirim', -sale.discountAmount, Colors.red[700]!),
               const SizedBox(height: 8),
             ],
-            _paymentRow('Toplam Tutar', sale.totalAmount, Colors.black87, bold: true),
+            _paymentRow('Toplam Tutar', sale.totalAmount, Colors.black87,
+                bold: true),
             const SizedBox(height: 8),
             _paymentRow('Ödenen', sale.paidAmount, POSColors.greenDark),
             if (remaining > 0) ...[
@@ -516,20 +522,28 @@ class SaleDetailsPage extends ConsumerWidget {
 
     // Build return items list from sale.items
     final returnItems = sale.items.map((item) {
-      final soldQty = ((item['sale_quantity'] ?? item['quantity']) as num?)?.toDouble() ?? 0.0;
-      final refundedQty = ((item['refunded_quantity'] ?? item['refundedQuantity']) as num?)?.toDouble() ?? 0.0;
+      final soldQty =
+          ((item['sale_quantity'] ?? item['quantity']) as num?)?.toDouble() ??
+              0.0;
+      final refundedQty =
+          ((item['refunded_quantity'] ?? item['refundedQuantity']) as num?)
+                  ?.toDouble() ??
+              0.0;
       final qty = (soldQty - refundedQty).clamp(0.0, double.infinity);
-      final isWeighed = item['sale_type'] == 'weighed' || (soldQty != soldQty.roundToDouble());
+      final isWeighed = item['sale_type'] == 'weighed' ||
+          (soldQty != soldQty.roundToDouble());
       return _ReturnItem(
         saleItemId: item['id']?.toString() ?? '',
         productId: item['product_id']?.toString() ?? '',
         maxQty: qty,
-        unitPrice: ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ?? 0.0,
+        unitPrice:
+            ((item['unit_price'] ?? item['unitPrice']) as num?)?.toDouble() ??
+                0.0,
         returnQty: 0.0,
         isWeighed: isWeighed,
       );
     }).toList();
-    String refundMethod = 'balance';
+    String refundMethod = 'cash';
     String reason = '';
 
     showDialog(
@@ -568,8 +582,11 @@ class SaleDetailsPage extends ConsumerWidget {
                             IconButton(
                               onPressed: ri.returnQty > 0.0001
                                   ? () => setDialog(() {
-                                        ri.returnQty = (ri.returnQty - step).clamp(0.0, ri.maxQty);
-                                        if (!ri.isWeighed) ri.returnQty = ri.returnQty.roundToDouble();
+                                        ri.returnQty = (ri.returnQty - step)
+                                            .clamp(0.0, ri.maxQty);
+                                        if (!ri.isWeighed)
+                                          ri.returnQty =
+                                              ri.returnQty.roundToDouble();
                                       })
                                   : null,
                               icon: const Icon(Icons.remove_circle_outline),
@@ -579,14 +596,17 @@ class SaleDetailsPage extends ConsumerWidget {
                               ri.isWeighed
                                   ? '${ri.returnQty.toStringAsFixed(2)} / ${ri.maxQty.toStringAsFixed(2)}'
                                   : '${ri.returnQty.toInt()} / ${ri.maxQty.toInt()}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             IconButton(
                               onPressed: ri.returnQty < ri.maxQty - 0.0001
                                   ? () => setDialog(() {
-                                        ri.returnQty = (ri.returnQty + step).clamp(0.0, ri.maxQty);
-                                        if (!ri.isWeighed) ri.returnQty = ri.returnQty.roundToDouble();
+                                        ri.returnQty = (ri.returnQty + step)
+                                            .clamp(0.0, ri.maxQty);
+                                        if (!ri.isWeighed)
+                                          ri.returnQty =
+                                              ri.returnQty.roundToDouble();
                                       })
                                   : null,
                               icon: const Icon(Icons.add_circle_outline),
@@ -625,15 +645,16 @@ class SaleDetailsPage extends ConsumerWidget {
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8)),
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'balance',
-                            child: Text('Müşteri Bakiyesine Ekle')),
-                        DropdownMenuItem(
+                      items: [
+                        const DropdownMenuItem(
                             value: 'cash', child: Text('Nakit İade')),
+                        if (sale.customerId.isNotEmpty)
+                          const DropdownMenuItem(
+                              value: 'balance',
+                              child: Text('Müşteri Bakiyesine Ekle')),
                       ],
                       onChanged: (v) =>
-                          setDialog(() => refundMethod = v ?? 'balance'),
+                          setDialog(() => refundMethod = v ?? 'cash'),
                     ),
                   ],
                 ),
@@ -667,7 +688,7 @@ class SaleDetailsPage extends ConsumerWidget {
                             );
                         ref.invalidate(saleDetailProvider(sale.id));
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppNotificationHost.show(
                             SnackBar(
                               content: Text(
                                   'İade tamamlandı. ${refundTotal.toStringAsFixed(2)} TL iade edildi.'),
@@ -818,7 +839,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                     );
               } catch (error) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  AppNotificationHost.show(SnackBar(
                     content: Text('Kart işlemi onaylanmadı: $error'),
                     backgroundColor: Colors.red,
                   ));
@@ -845,7 +866,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
               if (!context.mounted) return;
               Navigator.pop(context);
               if (widget.parentContext.mounted) {
-                ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                AppNotificationHost.show(
                   SnackBar(
                     content:
                         Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
@@ -860,7 +881,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                     .markUnreconciled(cardPayment, error);
               }
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                AppNotificationHost.show(SnackBar(
                   content:
                       Text('Ödeme kaydedilemedi; mutabakat gerekiyor: $error'),
                   backgroundColor: Colors.red,

@@ -18,7 +18,7 @@ import 'package:serenutos/providers/auth_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:share_plus/share_plus.dart';
 
-
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'reports/reports_controls.dart';
 part 'reports/products_tab.dart';
 part 'reports/receivables_tab.dart';
@@ -125,7 +125,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppNotificationHost.show(
           SnackBar(content: Text('Rapor oluşturulamadı: $error')),
         );
       }

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 
 class SyncStatusBadge extends ConsumerWidget {
@@ -19,6 +20,7 @@ class SyncStatusBadge extends ConsumerWidget {
     final syncState = ref.watch(syncProvider);
     final status = syncState.status;
     final pendingCount = syncState.pendingOutboxCount;
+    final conflictCount = syncState.unresolvedConflictCount;
     final friendlyError = syncState.userFriendlyError;
 
     // Determine colors and icon
@@ -32,16 +34,16 @@ class SyncStatusBadge extends ConsumerWidget {
       textColor = const Color(0xFF1D4ED8);
       icon = Icons.sync_rounded;
       label = 'Eşitleniyor';
+    } else if (status == SyncStatus.error) {
+      badgeColor = const Color(0xFFEF4444);
+      textColor = const Color(0xFFB91C1C);
+      icon = Icons.cloud_off_rounded;
+      label = conflictCount > 0 ? '$conflictCount çakışma' : 'Eşitleme sorunu';
     } else if (pendingCount > 0) {
       badgeColor = const Color(0xFFF59E0B);
       textColor = const Color(0xFFB45309);
       icon = Icons.cloud_queue_rounded;
       label = '$pendingCount bekliyor';
-    } else if (status == SyncStatus.error) {
-      badgeColor = const Color(0xFFEF4444);
-      textColor = const Color(0xFFB91C1C);
-      icon = Icons.cloud_off_rounded;
-      label = 'Bağlantı yok';
     } else {
       badgeColor = POSColors.green;
       textColor = POSColors.greenDark;
@@ -128,8 +130,10 @@ class SyncStatusBadge extends ConsumerWidget {
             final syncState = ref.watch(syncProvider);
             final status = syncState.status;
             final pendingCount = syncState.pendingOutboxCount;
+            final conflictCount = syncState.unresolvedConflictCount;
             final lastSyncAt = syncState.lastSyncAt;
             final friendlyError = syncState.userFriendlyError;
+            final hasError = status == SyncStatus.error;
 
             final timeStr = lastSyncAt != null
                 ? '${lastSyncAt.hour.toString().padLeft(2, '0')}:${lastSyncAt.minute.toString().padLeft(2, '0')}:${lastSyncAt.second.toString().padLeft(2, '0')}'
@@ -183,25 +187,33 @@ class SyncStatusBadge extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: pendingCount > 0
-                            ? const Color(0xFFFEF3C7)
-                            : const Color(0xFFF0FDF4),
+                        color: hasError
+                            ? const Color(0xFFFEF2F2)
+                            : pendingCount > 0
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFF0FDF4),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: pendingCount > 0
-                              ? const Color(0xFFFDE68A)
-                              : const Color(0xFFDCFCE7),
+                          color: hasError
+                              ? const Color(0xFFFECACA)
+                              : pendingCount > 0
+                                  ? const Color(0xFFFDE68A)
+                                  : const Color(0xFFDCFCE7),
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            pendingCount > 0
-                                ? Icons.inventory_2_outlined
-                                : Icons.check_circle_outline_rounded,
-                            color: pendingCount > 0
-                                ? const Color(0xFFB45309)
-                                : POSColors.green,
+                            hasError
+                                ? Icons.cloud_off_rounded
+                                : pendingCount > 0
+                                    ? Icons.inventory_2_outlined
+                                    : Icons.check_circle_outline_rounded,
+                            color: hasError
+                                ? const Color(0xFFDC2626)
+                                : pendingCount > 0
+                                    ? const Color(0xFFB45309)
+                                    : POSColors.green,
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -210,27 +222,39 @@ class SyncStatusBadge extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  pendingCount > 0
-                                      ? '$pendingCount bekleyen işlem kuyrukta'
-                                      : 'Tüm satış ve kayıtlar eşitlendi',
+                                  hasError
+                                      ? (conflictCount > 0
+                                          ? '$conflictCount kayıt için eşitleme çakışması'
+                                          : 'Senkronizasyon tamamlanamadı')
+                                      : pendingCount > 0
+                                          ? '$pendingCount bekleyen işlem kuyrukta'
+                                          : 'Tüm satış ve kayıtlar eşitlendi',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14,
-                                    color: pendingCount > 0
-                                        ? const Color(0xFF92400E)
-                                        : const Color(0xFF166534),
+                                    color: hasError
+                                        ? const Color(0xFF991B1B)
+                                        : pendingCount > 0
+                                            ? const Color(0xFF92400E)
+                                            : const Color(0xFF166534),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  pendingCount > 0
-                                      ? 'İşlemleriniz bu cihazın güvenli yerel veritabanında saklanır. İnternet bağlantısı sağlandığında otomatik olarak sunucuya aktarılır.'
-                                      : 'Son başarılı eşitleme saati: $timeStr',
+                                  hasError
+                                      ? (conflictCount > 0
+                                          ? 'Bu kayıtlar başka bir terminalde değiştirildi. Yeni satışlarınız güvende; yetkili kullanıcı senkronizasyon kayıtlarını incelemeli.'
+                                          : 'Bekleyen işlemler bu cihazda saklanıyor. Bağlantı veya oturum düzeldiğinde yeniden eşitlenecek.')
+                                      : pendingCount > 0
+                                          ? 'İşlemleriniz bu cihazın güvenli yerel veritabanında saklanır. İnternet bağlantısı sağlandığında otomatik olarak sunucuya aktarılır.'
+                                          : 'Son başarılı eşitleme saati: $timeStr',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: pendingCount > 0
-                                        ? const Color(0xFFB45309)
-                                        : const Color(0xFF15803D),
+                                    color: hasError
+                                        ? const Color(0xFF991B1B)
+                                        : pendingCount > 0
+                                            ? const Color(0xFFB45309)
+                                            : const Color(0xFF15803D),
                                   ),
                                 ),
                               ],
@@ -265,6 +289,17 @@ class SyncStatusBadge extends ConsumerWidget {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                    if (conflictCount > 0) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.rule_folder_outlined),
+                          label: Text('$conflictCount çakışma kaydını incele'),
+                          onPressed: () => _showConflictDetailsSheet(context),
                         ),
                       ),
                     ],
@@ -314,6 +349,92 @@ class SyncStatusBadge extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+
+  Future<void> _showConflictDetailsSheet(BuildContext context) async {
+    final conflictsFuture = () async {
+      final db = await DatabaseManager().getDatabase();
+      return db.rawQuery('''
+        SELECT entity_type, entity_id, server_revision, detected_at
+        FROM sync_conflicts_v4
+        WHERE resolved_at IS NULL
+        ORDER BY detected_at DESC
+        LIMIT 100
+      ''');
+    }();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * 0.65,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Senkronizasyon çakışmaları',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Bu kayıtlar başka bir terminalde daha yeni bir değişiklik olduğu için otomatik uygulanmadı. Yerel işlem korunuyor; çakışmayı yetkili kullanıcı incelemeli.',
+                  style: TextStyle(fontSize: 13, height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: FutureBuilder<List<Map<String, Object?>>>(
+                    future: conflictsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text('Çakışma kayıtları şu anda yüklenemedi.'),
+                        );
+                      }
+                      final conflicts = snapshot.data ?? const [];
+                      if (conflicts.isEmpty) {
+                        return const Center(
+                          child: Text('Açık çakışma kaydı bulunmuyor.'),
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: conflicts.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final conflict = conflicts[index];
+                          final type =
+                              conflict['entity_type']?.toString() ?? 'kayıt';
+                          final id = conflict['entity_id']?.toString() ?? '';
+                          final revision =
+                              conflict['server_revision']?.toString() ?? '—';
+                          final detectedAt =
+                              conflict['detected_at']?.toString() ?? '';
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.sync_problem_outlined,
+                                color: Color(0xFFDC2626)),
+                            title: Text('$type · $id'),
+                            subtitle: Text(
+                              'Sunucu sürümü $revision${detectedAt.isEmpty ? '' : ' · $detectedAt'}',
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
