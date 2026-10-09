@@ -407,7 +407,6 @@ class SyncNotifier extends StateNotifier<SyncState>
           lastSyncAt: DateTime.now(),
           clearError: true,
         );
-        unawaited(_ref.read(whatsappNotificationOutboxProvider).flush());
       } else {
         // Log the partial sync failure event
         await TelemetryService().logStructured(
@@ -442,6 +441,10 @@ class SyncNotifier extends StateNotifier<SyncState>
         userFriendlyError: _humanizeSyncError(rawErr),
       );
     } finally {
+      // WhatsApp delivery uses its own API queue and must not depend on the
+      // business-data sync succeeding. Retry it after both successful and
+      // failed sync passes; the durable outbox retains messages on failure.
+      unawaited(_ref.read(whatsappNotificationOutboxProvider).flush());
       await refreshPendingCount();
       if (_syncRequestedWhileRunning) {
         _syncRequestedWhileRunning = false;

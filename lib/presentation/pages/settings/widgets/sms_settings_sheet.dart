@@ -392,12 +392,19 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         );
         for (final item in list) {
           item['sms_enabled'] ??= item['enabled'] == true;
-          item['whatsapp_enabled'] ??= true; // Eski şablonlarda varsayılan: açık
           item['enabled'] = item['sms_enabled'] == true;
           item['sms_template'] ??= item['template'];
           final currentWa = item['whatsapp_template']?.toString().trim();
           final smsTpl =
               (item['sms_template'] ?? item['template'])?.toString().trim();
+          item['whatsapp_enabled'] ??= currentWa != null &&
+              currentWa.isNotEmpty &&
+              currentWa != smsTpl &&
+              !currentWa.startsWith('Merhaba ') &&
+              !currentWa.startsWith('Merhaba {customer}') &&
+              !currentWa.startsWith('🧾 *Satış Bilgilendirmesi*') &&
+              !currentWa.startsWith(
+                  '🛎️ *Siparişiniz Alındı*\n\nSayın *{customer}*,\n#{id} numaralı siparişiniz onaylanmış');
           final def = defaultTemplates.firstWhere(
             (t) => t['id'] == item['id'],
             orElse: () => <String, dynamic>{},

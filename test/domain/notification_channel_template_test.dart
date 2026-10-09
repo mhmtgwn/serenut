@@ -76,6 +76,26 @@ void main() {
     );
   });
 
+  test('legacy explicit WhatsApp template remains enabled without a flag', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'order_ready',
+        'template': 'SMS: {customer}',
+        'whatsapp_template': 'WA: {customer}',
+        'enabled': true,
+      }
+    ]);
+
+    expect(
+      resolver.resolveWhatsApp(
+        eventType: kSmsEventOrderReady,
+        settings: settings,
+        vars: variables,
+      ),
+      'WA: Ayşe',
+    );
+  });
+
   test('global SMS switch does not disable an enabled WhatsApp event', () {
     final settings = _settings(smsEnabled: false, templates: [
       {
@@ -104,7 +124,9 @@ void main() {
     );
   });
 
-  test('resolves distinct sms_template and whatsapp_template for the same event', () {
+  test(
+      'resolves distinct sms_template and whatsapp_template for the same event',
+      () {
     final settings = _settings(smsEnabled: true, templates: [
       {
         'id': 'sale_created',
@@ -133,12 +155,16 @@ void main() {
     );
   });
 
-  test('WhatsApp rejects legacy SMS template and uses rich kDefaultWhatsAppTemplates', () {
+  test(
+      'WhatsApp rejects legacy SMS template and uses rich kDefaultWhatsAppTemplates',
+      () {
     final settings = _settings(smsEnabled: true, templates: [
       {
         'id': 'sale_created',
-        'template': 'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
-        'sms_template': 'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
+        'template':
+            'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
+        'sms_template':
+            'Merhaba {customer}, {id} nolu işlem tamamlandı. {business}',
         'sms_enabled': true,
         'whatsapp_enabled': true,
       }
@@ -193,7 +219,8 @@ void main() {
     expect(wa, contains('Kapıda teslim ediniz, acısız olsun.'));
   });
 
-  test('Order WhatsApp template omits discount and note cleanly when absent', () {
+  test('Order WhatsApp template omits discount and note cleanly when absent',
+      () {
     final settings = _settings(smsEnabled: true, templates: [
       {
         'id': 'order_created',

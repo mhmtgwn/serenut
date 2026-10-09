@@ -327,12 +327,7 @@ class TemplateResolver {
         if (id == null || !candidateIds.contains(id)) continue;
 
         if (channel == NotificationTemplateChannel.whatsapp) {
-          // null → henüz ayarlanmamış (eski şablon) = izin ver
-          // false → kullanıcı açıkça kapattı = bloke et
-          // true  → açık = izin ver
           final enabled = item['whatsapp_enabled'];
-          if (enabled == false) return null;
-
           final customWa = item['whatsapp_template']?.toString().trim();
           final smsTpl =
               (item['sms_template'] ?? item['template'])?.toString().trim();
@@ -344,6 +339,13 @@ class TemplateResolver {
               customWa.startsWith('Merhaba ') ||
               customWa.startsWith('Merhaba {customer}') ||
               customWa.startsWith('Sayın {customer}, {id} numaralı');
+
+          // Older WhatsApp-specific templates may have no enabled flag. Treat
+          // a valid explicit WhatsApp template as opted in, while keeping
+          // legacy SMS-only templates disabled until the user enables them.
+          if (enabled == false || (enabled != true && isLegacySmsCopy)) {
+            return null;
+          }
 
           if (!isLegacySmsCopy) {
             return customWa;
@@ -386,14 +388,11 @@ class TemplateResolver {
             : (vars['sms_items'] ?? value);
         result = result.replaceAll('{$key}', replacement);
       } else if (key == 'discount_line') {
-        final replacement = isWhatsApp
-            ? value
-            : (vars['sms_discount_line'] ?? '');
+        final replacement =
+            isWhatsApp ? value : (vars['sms_discount_line'] ?? '');
         result = result.replaceAll('{$key}', replacement);
       } else if (key == 'note_line') {
-        final replacement = isWhatsApp
-            ? value
-            : (vars['sms_note_line'] ?? '');
+        final replacement = isWhatsApp ? value : (vars['sms_note_line'] ?? '');
         result = result.replaceAll('{$key}', replacement);
       } else if (!key.startsWith('whatsapp_') && !key.startsWith('sms_')) {
         result = result.replaceAll('{$key}', value);
@@ -436,20 +435,15 @@ class SmsTemplateVars {
       'discount': discountStr,
       'discount_amount': discountStr,
       'has_discount': discountAmount > 0.001 ? 'true' : 'false',
-      'discount_line': discountAmount > 0.001
-          ? '\n▫️ *İndirim:* -$discountStr'
-          : '',
-      'sms_discount_line': discountAmount > 0.001
-          ? ' (İndirim: -$discountStr)'
-          : '',
+      'discount_line':
+          discountAmount > 0.001 ? '\n▫️ *İndirim:* -$discountStr' : '',
+      'sms_discount_line':
+          discountAmount > 0.001 ? ' (İndirim: -$discountStr)' : '',
       'note': cleanNote,
       'order_note': cleanNote,
-      'note_line': cleanNote.isNotEmpty
-          ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
-          : '',
-      'sms_note_line': cleanNote.isNotEmpty
-          ? ' (Not: $cleanNote)'
-          : '',
+      'note_line':
+          cleanNote.isNotEmpty ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_' : '',
+      'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(
         (totalAmount - paidAmount).clamp(0, double.maxFinite),
@@ -547,20 +541,15 @@ class SmsTemplateVars {
       'discount': discountStr,
       'discount_amount': discountStr,
       'has_discount': discountAmount > 0.001 ? 'true' : 'false',
-      'discount_line': discountAmount > 0.001
-          ? '\n▫️ *İndirim:* -$discountStr'
-          : '',
-      'sms_discount_line': discountAmount > 0.001
-          ? ' (İndirim: -$discountStr)'
-          : '',
+      'discount_line':
+          discountAmount > 0.001 ? '\n▫️ *İndirim:* -$discountStr' : '',
+      'sms_discount_line':
+          discountAmount > 0.001 ? ' (İndirim: -$discountStr)' : '',
       'note': cleanNote,
       'order_note': cleanNote,
-      'note_line': cleanNote.isNotEmpty
-          ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_'
-          : '',
-      'sms_note_line': cleanNote.isNotEmpty
-          ? ' (Not: $cleanNote)'
-          : '',
+      'note_line':
+          cleanNote.isNotEmpty ? '\n\n📝 *Sipariş Notu:*\n_${cleanNote}_' : '',
+      'sms_note_line': cleanNote.isNotEmpty ? ' (Not: $cleanNote)' : '',
       'paid': _fmt(0, currency),
       'debt': '0,00 $currency',
       'id': orderId.toShortId,
@@ -601,7 +590,8 @@ class SmsTemplateVars {
       return ('', '');
     }
     // SMS: comma-separated without prices (to conserve SMS character limits)
-    final sms = itemNames.map((line) => line.split(' — ').first.trim()).join(', ');
+    final sms =
+        itemNames.map((line) => line.split(' — ').first.trim()).join(', ');
     // WhatsApp: bulleted items with full details and price
     final whatsapp = itemNames.map((line) => '▫️ $line').join('\n');
     return (sms, whatsapp);

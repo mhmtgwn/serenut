@@ -5,9 +5,8 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Durable bridge from local domain events to the company WhatsApp Cloud API
-/// channel. The server decides whether the company connection and approved
-/// Meta template are ready; a successful 202 response also covers safe skips.
+/// Durable bridge from local domain events to the server's WhatsApp API queue.
+/// The server decides whether the company connection and template are ready.
 class WhatsappNotificationOutbox {
   WhatsappNotificationOutbox(this._api);
 
