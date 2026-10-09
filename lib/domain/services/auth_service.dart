@@ -197,7 +197,8 @@ class AuthService {
           }
 
           await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, token);
-          await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, refreshToken);
+          await _tokenStorage.saveToken(
+              SecureTokenStorage.keyRefreshToken, refreshToken);
           _apiClient!.setJwtToken(token);
 
           // Synchronize trial starting date from server (AC 1.2)
@@ -248,9 +249,7 @@ class AuthService {
             try {
               final hash = _hashService.hashPassword(password);
               await _userRepository.updateUserFields(user,
-                  isActive: true,
-                  passwordHash: hash,
-                  username: user.username);
+                  isActive: true, passwordHash: hash, username: user.username);
             } catch (e, st) {
               TelemetryService().logError(e, st,
                   context: 'AuthService', level: LogLevel.warning);
@@ -523,8 +522,13 @@ class AuthService {
         final newRToken = data['refresh_token'] as String;
 
         await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, token);
-        await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, newRToken);
+        await _tokenStorage.saveToken(
+            SecureTokenStorage.keyRefreshToken, newRToken);
         _apiClient!.setJwtToken(token);
+        final subscription = data['subscription'] as Map<String, dynamic>?;
+        if (subscription != null) {
+          await TrialManager(_prefs).cacheSubscription(subscription);
+        }
         return true;
       }
     } on ApiException catch (e) {
@@ -532,13 +536,14 @@ class AuthService {
       if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
         return false;
       }
-      return false;
+      rethrow;
     } catch (e, st) {
       // Network timeout / SocketException — do not treat as permanent authentication revocation!
       TelemetryService().logError(e, st,
           context: 'AuthService.refreshToken (offline/network)',
           level: LogLevel.warning);
-      return false;
+      throw ApiException('Oturum yenileme sunucusuna ulaşılamıyor.',
+          statusCode: 503);
     }
     return false;
   }
@@ -795,8 +800,10 @@ class AuthService {
     // 1. Update remote user profile if connected
     if (_apiClient != null && _apiClient!.jwtToken != null) {
       try {
-        final res = await _apiClient!.send('PATCH', '/users/me', body: {'name': trimmed});
-        debugPrint('[AuthService] Profile name updated on server: ${res.statusCode}');
+        final res = await _apiClient!
+            .send('PATCH', '/users/me', body: {'name': trimmed});
+        debugPrint(
+            '[AuthService] Profile name updated on server: ${res.statusCode}');
       } catch (e) {
         debugPrint('[AuthService] Remote name update failed: $e');
       }
@@ -827,40 +834,13 @@ class AuthService {
   /// and potentially triggers sync resumption.
   Future<bool> refreshEntitlement() async {
     if (_apiClient == null) return false;
-    final refreshToken = _tokenStorage.getRefreshToken();
-    if (refreshToken == null) return false;
-
     try {
-      final response = await _apiClient!.post('/auth/refresh', {
-        'refresh_token': refreshToken,
-      });
-
-      if (response.isSuccess) {
-        final data = response.json;
-        final newAccessToken = data['access_token'] as String?;
-        final newRefreshToken = data['refresh_token'] as String?;
-        final subscription = data['subscription'] as Map<String, dynamic>?;
-
-        if (newAccessToken != null && newAccessToken.isNotEmpty) {
-          await _tokenStorage.saveToken(SecureTokenStorage.keyJwtToken, newAccessToken);
-          _apiClient!.setJwtToken(newAccessToken);
-        }
-        if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
-          await _tokenStorage.saveToken(SecureTokenStorage.keyRefreshToken, newRefreshToken);
-        }
-
-        if (subscription != null) {
-          final trialManager = TrialManager(_prefs);
-          await trialManager.cacheSubscription(subscription);
-        }
-
-        // Refresh follows the same server-owned entitlement and device
-        // activation contract as login.  The retired module bootstrap endpoint
-        // could silently return no license and leave a stale activation cached.
-        await _bootstrapAuthenticatedSession();
-
-        return true;
-      }
+      // Share the same single-flight refresh used by 401 recovery; independent
+      // rotations can race and trigger refresh-token replay revocation.
+      if (!await refreshToken()) return false;
+      // Apply the server-owned entitlement and device activation contract.
+      await _bootstrapAuthenticatedSession();
+      return true;
     } catch (e) {
       debugPrint('Entitlement refresh failed: $e');
     }

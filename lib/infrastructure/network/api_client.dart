@@ -190,9 +190,11 @@ class ApiClient {
           onTokenExpired != null) {
         _refreshFuture ??= onTokenExpired!();
         bool success = false;
+        Object? refreshFailure;
         try {
           success = await _refreshFuture!;
-        } catch (_) {
+        } catch (error) {
+          refreshFailure = error;
           success = false;
         } finally {
           _refreshFuture = null; // reset for next time
@@ -241,6 +243,13 @@ class ApiClient {
             );
           }
           return retryApiResponse;
+        } else if (refreshFailure is ApiException &&
+            refreshFailure.statusCode != 400 &&
+            refreshFailure.statusCode != 401 &&
+            refreshFailure.statusCode != 403) {
+          // A refresh outage is not proof that the refresh token was revoked.
+          // Preserve credentials and let the caller retry later.
+          throw refreshFailure;
         } else {
           _invalidateSession(
               'Oturum yenilenemedi: Sunucudaki oturum süresi doldu veya oturum kapatıldı.');

@@ -94,14 +94,40 @@ void main() {
       client.setJwtToken('expired-token');
       client.onSessionExpired = (_) => expirationCallbacks += 1;
 
-      await expectLater(client.get('/api/v4/sync/hardware-jobs/claim'),
-          throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));
-      await expectLater(client.get('/api/v4/sync/hardware-jobs/claim'),
-          throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));
+      await expectLater(
+          client.get('/api/v4/sync/hardware-jobs/claim'),
+          throwsA(isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 401)));
+      await expectLater(
+          client.get('/api/v4/sync/hardware-jobs/claim'),
+          throwsA(isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 401)));
 
       expect(networkCalls, 1);
       expect(expirationCallbacks, 1);
       expect(client.jwtToken, isNull);
+    });
+
+    test('preserves session when token refresh fails temporarily', () async {
+      final client = ApiClient(
+        config: EnvironmentConfig.fromEnv(AppEnvironment.test),
+        httpClient: MockClient((_) async => http.Response('{}', 401)),
+      );
+      client.setJwtToken('still-valid-refresh-session');
+      var expirationCallbacks = 0;
+      client.onSessionExpired = (_) => expirationCallbacks++;
+      client.onTokenExpired = () async => throw const ApiException(
+          'refresh service unavailable',
+          statusCode: 503);
+
+      await expectLater(
+        client.get('/api/v4/sync/push'),
+        throwsA(
+            isA<ApiException>().having((e) => e.statusCode, 'statusCode', 503)),
+      );
+
+      expect(client.jwtToken, 'still-valid-refresh-session');
+      expect(expirationCallbacks, 0);
     });
   });
 }
