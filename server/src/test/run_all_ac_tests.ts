@@ -58,6 +58,7 @@ const testFiles = [
   'ac_trial.test.ts',
   'ac_sync.test.ts',
   'sync_v4_domain_materialization.test.ts',
+  'evolution_api_contract.test.ts',
   'payment_lifecycle.test.ts',
   'refund_lifecycle.test.ts',
   'notification_credit_reservation.test.ts',

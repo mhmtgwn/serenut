@@ -375,15 +375,17 @@ export async function setWebhook(companyId: string, webhookUrl: string): Promise
   logger.info(`[Evolution] setWebhook: ${name} → ${webhookUrl}`);
 
   await evolutionFetch('POST', `/webhook/set/${name}`, {
-    enabled: true,
-    url: webhookUrl,
-    webhookByEvents: true,
-    webhookBase64: false,
-    events: [
-      'QRCODE_UPDATED',
-      'CONNECTION_UPDATE',
-      'STATUS_INSTANCE',
-    ],
+    webhook: {
+      enabled: true,
+      url: webhookUrl,
+      byEvents: true,
+      base64: false,
+      events: [
+        'QRCODE_UPDATED',
+        'CONNECTION_UPDATE',
+        'STATUS_INSTANCE',
+      ],
+    },
   });
 }
 
@@ -419,16 +421,14 @@ export async function sendTextMessage(
 
   // Numara normalizasyonu: Ülke kodu ile E.164 standardına getirilir (örn: 0542... -> 90542...)
   const normalizedPhone = normalizeEvolutionPhone(phone);
-  // JID formatı: 905xxxxxxxxx@s.whatsapp.net
-  const jid = `${normalizedPhone}@s.whatsapp.net`;
 
-  logger.info(`[Evolution] sendTextMessage: ${name} → ${jid}`);
+  logger.info(`[Evolution] sendTextMessage: ${name} → ${normalizedPhone}`);
 
   const response = await evolutionFetch<{ key?: { id?: string }; messageId?: string }>(
     'POST',
     `/message/sendText/${name}`,
     {
-      number: jid,
+      number: normalizedPhone,
       text,
       delay: 0, // Anında gönderim
     },
