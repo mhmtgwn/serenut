@@ -3,6 +3,16 @@
 
 import 'dart:convert';
 
+int _parseSyncCursor(Object? value, {required int fallback}) {
+  if (value == null) return fallback;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed != null) return parsed;
+  }
+  throw const FormatException('Sync cursor must be an integer.');
+}
+
 /// Acknowledged push mutation result from server
 class SyncPushAckResult {
   final String mutationId;
@@ -192,7 +202,10 @@ class SyncPullResponseDto {
                 (c) => SyncPullChangeDto.fromJson(Map<String, dynamic>.from(c)))
             .toList() ??
         const [];
-    final next = (json['next_cursor'] as num?)?.toInt() ?? fallbackCursor;
+    final next = _parseSyncCursor(
+      json['next_cursor'],
+      fallback: fallbackCursor,
+    );
     return SyncPullResponseDto(
       changes: changesList,
       nextCursor: next,
@@ -221,13 +234,9 @@ class SyncBootstrapResponseDto {
       }
       return SyncPullChangeDto.fromJson(Map<String, dynamic>.from(value));
     }).toList(growable: false);
-    final cursorValue = json['next_cursor'];
-    if (cursorValue != null && cursorValue is! num) {
-      throw const FormatException('Sync bootstrap cursor must be numeric.');
-    }
     return SyncBootstrapResponseDto(
       changes: changes,
-      nextCursor: (cursorValue as num?)?.toInt() ?? 0,
+      nextCursor: _parseSyncCursor(json['next_cursor'], fallback: 0),
     );
   }
 }
