@@ -26,7 +26,7 @@ class SyncPushAckResult {
   factory SyncPushAckResult.fromJson(Map<String, dynamic> json) {
     return SyncPushAckResult(
       mutationId: json['mutation_id']?.toString() ?? '',
-      revision: (json['revision'] as num?)?.toInt() ?? 0,
+      revision: _parseSyncCursor(json['revision'], fallback: 0),
     );
   }
 }
@@ -50,7 +50,7 @@ class SyncPushConflict {
       mutationId: json['mutation_id']?.toString() ?? '',
       entityType: json['entity_type']?.toString() ?? '',
       entityId: json['entity_id']?.toString() ?? '',
-      serverRevision: (json['server_revision'] as num?)?.toInt() ?? 0,
+      serverRevision: _parseSyncCursor(json['server_revision'], fallback: 0),
     );
   }
 
@@ -159,7 +159,7 @@ class SyncPullChangeDto {
     }
 
     return SyncPullChangeDto(
-      revision: (json['revision'] as num?)?.toInt() ?? 0,
+      revision: _parseSyncCursor(json['revision'], fallback: 0),
       mutationId: json['mutation_id']?.toString() ?? '',
       deviceId: json['device_id']?.toString() ?? '',
       entityType: json['entity_type']?.toString() ?? '',

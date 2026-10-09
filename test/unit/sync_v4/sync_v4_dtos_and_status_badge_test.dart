@@ -12,18 +12,20 @@ import 'package:serenutos/domain/models/auth_user.dart';
 
 void main() {
   group('Sync V4 Typed DTOs', () {
-    test('SyncPushResponseDto parses results, conflicts, and rejected entries', () {
+    test('SyncPushResponseDto parses results, conflicts, and rejected entries',
+        () {
       final json = {
         'results': [
           {'mutation_id': 'mut-1', 'revision': 42},
-          {'mutation_id': 'mut-2', 'revision': 43},
+          // PostgreSQL BIGINT revisions may be encoded as JSON strings.
+          {'mutation_id': 'mut-2', 'revision': '43'},
         ],
         'conflicts': [
           {
             'mutation_id': 'mut-c1',
             'entity_type': 'product',
             'entity_id': 'p-123',
-            'server_revision': 55,
+            'server_revision': '55',
           }
         ],
         'rejected': [
@@ -53,11 +55,12 @@ void main() {
       expect(dto.rejected.first.error, 'validation_failed');
     });
 
-    test('SyncPullResponseDto parses string payload and nested objects safely', () {
+    test('SyncPullResponseDto parses string payload and nested objects safely',
+        () {
       final json = {
         'changes': [
           {
-            'revision': 100,
+            'revision': '100',
             'mutation_id': 'pull-1',
             'device_id': 'dev-1',
             'entity_type': 'customer',
@@ -82,7 +85,9 @@ void main() {
   });
 
   group('SyncState & Cashier UX Visibility', () {
-    test('SyncState pendingOutboxCount and userFriendlyError fields work correctly', () {
+    test(
+        'SyncState pendingOutboxCount and userFriendlyError fields work correctly',
+        () {
       const state = SyncState(
         status: SyncStatus.idle,
         pendingOutboxCount: 5,
@@ -103,7 +108,8 @@ void main() {
       expect(updated.userFriendlyError, isNull);
     });
 
-    testWidgets('SyncStatusBadge renders pending count and status chip', (tester) async {
+    testWidgets('SyncStatusBadge renders pending count and status chip',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -128,7 +134,8 @@ void main() {
       expect(find.byIcon(Icons.cloud_queue_rounded), findsOneWidget);
     });
 
-    testWidgets('SyncStatusBadge in compact mode renders compact counter', (tester) async {
+    testWidgets('SyncStatusBadge in compact mode renders compact counter',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -154,7 +161,8 @@ void main() {
   });
 
   group('Product Repository Typed IDs', () {
-    test('InMemoryProductRepository findProductById and empty input validation', () async {
+    test('InMemoryProductRepository findProductById and empty input validation',
+        () async {
       final repo = InMemoryProductRepository();
       final product = ProductEntity(
         id: '869000000001',
@@ -177,7 +185,8 @@ void main() {
   });
 }
 
-class _FakeSyncNotifier extends StateNotifier<SyncState> implements SyncNotifier {
+class _FakeSyncNotifier extends StateNotifier<SyncState>
+    implements SyncNotifier {
   _FakeSyncNotifier(super.state);
 
   @override
