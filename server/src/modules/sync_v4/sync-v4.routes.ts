@@ -470,10 +470,10 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
       }
     }
   } else if (type === "collection" &&
-      (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId)) {
+      (amount <= 0 || Math.abs(amount-paidAmount)>0.01)) {
     throw new Error("invalid_collection_transaction");
   } else if (type === "manual_debt" &&
-      (amount <= 0 || paidAmount !== 0 || Math.abs(amount-debtAmount)>0.01 || referenceId)) {
+      (amount <= 0 || paidAmount !== 0 || Math.abs(amount-debtAmount)>0.01)) {
     throw new Error("invalid_manual_debt_transaction");
   } else if ((type === "cancellation" || type === "refund")) {
     if (!referenceId || amount <= 0 || paidAmount > amount || debtAmount > amount) {

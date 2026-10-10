@@ -312,17 +312,27 @@ extension SyncV4Orchestration on SyncV4Service {
           if (logo != null && logo.isNotEmpty)
             'logo_url': logo,
         };
-        var patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
-        if (patch.statusCode == 409) {
-          final freshRes = await _api.get('/api/v1/company');
-          if (freshRes.isSuccess && freshRes.json != null) {
-            final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
-            final freshVer = _syncInt(freshRemote['version']);
-            patchBody['expected_version'] = freshVer;
-            patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
+        ApiResponse? patch;
+        try {
+          patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
+        } on ApiException catch (e) {
+          if (e.statusCode == 409) {
+            final freshRes = await _api.get('/api/v1/company');
+            if (freshRes.isSuccess && freshRes.json != null) {
+              final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
+              final freshVer = _syncInt(freshRemote['version']);
+              patchBody['expected_version'] = freshVer;
+              try {
+                patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
+              } catch (retryErr) {
+                debugPrint('[SyncV4] Retry company PATCH failed: $retryErr');
+              }
+            }
+          } else {
+            debugPrint('[SyncV4] Company PATCH failed with status ${e.statusCode}: ${e.message}');
           }
         }
-        if (patch.isSuccess && patch.json != null) {
+        if (patch != null && patch.isSuccess && patch.json != null) {
           final canonical = Map<String, dynamic>.from(patch.json as Map);
           final newVer = _syncInt(canonical['version']);
           await prefs.setInt(SyncV4Service._companyVersionKey, newVer);

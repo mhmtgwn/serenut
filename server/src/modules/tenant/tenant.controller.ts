@@ -13,6 +13,7 @@ import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import multer from 'multer';
 import { decodeDataImage, publicLogoUrl, storeCompanyLogo } from './company-logo.service';
+import { logger } from '../../config/logger';
 
 const router = Router();
 const logoUpload = multer({
@@ -211,17 +212,27 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
     const companyIdIdx = idx++;
-    const expectedVersionIdx = idx++;
     values.push(user.company_id);
-    values.push(versionFilter);
 
-    // 3. Update atomically using version filter
+    let whereClause = `WHERE id = $${companyIdIdx}`;
+    if (!isForce) {
+      const expectedVersionIdx = idx++;
+      values.push(versionFilter);
+      whereClause += ` AND version = $${expectedVersionIdx}`;
+    }
+
+    // 3. Update atomically using version filter if not forced
     const updateRes = await pgPool.query(
-      `UPDATE companies SET ${updates.join(', ')} WHERE id = $${companyIdIdx} AND version = $${expectedVersionIdx} RETURNING *`,
+      `UPDATE companies SET ${updates.join(', ')} ${whereClause} RETURNING *`,
       values
     );
 
     if (updateRes.rowCount === 0) {
+      logger.warn('Company PATCH conflict: row not found or version mismatch', {
+        company_id: user.company_id,
+        isForce,
+        versionFilter,
+      });
       return res.status(409).json({
         error: {
           code: 'CONFLICT',

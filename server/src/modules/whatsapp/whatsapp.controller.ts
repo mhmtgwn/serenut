@@ -207,6 +207,12 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
   const clientEventId = String(req.body?.client_event_id || '');
   const fallbackBody = String(req.body?.fallback_body || '').slice(0, 4096);
   if (!supportedEvents.has(eventKey) || !rawRecipient || !clientEventId || clientEventId.length > 100) {
+    logger.warn('Invalid whatsapp event payload received', {
+      company_id: req.user?.company_id,
+      eventKey,
+      hasRecipient: !!rawRecipient,
+      clientEventId,
+    });
     return res.status(400).json({ error: 'invalid_whatsapp_event', message: 'WhatsApp bildirim olayı geçersiz.' });
   }
   if (!isNotificationChannelEnabled('whatsapp')) {
@@ -217,6 +223,12 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
   try {
     recipient = normalizeEvolutionPhone(rawRecipient);
   } catch (_) {
+    logger.warn('Invalid whatsapp recipient phone number', {
+      company_id: req.user?.company_id,
+      eventKey,
+      rawRecipient,
+      clientEventId,
+    });
     return res.status(400).json({ error: 'recipient_invalid', message: 'Alıcı telefon numarası geçersiz.' });
   }
 

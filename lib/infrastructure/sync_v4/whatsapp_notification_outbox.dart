@@ -68,6 +68,14 @@ class WhatsappNotificationOutbox {
             sent++;
             await _save(prefs, pending);
           } catch (error) {
+            if (error is ApiException &&
+                (error.statusCode == 400 || error.statusCode == 422)) {
+              debugPrint(
+                  'WhatsApp bildirimi kalıcı olarak geçersiz (${error.statusCode}); kuyruktan kaldırıldı: $error');
+              pending.removeAt(0);
+              await _save(prefs, pending);
+              continue;
+            }
             final now = DateTime.now();
             if (_lastFailureLogAt == null ||
                 now.difference(_lastFailureLogAt!) >=
