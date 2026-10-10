@@ -80,6 +80,42 @@ typedef WritePrinterDartFunc = int Function(
   Pointer<Uint32> pcWritten,
 );
 
+typedef GetDefaultPrinterWUtf16Func = Int32 Function(
+  Pointer<Utf16> pszBuffer,
+  Pointer<Uint32> pcchBuffer,
+);
+typedef GetDefaultPrinterWDartFunc = int Function(
+  Pointer<Utf16> pszBuffer,
+  Pointer<Uint32> pcchBuffer,
+);
+
+final class PrinterInfo4W extends Struct {
+  external Pointer<Utf16> pPrinterName;
+  external Pointer<Utf16> pServerName;
+  @Uint32()
+  external int attributes;
+}
+
+typedef EnumPrintersWFunc = Int32 Function(
+  Uint32 flags,
+  Pointer<Utf16> name,
+  Uint32 level,
+  Pointer<Uint8> pPrinterEnum,
+  Uint32 cbBuf,
+  Pointer<Uint32> pcbNeeded,
+  Pointer<Uint32> pcReturned,
+);
+
+typedef EnumPrintersWDartFunc = int Function(
+  int flags,
+  Pointer<Utf16> name,
+  int level,
+  Pointer<Uint8> pPrinterEnum,
+  int cbBuf,
+  Pointer<Uint32> pcbNeeded,
+  Pointer<Uint32> pcReturned,
+);
+
 class NativePrinterBridge {
   final WinspoolWrapper _winspool;
 
@@ -91,6 +127,18 @@ class NativePrinterBridge {
   @visibleForTesting
   static set defaultInstance(NativePrinterBridge instance) {
     _defaultInstance = instance;
+  }
+
+  /// Returns the current default Windows printer name via Win32 FFI (0ms).
+  static String? getDefaultWindowsPrinter() {
+    if (kIsWeb || !Platform.isWindows) return null;
+    return _defaultInstance._winspool.getDefaultPrinter();
+  }
+
+  /// Lists all local and network connected Windows printer names via Win32 FFI (0ms).
+  static List<String> getWindowsPrinters() {
+    if (kIsWeb || !Platform.isWindows) return const [];
+    return _defaultInstance._winspool.enumPrinters();
   }
 
   static const MethodChannel _bluetoothChannel =
@@ -190,8 +238,27 @@ if (-not \$success) {
     Pointer<Uint32>? pcWritten;
     int hPrinter = 0;
 
+    String targetPrinter = printerName.trim();
+    final isGenericDefault = targetPrinter.isEmpty ||
+        targetPrinter.toLowerCase() == 'varsayılan windows yazıcısı' ||
+        targetPrinter.toLowerCase() == 'varsayılan yazıcı' ||
+        targetPrinter.toLowerCase() == 'default' ||
+        targetPrinter.toLowerCase() == 'default printer';
+
+    if (isGenericDefault) {
+      final defaultName = _winspool.getDefaultPrinter();
+      if (defaultName != null && defaultName.isNotEmpty) {
+        targetPrinter = defaultName;
+      } else {
+        final available = _winspool.enumPrinters();
+        if (available.isNotEmpty) {
+          targetPrinter = available.first;
+        }
+      }
+    }
+
     try {
-      pPrinterName = printerName.toNativeUtf16();
+      pPrinterName = targetPrinter.toNativeUtf16();
       phPrinter = calloc<IntPtr>();
 
       final openRes = _winspool.openPrinter(pPrinterName, phPrinter, nullptr);
@@ -485,6 +552,8 @@ abstract class WinspoolWrapper {
   int endPagePrinter(int hPrinter);
   int writePrinter(
       int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten);
+  String? getDefaultPrinter() => null;
+  List<String> enumPrinters() => const [];
 }
 
 /// Üretim Uygulaması: winspool.drv DLL FFI çağrılarını gerçekleştiren gerçek wrapper
@@ -497,6 +566,8 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
   late final StartPagePrinterDartFunc _startPagePrinter;
   late final EndPagePrinterDartFunc _endPagePrinter;
   late final WritePrinterDartFunc _writePrinter;
+  GetDefaultPrinterWDartFunc? _getDefaultPrinter;
+  EnumPrintersWDartFunc? _enumPrinters;
 
   WinspoolWrapperImpl() {
     if (Platform.isWindows) {
@@ -522,6 +593,16 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
       _writePrinter =
           _dylib.lookupFunction<WritePrinterFunc, WritePrinterDartFunc>(
               'WritePrinter');
+      try {
+        _getDefaultPrinter = _dylib.lookupFunction<
+            GetDefaultPrinterWUtf16Func, GetDefaultPrinterWDartFunc>(
+            'GetDefaultPrinterW');
+      } catch (_) {}
+      try {
+        _enumPrinters = _dylib.lookupFunction<
+            EnumPrintersWFunc, EnumPrintersWDartFunc>(
+            'EnumPrintersW');
+      } catch (_) {}
     }
   }
 
@@ -560,5 +641,65 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
   int writePrinter(
       int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
     return _writePrinter(hPrinter, pBuf, cbBuf, pcWritten);
+  }
+
+  @override
+  String? getDefaultPrinter() {
+    if (!Platform.isWindows || _getDefaultPrinter == null) return null;
+    final sizePtr = calloc<Uint32>();
+    try {
+      _getDefaultPrinter!(nullptr, sizePtr);
+      if (sizePtr.value == 0) return null;
+      final buf = calloc<Uint16>(sizePtr.value);
+      try {
+        final res = _getDefaultPrinter!(buf.cast<Utf16>(), sizePtr);
+        if (res != 0) {
+          final name = buf.cast<Utf16>().toDartString();
+          if (name.isNotEmpty) return name;
+        }
+      } finally {
+        calloc.free(buf);
+      }
+    } catch (_) {
+      return null;
+    } finally {
+      calloc.free(sizePtr);
+    }
+    return null;
+  }
+
+  @override
+  List<String> enumPrinters() {
+    if (!Platform.isWindows || _enumPrinters == null) return const [];
+    final cbNeeded = calloc<Uint32>();
+    final cReturned = calloc<Uint32>();
+    const flags = 0x00000002 | 0x00000004; // PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS
+    try {
+      _enumPrinters!(flags, nullptr, 4, nullptr, 0, cbNeeded, cReturned);
+      if (cbNeeded.value == 0) return const [];
+      final buf = calloc<Uint8>(cbNeeded.value);
+      try {
+        final res = _enumPrinters!(
+            flags, nullptr, 4, buf, cbNeeded.value, cbNeeded, cReturned);
+        if (res == 0) return const [];
+        final list = buf.cast<PrinterInfo4W>();
+        final names = <String>[];
+        for (var i = 0; i < cReturned.value; i++) {
+          final item = list[i];
+          if (item.pPrinterName != nullptr) {
+            final name = item.pPrinterName.toDartString();
+            if (name.isNotEmpty) names.add(name);
+          }
+        }
+        return names;
+      } finally {
+        calloc.free(buf);
+      }
+    } catch (_) {
+      return const [];
+    } finally {
+      calloc.free(cbNeeded);
+      calloc.free(cReturned);
+    }
   }
 }

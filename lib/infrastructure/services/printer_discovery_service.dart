@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+
 enum DiscoveredPrinterKind { windows, network, bluetooth, sunmi }
 
 class DiscoveredPrinter {
@@ -56,7 +58,26 @@ class PrinterDiscoveryService {
   Future<List<DiscoveredPrinter>> listWindowsPrinters() async {
     if (!Platform.isWindows) return const [];
 
-    // Script uses $_ inside ForEach-Object — must be passed via
+    // 1. Fast path: Direct Win32 FFI (0ms, no process spawning)
+    try {
+      final defaultName = NativePrinterBridge.getDefaultWindowsPrinter();
+      final printers = NativePrinterBridge.getWindowsPrinters();
+      if (printers.isNotEmpty) {
+        return printers.map((name) {
+          final isDef = defaultName != null &&
+              name.toLowerCase() == defaultName.toLowerCase();
+          return DiscoveredPrinter(
+            id: 'windows:$name',
+            name: name,
+            kind: DiscoveredPrinterKind.windows,
+            address: null,
+            isDefault: isDef,
+          );
+        }).toList();
+      }
+    } catch (_) {}
+
+    // 2. Slow fallback: PowerShell (only if FFI enumeration returned empty)
     // -EncodedCommand to prevent Dart/shell from stripping the $ signs.
     const psScript = r'''
 $defaultName = (Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -First 1 -ExpandProperty Name)

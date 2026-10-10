@@ -11,6 +11,14 @@ class MockWinspoolWrapper implements WinspoolWrapper {
   bool startDocPrinterCalled = false;
   bool writePrinterCalled = false;
   bool closePrinterCalled = false;
+  String? mockDefaultPrinter;
+  List<String> mockEnumPrinters = [];
+
+  @override
+  String? getDefaultPrinter() => mockDefaultPrinter;
+
+  @override
+  List<String> enumPrinters() => mockEnumPrinters;
 
   @override
   int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter,
@@ -97,6 +105,21 @@ void main() {
       expect(mockWinspool.writePrinterCalled, isTrue);
       expect(mockWinspool.lastBytes, testBytes);
       expect(mockWinspool.closePrinterCalled, isTrue);
+    });
+
+    test('FFI auto-resolves "Varsayılan Windows Yazıcısı" to actual default printer',
+        () async {
+      final mockWinspool = MockWinspoolWrapper();
+      mockWinspool.mockDefaultPrinter = 'POS-80';
+      final bridge = NativePrinterBridge(mockWinspool);
+
+      final testBytes = [0x1B, 0x40, 0x0A];
+      final bool success =
+          await bridge.printUsbFfi('Varsayılan Windows Yazıcısı', testBytes);
+
+      expect(success, isTrue);
+      expect(mockWinspool.openPrinterCalled, isTrue);
+      expect(mockWinspool.lastPrinterName, 'POS-80');
     });
   });
 }

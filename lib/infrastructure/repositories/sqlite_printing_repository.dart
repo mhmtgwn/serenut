@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/domain/printing/printing_repository.dart';
@@ -249,7 +250,9 @@ class SqlitePrintingRepository implements PrintingRepository {
           try {
             final sRows = await _executor.query('settings', limit: 1);
             final s = sRows.isNotEmpty ? sRows.first : const <String, Object?>{};
+            final defaultWin = Platform.isWindows ? NativePrinterBridge.getDefaultWindowsPrinter() : null;
             final pName = (s['printer_name'] as String?)?.trim() ??
+                defaultWin ??
                 (Platform.isWindows ? 'Varsayılan Windows Yazıcısı' : 'Varsayılan Yazıcı');
             final pIp = (s['printer_ip'] as String?)?.trim();
             final isTcp = pIp != null && pIp.isNotEmpty;

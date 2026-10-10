@@ -70,6 +70,13 @@ extension HardwareDeviceOperations on HardwareDevicesNotifier {
       throw StateError('Windows yazıcı adı boş bırakılamaz.');
     }
     final printers = await PrinterDiscoveryService().listWindowsPrinters();
+    final isGeneric = requested.toLowerCase() == 'varsayılan windows yazıcısı' ||
+        requested.toLowerCase() == 'varsayılan yazıcı' ||
+        requested.toLowerCase() == 'default';
+    if (isGeneric && printers.isNotEmpty) {
+      final preferred = printers.firstWhere((p) => p.isDefault, orElse: () => printers.first);
+      return 'Windows varsayılan yazıcı kuyruğu hazır: ${preferred.name}';
+    }
     final matched = printers.any(
       (printer) => printer.name.toLowerCase() == requested.toLowerCase(),
     );
