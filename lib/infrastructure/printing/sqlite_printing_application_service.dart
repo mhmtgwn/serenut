@@ -11,6 +11,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/printing/print_asset_encoder.dart';
 import 'package:serenutos/infrastructure/printing/printing_runtime.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
+import 'package:serenutos/domain/models/installment_models.dart';
 
 typedef CustomerLookupFn = Future<CustomerEntity?> Function(String customerId);
 
@@ -162,6 +163,65 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       'total': amount,
       'paid': amount,
       'notes': notes,
+    }, const []);
+  }
+
+  @override
+  Future<PrintJobRecord> queueInstallmentPlanReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentPlanEntity plan,
+    required List<CustomerInstallmentEntity> installments,
+    required Settings settings,
+  }) {
+    final cleanPlanNo = plan.id.length > 8
+        ? plan.id.substring(plan.id.length - 6).toUpperCase()
+        : plan.id;
+    return _receipt(settings, {
+      'kind': 'installment_plan',
+      'number': 'TK-$cleanPlanNo',
+      'date': _date(plan.createdAt),
+      'customerName': customer.name,
+      'customerPhone': customer.phone,
+      'customerBalance': customer.balance,
+      'description': plan.description,
+      'total': plan.totalAmount,
+      'downPayment': plan.downPayment,
+      'financedAmount': plan.financedAmount,
+      'installmentCount': plan.installmentCount,
+      'installments': installments.map((i) => {
+        'no': i.installmentNo,
+        'date': i.dueDate,
+        'amount': i.amount,
+      }).toList(),
+    }, const []);
+  }
+
+  @override
+  Future<PrintJobRecord> queueInstallmentPaymentReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentEntity installment,
+    required double paidAmount,
+    required String paymentMethod,
+    required Settings settings,
+    int? remainingCount,
+    double? remainingDebt,
+    String? nextDueDate,
+  }) {
+    return _receipt(settings, {
+      'kind': 'installment_collection',
+      'number':
+          'TT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      'date': _date(DateTime.now()),
+      'payment': _payment(paymentMethod),
+      'customerName': customer.name,
+      'customerPhone': customer.phone,
+      'customerBalance': customer.balance,
+      'installmentNo': installment.installmentNo,
+      'paid': paidAmount,
+      'total': paidAmount,
+      'remainingCount': remainingCount,
+      'remainingDebt': remainingDebt,
+      'nextDueDate': nextDueDate,
     }, const []);
   }
 

@@ -2,6 +2,7 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
+import 'package:serenutos/domain/models/installment_models.dart';
 
 abstract interface class PrintingApplicationService {
   Future<PrintJobRecord> queueSaleReceipt(
@@ -34,4 +35,21 @@ abstract interface class PrintingApplicationService {
   Future<List<PrintJobRecord>> queueProductLabels(
       List<ProductEntity> products, Settings settings,
       {int copies = 1});
+  Future<PrintJobRecord> queueInstallmentPlanReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentPlanEntity plan,
+    required List<CustomerInstallmentEntity> installments,
+    required Settings settings,
+  });
+  Future<PrintJobRecord> queueInstallmentPaymentReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentEntity installment,
+    required double paidAmount,
+    required String paymentMethod,
+    required Settings settings,
+    int? remainingCount,
+    double? remainingDebt,
+    String? nextDueDate,
+  });
 }
+

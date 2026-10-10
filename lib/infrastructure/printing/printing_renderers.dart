@@ -105,10 +105,16 @@ class EscPosReceiptRenderer implements PrintRenderer {
       _line(bytes, '— $subtitle —', mode: turkishMode);
     }
     final docKind = document['kind']?.toString().toLowerCase().trim();
-    if (docKind == 'report' || docKind == 'rapor' || design['showHeaderTitle'] == true) {
+    if (docKind == 'report' ||
+        docKind == 'rapor' ||
+        docKind == 'installment_plan' ||
+        docKind == 'installment_collection' ||
+        design['showHeaderTitle'] == true) {
       final headerTitle = switch (docKind) {
         'sale' || 'satis' => '[ SATIS FISI ]',
         'collection' || 'tahsilat' => '[ TAHSILAT MAKBUZU ]',
+        'installment_plan' => '[ TAKSITLI SATIS & ODEME PLANI ]',
+        'installment_collection' => '[ TAKSIT TAHSILAT MAKBUZU ]',
         'report' || 'rapor' => '[ RAPOR ]',
         _ => '[ SIPARIS FISI ]',
       };
@@ -229,7 +235,74 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
     final currency = payload['currency']?.toString() ?? 'TL';
 
-    if (design['showProductDetails'] != false) {
+    if (docKind == 'installment_plan') {
+      _line(bytes, '-' * width, mode: turkishMode);
+      final downPayment = _decimal(document['downPayment']);
+      final financedAmount = _decimal(document['financedAmount']);
+      final installmentCount = document['installmentCount'] ?? 1;
+
+      if (downPayment > 0.009) {
+        _line(
+            bytes,
+            _columns('Alinan Pesinat:',
+                '${downPayment.toStringAsFixed(2)} $currency', width),
+            mode: turkishMode);
+      }
+      _line(
+          bytes,
+          _columns('Taksitli Tutar:',
+              '${financedAmount.toStringAsFixed(2)} $currency', width),
+          bold: true,
+          mode: turkishMode);
+      _line(
+          bytes,
+          _columns('Taksit Sayisi:', '$installmentCount Taksit', width),
+          mode: turkishMode);
+      _line(bytes, '-' * width, mode: turkishMode);
+
+      _line(bytes, '            ODEME PLANI',
+          bold: true, mode: turkishMode);
+      _line(bytes, '-' * width, mode: turkishMode);
+      final insts = document['installments'] as List? ?? const [];
+      for (final raw in insts) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        final no = m['no']?.toString() ?? '1';
+        final d = m['date']?.toString() ?? '';
+        final amt = _decimal(m['amount']);
+        final noText = '$no. Taksit ($d)';
+        final amtText = '${amt.toStringAsFixed(2)} $currency';
+        _line(bytes, _columns(noText, amtText, width), mode: turkishMode);
+      }
+      _line(bytes, '-' * width, mode: turkishMode);
+    } else if (docKind == 'installment_collection') {
+      _line(bytes, '-' * width, mode: turkishMode);
+      final instNo = document['installmentNo']?.toString() ?? '1';
+      final remCount = document['remainingCount'];
+      final remDebt = document['remainingDebt'] != null
+          ? _decimal(document['remainingDebt'])
+          : null;
+      final nextDue = document['nextDueDate']?.toString();
+
+      _line(bytes, _columns('Odenen Taksit:', '$instNo. Taksit', width),
+          bold: true, mode: turkishMode);
+      if (remCount != null) {
+        _line(bytes, _columns('Kalan Taksit:', '$remCount Adet', width),
+            mode: turkishMode);
+      }
+      if (remDebt != null) {
+        _line(
+            bytes,
+            _columns('Kalan Toplam Borc:',
+                '${remDebt.toStringAsFixed(2)} $currency', width),
+            bold: true,
+            mode: turkishMode);
+      }
+      if (nextDue != null && nextDue.isNotEmpty) {
+        _line(bytes, _columns('Siradaki Vade:', nextDue, width),
+            mode: turkishMode);
+      }
+      _line(bytes, '-' * width, mode: turkishMode);
+    } else if (design['showProductDetails'] != false) {
       final items = payload['items'] as List? ?? const [];
       _line(bytes, '-' * width, mode: turkishMode);
 
@@ -370,6 +443,27 @@ class EscPosReceiptRenderer implements PrintRenderer {
             bold: true,
             mode: turkishMode);
       }
+      _line(bytes, '-' * width, mode: turkishMode);
+    }
+
+    if (docKind == 'installment_plan') {
+      for (final line in _wrap(
+          'Yukarida belirtilen odeme planini kabul ediyor, vadelerinde eksiksiz odeyecegimi taahhut ederim.',
+          width)) {
+        _line(bytes, line, mode: turkishMode);
+      }
+      bytes.addAll([0x0A]);
+      _line(bytes, _columns('Musteri Imzasi', 'Magaza Yetkilisi', width),
+          mode: turkishMode);
+      _line(bytes, _columns('...............', '................', width),
+          mode: turkishMode);
+      _line(bytes, '-' * width, mode: turkishMode);
+    } else if (docKind == 'installment_collection') {
+      bytes.addAll([0x0A]);
+      _line(bytes, _columns('Tahsil Eden', 'Teslim Eden', width),
+          mode: turkishMode);
+      _line(bytes, _columns('...........', '...........', width),
+          mode: turkishMode);
       _line(bytes, '-' * width, mode: turkishMode);
     }
 

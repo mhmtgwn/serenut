@@ -20,6 +20,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 import 'package:serenutos/domain/models/installment_models.dart';
 import 'package:serenutos/presentation/controllers/installment_controller.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/repository_providers.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -48,6 +51,7 @@ class CustomerDetailsPage extends ConsumerWidget {
     var installmentCount = 3;
     var firstDueDate = DateTime.now().add(const Duration(days: 30));
     var downPaymentMethod = 'cash';
+    var printReceipt = true;
     var saving = false;
 
     await showDialog<void>(
@@ -404,6 +408,23 @@ class CustomerDetailsPage extends ConsumerWidget {
                               : 'Örn. Önceki dönem devri',
                         ),
                       ),
+                      if (isInstallment) ...[
+                        const SizedBox(height: 12),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Ödeme Planını Fişe Yazdır',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                          subtitle: const Text(
+                              '58/80mm termal sözleşme & döküm çıktısı (müşteri & yetkili imza alanı)',
+                              style: TextStyle(
+                                  fontSize: 11, color: _kTextSecondary)),
+                          value: printReceipt,
+                          activeColor: _kGreen,
+                          onChanged: (val) =>
+                              setDialogState(() => printReceipt = val),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -435,7 +456,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                                     .trim()
                                     .replaceAll(',', '.')) ??
                                 0.0;
-                            await ref
+                            final plan = await ref
                                 .read(installmentsControllerProvider.notifier)
                                 .createPlan(
                                   customerId: customer.id,
@@ -446,6 +467,28 @@ class CustomerDetailsPage extends ConsumerWidget {
                                   firstDueDate: firstDueDate,
                                   description: note,
                                 );
+
+                            if (printReceipt) {
+                              try {
+                                final planInsts = await ref
+                                    .read(installmentRepositoryProvider)
+                                    .getInstallmentsForPlan(plan.id);
+                                final settings =
+                                    await ref.read(settingsProvider.future);
+                                await ref
+                                    .read(printingApplicationServiceProvider)
+                                    .queueInstallmentPlanReceipt(
+                                      customer: customer,
+                                      plan: plan,
+                                      installments: planInsts,
+                                      settings: settings,
+                                    );
+                              } catch (printErr) {
+                                debugPrint(
+                                    'Taksit planı fiş yazdırma hatası: $printErr');
+                              }
+                            }
+
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
                             }
@@ -1053,6 +1096,22 @@ class CustomerDetailsPage extends ConsumerWidget {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.print_outlined,
+                                    size: 18, color: _kTextSecondary),
+                                tooltip: 'Ödeme Planını Fişe Yazdır',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 28, minHeight: 28),
+                                onPressed: () => _printInstallmentPlan(
+                                  context,
+                                  ref,
+                                  customer,
+                                  plan,
+                                  planInsts,
+                                ),
+                              ),
                               if (plan.status == 'active')
                                 PopupMenuButton<String>(
                                   icon: const Icon(Icons.more_vert_rounded,
@@ -1354,6 +1413,7 @@ class CustomerDetailsPage extends ConsumerWidget {
     );
     final noteController = TextEditingController();
     var method = 'cash';
+    var printReceipt = true;
     var saving = false;
     final formKey = GlobalKey<FormState>();
 
@@ -1424,6 +1484,19 @@ class CustomerDetailsPage extends ConsumerWidget {
                       hintText: 'Örn. Elden nakit teslim alındı',
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Tahsilat Makbuzu Yazdır',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('58/80mm termal tahsilat fişi çıktısı',
+                        style: TextStyle(fontSize: 11, color: _kTextSecondary)),
+                    value: printReceipt,
+                    activeColor: _kGreen,
+                    onChanged: (val) =>
+                        setDialogState(() => printReceipt = val),
+                  ),
                 ],
               ),
             ),
@@ -1454,6 +1527,37 @@ class CustomerDetailsPage extends ConsumerWidget {
                               paymentMethod: method,
                               note: noteController.text.trim(),
                             );
+
+                        if (printReceipt) {
+                          try {
+                            final settings =
+                                await ref.read(settingsProvider.future);
+                            final remainingInsts = (await ref
+                                    .read(installmentRepositoryProvider)
+                                    .getInstallmentsForPlan(inst.planId))
+                                .where((i) => !i.isPaid && i.id != inst.id)
+                                .toList();
+                            await ref
+                                .read(printingApplicationServiceProvider)
+                                .queueInstallmentPaymentReceipt(
+                                  customer: customer,
+                                  installment: inst,
+                                  paidAmount: amt,
+                                  paymentMethod: method,
+                                  settings: settings,
+                                  remainingCount: remainingInsts.length,
+                                  remainingDebt: remainingInsts.fold<double>(
+                                      0.0, (acc, i) => acc + i.remainingAmount),
+                                  nextDueDate: remainingInsts.isNotEmpty
+                                      ? remainingInsts.first.dueDate
+                                      : null,
+                                );
+                          } catch (printErr) {
+                            debugPrint(
+                                'Taksit tahsilatı fiş yazdırma hatası: $printErr');
+                          }
+                        }
+
                         if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                         if (context.mounted) {
                           AppNotificationHost.show(
@@ -1488,6 +1592,38 @@ class CustomerDetailsPage extends ConsumerWidget {
     );
     amountController.dispose();
     noteController.dispose();
+  }
+
+  Future<void> _printInstallmentPlan(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+    CustomerInstallmentPlanEntity plan,
+    List<CustomerInstallmentEntity> planInsts,
+  ) async {
+    try {
+      final settings = await ref.read(settingsProvider.future);
+      await ref.read(printingApplicationServiceProvider).queueInstallmentPlanReceipt(
+            customer: customer,
+            plan: plan,
+            installments: planInsts,
+            settings: settings,
+          );
+      if (context.mounted) {
+        AppNotificationHost.show(
+          const SnackBar(
+            content: Text('Taksit ödeme planı fişi yazıcıya gönderildi.'),
+            backgroundColor: _kGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppNotificationHost.show(
+          SnackBar(content: Text('Yazdırma hatası: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _sendWhatsAppInstallmentReminder(
