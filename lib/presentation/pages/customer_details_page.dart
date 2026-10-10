@@ -1011,8 +1011,8 @@ class CustomerDetailsPage extends ConsumerWidget {
                   final totalInsts = plan.installmentCount;
                   final paidSum = planInsts.fold<double>(
                       0.0, (acc, i) => acc + i.paidAmount);
-                  final remainingSum = (plan.financedAmount - paidSum)
-                      .clamp(0.0, double.infinity);
+                  final remainingSum = planInsts.fold<double>(
+                      0.0, (acc, i) => acc + i.remainingAmount);
                   final progress = plan.financedAmount > 0
                       ? (paidSum / plan.financedAmount).clamp(0.0, 1.0)
                       : 1.0;
@@ -1237,6 +1237,7 @@ class CustomerDetailsPage extends ConsumerWidget {
     CustomerInstallmentEntity inst,
   ) {
     final isPaid = inst.isPaid;
+    final isPartiallyPaid = !isPaid && inst.paidAmount > 0.009;
     final isOverdue = inst.isOverdue;
     final isDueToday = inst.isDueToday;
 
@@ -1250,6 +1251,11 @@ class CustomerDetailsPage extends ConsumerWidget {
       badgeFg = _kGreenDark;
       badgeText = 'Ödendi';
       badgeIcon = Icons.check_circle_outline_rounded;
+    } else if (isPartiallyPaid) {
+      badgeBg = _kAmberLight;
+      badgeFg = _kAmberDark;
+      badgeText = 'Kısmi Ödendi';
+      badgeIcon = Icons.timelapse_rounded;
     } else if (isOverdue) {
       badgeBg = _kRedLight;
       badgeFg = _kRed;
@@ -1282,7 +1288,9 @@ class CustomerDetailsPage extends ConsumerWidget {
             decoration: BoxDecoration(
               color: isPaid
                   ? _kGreenLight
-                  : (isOverdue ? _kRedLight : const Color(0xFFF1F5F9)),
+                  : (isPartiallyPaid
+                      ? _kAmberLight
+                      : (isOverdue ? _kRedLight : const Color(0xFFF1F5F9))),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -1291,7 +1299,11 @@ class CustomerDetailsPage extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: isPaid ? _kGreenDark : (isOverdue ? _kRed : _kText),
+                color: isPaid
+                    ? _kGreenDark
+                    : (isPartiallyPaid
+                        ? _kAmberDark
+                        : (isOverdue ? _kRed : _kText)),
               ),
             ),
           ),
@@ -1352,17 +1364,35 @@ class CustomerDetailsPage extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '₺${inst.amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isPaid
-                      ? _kTextSecondary
-                      : (isOverdue ? _kRed : _kText),
-                  decoration: isPaid ? TextDecoration.lineThrough : null,
+              if (isPartiallyPaid) ...[
+                Text(
+                  '₺${inst.remainingAmount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isOverdue ? _kRed : _kAmberDark,
+                  ),
                 ),
-              ),
+                Text(
+                  'Top: ₺${inst.amount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: _kTextSecondary,
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  '₺${inst.amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isPaid
+                        ? _kTextSecondary
+                        : (isOverdue ? _kRed : _kText),
+                    decoration: isPaid ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(width: 8),
@@ -1537,16 +1567,20 @@ class CustomerDetailsPage extends ConsumerWidget {
                           try {
                             final settings =
                                 await ref.read(settingsProvider.future);
-                            final remainingInsts = (await ref
-                                    .read(installmentRepositoryProvider)
-                                    .getInstallmentsForPlan(inst.planId))
-                                .where((i) => !i.isPaid && i.id != inst.id)
+                            final updatedPlanInsts = await ref
+                                .read(installmentRepositoryProvider)
+                                .getInstallmentsForPlan(inst.planId);
+                            final updatedCurrentInst = updatedPlanInsts
+                                .firstWhere((i) => i.id == inst.id,
+                                    orElse: () => inst);
+                            final remainingInsts = updatedPlanInsts
+                                .where((i) => !i.isPaid && i.remainingAmount > 0.009)
                                 .toList();
                             await ref
                                 .read(printingApplicationServiceProvider)
                                 .queueInstallmentPaymentReceipt(
                                   customer: customer,
-                                  installment: inst,
+                                  installment: updatedCurrentInst,
                                   paidAmount: amt,
                                   paymentMethod: method,
                                   settings: settings,
