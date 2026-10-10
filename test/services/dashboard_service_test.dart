@@ -68,6 +68,7 @@ void main() {
               normalized_name TEXT,
               email TEXT,
               normalized_email TEXT,
+              address TEXT,
               phone TEXT,
               balance REAL NOT NULL DEFAULT 0,
               credit_limit REAL,

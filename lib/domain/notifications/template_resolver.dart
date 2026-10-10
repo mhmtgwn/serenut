@@ -422,10 +422,18 @@ class TemplateResolver {
       } else if (key == 'note_line') {
         final replacement = isWhatsApp ? value : (vars['sms_note_line'] ?? '');
         result = result.replaceAll('{$key}', replacement);
+      } else if (key == 'sms_note_line') {
+        result = result.replaceAll('{$key}', isWhatsApp ? '' : value);
+      } else if (key == 'sms_discount_line') {
+        result = result.replaceAll('{$key}', isWhatsApp ? '' : value);
       } else if (!key.startsWith('whatsapp_') && !key.startsWith('sms_')) {
         result = result.replaceAll('{$key}', value);
       }
     });
+    result = result.replaceAll('{sms_note_line}', isWhatsApp ? '' : (vars['sms_note_line'] ?? ''));
+    result = result.replaceAll('{sms_discount_line}', isWhatsApp ? '' : (vars['sms_discount_line'] ?? ''));
+    result = result.replaceAll('{note_line}', isWhatsApp ? (vars['note_line'] ?? '') : (vars['sms_note_line'] ?? ''));
+    result = result.replaceAll('{discount_line}', isWhatsApp ? (vars['discount_line'] ?? '') : (vars['sms_discount_line'] ?? ''));
     while (result.contains('\n\n\n')) {
       result = result.replaceAll('\n\n\n', '\n\n');
     }

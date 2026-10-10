@@ -8,7 +8,6 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/presentation/widgets/sync_status_badge.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
 
 void main() {
   group('Sync V4 Typed DTOs', () {

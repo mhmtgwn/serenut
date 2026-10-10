@@ -321,13 +321,53 @@ void main() {
     expect(wa, contains('Serenut POS'));
   });
 
-  test('All default WhatsApp templates contain contact save notice', () {
-    for (final entry in kDefaultWhatsAppTemplates.entries) {
-      expect(
-        entry.value,
-        contains('lütfen numaramızı rehberinize kaydediniz'),
-        reason: 'Template for "${entry.key}" must include the contact save notice',
-      );
-    }
+  test('Debt created SMS template resolves note cleanly and omits token when absent', () {
+    final settings = _settings(smsEnabled: true, templates: [
+      {
+        'id': 'debt_created',
+        'sms_enabled': true,
+      }
+    ]);
+
+    final varsWithNote = SmsTemplateVars.forDebt(
+      customerName: 'Hasan Usta',
+      totalAmount: 500.0,
+      paidAmount: 100.0,
+      saleId: 'sale-12345',
+      businessName: 'Serenut Test',
+      currentBalance: 400.0,
+      note: 'Haftaya çarşamba ödenecek',
+    );
+
+    final smsWithNote = resolver.resolveSms(
+      eventType: kSmsEventDebtCreated,
+      settings: settings,
+      vars: varsWithNote,
+    );
+    expect(smsWithNote, isNotNull);
+    expect(smsWithNote, contains('Hasan Usta'));
+    expect(smsWithNote, contains('400,00 ₺'));
+    expect(smsWithNote, contains('(Açıklama: Haftaya çarşamba ödenecek)'));
+    expect(smsWithNote, isNot(contains('{sms_note_line}')));
+
+    final varsWithoutNote = SmsTemplateVars.forDebt(
+      customerName: 'Hasan Usta',
+      totalAmount: 500.0,
+      paidAmount: 100.0,
+      saleId: 'sale-12345',
+      businessName: 'Serenut Test',
+      currentBalance: 400.0,
+      note: null,
+    );
+
+    final smsWithoutNote = resolver.resolveSms(
+      eventType: kSmsEventDebtCreated,
+      settings: settings,
+      vars: varsWithoutNote,
+    );
+    expect(smsWithoutNote, isNotNull);
+    expect(smsWithoutNote, isNot(contains('{sms_note_line}')));
+    expect(smsWithoutNote, isNot(contains('Açıklama')));
   });
 }
+

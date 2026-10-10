@@ -1086,6 +1086,15 @@ class _CashCountPanelState extends ConsumerState<_CashCountPanel> {
             color: POSColors.red,
             isDeduction: true,
           ),
+          if (cashFlow.refundBalance > 0)
+            _CashRow(
+              label: 'Cari Hesaba İadeler (Kasa Dışı)',
+              value: cashFlow.refundBalance,
+              fmt: fmt,
+              icon: Icons.account_balance_wallet_outlined,
+              color: POSColors.blue,
+              isDeduction: false,
+            ),
 
           // Kasadan Yapılan Harcamalar / Masraflar
           Padding(

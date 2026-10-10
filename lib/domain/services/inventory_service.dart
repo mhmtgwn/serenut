@@ -67,11 +67,12 @@ class InventoryService {
       if (product == null) {
         throw ProductNotFoundException('Ürün bulunamadı: ${item.productId}');
       }
-      final double requiredQuantity =
-          product.isWeighed ? item.saleQuantity : item.quantity.toDouble();
+      final double requiredQuantity = (item.saleQuantity > 0)
+          ? item.saleQuantity
+          : item.quantity.toDouble();
       if (product.quantity < requiredQuantity) {
         throw InsufficientStockException(
-          'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${product.isWeighed ? item.saleQuantity.toStringAsFixed(3) : item.quantity}',
+          'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${product.isWeighed ? item.saleQuantity.toStringAsFixed(3) : item.saleQuantity.toStringAsFixed(1)}',
         );
       }
     }
@@ -81,9 +82,9 @@ class InventoryService {
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final double qtyToDeduct = (product != null && product.isWeighed)
+      final double qtyToDeduct = (item.saleQuantity > 0)
           ? item.saleQuantity
-          : (item.quantity > 0 ? item.quantity.toDouble() : item.saleQuantity);
+          : item.quantity.toDouble();
       if (qtyToDeduct <= 0) continue;
 
       await _productRepository.decreaseStock(item.productId, qtyToDeduct);
@@ -104,9 +105,9 @@ class InventoryService {
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final double qtyToApply = (product != null && product.isWeighed)
+      final double qtyToApply = (item.saleQuantity > 0)
           ? item.saleQuantity
-          : (item.quantity > 0 ? item.quantity.toDouble() : item.saleQuantity);
+          : item.quantity.toDouble();
       if (qtyToApply <= 0) continue;
 
       await _productRepository.increaseStock(item.productId, qtyToApply);

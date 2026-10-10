@@ -205,6 +205,9 @@ class CashFlowSummary {
   /// 5. Bugün kasadan müşteriye geri ödenen nakit iadeler (eksi)
   final double refundCash;
 
+  /// Bugün cari hesaba (bakiyeye) işlenen iadeler (fiziki kasa nakit çıkışı yaratmaz)
+  final double refundBalance;
+
   /// 6. Bugün kasadan yapılan nakit harcamalar / masraflar (eksi)
   final double expenseCash;
 
@@ -251,6 +254,7 @@ class CashFlowSummary {
     required this.orderDeliveryCash,
     required this.collectionCash,
     required this.refundCash,
+    this.refundBalance = 0.0,
     this.expenseCash = 0.0,
     required this.saleCard,
     required this.orderDepositCard,
@@ -392,6 +396,7 @@ class EndOfDayRepository {
     // 5. İadeler
     final refundCash = refundData.refundCash;
     final refundCard = refundData.refundCard;
+    final refundBalance = refundData.refundBalance;
 
     // 6. Kasadan Yapılan Harcamalar / Masraflar
     final expenseCash = expensesResult.total;
@@ -403,6 +408,7 @@ class EndOfDayRepository {
       orderDeliveryCash: orderDeliveryCash,
       collectionCash: collectionCash,
       refundCash: refundCash,
+      refundBalance: refundBalance,
       expenseCash: expenseCash,
       saleCard: saleCard,
       orderDepositCard: orderDepositCard,
@@ -468,7 +474,7 @@ class EndOfDayRepository {
       deliveredOrdersRevenue: deliveredOrdersRevenue,
       totalRevenue: totalRevenue,
       totalDiscount: totals.discount,
-      totalRefunds: refundCash + refundCard,
+      totalRefunds: refundCash + refundCard + refundBalance,
       salesBreakdown: salesLines,
       salesList: salesData.salesList,
       orders: orders,
@@ -495,7 +501,7 @@ class EndOfDayRepository {
       LEFT JOIN financial_transactions ft ON ft.reference_id = s.id AND ft.type = 'sale'
       WHERE s.status NOT IN ('cancelled', 'iptal')
         AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
-        AND substr(s.created_at, 1, 10) = ?
+        AND ${_sqlDate('s.created_at')} = ?
       ORDER BY s.created_at DESC
     ''', [dayStr]);
 
@@ -611,7 +617,7 @@ class EndOfDayRepository {
         LEFT JOIN customers c ON o.customer_id = c.id
         WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
           AND LOWER(o.status) IN ('delivered', 'completed', 'teslim')
-          AND substr(COALESCE(o.actual_delivery_date, o.updated_at, o.created_at), 1, 10) = ?
+          AND ${_sqlDate("COALESCE(o.actual_delivery_date, o.updated_at, o.created_at)")} = ?
         ORDER BY COALESCE(o.actual_delivery_date, o.updated_at) DESC
       ''', [dayStr]);
 
@@ -698,7 +704,7 @@ class EndOfDayRepository {
           COALESCE(SUM(total_amount), 0) AS total
         FROM orders
         WHERE (is_deleted = 0 OR is_deleted IS NULL)
-          AND substr(created_at, 1, 10) = ?
+          AND ${_sqlDate('created_at')} = ?
         GROUP BY LOWER(COALESCE(status, ''))
       ''', [dayStr]);
 
@@ -782,7 +788,7 @@ class EndOfDayRepository {
         LEFT JOIN orders o ON ft.reference_id = o.id
         LEFT JOIN sales s ON ft.reference_id = s.id
         WHERE (ft.is_deleted = 0 OR ft.is_deleted IS NULL)
-          AND substr(ft.created_at, 1, 10) = ?
+          AND ${_sqlDate('ft.created_at')} = ?
         ORDER BY ft.created_at DESC
       ''', [dayStr]);
 
@@ -853,6 +859,7 @@ class EndOfDayRepository {
   Future<_RefundDataResult> _fetchRefunds(String dayStr) async {
     double refundCash = 0;
     double refundCard = 0;
+    double refundBalance = 0;
 
     try {
       final refundRows = await _gateway.rawQuery('''
@@ -861,7 +868,7 @@ class EndOfDayRepository {
           COALESCE(SUM(amount), 0) AS total
         FROM refunds
         WHERE (status != 'cancelled' OR status IS NULL)
-          AND substr(created_at, 1, 10) = ?
+          AND ${_sqlDate('created_at')} = ?
         GROUP BY LOWER(COALESCE(refund_method, 'cash'))
       ''', [dayStr]);
 
@@ -870,8 +877,11 @@ class EndOfDayRepository {
         final tot = (r['total'] as num?)?.toDouble() ?? 0.0;
         if (_isCard(m)) {
           refundCard += tot;
-        } else {
+        } else if (_isCash(m)) {
           refundCash += tot;
+        } else {
+          // 'balance', 'cari' vb. nakit kasasından para çıkışı yaratmaz
+          refundBalance += tot;
         }
       }
     } catch (_) {}
@@ -879,6 +889,7 @@ class EndOfDayRepository {
     return _RefundDataResult(
       refundCash: refundCash,
       refundCard: refundCard,
+      refundBalance: refundBalance,
     );
   }
 
@@ -891,7 +902,7 @@ class EndOfDayRepository {
         COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
       FROM sales
       WHERE (is_deleted = 0 OR is_deleted IS NULL)
-        AND substr(created_at, 1, 10) = ?
+        AND ${_sqlDate('created_at')} = ?
     ''', [dayStr]);
 
     final row = rows.first;
@@ -917,6 +928,9 @@ class EndOfDayRepository {
   }
 
   // ── Yardımcı Filtreler ──────────────────────────────────────
+  static String _sqlDate(String col) =>
+      "CASE WHEN $col LIKE '%Z' THEN substr(datetime($col, 'localtime'), 1, 10) ELSE substr($col, 1, 10) END";
+
   bool _isCash(String m) =>
       m == 'cash' || m == 'nakit' || m == 'peşin' || m == 'pesin';
 
@@ -982,7 +996,7 @@ class EndOfDayRepository {
         SELECT id, amount, category, description, created_at
         FROM cash_expenses
         WHERE is_deleted = 0
-          AND substr(created_at, 1, 10) = ?
+          AND ${_sqlDate('created_at')} = ?
         ORDER BY created_at DESC
       ''', [dayStr]);
 
@@ -1163,10 +1177,12 @@ class _TransactionsDataResult {
 class _RefundDataResult {
   final double refundCash;
   final double refundCard;
+  final double refundBalance;
 
   const _RefundDataResult({
     required this.refundCash,
     required this.refundCard,
+    this.refundBalance = 0.0,
   });
 }
 
