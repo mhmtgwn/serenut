@@ -322,7 +322,8 @@ extension SyncV4Orchestration on SyncV4Service {
               final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
               final freshVer = _syncInt(freshRemote['version']);
               patchBody['expected_version'] = freshVer;
-              final isTaxConflict = e.responseBody.contains('TAX_NUMBER_CONFLICT');
+              final isTaxConflict =
+                  e.responseBody?.contains('TAX_NUMBER_CONFLICT') == true;
               if (isTaxConflict) {
                 patchBody.remove('tax_number');
                 if (freshRemote['tax_number'] != null) {

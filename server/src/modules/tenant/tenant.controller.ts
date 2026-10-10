@@ -179,20 +179,16 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
           [cleanTax, user.company_id]
         );
         if (dupCheck.rows.length > 0) {
-          logger.warn('Company PATCH tax number conflict', {
+          logger.warn('Company PATCH tax number conflict; keeping original company tax number', {
             company_id: user.company_id,
             cleanTax,
             existing_company_id: dupCheck.rows[0].id,
           });
-          return res.status(409).json({
-            error: {
-              code: 'TAX_NUMBER_CONFLICT',
-              message: 'Bu vergi numarası başka bir şirket tarafından kullanılmaktadır.'
-            }
-          });
+          // Do not overwrite with duplicate tax number; retain existing company tax number
+        } else {
+          updates.push(`tax_number = $${idx++}`);
+          values.push(cleanTax);
         }
-        updates.push(`tax_number = $${idx++}`);
-        values.push(cleanTax);
       }
     }
     if (tax_office !== undefined) { updates.push(`tax_office = $${idx++}`); values.push(tax_office); }
