@@ -107,7 +107,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             appBar: AppBar(
               leading: IconButton(
                   icon: const Icon(Icons.close_rounded),
-                  onPressed: () => context.pop()),
+                  onPressed: () => context.canPop() ? context.pop() : context.go('/customers')),
               title: const Text('Tahsilat'),
             ),
             body: const Center(child: Text('Müşteri bulunamadı.')),
@@ -141,7 +141,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             surfaceTintColor: Colors.transparent,
             leading: IconButton(
               icon: const Icon(Icons.close_rounded, color: _kText),
-              onPressed: () => context.pop(),
+              onPressed: () => context.canPop() ? context.pop() : context.go('/customers'),
             ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,7 +654,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             backgroundColor: Colors.black.withValues(alpha: 0.45),
             body: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => context.pop(),
+              onTap: () =>
+                  context.canPop() ? context.pop() : context.go('/customers'),
               child: Center(
                 child: GestureDetector(
                   onTap: () {},
@@ -768,7 +769,11 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
       ref.invalidate(dashboardProvider);
       if (mounted) {
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/customers');
+        }
         AppNotificationHost.show(
           const SnackBar(
             content: Text('Tahsilat başarıyla kaydedildi.'),

@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
 class BarcodeScannerDialog extends StatefulWidget {
   final Function(String) onBarcodeScanned;
@@ -8,6 +11,16 @@ class BarcodeScannerDialog extends StatefulWidget {
 
   static Future<void> show(BuildContext context,
       {required Function(String) onBarcodeScanned}) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+      AppNotificationHost.show(
+        const SnackBar(
+          content: Text(
+              'Kamera ile tarama mobil cihazlarda desteklenmektedir. Lütfen USB barkod okuyucunuzu veya klavyeyi kullanın.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return Future.value();
+    }
     return showGeneralDialog(
       context: context,
       barrierDismissible: true,

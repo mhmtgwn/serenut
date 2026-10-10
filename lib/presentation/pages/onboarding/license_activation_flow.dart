@@ -273,7 +273,19 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
 
                 // QR Kod ile Tara
                 OutlinedButton.icon(
-                  onPressed: () => setState(() => _showScanner = true),
+                  onPressed: () {
+                    if (AppPlatform.isDesktop) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Kamera ile QR tarama mobil cihazlarda desteklenmektedir. Lütfen lisans anahtarınızı klavye ile girin.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+                    setState(() => _showScanner = true);
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: POSColors.text,
                     side: const BorderSide(color: POSColors.border, width: 1.5),

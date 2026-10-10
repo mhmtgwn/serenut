@@ -621,7 +621,8 @@ class CustomerDetailsPage extends ConsumerWidget {
                       style: TextStyle(fontSize: 16, color: _kTextSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () =>
+                        context.canPop() ? context.pop() : context.go('/customers'),
                     child: const Text('Geri Dön'),
                   ),
                 ],

@@ -50,9 +50,10 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
   @override
   void initState() {
     super.initState();
-    // Masaüstünde varsayılan kamera olmayabilir veya kullanıcı USB okuyucu kullanabilir
+    // Masaüstünde mobile_scanner kamera eklentisi desteklenmez; USB barkod okuyucu / klavye kullanılır
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-      _isCameraSupported = true; // Web cam varsa açılır, yoksa hata vermez
+      _isCameraSupported = false;
+      _isCameraActive = false;
     }
     _scannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,

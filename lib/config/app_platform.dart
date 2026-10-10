@@ -6,6 +6,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 ///
 /// Keep this mapping in one place so iOS never falls through to Windows.
 abstract final class AppPlatform {
+  static bool get isDesktop =>
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
   static String get releaseKey {
     if (kIsWeb) return 'web';
     if (Platform.isAndroid) return 'android';
