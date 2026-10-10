@@ -150,14 +150,12 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         'amount': financed,
         'paid_amount': 0.0,
         'debt_amount': financed,
-        'date': now.toIso8601String(),
         'reference_id': planId,
         'description': debtDesc,
         'payment_method': 'veresiye',
         'is_deleted': 0,
         'is_synced': 0,
         'created_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
       });
 
       await SyncOutboxV4.enqueue(
@@ -172,7 +170,6 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'amount': financed,
           'paid_amount': 0.0,
           'debt_amount': financed,
-          'date': now.toIso8601String(),
           'reference_id': planId,
           'description': debtDesc,
           'payment_method': 'veresiye',
@@ -194,14 +191,12 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'amount': downPayment,
           'paid_amount': downPayment,
           'debt_amount': 0.0,
-          'date': now.toIso8601String(),
           'reference_id': planId,
           'description': colDesc,
           'payment_method': downPaymentMethod,
           'is_deleted': 0,
           'is_synced': 0,
           'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
         });
 
         await SyncOutboxV4.enqueue(
@@ -216,7 +211,6 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
             'amount': downPayment,
             'paid_amount': downPayment,
             'debt_amount': 0.0,
-            'date': now.toIso8601String(),
             'reference_id': planId,
             'description': colDesc,
             'payment_method': downPaymentMethod,
@@ -358,14 +352,12 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         'amount': amount,
         'paid_amount': amount,
         'debt_amount': 0.0,
-        'date': now.toIso8601String(),
         'reference_id': installmentId,
         'description': colDesc,
         'payment_method': paymentMethod,
         'is_deleted': 0,
         'is_synced': 0,
         'created_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
       });
 
       await SyncOutboxV4.enqueue(
@@ -380,7 +372,6 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'amount': amount,
           'paid_amount': amount,
           'debt_amount': 0.0,
-          'date': now.toIso8601String(),
           'reference_id': installmentId,
           'description': colDesc,
           'payment_method': paymentMethod,
