@@ -153,8 +153,13 @@ extension SyncV4Materializer on SyncV4Service {
             await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
           }
         } else if ((prev['is_synced'] as num?)?.toInt() != 1) {
-          await db.update(table, {'is_synced': 1},
-              where: 'id = ?', whereArgs: [id]);
+          await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
+          try {
+            await db.update(table, {'is_synced': 1},
+                where: 'id = ?', whereArgs: [id]);
+          } finally {
+            await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
+          }
         }
         return;
       }

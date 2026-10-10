@@ -721,9 +721,17 @@ class FinancialTransactionEntity {
                     .toString()) ??
             DateTime.now(),
         referenceId: map['reference_id']?.toString(),
-        metadata: map['metadata'] is String
-            ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>?
-            : map['metadata'] as Map<String, dynamic>?,
+        metadata: () {
+          final m = map['metadata'];
+          if (m is Map) return Map<String, dynamic>.from(m);
+          if (m is String && m.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(m);
+              if (decoded is Map) return Map<String, dynamic>.from(decoded);
+            } catch (_) {}
+          }
+          return null;
+        }(),
         logicalClock: (map['logical_clock'] is num)
             ? (map['logical_clock'] as num).toInt()
             : (int.tryParse((map['logical_clock'] ?? '0').toString()) ?? 0),

@@ -106,12 +106,21 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         ));
       }
     } else {
-      final baseAmount = (financed / installmentCount * 100).floor() / 100.0;
-      final remainder = (financed - (baseAmount * installmentCount) * 100).round() / 100.0;
+      // Taksitler yuvarlak olsun, küsuratlar son taksite bağlansın
+      double baseAmount = (financed / installmentCount).floorToDouble();
+      if (baseAmount < 1.0 && financed > 0) {
+        baseAmount = (financed / installmentCount * 100).floor() / 100.0;
+      }
 
+      double allocatedTotal = 0.0;
       for (int i = 0; i < installmentCount; i++) {
         final d = _addMonths(firstDueDate, i);
-        final amt = i == 0 ? (baseAmount + remainder) : baseAmount;
+        final isLast = (i == installmentCount - 1);
+        final amt = isLast
+            ? double.parse((financed - allocatedTotal).toStringAsFixed(2))
+            : baseAmount;
+        allocatedTotal += amt;
+
         installments.add(CustomerInstallmentEntity(
           id: 'inst-${_uuid.v4()}',
           planId: planId,

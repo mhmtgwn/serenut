@@ -375,11 +375,6 @@ extension _StatusStepperMixin on OrderDetailsPage {
               // 1. Close confirmation dialog
               Navigator.pop(dialogCtx);
 
-              // 2. Immediately pop OrderDetailsPage so it doesn't rebuild in invalid state
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-
               AppNotificationHost.show(
                 const SnackBar(
                   content: Text('Sipariş siliniyor...'),
@@ -400,16 +395,23 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 }
                 await controller.deleteOrder(order.id);
 
-                ref.invalidate(dashboardProvider);
-                ref.invalidate(productsControllerProvider);
-                if (order.customerId.isNotEmpty) {
-                  ref.invalidate(
-                      customerTransactionsProvider(order.customerId));
-                  ref.invalidate(
-                      customerBalanceDetailsProvider(order.customerId));
+                if (context.mounted) {
+                  ref.invalidate(dashboardProvider);
+                  ref.invalidate(productsControllerProvider);
+                  if (order.customerId.isNotEmpty) {
+                    ref.invalidate(
+                        customerTransactionsProvider(order.customerId));
+                    ref.invalidate(
+                        customerBalanceDetailsProvider(order.customerId));
+                  }
+                  unawaited(
+                      ref.read(customersControllerProvider.notifier).refresh());
                 }
-                unawaited(
-                    ref.read(customersControllerProvider.notifier).refresh());
+
+                // 2. Pop OrderDetailsPage after state invalidations complete
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
 
                 AppNotificationHost.show(
                   const SnackBar(

@@ -66,8 +66,11 @@ class CustomerDetailsPage extends ConsumerWidget {
               0.0;
           final financedAmt =
               (totalAmt - downAmt).clamp(0.0, double.infinity);
-          final perInstallmentAmt = installmentCount > 0
-              ? (financedAmt / installmentCount)
+          final basePerInst = installmentCount > 0
+              ? (financedAmt / installmentCount).floorToDouble()
+              : 0.0;
+          final lastInstAmt = installmentCount > 0
+              ? (financedAmt - (basePerInst * (installmentCount - 1)))
               : 0.0;
 
           return AlertDialog(
@@ -379,7 +382,9 @@ class CustomerDetailsPage extends ConsumerWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Aylık Taksit: $installmentCount x ₺${perInstallmentAmt.toStringAsFixed(2)}',
+                                (basePerInst - lastInstAmt).abs() < 0.01
+                                    ? 'Aylık Taksit: $installmentCount x ₺${basePerInst.toStringAsFixed(2)}'
+                                    : 'Aylık Taksit: ${installmentCount - 1} x ₺${basePerInst.toStringAsFixed(2)} • Son: ₺${lastInstAmt.toStringAsFixed(2)}',
                                 style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,

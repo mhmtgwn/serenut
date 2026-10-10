@@ -138,18 +138,6 @@ class SqliteReportRepository implements IReportRepository {
       ORDER BY total DESC
     ''', [range.toIsoFrom(), range.toIsoTo(), range.toIsoFrom(), range.toIsoTo()]);
 
-    // Also try categories table for names
-    final categoryNames = <String, String>{};
-    try {
-      final catRows =
-          await _gateway.query('categories', columns: ['id', 'name']);
-      for (final r in catRows) {
-        categoryNames[r['id'].toString()] = r['name'] as String;
-      }
-    } catch (_) {
-      // categories table may be empty or differ in schema
-    }
-
     if (rows.isEmpty) return [];
 
     final grandTotal = rows.fold<double>(
@@ -159,7 +147,7 @@ class SqliteReportRepository implements IReportRepository {
 
     return rows.map((row) {
       final catId = row['cat_id'] as String? ?? 'unknown';
-      final catName = categoryNames[catId] ?? 'Kategori $catId';
+      final catName = row['cat_name'] as String? ?? 'Genel';
       final total = (row['total'] as num?)?.toDouble() ?? 0.0;
       final cnt = (row['cnt'] as num?)?.toInt() ?? 0;
       return CategoryRevenue(
