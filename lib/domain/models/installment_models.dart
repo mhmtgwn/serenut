@@ -1,6 +1,8 @@
 // lib/domain/models/installment_models.dart
 // Serenut OS — Customer Installment Plans and Tracking Models
 
+import '../utils/safe_money.dart';
+
 class CustomerInstallmentPlanEntity {
   final String id;
   final String customerId;
@@ -100,8 +102,9 @@ class CustomerInstallmentEntity {
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
-  double get remainingAmount => (amount - paidAmount).clamp(0.0, double.infinity);
-  bool get isPaid => status == 'paid' || remainingAmount <= 0.01;
+  double get remainingAmount =>
+      SafeMoney.subtract(amount, paidAmount).clamp(0.0, double.infinity);
+  bool get isPaid => status == 'paid' || SafeMoney.isZero(remainingAmount);
 
   DateTime? get parsedDueDate => DateTime.tryParse(dueDate);
 

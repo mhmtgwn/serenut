@@ -4,6 +4,7 @@
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/models/installment_models.dart';
+import 'package:serenutos/domain/utils/safe_money.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
@@ -106,20 +107,15 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         ));
       }
     } else {
-      // Taksitler yuvarlak olsun, küsuratlar son taksite bağlansın
-      double baseAmount = (financed / installmentCount).floorToDouble();
-      if (baseAmount < 1.0 && financed > 0) {
-        baseAmount = (financed / installmentCount * 100).floor() / 100.0;
-      }
+      final splitAmounts = SafeMoney.splitInstallments(
+        totalAmount: financed,
+        count: installmentCount,
+        roundBaseToWholeUnits: true,
+      );
 
-      double allocatedTotal = 0.0;
       for (int i = 0; i < installmentCount; i++) {
         final d = _addMonths(firstDueDate, i);
-        final isLast = (i == installmentCount - 1);
-        final amt = isLast
-            ? double.parse((financed - allocatedTotal).toStringAsFixed(2))
-            : baseAmount;
-        allocatedTotal += amt;
+        final amt = splitAmounts[i];
 
         installments.add(CustomerInstallmentEntity(
           id: 'inst-${_uuid.v4()}',
@@ -328,8 +324,8 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
     }
 
     final inst = CustomerInstallmentEntity.fromMap(rows.first);
-    final newPaid = inst.paidAmount + amount;
-    final isFullyPaid = newPaid >= (inst.amount - 0.01);
+    final newPaid = SafeMoney.add(inst.paidAmount, amount);
+    final isFullyPaid = SafeMoney.isGreaterOrEqual(newPaid, inst.amount);
     final newStatus = isFullyPaid ? 'paid' : 'partial';
     final now = DateTime.now();
     final colTxId = 'trans-col-${_uuid.v4()}';

@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 import 'package:serenutos/domain/models/installment_models.dart';
+import 'package:serenutos/domain/utils/safe_money.dart';
 import 'package:serenutos/presentation/controllers/installment_controller.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
@@ -1575,7 +1576,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                                 .firstWhere((i) => i.id == inst.id,
                                     orElse: () => inst);
                             final remainingInsts = updatedPlanInsts
-                                .where((i) => !i.isPaid && i.remainingAmount > 0.009)
+                                .where((i) => !i.isPaid && SafeMoney.isPositive(i.remainingAmount))
                                 .toList();
                             await ref
                                 .read(printingApplicationServiceProvider)
@@ -1587,7 +1588,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                                   settings: settings,
                                   remainingCount: remainingInsts.length,
                                   remainingDebt: remainingInsts.fold<double>(
-                                      0.0, (acc, i) => acc + i.remainingAmount),
+                                      0.0, (acc, i) => SafeMoney.add(acc, i.remainingAmount)),
                                   nextDueDate: remainingInsts.isNotEmpty
                                       ? remainingInsts.first.dueDate
                                       : null,
