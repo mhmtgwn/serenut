@@ -13,6 +13,8 @@ import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
+import 'package:serenutos/presentation/controllers/installment_controller.dart';
+import 'package:intl/intl.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -21,6 +23,7 @@ const _kGreenLight = POSColors.greenLight;
 const _kRed = POSColors.red;
 const _kRedLight = POSColors.redLight;
 const _kAmberDark = POSColors.amberDark;
+const _kAmberLight = POSColors.amberLight;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
 
@@ -82,6 +85,9 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     final isLoadingMore = ref.watch(customerLoadingMoreProvider);
     final balanceFilter = ref.watch(customerBalanceFilterProvider);
     final balanceSummary = ref.watch(customerBalanceSummaryProvider);
+    final dueSummaryVal = ref.watch(dueInstallmentsSummaryProvider);
+    final overdue = dueSummaryVal.valueOrNull?['overdue'] ?? 0;
+    final today = dueSummaryVal.valueOrNull?['today'] ?? 0;
 
     return PosPageLayout(
       title: 'Müşteriler',
@@ -127,6 +133,33 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       body: Column(
         children: [
           _buildSummaryBar(balanceSummary),
+          if (overdue > 0)
+            InkWell(
+              onTap: _showDueInstallmentsSheet,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: _kRedLight,
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        size: 18, color: _kRed),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$overdue adet taksit vadesi gecikmiştir! Detaylar ve hatırlatma için tıklayın.',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _kRed),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded,
+                        size: 18, color: _kRed),
+                  ],
+                ),
+              ),
+            ),
           SizedBox(
             height: 46,
             child: ListView(
@@ -137,6 +170,35 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 _balanceChip('Borçlu', 'debt'),
                 _balanceChip('Alacaklı', 'credit'),
                 _balanceChip('Bakiyesi yok', 'clear'),
+                if (overdue > 0 || today > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      avatar: Icon(
+                        Icons.alarm_rounded,
+                        size: 16,
+                        color: overdue > 0 ? _kRed : _kAmberDark,
+                      ),
+                      label: Text(
+                        overdue > 0
+                            ? '$overdue Vadesi Geçmiş Taksit'
+                            : '$today Bugün Vadeli Taksit',
+                        style: TextStyle(
+                          color: overdue > 0 ? _kRed : _kAmberDark,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      backgroundColor:
+                          overdue > 0 ? _kRedLight : _kAmberLight,
+                      side: BorderSide(
+                        color: overdue > 0
+                            ? _kRed.withValues(alpha: 0.5)
+                            : _kAmberDark.withValues(alpha: 0.5),
+                      ),
+                      onPressed: _showDueInstallmentsSheet,
+                    ),
+                  ),
                 if (balanceFilter != CustomerBalanceFilter.all)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -526,6 +588,166 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
 
     if (!mounted || result == null) return;
     ref.read(customerBalanceFilterProvider.notifier).state = result;
+  }
+
+  Future<void> _showDueInstallmentsSheet() async {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (sheetCtx, scrollCtrl) {
+            return Material(
+              color: Colors.white,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+              clipBehavior: Clip.antiAlias,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final upcomingAsync =
+                      ref.watch(upcomingInstallmentsProvider);
+                  return Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                              bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_month_rounded,
+                                color: _kAmberDark),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Vadesi Gelen ve Geciken Taksitler',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: _kText,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.pop(sheetCtx),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: upcomingAsync.when(
+                          loading: () => const Center(
+                            child: CircularProgressIndicator(
+                                valueColor:
+                                    AlwaysStoppedAnimation(_kGreen)),
+                          ),
+                          error: (e, _) => Center(
+                            child: Text('Yüklenemedi: $e',
+                                style: const TextStyle(color: _kRed)),
+                          ),
+                          data: (items) {
+                            if (items.isEmpty) {
+                              return const Center(
+                                child: Text(
+                                    'Yakın zamanda vadesi gelen taksit bulunmuyor.'),
+                              );
+                            }
+                            return ListView.separated(
+                              controller: scrollCtrl,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              itemCount: items.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, idx) {
+                                final inst = items[idx];
+                                final isOverdue = inst.isOverdue;
+                                final isToday = inst.isDueToday;
+                                final dateStr = inst.parsedDueDate != null
+                                    ? DateFormat('dd.MM.yyyy')
+                                        .format(inst.parsedDueDate!)
+                                    : inst.dueDate;
+
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 4, horizontal: 8),
+                                  leading: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: isOverdue
+                                          ? _kRedLight
+                                          : (isToday
+                                              ? _kAmberLight
+                                              : const Color(0xFFF1F5F9)),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      isOverdue
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.event_rounded,
+                                      size: 18,
+                                      color: isOverdue
+                                          ? _kRed
+                                          : (isToday
+                                              ? _kAmberDark
+                                              : _kTextSecondary),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    '${inst.installmentNo}. Taksit • $dateStr',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isOverdue ? _kRed : _kText,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    isOverdue
+                                        ? 'Gecikti! Kalan: ₺${inst.remainingAmount.toStringAsFixed(2)}'
+                                        : (isToday
+                                            ? 'Bugün Son Gün! Kalan: ₺${inst.remainingAmount.toStringAsFixed(2)}'
+                                            : 'Kalan: ₺${inst.remainingAmount.toStringAsFixed(2)}'),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isOverdue
+                                          ? _kRed
+                                          : _kTextSecondary,
+                                    ),
+                                  ),
+                                  trailing: const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 14,
+                                      color: _kTextSecondary),
+                                  onTap: () {
+                                    Navigator.pop(sheetCtx);
+                                    context.push(
+                                        '/customers/${inst.customerId}');
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _balanceChip(String label, String value) {

@@ -623,6 +623,54 @@ class DatabaseSchema {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_terminal_payment_intents_state ON terminal_payment_intents(state, updated_at)',
     );
+
+    // Customer Installment Plans and Installments
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customer_installment_plans (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        down_payment REAL NOT NULL DEFAULT 0,
+        installment_count INTEGER NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_synced INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_installment_plans_customer ON customer_installment_plans(customer_id)',
+    );
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customer_installments (
+        id TEXT PRIMARY KEY,
+        plan_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        installment_no INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        paid_amount REAL NOT NULL DEFAULT 0,
+        due_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        paid_at TEXT,
+        financial_transaction_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_synced INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_customer_installments_customer ON customer_installments(customer_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_customer_installments_plan ON customer_installments(plan_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_customer_installments_due ON customer_installments(due_date, status)',
+    );
   }
 
   static Future<void> _createPrintingV2Tables(Database db) async {

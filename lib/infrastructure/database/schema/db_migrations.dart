@@ -1066,6 +1066,60 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 58 && newVersion >= 58) {
+          await txn.execute('''
+            CREATE TABLE IF NOT EXISTS customer_installment_plans (
+              id TEXT PRIMARY KEY,
+              customer_id TEXT NOT NULL,
+              total_amount REAL NOT NULL,
+              down_payment REAL NOT NULL DEFAULT 0,
+              installment_count INTEGER NOT NULL,
+              description TEXT,
+              status TEXT NOT NULL DEFAULT 'active',
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              is_synced INTEGER NOT NULL DEFAULT 0,
+              is_deleted INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_installment_plans_customer ON customer_installment_plans(customer_id)',
+          );
+
+          await txn.execute('''
+            CREATE TABLE IF NOT EXISTS customer_installments (
+              id TEXT PRIMARY KEY,
+              plan_id TEXT NOT NULL,
+              customer_id TEXT NOT NULL,
+              installment_no INTEGER NOT NULL,
+              amount REAL NOT NULL,
+              paid_amount REAL NOT NULL DEFAULT 0,
+              due_date TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              paid_at TEXT,
+              financial_transaction_id TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              is_synced INTEGER NOT NULL DEFAULT 0,
+              is_deleted INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_customer_installments_customer ON customer_installments(customer_id)',
+          );
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_customer_installments_plan ON customer_installments(plan_id)',
+          );
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_customer_installments_due ON customer_installments(due_date, status)',
+          );
+
+          await txn.insert('app_migration_history', {
+            'version': 58,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

@@ -18,6 +18,8 @@ import 'package:serenutos/presentation/widgets/common/country_code_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+import 'package:serenutos/domain/models/installment_models.dart';
+import 'package:serenutos/presentation/controllers/installment_controller.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -26,6 +28,7 @@ const _kRed = POSColors.red;
 const _kRedLight = POSColors.redLight;
 const _kAmber = POSColors.amber;
 const _kAmberLight = POSColors.amberLight;
+const _kAmberDark = POSColors.amberDark;
 const _kSurface = POSColors.surface;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
@@ -39,114 +42,478 @@ class CustomerDetailsPage extends ConsumerWidget {
       BuildContext context, WidgetRef ref, CustomerEntity customer) async {
     final amountController = TextEditingController();
     final noteController = TextEditingController();
+    final downPaymentController = TextEditingController(text: '0');
     final formKey = GlobalKey<FormState>();
+    var isInstallment = false;
+    var installmentCount = 3;
+    var firstDueDate = DateTime.now().add(const Duration(days: 30));
+    var downPaymentMethod = 'cash';
     var saving = false;
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Elle Borç Ekle'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                    '${customer.name} için cari hesaba borç hareketi eklenir.'),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: amountController,
-                  autofocus: true,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Borç Tutarı (₺)',
-                    prefixIcon: Icon(Icons.account_balance_wallet_rounded),
-                  ),
-                  validator: (value) {
-                    final amount = double.tryParse(
-                        (value ?? '').trim().replaceAll(',', '.'));
-                    return amount == null || amount <= 0
-                        ? 'Sıfırdan büyük bir tutar girin'
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Açıklama',
-                    hintText: 'Örn. Önceki dönem devri',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: const Text('İptal'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      if (!(formKey.currentState?.validate() ?? false)) return;
-                      setDialogState(() => saving = true);
-                      try {
-                        await ref
-                            .read(customersControllerProvider.notifier)
-                            .recordManualDebt(
-                              customerId: customer.id,
-                              amount: double.parse(amountController.text
-                                  .trim()
-                                  .replaceAll(',', '.')),
-                              notes: noteController.text,
-                            );
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-                        if (context.mounted) {
-                          AppNotificationHost.show(
-                            const SnackBar(
-                              content: Text('Borç hareketi eklendi.'),
-                              backgroundColor: _kGreen,
+        builder: (context, setDialogState) {
+          final totalAmt = double.tryParse(
+                  amountController.text.trim().replaceAll(',', '.')) ??
+              0.0;
+          final downAmt = double.tryParse(
+                  downPaymentController.text.trim().replaceAll(',', '.')) ??
+              0.0;
+          final financedAmt =
+              (totalAmt - downAmt).clamp(0.0, double.infinity);
+          final perInstallmentAmt = installmentCount > 0
+              ? (financedAmt / installmentCount)
+              : 0.0;
+
+          return AlertDialog(
+            title: Text(
+                isInstallment ? 'Taksitli Borç Planı Ekle' : 'Elle Borç Ekle'),
+            content: SizedBox(
+              width: 440,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${customer.name} için cari hesaba borç kaydı oluşturulur.',
+                        style: const TextStyle(
+                            fontSize: 13, color: _kTextSecondary),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Seçim Segmenti: Tek Seferlik vs Taksitli
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _kBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(9),
+                                onTap: () => setDialogState(
+                                    () => isInstallment = false),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: !isInstallment
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                    boxShadow: !isInstallment
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            )
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Tek Seferlik Borç',
+                                    style: TextStyle(
+                                      fontWeight: !isInstallment
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: !isInstallment
+                                          ? _kGreenDark
+                                          : _kTextSecondary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          );
-                        }
-                      } catch (error) {
-                        if (dialogContext.mounted) {
-                          setDialogState(() => saving = false);
-                          AppNotificationHost.show(
-                            SnackBar(content: Text('Borç eklenemedi: $error')),
-                          );
-                        }
-                      }
-                    },
-              child: saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Borcu Ekle'),
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(9),
+                                onTap: () => setDialogState(
+                                    () => isInstallment = true),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isInstallment
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                    boxShadow: isInstallment
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            )
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.calendar_month_rounded,
+                                          size: 16,
+                                          color: isInstallment
+                                              ? _kAmberDark
+                                              : _kTextSecondary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Taksitli Borç Planı',
+                                        style: TextStyle(
+                                          fontWeight: isInstallment
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: isInstallment
+                                              ? _kAmberDark
+                                              : _kTextSecondary,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Tutar
+                      TextFormField(
+                        controller: amountController,
+                        autofocus: true,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: InputDecoration(
+                          labelText: isInstallment
+                              ? 'Toplam Tutar (₺)'
+                              : 'Borç Tutarı (₺)',
+                          prefixIcon: const Icon(
+                              Icons.account_balance_wallet_rounded),
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                        validator: (value) {
+                          final amount = double.tryParse((value ?? '')
+                              .trim()
+                              .replaceAll(',', '.'));
+                          return amount == null || amount <= 0
+                              ? 'Sıfırdan büyük bir tutar girin'
+                              : null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (isInstallment) ...[
+                        // Taksit Sayısı
+                        DropdownButtonFormField<int>(
+                          value: installmentCount,
+                          decoration: const InputDecoration(
+                            labelText: 'Taksit Sayısı',
+                            prefixIcon:
+                                Icon(Icons.format_list_numbered_rounded),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 2, child: Text('2 Taksit')),
+                            DropdownMenuItem(
+                                value: 3, child: Text('3 Taksit')),
+                            DropdownMenuItem(
+                                value: 4, child: Text('4 Taksit')),
+                            DropdownMenuItem(
+                                value: 5, child: Text('5 Taksit')),
+                            DropdownMenuItem(
+                                value: 6, child: Text('6 Taksit')),
+                            DropdownMenuItem(
+                                value: 9, child: Text('9 Taksit')),
+                            DropdownMenuItem(
+                                value: 12, child: Text('12 Taksit')),
+                            DropdownMenuItem(
+                                value: 18, child: Text('18 Taksit')),
+                            DropdownMenuItem(
+                                value: 24, child: Text('24 Taksit')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setDialogState(() => installmentCount = v);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Peşinat
+                        TextFormField(
+                          controller: downPaymentController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Alınan Peşinat (₺, Opsiyonel)',
+                            prefixIcon: Icon(Icons.payments_outlined),
+                          ),
+                          onChanged: (_) => setDialogState(() {}),
+                          validator: (value) {
+                            final down = double.tryParse((value ?? '')
+                                    .trim()
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                            final tot = double.tryParse(amountController
+                                    .text
+                                    .trim()
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                            if (down < 0) return 'Peşinat negatif olamaz';
+                            if (tot > 0 && down >= tot) {
+                              return 'Peşinat toplam tutardan az olmalıdır';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (downAmt > 0) ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: downPaymentMethod,
+                            decoration: const InputDecoration(
+                              labelText: 'Peşinat Ödeme Yöntemi',
+                              prefixIcon: Icon(Icons.payment_rounded),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'cash', child: Text('Nakit (Kasa)')),
+                              DropdownMenuItem(
+                                  value: 'credit_card',
+                                  child: Text('Kredi Kartı / POS')),
+                              DropdownMenuItem(
+                                  value: 'bank_transfer',
+                                  child: Text('Havale / EFT')),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) {
+                                setDialogState(() => downPaymentMethod = v);
+                              }
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+
+                        // İlk Vade Tarihi
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: firstDueDate,
+                              firstDate: DateTime.now()
+                                  .subtract(const Duration(days: 30)),
+                              lastDate: DateTime.now()
+                                  .add(const Duration(days: 365 * 3)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => firstDueDate = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'İlk Taksit Vade Tarihi',
+                              prefixIcon: Icon(Icons.event_rounded),
+                              suffixIcon:
+                                  Icon(Icons.calendar_today_rounded, size: 18),
+                            ),
+                            child: Text(
+                              DateFormat('dd MMMM yyyy', 'tr_TR')
+                                  .format(firstDueDate),
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Canlı Hesaplama Özeti Kartı
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _kAmberLight.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: _kAmber.withValues(alpha: 0.4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.calculate_rounded,
+                                      size: 16, color: _kAmberDark),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Ödeme Özeti',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: _kAmberDark),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                downAmt > 0
+                                    ? 'Peşinat: ₺${downAmt.toStringAsFixed(2)} • Kalan: ₺${financedAmt.toStringAsFixed(2)}'
+                                    : 'Kalan Tutar: ₺${financedAmt.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: _kText),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Aylık Taksit: $installmentCount x ₺${perInstallmentAmt.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _kGreenDark),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'İlk Ödeme: ${DateFormat('dd.MM.yyyy').format(firstDueDate)} (Her ayın ${firstDueDate.day}. günü)',
+                                style: const TextStyle(
+                                    fontSize: 11, color: _kTextSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Açıklama
+                      TextField(
+                        controller: noteController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Açıklama',
+                          hintText: isInstallment
+                              ? 'Örn. Çeyiz Paketi / Mobilya'
+                              : 'Örn. Önceki dönem devri',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed:
+                    saving ? null : () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (!(formKey.currentState?.validate() ?? false)) {
+                          return;
+                        }
+                        setDialogState(() => saving = true);
+                        try {
+                          final amt = double.parse(amountController.text
+                              .trim()
+                              .replaceAll(',', '.'));
+                          final note = noteController.text.trim();
+
+                          if (isInstallment) {
+                            final down = double.tryParse(downPaymentController
+                                    .text
+                                    .trim()
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                            await ref
+                                .read(installmentsControllerProvider.notifier)
+                                .createPlan(
+                                  customerId: customer.id,
+                                  totalAmount: amt,
+                                  downPayment: down,
+                                  downPaymentMethod: downPaymentMethod,
+                                  installmentCount: installmentCount,
+                                  firstDueDate: firstDueDate,
+                                  description: note,
+                                );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            if (context.mounted) {
+                              AppNotificationHost.show(
+                                const SnackBar(
+                                  content: Text(
+                                      'Taksitli borç planı başarıyla oluşturuldu.'),
+                                  backgroundColor: _kGreen,
+                                ),
+                              );
+                            }
+                          } else {
+                            await ref
+                                .read(customersControllerProvider.notifier)
+                                .recordManualDebt(
+                                  customerId: customer.id,
+                                  amount: amt,
+                                  notes: note,
+                                );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            if (context.mounted) {
+                              AppNotificationHost.show(
+                                const SnackBar(
+                                  content: Text('Borç hareketi eklendi.'),
+                                  backgroundColor: _kGreen,
+                                ),
+                              );
+                            }
+                          }
+                        } catch (error) {
+                          if (dialogContext.mounted) {
+                            setDialogState(() => saving = false);
+                            AppNotificationHost.show(
+                              SnackBar(content: Text('Hata oluştu: $error')),
+                            );
+                          }
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(isInstallment ? 'Planı Başlat' : 'Borcu Ekle'),
+              ),
+            ],
+          );
+        },
       ),
     );
     amountController.dispose();
     noteController.dispose();
+    downPaymentController.dispose();
   }
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customerAsync = ref.watch(customerDetailProvider(customerId));
     final transactionsVal = ref.watch(customerTransactionsProvider(customerId));
     final balanceVal = ref.watch(customerBalanceDetailsProvider(customerId));
+    final plansVal = ref.watch(customerInstallmentPlansProvider(customerId));
+    final installmentsVal = ref.watch(customerInstallmentsProvider(customerId));
 
     return customerAsync.when(
       skipLoadingOnReload: true,
@@ -418,6 +785,10 @@ class CustomerDetailsPage extends ConsumerWidget {
                 ),
               ),
 
+              // ── Taksit Planları Bölümü (Varsa) ──
+              _buildInstallmentPlansSliver(
+                  context, ref, customer, plansVal, installmentsVal),
+
               // ── Banka Ekstresi: İşlem Geçmişi ───────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
@@ -541,6 +912,701 @@ class CustomerDetailsPage extends ConsumerWidget {
       ],
     );
   }
+
+  // ── Taksit Planları Bölümü ──────────────────────────────────────────────────
+
+  Widget _buildInstallmentPlansSliver(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+    AsyncValue<List<CustomerInstallmentPlanEntity>> plansVal,
+    AsyncValue<List<CustomerInstallmentEntity>> installmentsVal,
+  ) {
+    return plansVal.when(
+      loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+      error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+      data: (plans) {
+        if (plans.isEmpty) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        final allInstallments = installmentsVal.valueOrNull ?? [];
+
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.calendar_month_rounded,
+                        size: 16, color: _kAmberDark),
+                    SizedBox(width: 8),
+                    Text(
+                      'Taksit Planları & Vadeler',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: _kText,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...plans.map((plan) {
+                  final planInsts = allInstallments
+                      .where((i) => i.planId == plan.id)
+                      .toList();
+                  final paidInsts =
+                      planInsts.where((i) => i.isPaid).length;
+                  final totalInsts = plan.installmentCount;
+                  final paidSum = planInsts.fold<double>(
+                      0.0, (acc, i) => acc + i.paidAmount);
+                  final remainingSum = (plan.financedAmount - paidSum)
+                      .clamp(0.0, double.infinity);
+                  final progress = plan.financedAmount > 0
+                      ? (paidSum / plan.financedAmount).clamp(0.0, 1.0)
+                      : 1.0;
+                  final isCompleted = plan.status == 'completed' ||
+                      (totalInsts > 0 && paidInsts == totalInsts);
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isCompleted
+                            ? _kBorder
+                            : _kAmberDark.withValues(alpha: 0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Plan Başlığı
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isCompleted
+                                ? Colors.grey[50]
+                                : _kAmberLight.withValues(alpha: 0.35),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(13)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isCompleted
+                                    ? Icons.task_alt_rounded
+                                    : Icons.receipt_long_rounded,
+                                size: 18,
+                                color: isCompleted ? _kGreenDark : _kAmberDark,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  plan.description.isNotEmpty
+                                      ? plan.description
+                                      : 'Taksitli Borç Planı',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: _kText,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isCompleted
+                                      ? _kGreenLight
+                                      : (plan.status == 'cancelled'
+                                          ? Colors.grey[200]
+                                          : _kAmberLight),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isCompleted
+                                      ? 'Tamamlandı'
+                                      : (plan.status == 'cancelled'
+                                          ? 'İptal Edildi'
+                                          : '$paidInsts/$totalInsts Taksit'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isCompleted
+                                        ? _kGreenDark
+                                        : (plan.status == 'cancelled'
+                                            ? Colors.grey[700]
+                                            : _kAmberDark),
+                                  ),
+                                ),
+                              ),
+                              if (plan.status == 'active')
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert_rounded,
+                                      size: 18, color: _kTextSecondary),
+                                  padding: EdgeInsets.zero,
+                                  itemBuilder: (_) => [
+                                    const PopupMenuItem(
+                                      value: 'cancel',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.cancel_outlined,
+                                              size: 16, color: _kRed),
+                                          SizedBox(width: 8),
+                                          Text('Planı İptal Et',
+                                              style: TextStyle(color: _kRed)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  onSelected: (val) {
+                                    if (val == 'cancel') {
+                                      _confirmCancelPlan(
+                                          context, ref, plan, customer);
+                                    }
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        // İlerleme ve Özet
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Toplam: ₺${plan.totalAmount.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: _kTextSecondary,
+                                    ),
+                                  ),
+                                  if (plan.downPayment > 0)
+                                    Text(
+                                      'Peşinat: ₺${plan.downPayment.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: _kGreenDark,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  Text(
+                                    'Kalan: ₺${remainingSum.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: remainingSum > 0
+                                          ? _kRed
+                                          : _kGreenDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: progress,
+                                  minHeight: 6,
+                                  backgroundColor: Colors.grey[200],
+                                  valueColor: AlwaysStoppedAnimation(
+                                      isCompleted ? _kGreen : _kAmberDark),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const Divider(height: 1, indent: 14, endIndent: 14),
+
+                        // Taksit Satırları
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          itemCount: planInsts.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: Color(0xFFF1F5F9)),
+                          itemBuilder: (context, idx) {
+                            final inst = planInsts[idx];
+                            return _buildInstallmentItemRow(
+                                context, ref, customer, inst);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInstallmentItemRow(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+    CustomerInstallmentEntity inst,
+  ) {
+    final isPaid = inst.isPaid;
+    final isOverdue = inst.isOverdue;
+    final isDueToday = inst.isDueToday;
+
+    Color badgeBg;
+    Color badgeFg;
+    String badgeText;
+    IconData? badgeIcon;
+
+    if (isPaid) {
+      badgeBg = _kGreenLight;
+      badgeFg = _kGreenDark;
+      badgeText = 'Ödendi';
+      badgeIcon = Icons.check_circle_outline_rounded;
+    } else if (isOverdue) {
+      badgeBg = _kRedLight;
+      badgeFg = _kRed;
+      badgeText = 'Gecikti';
+      badgeIcon = Icons.warning_amber_rounded;
+    } else if (isDueToday) {
+      badgeBg = _kAmberLight;
+      badgeFg = _kAmberDark;
+      badgeText = 'Vadesi Bugün';
+      badgeIcon = Icons.today_rounded;
+    } else {
+      badgeBg = const Color(0xFFF1F5F9);
+      badgeFg = _kTextSecondary;
+      badgeText = 'Bekliyor';
+      badgeIcon = Icons.hourglass_top_rounded;
+    }
+
+    final dateStr = inst.parsedDueDate != null
+        ? DateFormat('dd.MM.yyyy').format(inst.parsedDueDate!)
+        : inst.dueDate;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          // Taksit No Çemberi
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: isPaid
+                  ? _kGreenLight
+                  : (isOverdue ? _kRedLight : const Color(0xFFF1F5F9)),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${inst.installmentNo}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isPaid ? _kGreenDark : (isOverdue ? _kRed : _kText),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Vade ve Bilgi
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '$dateStr Vadeli',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isOverdue ? FontWeight.bold : FontWeight.w600,
+                        color: isOverdue ? _kRed : _kText,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(badgeIcon, size: 10, color: badgeFg),
+                          const SizedBox(width: 3),
+                          Text(
+                            badgeText,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: badgeFg),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isPaid && inst.paidAmount > 0)
+                  Text(
+                    'Ödenen: ₺${inst.paidAmount.toStringAsFixed(2)} • Kalan: ₺${inst.remainingAmount.toStringAsFixed(2)}',
+                    style:
+                        const TextStyle(fontSize: 11, color: _kTextSecondary),
+                  ),
+              ],
+            ),
+          ),
+
+          // Tutar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₺${inst.amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isPaid
+                      ? _kTextSecondary
+                      : (isOverdue ? _kRed : _kText),
+                  decoration: isPaid ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+
+          // İşlem Butonları (Ödenmediyse)
+          if (!isPaid) ...[
+            // WhatsApp Hatırlat Butonu
+            if (customer.phone.trim().isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline_rounded,
+                    size: 18, color: Color(0xFF25D366)),
+                tooltip: 'WhatsApp ile Hatırlat',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints:
+                    const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () =>
+                    _sendWhatsAppInstallmentReminder(context, customer, inst),
+              ),
+
+            // Tahsil Et Butonu
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _kGreenDark,
+                side: const BorderSide(color: _kGreen),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6)),
+              ),
+              onPressed: () =>
+                  _showPayInstallmentDialog(context, ref, customer, inst),
+              child: const Text('Tahsil Et',
+                  style:
+                      TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPayInstallmentDialog(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+    CustomerInstallmentEntity inst,
+  ) async {
+    final amountController = TextEditingController(
+      text: inst.remainingAmount.toStringAsFixed(2),
+    );
+    final noteController = TextEditingController();
+    var method = 'cash';
+    var saving = false;
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('${inst.installmentNo}. Taksit Tahsilatı'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Müşteri: ${customer.name}\nVade: ${DateFormat('dd.MM.yyyy').format(inst.parsedDueDate ?? DateTime.now())}\nKalan Taksit: ₺${inst.remainingAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 13, color: _kTextSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: amountController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Tahsil Edilen Tutar (₺)',
+                      prefixIcon: Icon(Icons.price_check_rounded),
+                    ),
+                    validator: (v) {
+                      final val = double.tryParse(
+                          (v ?? '').trim().replaceAll(',', '.'));
+                      if (val == null || val <= 0) {
+                        return 'Geçerli bir tutar girin';
+                      }
+                      if (val > (inst.remainingAmount + 0.01)) {
+                        return 'Kalan tutardan fazla girilemez';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    value: method,
+                    decoration: const InputDecoration(
+                      labelText: 'Ödeme Yöntemi',
+                      prefixIcon: Icon(Icons.payment_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'cash', child: Text('Nakit (Kasa)')),
+                      DropdownMenuItem(
+                          value: 'credit_card',
+                          child: Text('Kredi Kartı / POS')),
+                      DropdownMenuItem(
+                          value: 'bank_transfer',
+                          child: Text('Havale / EFT')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => method = v);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Not (Opsiyonel)',
+                      hintText: 'Örn. Elden nakit teslim alındı',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!(formKey.currentState?.validate() ?? false)) {
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        final amt = double.parse(amountController.text
+                            .trim()
+                            .replaceAll(',', '.'));
+                        await ref
+                            .read(installmentsControllerProvider.notifier)
+                            .payInstallment(
+                              customerId: customer.id,
+                              installmentId: inst.id,
+                              amount: amt,
+                              paymentMethod: method,
+                              note: noteController.text.trim(),
+                            );
+                        if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                        if (context.mounted) {
+                          AppNotificationHost.show(
+                            const SnackBar(
+                              content: Text(
+                                  'Taksit tahsilatı başarıyla kaydedildi.'),
+                              backgroundColor: _kGreen,
+                            ),
+                          );
+                        }
+                      } catch (err) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => saving = false);
+                          AppNotificationHost.show(
+                            SnackBar(content: Text('Tahsilat hatası: $err')),
+                          );
+                        }
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Tahsil Et'),
+            ),
+          ],
+        ),
+      ),
+    );
+    amountController.dispose();
+    noteController.dispose();
+  }
+
+  Future<void> _sendWhatsAppInstallmentReminder(
+    BuildContext context,
+    CustomerEntity customer,
+    CustomerInstallmentEntity inst,
+  ) async {
+    final phone = customer.phone.trim();
+    if (phone.isEmpty) {
+      AppNotificationHost.show(
+        const SnackBar(
+          content: Text('Müşterinin kayıtlı telefon numarası bulunmuyor.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final dueDateFormatted = inst.parsedDueDate != null
+        ? DateFormat('dd.MM.yyyy').format(inst.parsedDueDate!)
+        : inst.dueDate;
+    final amountFormatted = '₺${inst.remainingAmount.toStringAsFixed(2)}';
+
+    final message = '''📅 *Taksit Ödeme Hatırlatması*
+
+Sayın *${customer.name}*,
+Mağazamızdaki taksitli alışverişinize ait vade hatırlatmasıdır:
+
+▫️ *Taksit No:* ${inst.installmentNo}. Taksit
+▫️ *Vade Tarihi:* $dueDateFormatted
+▫️ *Ödenecek Tutar:* *$amountFormatted*
+
+Ödemenizi mağazamızdan veya banka hesaplarımıza gerçekleştirebilirsiniz.
+Hayırlı günler dileriz.
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''';
+
+    final normalized = normalizeForWhatsApp(phone);
+    final encoded = Uri.encodeComponent(message);
+    final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          AppNotificationHost.show(
+            const SnackBar(
+              content: Text('WhatsApp başlatılamadı.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppNotificationHost.show(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: _kRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmCancelPlan(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerInstallmentPlanEntity plan,
+    CustomerEntity customer,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Taksit Planını İptal Et'),
+        content: Text(
+          '"${plan.description.isNotEmpty ? plan.description : 'Taksit Planı'}" iptal edilecek.\n\nNot: Bu işlem plandaki bekleyen taksitleri iptal eder. Onaylıyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _kRed, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Planı İptal Et'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ref
+            .read(installmentsControllerProvider.notifier)
+            .cancelPlan(planId: plan.id, customerId: customer.id);
+        if (context.mounted) {
+          AppNotificationHost.show(
+            const SnackBar(
+              content: Text('Taksit planı iptal edildi.'),
+              backgroundColor: _kGreen,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          AppNotificationHost.show(
+            SnackBar(
+                content: Text('İptal hatası: $e'), backgroundColor: _kRed),
+          );
+        }
+      }
+    }
+  }
+
 
   // ── Aylara Göre Gruplama ──────────────────────────────────────────────────
 

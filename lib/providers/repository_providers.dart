@@ -23,6 +23,7 @@ import 'package:serenutos/infrastructure/repositories/billing_repository.dart';
 import 'package:serenutos/infrastructure/repositories/notification_repository.dart';
 import 'package:serenutos/infrastructure/repositories/portal_repository.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_installment_repository.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 // ════════════════════════════════════════════════════════════
@@ -166,4 +167,10 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
 final portalRepositoryProvider = Provider<PortalRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return PortalRepository(apiClient: apiClient);
+});
+
+// ── Installment Repository Provider ──
+final installmentRepositoryProvider = Provider<IInstallmentRepository>((ref) {
+  final gateway = ref.watch(dbGatewayProvider);
+  return SqliteInstallmentRepository(gateway);
 });
