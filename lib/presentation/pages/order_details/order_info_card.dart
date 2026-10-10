@@ -380,7 +380,7 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
   Future<void> _sendWhatsApp(String phoneNumber, OrderEntity order) async {
     final normalized = normalizeForWhatsApp(phoneNumber);
     final message =
-        'Sayın *${order.customerName ?? 'Müşterimiz'}*,\n#${order.id} numaralı siparişiniz hakkında bilgilendirme.';
+        'Sayın *${order.customerName ?? 'Müşterimiz'}*,\n#${order.id} numaralı siparişiniz hakkında bilgilendirme.\n\nℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._';
     final encoded = Uri.encodeComponent(message);
     final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
     if (await canLaunchUrl(uri)) {

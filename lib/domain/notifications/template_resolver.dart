@@ -54,7 +54,9 @@ Sayın *{customer}*,
 
 Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
 Bizi tercih ettiğiniz için teşekkür ederiz!
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   _kLegacyOrder: '''🛎️ *Siparişiniz Alındı*
 
 Sayın *{customer}*,
@@ -68,14 +70,18 @@ Sayın *{customer}*,
 
 Siparişiniz hazırlanmaya başladığında tekrar bilgilendirileceksiniz.
 Bizi tercih ettiğiniz için teşekkür ederiz!
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventOrderPreparing: '''👨‍🍳 *Siparişiniz Hazırlanıyor*
 
 Sayın *{customer}*,
 #{id} numaralı siparişiniz şu anda özenle hazırlanmaktadır.{note_line}
 
 En kısa sürede tamamlanıp hazır hale getirilecektir.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventOrderReady: '''🎉 *Siparişiniz Hazır!*
 
 Sayın *{customer}*,
@@ -85,28 +91,36 @@ Sayın *{customer}*,
 ▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 İşletmemizden teslim alabilirsiniz. Afiyet olsun, iyi günlerde kullanın!
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventOrderShipped: '''🛵 *Siparişiniz Yola Çıktı*
 
 Sayın *{customer}*,
 #{id} numaralı siparişiniz kuryeye teslim edilmiş olup yola çıkmıştır.{note_line}
 
 En kısa sürede adresinize ulaştırılacaktır.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventOrderDelivered: '''✨ *Sipariş Teslim Edildi*
 
 Sayın *{customer}*,
 #{id} numaralı siparişiniz teslim edilmiştir.{note_line}
 
 Bizi tercih ettiğiniz için teşekkür ederiz. Tekrar görüşmek dileğiyle!
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventOrderCancelled: '''❌ *Sipariş İptal Bildirimi*
 
 Sayın *{customer}*,
 #{id} numaralı siparişiniz iptal edilmiştir.{note_line}
 
 Herhangi bir sorunuz veya ayrıntılı bilgi için bizimle iletişime geçebilirsiniz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventSaleCreated: '''🧾 *Alışveriş Fişi*
 
 Sayın *{customer}*,
@@ -122,7 +136,9 @@ Alışverişiniz başarıyla tamamlanmıştır.
 ▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   _kLegacySale: '''🧾 *Alışveriş Fişi*
 
 Sayın *{customer}*,
@@ -138,7 +154,9 @@ Alışverişiniz başarıyla tamamlanmıştır.
 ▫️ *Toplam Tutar:* *{amount}*{note_line}
 
 Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventDebtCreated: '''📋 *Cari Hesap Bilgilendirmesi*
 
 Sayın *{customer}*,
@@ -149,7 +167,9 @@ Sayın *{customer}*,
 ▫️ *Güncel Toplam Bakiyeniz:* *{balance}*{note_line}
 
 Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   _kLegacyDebt: '''📋 *Cari Hesap Bilgilendirmesi*
 
 Sayın *{customer}*,
@@ -160,7 +180,9 @@ Sayın *{customer}*,
 ▫️ *Güncel Toplam Bakiyeniz:* *{balance}*{note_line}
 
 Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   kSmsEventCollectionRecorded: '''✅ *Tahsilat Makbuzu*
 
 Sayın *{customer}*,
@@ -172,7 +194,9 @@ Yapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmi�
 📅 *Tarih:* {date}
 
 Ödemeniz için teşekkür ederiz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   _kLegacyCollection: '''✅ *Tahsilat Makbuzu*
 
 Sayın *{customer}*,
@@ -184,7 +208,9 @@ Yapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmi�
 📅 *Tarih:* {date}
 
 Ödemeniz için teşekkür ederiz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
   'balance_reminder': '''🔔 *Bakiye Hatırlatması*
 
 Sayın *{customer}*,
@@ -195,7 +221,9 @@ Sayın *{customer}*,
 
 Ödeme ve mutabakat işlemleriniz için işletmemizle iletişime geçebilirsiniz.
 Sağlıklı ve bereketli günler dileriz.
-*{business}*''',
+*{business}*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''',
 };
 
 /// Canonical default templates for SMS

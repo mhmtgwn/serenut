@@ -320,4 +320,14 @@ void main() {
     expect(wa, contains('1450,00 ₺'));
     expect(wa, contains('Serenut POS'));
   });
+
+  test('All default WhatsApp templates contain contact save notice', () {
+    for (final entry in kDefaultWhatsAppTemplates.entries) {
+      expect(
+        entry.value,
+        contains('lütfen numaramızı rehberinize kaydediniz'),
+        reason: 'Template for "${entry.key}" must include the contact save notice',
+      );
+    }
+  });
 }

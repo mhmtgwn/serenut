@@ -301,7 +301,9 @@ class _CreateGibInvoiceDialogState
     final message = '''Sayın $name,
 $total ₺ tutarındaki e-Arşiv Faturanız Gelir İdaresi Başkanlığı (GİB) sisteminde onaylanarak düzenlenmiştir.
 Fatura Takip / ETTN No: $uuid
-Bizi tercih ettiğiniz için teşekkür ederiz.''';
+Bizi tercih ettiğiniz için teşekkür ederiz.
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''';
 
     final uri = Uri.parse(
         'https://wa.me/${phone.startsWith('90') ? phone : '90$phone'}?text=${Uri.encodeComponent(message)}');

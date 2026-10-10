@@ -732,7 +732,9 @@ Güncel hesap durumunuz:
 ▫️ *Durum:* $statusText
 ▫️ *Güncel Tutar:* *₺${absBalance.toStringAsFixed(2)}*
 
-Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
+Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._''';
 
     final normalized = normalizeForWhatsApp(phone);
     final encoded = Uri.encodeComponent(message);
