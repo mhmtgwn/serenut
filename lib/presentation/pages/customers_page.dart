@@ -802,36 +802,18 @@ class _CustomerCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                      if (customer.email.isNotEmpty && customer.phone.isEmpty)
-                        Row(
-                          children: [
-                            const Icon(Icons.email_outlined,
-                                size: 13, color: _kTextSecondary),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                customer.email,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: _kTextSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (customer.phone.isNotEmpty && customer.email.isNotEmpty)
+                      if (customer.address != null &&
+                          customer.address!.trim().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Row(
                             children: [
-                              const Icon(Icons.email_outlined,
+                              const Icon(Icons.location_on_outlined,
                                   size: 13, color: _kTextSecondary),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  customer.email,
+                                  customer.address!,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _kTextSecondary,

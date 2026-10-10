@@ -43,11 +43,11 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
-  final _emailFocus = FocusNode();
+  final _addressFocus = FocusNode();
 
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _emailController;
+  late final TextEditingController _addressController;
   CountryCode _selectedCountry = kDefaultCountry;
 
   bool _isSaving = false;
@@ -60,17 +60,17 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     final parsed = parsePhoneNumber(c?.phone);
     _selectedCountry = parsed.country;
     _phoneController = TextEditingController(text: parsed.localNumber);
-    _emailController = TextEditingController(text: c?.email ?? '');
+    _addressController = TextEditingController(text: c?.address ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _emailController.dispose();
+    _addressController.dispose();
     _nameFocus.dispose();
     _phoneFocus.dispose();
-    _emailFocus.dispose();
+    _addressFocus.dispose();
     super.dispose();
   }
 
@@ -88,7 +88,10 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
         id: id,
         name: _nameController.text.toTurkishUpperCase,
         phone: fullPhone.isNotEmpty ? fullPhone : _phoneController.text.trim(),
-        email: _emailController.text.trim(),
+        email: widget.existingCustomer?.email ?? '',
+        address: _addressController.text.trim().isNotEmpty
+            ? _addressController.text.trim()
+            : null,
         balance: widget.isEditing ? widget.existingCustomer!.balance : 0.0,
         createdAt: widget.isEditing
             ? widget.existingCustomer!.createdAt
@@ -361,15 +364,16 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                         FilteringTextInputFormatter.allow(RegExp(r'[\d\s\-]')),
                         LengthLimitingTextInputFormatter(16),
                       ],
-                      nextFocus: _emailFocus,
+                      nextFocus: _addressFocus,
                     ),
                     const SizedBox(height: 14),
                     _buildField(
-                      controller: _emailController,
-                      focusNode: _emailFocus,
-                      label: 'E-posta Adresi',
-                      icon: Icons.email_rounded,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _addressController,
+                      focusNode: _addressFocus,
+                      label: 'Adres',
+                      hintText: 'Mahalle, cadde, sokak, no...',
+                      icon: Icons.location_on_rounded,
+                      maxLines: 2,
                       nextFocus: null,
                     ),
                   ],
@@ -504,6 +508,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
+    int maxLines = 1,
   }) {
     return TextFormField(
       controller: controller,
@@ -512,6 +517,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
       textCapitalization: textCapitalization,
       inputFormatters: inputFormatters,
       validator: validator,
+      maxLines: maxLines,
       textInputAction:
           nextFocus != null ? TextInputAction.next : TextInputAction.done,
       onFieldSubmitted: (_) {

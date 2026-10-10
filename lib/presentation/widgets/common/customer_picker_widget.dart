@@ -135,6 +135,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
   final _addFormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   CountryCode _selectedCountry = kDefaultCountry;
   bool _isSaving = false;
 
@@ -160,6 +161,7 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
     _searchController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _scrollController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
@@ -341,6 +343,9 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
         name: nameToUse,
         phone: phoneToUse,
         email: '',
+        address: _addressController.text.trim().isNotEmpty
+            ? _addressController.text.trim()
+            : null,
         balance: 0.0,
         createdAt: DateTime.now(),
       );
@@ -783,6 +788,23 @@ class _CustomerPickerWidgetState extends ConsumerState<CustomerPickerWidget> {
                   country: _selectedCountry,
                   onCountryChanged: (c) => setState(() => _selectedCountry = c),
                 ),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kGreen, width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _addressController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Adres (Opsiyonel)',
+                hintText: 'Mahalle, cadde, sokak, no...',
+                prefixIcon: const Icon(Icons.location_on_rounded,
+                    color: _kTextSecondary),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 focusedBorder: OutlineInputBorder(

@@ -469,6 +469,11 @@ class DatabaseManager {
                 'SQLite integrity check failed: ${integrity.first.values.first}');
           }
 
+          // Ensure address column exists on customers table
+          try {
+            await db.execute('ALTER TABLE customers ADD COLUMN address TEXT;');
+          } catch (_) {}
+
           // Older databases can contain anonymous sales before the system
           // customer was introduced. Materialize it before checking relations.
           final now = DateTime.now().toUtc().toIso8601String();

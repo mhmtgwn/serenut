@@ -70,6 +70,7 @@ class DatabaseSchema {
         email TEXT,
         normalized_email TEXT,
         phone TEXT,
+        address TEXT,
         balance REAL NOT NULL DEFAULT 0,
         credit_limit REAL,
         status TEXT NOT NULL DEFAULT 'active',

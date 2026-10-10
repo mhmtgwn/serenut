@@ -224,7 +224,10 @@ class CustomerDetailsPage extends ConsumerWidget {
             slivers: [
               // ── Hero AppBar + Gradient Card ─────────────────────────────────────
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: customer.address != null &&
+                        customer.address!.trim().isNotEmpty
+                    ? 225
+                    : 200,
                 pinned: true,
                 backgroundColor: isDebt
                     ? _kRed
@@ -321,13 +324,41 @@ class CustomerDetailsPage extends ConsumerWidget {
                           Text(
                             customer.phone.isNotEmpty
                                 ? formatPhoneForDisplay(customer.phone)
-                                : customer.email.isNotEmpty
-                                    ? customer.email
-                                    : 'Kayıt: ${DateFormat('dd.MM.yyyy').format(customer.createdAt)}',
+                                : 'Kayıt: ${DateFormat('dd.MM.yyyy').format(customer.createdAt)}',
                             style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 13),
                           ),
+                          if (customer.address != null &&
+                              customer.address!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.location_on_outlined,
+                                      size: 14,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.85)),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      customer.address!,
+                                      style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.85),
+                                          fontSize: 12),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

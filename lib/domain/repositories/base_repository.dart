@@ -486,6 +486,7 @@ class CustomerEntity {
   final String id;
   final String name;
   final String email;
+  final String? address;
   final String phone;
   final double balance; // Positive = credit, Negative = debt
   final DateTime createdAt;
@@ -493,7 +494,8 @@ class CustomerEntity {
   CustomerEntity({
     required this.id,
     required this.name,
-    required this.email,
+    this.email = '',
+    this.address,
     required this.phone,
     required this.balance,
     required this.createdAt,
@@ -503,6 +505,7 @@ class CustomerEntity {
     String? id,
     String? name,
     String? email,
+    String? address,
     String? phone,
     double? balance,
     DateTime? createdAt,
@@ -511,6 +514,7 @@ class CustomerEntity {
         id: id ?? this.id,
         name: name ?? this.name,
         email: email ?? this.email,
+        address: address ?? this.address,
         phone: phone ?? this.phone,
         balance: balance ?? this.balance,
         createdAt: createdAt ?? this.createdAt,
@@ -520,6 +524,7 @@ class CustomerEntity {
         'id': id,
         'name': name,
         'email': email,
+        'address': address ?? '',
         'phone': phone,
         'balance': balance,
         'created_at': createdAt.toIso8601String(),
@@ -529,6 +534,10 @@ class CustomerEntity {
         id: (map['id'] ?? '').toString(),
         name: (map['name'] ?? '').toString(),
         email: (map['email'] ?? '').toString(),
+        address: (map['address'] != null &&
+                map['address'].toString().trim().isNotEmpty)
+            ? map['address'].toString().trim()
+            : null,
         phone: (map['phone'] ?? '').toString(),
         balance: (map['balance'] is num)
             ? (map['balance'] as num).toDouble()
