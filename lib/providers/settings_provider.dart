@@ -131,6 +131,10 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
                 ? retryRemote['version'] as int
                 : int.tryParse(retryRemote['version']?.toString() ?? '') ?? (remoteVersion + 1);
             body['expected_version'] = retryVer;
+            final isTaxConflict = e.responseBody.contains('TAX_NUMBER_CONFLICT');
+            if (isTaxConflict) {
+              body.remove('tax_number');
+            }
             try {
               patch = await apiClient.send('PATCH', '/api/v1/company', body: body);
             } catch (retryErr) {

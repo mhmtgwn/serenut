@@ -322,6 +322,14 @@ extension SyncV4Orchestration on SyncV4Service {
               final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
               final freshVer = _syncInt(freshRemote['version']);
               patchBody['expected_version'] = freshVer;
+              final isTaxConflict = e.responseBody.contains('TAX_NUMBER_CONFLICT');
+              if (isTaxConflict) {
+                patchBody.remove('tax_number');
+                if (freshRemote['tax_number'] != null) {
+                  await prefs.setString(
+                      'settings_tax_number', freshRemote['tax_number'].toString());
+                }
+              }
               try {
                 patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
               } catch (retryErr) {
