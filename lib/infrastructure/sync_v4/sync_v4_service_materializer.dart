@@ -146,7 +146,12 @@ extension SyncV4Materializer on SyncV4Service {
         final customerChanged =
             prev['customer_id']?.toString() != row['customer_id']?.toString();
         if (amountChanged || paidChanged || debtChanged || customerChanged) {
-          await db.update(table, row, where: 'id = ?', whereArgs: [id]);
+          await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
+          try {
+            await db.update(table, row, where: 'id = ?', whereArgs: [id]);
+          } finally {
+            await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
+          }
         } else if ((prev['is_synced'] as num?)?.toInt() != 1) {
           await db.update(table, {'is_synced': 1},
               where: 'id = ?', whereArgs: [id]);
@@ -356,10 +361,20 @@ extension SyncV4Materializer on SyncV4Service {
         .map((column) => column['name']?.toString())
         .whereType<String>()
         .toSet();
-    final row = <String, Object?>{
-      for (final entry in source.entries)
-        if (columns.contains(entry.key)) entry.key: entry.value,
-    };
+    final row = <String, Object?>{};
+    for (final entry in source.entries) {
+      if (!columns.contains(entry.key)) continue;
+      final val = entry.value;
+      if (val == null) {
+        row[entry.key] = null;
+      } else if (val is Map || val is List) {
+        row[entry.key] = jsonEncode(val);
+      } else if (val is bool) {
+        row[entry.key] = val ? 1 : 0;
+      } else {
+        row[entry.key] = val;
+      }
+    }
     final now = DateTime.now().toUtc().toIso8601String();
     if (columns.contains('created_at') && row['created_at'] == null) {
       row['created_at'] = now;

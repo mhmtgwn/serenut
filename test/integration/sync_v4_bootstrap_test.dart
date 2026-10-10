@@ -52,7 +52,7 @@ void main() {
               {"entity_type":"order","entity_id":"legacy-order-1","operation":"UPSERT","payload":{"id":"legacy-order-1","customer_id":"cust-1","status":"preparing","total_amount":"40.00","order_date":"2026-01-01T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","items":[]}},
               {"entity_type":"order","entity_id":"remote-order-1","operation":"UPSERT","payload":{"id":"remote-order-1","order_number":"SP-000001","customer_id":"cust-1","status":"created","total_amount":"20.00","order_date":"2026-01-01T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","items":[]}},
               {"entity_type":"sale","entity_id":"sale-1","operation":"UPSERT","payload":{"id":"sale-1","customer_id":"cust-1","total_amount":"874.00","paid_amount":"0.00","payment_method":"debt","status":"completed","is_deleted":0,"created_at":"2026-01-01T00:00:00.000Z","future_server_field":"ignored","items":[{"id":"sale-item-1","product_id":"prod-1","product_name":"Çay (Satış Anı)","quantity":"2.000","unit_price":"437.00","subtotal":"874.00","created_at":"2026-01-01T00:00:00.000Z"}]}},
-              {"entity_type":"financial_transaction","entity_id":"tx-1","operation":"UPSERT","payload":{"id":"tx-1","type":"sale","customer_id":"cust-1","amount":874,"paid_amount":0,"debt_amount":874,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z"}}
+              {"entity_type":"financial_transaction","entity_id":"tx-1","operation":"UPSERT","payload":{"id":"tx-1","type":"sale","customer_id":"cust-1","amount":874,"paid_amount":0,"debt_amount":874,"metadata":{"notes":"kk","source":"customer_screen"},"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z"}}
             ]
           }''',
         );
@@ -138,11 +138,11 @@ void main() {
                 .query('orders', where: 'id = ?', whereArgs: ['local-order-1']))
             .single['order_number'],
         'SP-000001');
-    expect(
-        (await db.query('financial_transactions',
-                where: 'id = ?', whereArgs: ['tx-1']))
-            .single['amount'],
-        874.0);
+    final txRow = (await db.query('financial_transactions',
+            where: 'id = ?', whereArgs: ['tx-1']))
+        .single;
+    expect(txRow['amount'], 874.0);
+    expect(txRow['metadata'], '{"notes":"kk","source":"customer_screen"}');
     expect(
         (await db.query('sync_cursor_v4',
                 where: 'key = ?', whereArgs: ['global']))

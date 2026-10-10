@@ -286,41 +286,41 @@ extension SyncV4Orchestration on SyncV4Service {
         final local = rows.first;
         final logo =
             await this._portableLogo(local['business_logo']?.toString());
-        var patch = await _api.send('PATCH', '/api/v1/company', body: {
+        final localName = local['business_name']?.toString().trim();
+        final localTax = local['business_tax_id']?.toString().trim();
+        final patchBody = <String, dynamic>{
           'expected_version': remoteVersion,
           'force': true,
-          'name': local['business_name'],
-          'address': local['business_address'],
-          'phone': local['business_phone'],
-          'email': local['business_email'],
-          'tax_number': local['business_tax_id'],
-          'owner_name': local['owner_name'],
-          'type': local['business_type'],
-          'city': local['business_city'],
-          'district': local['business_district'],
-          'currency': local['currency'],
-          'logo_url': logo,
-        });
+          if (localName != null && localName.isNotEmpty) 'name': localName,
+          if (local['business_address'] != null)
+            'address': local['business_address'],
+          if (local['business_phone'] != null)
+            'phone': local['business_phone'],
+          if (local['business_email'] != null)
+            'email': local['business_email'],
+          if (localTax != null && localTax.isNotEmpty)
+            'tax_number': localTax,
+          if (local['owner_name'] != null)
+            'owner_name': local['owner_name'],
+          if (local['business_type'] != null)
+            'type': local['business_type'],
+          if (local['business_city'] != null)
+            'city': local['business_city'],
+          if (local['business_district'] != null)
+            'district': local['business_district'],
+          if (local['currency'] != null)
+            'currency': local['currency'],
+          if (logo != null && logo.isNotEmpty)
+            'logo_url': logo,
+        };
+        var patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
         if (patch.statusCode == 409) {
           final freshRes = await _api.get('/api/v1/company');
           if (freshRes.isSuccess && freshRes.json != null) {
             final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
             final freshVer = _syncInt(freshRemote['version']);
-            patch = await _api.send('PATCH', '/api/v1/company', body: {
-              'expected_version': freshVer,
-              'force': true,
-              'name': local['business_name'],
-              'address': local['business_address'],
-              'phone': local['business_phone'],
-              'email': local['business_email'],
-              'tax_number': local['business_tax_id'],
-              'owner_name': local['owner_name'],
-              'type': local['business_type'],
-              'city': local['business_city'],
-              'district': local['business_district'],
-              'currency': local['currency'],
-              'logo_url': logo,
-            });
+            patchBody['expected_version'] = freshVer;
+            patch = await _api.send('PATCH', '/api/v1/company', body: patchBody);
           }
         }
         if (patch.isSuccess && patch.json != null) {

@@ -153,11 +153,35 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     const values: any[] = [];
     let idx = 1;
 
-    if (name !== undefined) { updates.push(`name = $${idx++}`); values.push(name.trim()); }
+    if (name !== undefined) {
+      const trimmed = typeof name === 'string' ? name.trim() : '';
+      if (trimmed.length > 0) {
+        updates.push(`name = $${idx++}`);
+        values.push(trimmed);
+      }
+    }
     if (address !== undefined) { updates.push(`address = $${idx++}`); values.push(address); }
     if (phone !== undefined) { updates.push(`phone = $${idx++}`); values.push(phone); }
     if (email !== undefined) { updates.push(`email = $${idx++}`); values.push(email); }
-    if (tax_number !== undefined) { updates.push(`tax_number = $${idx++}`); values.push(tax_number); }
+    if (tax_number !== undefined) {
+      const cleanTax = tax_number ? String(tax_number).trim() : null;
+      if (cleanTax) {
+        const dupCheck = await pgPool.query(
+          'SELECT id FROM companies WHERE tax_number = $1 AND id != $2 LIMIT 1',
+          [cleanTax, user.company_id]
+        );
+        if (dupCheck.rows.length > 0) {
+          return res.status(409).json({
+            error: {
+              code: 'TAX_NUMBER_CONFLICT',
+              message: 'Bu vergi numarası başka bir şirket tarafından kullanılmaktadır.'
+            }
+          });
+        }
+        updates.push(`tax_number = $${idx++}`);
+        values.push(cleanTax);
+      }
+    }
     if (tax_office !== undefined) { updates.push(`tax_office = $${idx++}`); values.push(tax_office); }
     if (owner_name !== undefined) { updates.push(`owner_name = $${idx++}`); values.push(owner_name); }
     if (type !== undefined) { updates.push(`type = $${idx++}`); values.push(type); }
@@ -207,7 +231,15 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     return res.json(updateRes.rows[0]);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === '23505') {
+      return res.status(409).json({
+        error: {
+          code: 'TAX_NUMBER_CONFLICT',
+          message: 'Bu vergi numarası başka bir şirket tarafından kullanılmaktadır.'
+        }
+      });
+    }
     console.error('Update company error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Şirket güncellenemedi.' } });
   }

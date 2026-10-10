@@ -1578,7 +1578,11 @@ router.get("/bootstrap", async (req, res) => {
         default:
           return { id: row.id, type: row.type, customer_id: row.customer_id ?? "", amount: row.amount,
             paid_amount: row.paid_amount, debt_amount: row.debt_amount, reference_id: row.reference_id,
-            description: row.description ?? "", metadata: row.metadata ?? null, payment_method: row.payment_method ?? null,
+            description: row.description ?? "",
+            metadata: row.metadata
+              ? (typeof row.metadata === "string" ? row.metadata : JSON.stringify(row.metadata))
+              : null,
+            payment_method: row.payment_method ?? null,
             created_at: row.date, logical_clock: row.logical_clock ?? 0,
             device_id: row.device_id, is_deleted: deleted, deleted_at: row.deleted_at,
             deleted_by: row.deleted_by };

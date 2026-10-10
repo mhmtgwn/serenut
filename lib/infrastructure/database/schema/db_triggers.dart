@@ -15,6 +15,7 @@ class DatabaseTriggers {
     await db.execute('''
       CREATE TRIGGER trg_ft_block_update BEFORE UPDATE ON financial_transactions
       WHEN (SELECT active FROM ledger_bypass_flag LIMIT 1) = 0
+       AND NEW.is_synced != 1
        AND (
          OLD.id != NEW.id OR
          OLD.type != NEW.type OR
