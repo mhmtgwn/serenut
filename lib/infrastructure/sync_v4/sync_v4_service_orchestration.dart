@@ -59,8 +59,7 @@ extension SyncV4Orchestration on SyncV4Service {
                         'payload': jsonDecode(r['payload'] as String),
                       })
                   .toList(),
-            },
-            idempotencyKey: 'sync-v4-${orderedPending.first['mutation_id']}');
+            });
         final pushDto = SyncPushResponseDto.fromJson(
             Map<String, dynamic>.from(response.json as Map));
         final acknowledged = pushDto.results

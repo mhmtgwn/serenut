@@ -98,6 +98,12 @@ export async function idempotencyMiddleware(req: Request, res: Response, next: N
     return next();
   }
 
+  // Sync v4 push operations possess aggregate-level mutation idempotency in PostgreSQL.
+  // Bypass Redis request-level idempotency to prevent batch key collision locks.
+  if (req.originalUrl?.includes('/sync/push') || req.path?.includes('/sync/push')) {
+    return next();
+  }
+
   // Generate payload hash to protect against key collision (same key, different bodies)
   const incomingPayload = req.body ? JSON.stringify(req.body) : '';
   const incomingHash = crypto.createHash('sha256').update(incomingPayload).digest('hex');
