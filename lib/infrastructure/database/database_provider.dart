@@ -335,7 +335,8 @@ class DatabaseManager {
             '[DatabaseManager] ⚠️ Encrypted or corrupt database file detected.');
 
         final dbDir = dirname(path);
-        final backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
+        final dbFileName = basenameWithoutExtension(path);
+        final backupPath = join(dbDir, '${dbFileName}_upgrade_backup.db');
         final backupFile = File(backupPath);
 
         List<Map<String, dynamic>> pendingSales = [];
@@ -418,7 +419,8 @@ class DatabaseManager {
       final dbFile = File(path);
       if (await dbFile.exists() && await _isDatabaseFile(path)) {
         final dbDir = dirname(path);
-        safeSnapshotPath = join(dbDir, 'serenut_pos_safe_snapshot.db');
+        final dbFileName = basenameWithoutExtension(path);
+        safeSnapshotPath = join(dbDir, '${dbFileName}_safe_snapshot.db');
         try {
           // Always create a rolling safe snapshot before opening or applying migrations
           final safeFile = File(safeSnapshotPath);
@@ -453,7 +455,7 @@ class DatabaseManager {
         }
 
         if (currentVersion > 0 && currentVersion < databaseVersion) {
-          backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
+          backupPath = join(dbDir, '${dbFileName}_upgrade_backup.db');
           final backupFile = File(backupPath);
           if (await backupFile.exists()) await backupFile.delete();
           await dbFile.copy(backupPath);
