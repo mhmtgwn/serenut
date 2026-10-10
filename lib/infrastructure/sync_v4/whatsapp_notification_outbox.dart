@@ -54,7 +54,9 @@ class WhatsappNotificationOutbox {
             );
             final result = response.json;
             if (result is! Map ||
-                (result['queued'] != true && result['duplicate'] != true)) {
+                (result['queued'] != true &&
+                 result['duplicate'] != true &&
+                 result['skipped'] != true)) {
               final reason = result is Map
                   ? result['reason']?.toString() ?? result['error']?.toString()
                   : null;
@@ -69,9 +71,12 @@ class WhatsappNotificationOutbox {
             await _save(prefs, pending);
           } catch (error) {
             if (error is ApiException &&
-                (error.statusCode == 400 || error.statusCode == 422)) {
+                (error.statusCode == 400 ||
+                 error.statusCode == 404 ||
+                 error.statusCode == 409 ||
+                 error.statusCode == 422)) {
               debugPrint(
-                  'WhatsApp bildirimi kalıcı olarak geçersiz (${error.statusCode}); kuyruktan kaldırıldı: $error');
+                  'WhatsApp bildirimi kalıcı olarak işlenemez (${error.statusCode}); kuyruktan kaldırıldı: $error');
               pending.removeAt(0);
               await _save(prefs, pending);
               continue;

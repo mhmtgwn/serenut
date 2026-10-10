@@ -148,8 +148,10 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(409).json({
         error: {
           code: 'CONFLICT',
-          message: `Sürüm çakışması: Beklenen sürüm ${expected_version}, sunucu sürümü ${currentServerVersion}.`
-        }
+          message: `Sürüm çakışması: Beklenen sürüm ${expected_version}, sunucu sürümü ${currentServerVersion}.`,
+          current_version: currentServerVersion,
+        },
+        current_version: currentServerVersion,
       });
     }
 

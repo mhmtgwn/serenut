@@ -216,7 +216,12 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(400).json({ error: 'invalid_whatsapp_event', message: 'WhatsApp bildirim olayı geçersiz.' });
   }
   if (!isNotificationChannelEnabled('whatsapp')) {
-    return res.status(503).json({ error: 'whatsapp_channel_disabled', message: 'WhatsApp bildirim kanalı etkin değil.' });
+    return res.status(200).json({
+      queued: false,
+      skipped: true,
+      reason: 'whatsapp_channel_disabled',
+      message: 'WhatsApp bildirim kanalı etkin olmadığı için bildirim atlandı.',
+    });
   }
 
   let recipient: string;
@@ -229,7 +234,12 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
       rawRecipient,
       clientEventId,
     });
-    return res.status(400).json({ error: 'recipient_invalid', message: 'Alıcı telefon numarası geçersiz.' });
+    return res.status(200).json({
+      queued: false,
+      skipped: true,
+      reason: 'recipient_invalid',
+      message: 'Alıcı telefon numarası geçersiz olduğu için bildirim atlandı.',
+    });
   }
 
   try {
@@ -240,10 +250,20 @@ router.post('/events', async (req: AuthenticatedRequest, res: Response) => {
     );
     const row = connection.rows[0];
     if (!row) {
-      return res.status(409).json({ error: 'whatsapp_not_configured', message: 'WhatsApp API bağlantısı kurulmamış.' });
+      return res.status(200).json({
+        queued: false,
+        skipped: true,
+        reason: 'whatsapp_not_configured',
+        message: 'WhatsApp API bağlantısı kurulmadığı için bildirim atlandı.',
+      });
     }
     if (row.status !== 'active' || row.evolution_status !== 'open') {
-      return res.status(409).json({ error: 'whatsapp_not_connected', message: 'WhatsApp API bağlantısı açık değil.' });
+      return res.status(200).json({
+        queued: false,
+        skipped: true,
+        reason: 'whatsapp_not_connected',
+        message: 'WhatsApp API bağlantısı açık olmadığı için bildirim atlandı.',
+      });
     }
 
     const id = `notif-wa-${crypto.randomUUID()}`;
