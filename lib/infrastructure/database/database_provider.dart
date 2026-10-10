@@ -413,9 +413,35 @@ class DatabaseManager {
 
     // Create upgrade backup if schema version will change
     String? backupPath;
+    String? safeSnapshotPath;
     if (isDiskDb) {
       final dbFile = File(path);
       if (await dbFile.exists() && await _isDatabaseFile(path)) {
+        final dbDir = dirname(path);
+        safeSnapshotPath = join(dbDir, 'serenut_pos_safe_snapshot.db');
+        try {
+          // Always create a rolling safe snapshot before opening or applying migrations
+          final safeFile = File(safeSnapshotPath);
+          if (await safeFile.exists()) await safeFile.delete();
+          await dbFile.copy(safeSnapshotPath);
+
+          final walFile = File('$path-wal');
+          if (await walFile.exists()) {
+            final safeWal = File('$safeSnapshotPath-wal');
+            if (await safeWal.exists()) await safeWal.delete();
+            await walFile.copy('$safeSnapshotPath-wal');
+          }
+          final shmFile = File('$path-shm');
+          if (await shmFile.exists()) {
+            final safeShm = File('$safeSnapshotPath-shm');
+            if (await safeShm.exists()) await safeShm.delete();
+            await shmFile.copy('$safeSnapshotPath-shm');
+          }
+        } catch (e, st) {
+          debugPrint('[DatabaseManager] ⚠️ Safe snapshot failed: $e');
+          TelemetryService().logError(e, st, context: 'db_safe_snapshot_failed');
+        }
+
         int currentVersion = 0;
         try {
           currentVersion = await _readDatabaseUserVersion(path);
@@ -427,7 +453,6 @@ class DatabaseManager {
         }
 
         if (currentVersion > 0 && currentVersion < databaseVersion) {
-          final dbDir = dirname(path);
           backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
           final backupFile = File(backupPath);
           if (await backupFile.exists()) await backupFile.delete();
@@ -565,21 +590,43 @@ class DatabaseManager {
       }
 
       return db;
-    } catch (e) {
-      // Self-healing: if database decryption fails (wrong key / corrupted DB on re-installation),
-      // delete the database file and re-open it to start clean.
-      final isDecryptionError =
-          e.toString().contains('file is not a database') ||
-              e.toString().contains('code 26') ||
-              e.toString().contains('open_failed');
-      if (isDiskDb && isDecryptionError) {
-        try {
-          await deleteDatabase(path);
-          final walFile = File('$path-wal');
-          if (await walFile.exists()) await walFile.delete();
-          final shmFile = File('$path-shm');
-          if (await shmFile.exists()) await shmFile.delete();
+    } catch (e, st) {
+      debugPrint('[DatabaseManager] ❌ Database open failed: $e');
+      TelemetryService().logError(e, st, context: 'db_open_failed');
 
+      // Attempt non-destructive recovery from safe snapshot or upgrade backup
+      final candidateBackupPath = (safeSnapshotPath != null && await File(safeSnapshotPath).exists())
+          ? safeSnapshotPath
+          : (backupPath != null && await File(backupPath).exists())
+              ? backupPath
+              : null;
+
+      if (isDiskDb && candidateBackupPath != null) {
+        debugPrint(
+            '[DatabaseManager] 🛡️ Attempting automatic recovery from safe snapshot: $candidateBackupPath');
+        try {
+          final dbFile = File(path);
+          // Quarantine rather than delete so no customer bytes are lost
+          if (await dbFile.exists()) {
+            final quarantinePath = '$path.corrupted_${DateTime.now().millisecondsSinceEpoch}';
+            await dbFile.rename(quarantinePath);
+            debugPrint('[DatabaseManager] 📦 Quarantined corrupted DB to $quarantinePath');
+          }
+
+          final backupFile = File(candidateBackupPath);
+          await backupFile.copy(path);
+
+          final backupWal = File('$candidateBackupPath-wal');
+          final dbWal = File('$path-wal');
+          if (await dbWal.exists()) await dbWal.delete();
+          if (await backupWal.exists()) await backupWal.copy('$path-wal');
+
+          final backupShm = File('$candidateBackupPath-shm');
+          final dbShm = File('$path-shm');
+          if (await dbShm.exists()) await dbShm.delete();
+          if (await backupShm.exists()) await backupShm.copy('$path-shm');
+
+          debugPrint('[DatabaseManager] 🔄 Re-opening restored safe database...');
           return await openDatabase(
             path,
             version: databaseVersion,
@@ -596,32 +643,14 @@ class DatabaseManager {
               } catch (_) {}
             },
           );
-        } catch (e, st) {
+        } catch (recoveryErr, recoverySt) {
           debugPrint(
-              '[DatabaseManager] ❌ Self-heal re-open failed after decryption error: $e');
+              '[DatabaseManager] ❌ Safe snapshot recovery re-open failed: $recoveryErr');
           TelemetryService()
-              .logError(e, st, context: 'db_selfheal_reopen_failed');
+              .logError(recoveryErr, recoverySt, context: 'db_snapshot_recovery_failed');
         }
       }
 
-      if (isDiskDb && backupPath != null) {
-        final backupFile = File(backupPath);
-        if (await backupFile.exists()) {
-          final dbFile = File(path);
-          if (await dbFile.exists()) await dbFile.delete();
-          await backupFile.copy(path);
-
-          final backupWal = File('$backupPath-wal');
-          final dbWal = File('$path-wal');
-          if (await dbWal.exists()) await dbWal.delete();
-          if (await backupWal.exists()) await backupWal.copy('$path-wal');
-
-          final backupShm = File('$backupPath-shm');
-          final dbShm = File('$path-shm');
-          if (await dbShm.exists()) await dbShm.delete();
-          if (await backupShm.exists()) await backupShm.copy('$path-shm');
-        }
-      }
       rethrow;
     }
   }
