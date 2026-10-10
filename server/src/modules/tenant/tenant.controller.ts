@@ -140,6 +140,11 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     // 2. Exact version equality check (if not forced and expected_version is provided)
     const isForce = force === true || expected_version === undefined || expected_version === null;
     if (!isForce && Number(expected_version) !== Number(currentServerVersion)) {
+      logger.warn('Company PATCH version conflict', {
+        company_id: user.company_id,
+        expected_version,
+        currentServerVersion,
+      });
       return res.status(409).json({
         error: {
           code: 'CONFLICT',
@@ -172,6 +177,11 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
           [cleanTax, user.company_id]
         );
         if (dupCheck.rows.length > 0) {
+          logger.warn('Company PATCH tax number conflict', {
+            company_id: user.company_id,
+            cleanTax,
+            existing_company_id: dupCheck.rows[0].id,
+          });
           return res.status(409).json({
             error: {
               code: 'TAX_NUMBER_CONFLICT',
