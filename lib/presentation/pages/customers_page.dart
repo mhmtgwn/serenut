@@ -883,8 +883,8 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDebt = customer.balance < 0;
-    final isClear = customer.balance == 0;
+    final isDebt = customer.balance < -0.009;
+    final isClear = customer.balance.abs() <= 0.009;
     final absBalance = customer.balance.abs();
     final initial = customer.name.trim().isNotEmpty
         ? customer.name.trim()[0].toUpperCase()

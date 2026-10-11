@@ -1961,8 +1961,8 @@ Hayırlı günler dileriz.
       return;
     }
 
-    final isDebt = customer.balance < 0;
-    final isClear = customer.balance == 0;
+    final isDebt = customer.balance < -0.009;
+    final isClear = customer.balance.abs() <= 0.009;
     final absBalance = customer.balance.abs();
     final statusText =
         isDebt ? 'Borçlu' : (isClear ? 'Bakiyesi Yok' : 'Alacaklı');

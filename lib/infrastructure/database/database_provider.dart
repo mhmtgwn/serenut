@@ -153,29 +153,61 @@ class DatabaseManager {
         await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
       }
 
-      // 2. Reconcile customer balances with ledger
+      // 1.5. Heal historical installment plans where manual_debt was written with financed instead of totalAmount
+      await db.rawUpdate('''
+        UPDATE financial_transactions
+           SET amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id),
+               debt_amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id)
+         WHERE type = 'manual_debt'
+           AND reference_id IN (SELECT id FROM customer_installment_plans WHERE down_payment > 0)
+           AND EXISTS (
+             SELECT 1 FROM customer_installment_plans p
+              WHERE p.id = financial_transactions.reference_id
+                AND ABS(p.total_amount - financial_transactions.debt_amount) > 0.001
+           )
+      ''');
+
+      // 2. Reconcile customer balances with ledger (clamping float noise < 0.01 to exact 0.0)
       await db.rawUpdate('''
         UPDATE customers
            SET balance = COALESCE((
-             SELECT SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-               ELSE 0
-             END)
+             SELECT CASE
+               WHEN ABS(SUM(CASE
+                 WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                 WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+                 WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                 WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+                 ELSE 0
+               END)) < 0.009 THEN 0.0
+               ELSE SUM(CASE
+                 WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                 WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+                 WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                 WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+                 ELSE 0
+               END)
+             END
                FROM financial_transactions ft
               WHERE ft.customer_id = customers.id
                 AND COALESCE(ft.is_deleted, 0) = 0
            ), 0)
           WHERE ABS(balance - COALESCE((
-              SELECT SUM(CASE
-                WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                ELSE 0
-              END)
+              SELECT CASE
+                WHEN ABS(SUM(CASE
+                  WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                  WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+                  WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                  WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+                  ELSE 0
+                END)) < 0.009 THEN 0.0
+                ELSE SUM(CASE
+                  WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                  WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+                  WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
+                  WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+                  ELSE 0
+                END)
+              END
                 FROM financial_transactions ft
                WHERE ft.customer_id = customers.id
                  AND COALESCE(ft.is_deleted, 0) = 0

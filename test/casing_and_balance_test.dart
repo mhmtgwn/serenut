@@ -5,6 +5,8 @@ import 'package:path/path.dart' hide equals;
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_installment_repository.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -190,6 +192,69 @@ void main() {
       expect(customer?.balance, -275.50);
       expect(await customerRepository.getTotalDebt(customerId), 275.50);
       expect(await customerRepository.getTotalPaid(customerId), 0.0);
+    });
+
+    test(
+        'installment plan with down payment zeroes customer balance upon completion without artificial credit',
+        () async {
+      final db = await databaseManager.getDatabase();
+      const customerId = 'cust-inst-test';
+
+      await db.insert('customers', {
+        'id': customerId,
+        'name': 'Taksit Test Müşteri',
+        'phone': '5559998877',
+        'balance': 0.0,
+        'is_active': 1,
+        'is_deleted': 0,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      final installmentRepo = SqliteInstallmentRepository(gateway);
+      final plan = await installmentRepo.createPlan(
+        customerId: customerId,
+        totalAmount: 1000.0,
+        downPayment: 200.0,
+        downPaymentMethod: 'cash',
+        installmentCount: 2,
+        firstDueDate: DateTime.now().add(const Duration(days: 30)),
+        description: 'Test Taksit',
+      );
+
+      // Total: 1000, Down payment: 200 -> financed: 800.
+      // Net customer balance should be exactly -800.0 (800 TL debt)
+      var customer = await customerRepository.findById(customerId);
+      expect(customer?.balance, -800.0);
+
+      // Pay all installments
+      final insts = await installmentRepo.getInstallmentsForPlan(plan.id);
+      expect(insts.length, 2);
+      for (final inst in insts) {
+        await installmentRepo.payInstallment(
+          installmentId: inst.id,
+          amount: inst.amount,
+          paymentMethod: 'cash',
+        );
+      }
+
+      // Customer should now have 0.0 balance, NEVER positive/alacaklı!
+      customer = await customerRepository.findById(customerId);
+      expect(customer?.balance, 0.0);
+
+      // Confirm filter classification
+      final creditors = await customerRepository.findFiltered(
+        searchQuery: 'Taksit Test Müşteri',
+        balanceFilter: CustomerBalanceFilter.credit,
+      );
+      expect(creditors, isEmpty);
+
+      final clearCustomers = await customerRepository.findFiltered(
+        searchQuery: 'Taksit Test Müşteri',
+        balanceFilter: CustomerBalanceFilter.clear,
+      );
+      expect(clearCustomers.length, 1);
+      expect(clearCustomers.first.id, customerId);
     });
   });
 }

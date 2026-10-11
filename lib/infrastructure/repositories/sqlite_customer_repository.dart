@@ -190,11 +190,11 @@ class SqliteCustomerRepository implements ICustomerRepository {
     if (searchQuery == null || searchQuery.trim().isEmpty) {
       final rows = await _executor.rawQuery('''
         SELECT
-          COALESCE(SUM(CASE WHEN balance < 0 THEN -balance ELSE 0 END), 0) AS total_debt,
-          COALESCE(SUM(CASE WHEN balance > 0 THEN balance ELSE 0 END), 0) AS total_credit,
-          SUM(CASE WHEN balance < 0 THEN 1 ELSE 0 END) AS debtor_count,
-          SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END) AS credit_count,
-          SUM(CASE WHEN balance = 0 THEN 1 ELSE 0 END) AS clear_count
+          COALESCE(SUM(CASE WHEN balance < -0.009 THEN -balance ELSE 0 END), 0) AS total_debt,
+          COALESCE(SUM(CASE WHEN balance > 0.009 THEN balance ELSE 0 END), 0) AS total_credit,
+          SUM(CASE WHEN balance < -0.009 THEN 1 ELSE 0 END) AS debtor_count,
+          SUM(CASE WHEN balance > 0.009 THEN 1 ELSE 0 END) AS credit_count,
+          SUM(CASE WHEN ABS(balance) <= 0.009 THEN 1 ELSE 0 END) AS clear_count
         FROM customers WHERE is_active = 1 AND id != ''
       ''');
       final row = rows.first;
@@ -214,9 +214,9 @@ class SqliteCustomerRepository implements ICustomerRepository {
   }
 
   static String _balanceWhere(CustomerBalanceFilter filter) => switch (filter) {
-        CustomerBalanceFilter.debt => ' AND balance < 0',
-        CustomerBalanceFilter.credit => ' AND balance > 0',
-        CustomerBalanceFilter.clear => ' AND balance = 0',
+        CustomerBalanceFilter.debt => ' AND balance < -0.009',
+        CustomerBalanceFilter.credit => ' AND balance > 0.009',
+        CustomerBalanceFilter.clear => ' AND ABS(balance) <= 0.009',
         CustomerBalanceFilter.all => '',
       };
 
@@ -226,9 +226,9 @@ class SqliteCustomerRepository implements ICustomerRepository {
   ) {
     final balance = (row['balance'] as num?)?.toDouble() ?? 0;
     return switch (filter) {
-      CustomerBalanceFilter.debt => balance < 0,
-      CustomerBalanceFilter.credit => balance > 0,
-      CustomerBalanceFilter.clear => balance == 0,
+      CustomerBalanceFilter.debt => balance < -0.009,
+      CustomerBalanceFilter.credit => balance > 0.009,
+      CustomerBalanceFilter.clear => balance.abs() <= 0.009,
       CustomerBalanceFilter.all => true,
     };
   }
@@ -249,10 +249,10 @@ class SqliteCustomerRepository implements ICustomerRepository {
     var clear = 0;
     for (final row in rows) {
       final balance = (row['balance'] as num?)?.toDouble() ?? 0;
-      if (balance < 0) {
+      if (balance < -0.009) {
         debt += balance.abs();
         debtors++;
-      } else if (balance > 0) {
+      } else if (balance > 0.009) {
         credit += balance;
         creditors++;
       } else {
