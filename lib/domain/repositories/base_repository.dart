@@ -105,6 +105,15 @@ abstract class IProductRepository implements BaseRepository<ProductEntity> {
 /// Customer repository
 enum CustomerBalanceFilter { all, debt, credit, clear }
 
+enum CustomerSortOption {
+  nameAsc,
+  nameDesc,
+  oldestDebt,
+  newestDebt,
+  highestDebt,
+  lowestDebt,
+}
+
 class CustomerBalanceSummary {
   final double totalDebt;
   final double totalCredit;
@@ -129,6 +138,7 @@ abstract class ICustomerRepository implements BaseRepository<CustomerEntity> {
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
     CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
+    CustomerSortOption sortOption = CustomerSortOption.nameAsc,
     int? limit,
     int? offset,
   });
@@ -490,6 +500,8 @@ class CustomerEntity {
   final String phone;
   final double balance; // Positive = credit, Negative = debt
   final DateTime createdAt;
+  final DateTime? oldestDebtDate;
+  final DateTime? latestDebtDate;
 
   CustomerEntity({
     required this.id,
@@ -499,6 +511,8 @@ class CustomerEntity {
     required this.phone,
     required this.balance,
     required this.createdAt,
+    this.oldestDebtDate,
+    this.latestDebtDate,
   });
 
   CustomerEntity copyWith({
@@ -509,6 +523,8 @@ class CustomerEntity {
     String? phone,
     double? balance,
     DateTime? createdAt,
+    DateTime? oldestDebtDate,
+    DateTime? latestDebtDate,
   }) =>
       CustomerEntity(
         id: id ?? this.id,
@@ -518,6 +534,8 @@ class CustomerEntity {
         phone: phone ?? this.phone,
         balance: balance ?? this.balance,
         createdAt: createdAt ?? this.createdAt,
+        oldestDebtDate: oldestDebtDate ?? this.oldestDebtDate,
+        latestDebtDate: latestDebtDate ?? this.latestDebtDate,
       );
 
   Map<String, dynamic> toMap() => {
@@ -545,6 +563,12 @@ class CustomerEntity {
         createdAt: map['created_at'] != null
             ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
             : DateTime.now(),
+        oldestDebtDate: map['oldest_debt_date'] != null
+            ? DateTime.tryParse(map['oldest_debt_date'].toString())
+            : null,
+        latestDebtDate: map['latest_debt_date'] != null
+            ? DateTime.tryParse(map['latest_debt_date'].toString())
+            : null,
       );
 }
 

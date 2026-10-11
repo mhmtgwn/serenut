@@ -12,6 +12,8 @@ import 'package:serenutos/providers/sync_provider.dart';
 final customerSearchQueryProvider = StateProvider<String>((ref) => '');
 final customerBalanceFilterProvider =
     StateProvider<CustomerBalanceFilter>((ref) => CustomerBalanceFilter.all);
+final customerSortOptionProvider =
+    StateProvider<CustomerSortOption>((ref) => CustomerSortOption.nameAsc);
 
 /// Reactive indicator for customer pagination loading state
 final customerLoadingMoreProvider = StateProvider<bool>((ref) => false);
@@ -34,6 +36,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
 
     final searchQuery = ref.watch(customerSearchQueryProvider);
     final balanceFilter = ref.watch(customerBalanceFilterProvider);
+    final sortOption = ref.watch(customerSortOptionProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
@@ -42,6 +45,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           page: offset ~/ limit,
           limit: limit,
           balanceFilter: balanceFilter,
+          sortOption: sortOption,
         );
         return result.items;
       },

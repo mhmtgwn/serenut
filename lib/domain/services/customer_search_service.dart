@@ -34,6 +34,7 @@ class CustomerSearchService {
     required int page,
     required int limit,
     CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
+    CustomerSortOption sortOption = CustomerSortOption.nameAsc,
     int? expectedRequestId,
     String? companyScope,
   }) async {
@@ -46,6 +47,7 @@ class CustomerSearchService {
     final results = await _repository.findFiltered(
       searchQuery: normalized,
       balanceFilter: balanceFilter,
+      sortOption: sortOption,
       limit: limit,
       offset: offset,
     );

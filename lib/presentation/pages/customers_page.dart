@@ -84,6 +84,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     final customersAsync = ref.watch(customersControllerProvider);
     final isLoadingMore = ref.watch(customerLoadingMoreProvider);
     final balanceFilter = ref.watch(customerBalanceFilterProvider);
+    final sortOption = ref.watch(customerSortOptionProvider);
     final balanceSummary = ref.watch(customerBalanceSummaryProvider);
     final dueSummaryVal = ref.watch(dueInstallmentsSummaryProvider);
     final overdue = dueSummaryVal.valueOrNull?['overdue'] ?? 0;
@@ -106,6 +107,25 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       onSearchChanged: (val) => _onSearchChanged(val),
       searchHint: 'Müşteri adı veya telefon ile ara...',
       actions: [
+        Semantics(
+          label: 'Sıralama: ${_sortOptionLabel(sortOption)}',
+          button: true,
+          child: Badge(
+            isLabelVisible: sortOption != CustomerSortOption.nameAsc,
+            backgroundColor: _kAmberDark,
+            smallSize: 8,
+            child: IconButton(
+              tooltip: 'Sırala: ${_sortOptionLabel(sortOption)}',
+              onPressed: () => _showSortSheet(sortOption),
+              icon: Icon(
+                Icons.swap_vert_rounded,
+                color: sortOption == CustomerSortOption.nameAsc
+                    ? _kTextSecondary
+                    : _kGreen,
+              ),
+            ),
+          ),
+        ),
         Semantics(
           label: balanceFilter == CustomerBalanceFilter.all
               ? 'Bakiye filtresi'
@@ -166,6 +186,39 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               scrollDirection: Axis.horizontal,
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    avatar: Icon(
+                      Icons.swap_vert_rounded,
+                      size: 16,
+                      color: sortOption != CustomerSortOption.nameAsc
+                          ? _kGreen
+                          : _kTextSecondary,
+                    ),
+                    label: Text(
+                      _sortOptionShortLabel(sortOption),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: sortOption != CustomerSortOption.nameAsc
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: sortOption != CustomerSortOption.nameAsc
+                            ? _kGreen
+                            : _kText,
+                      ),
+                    ),
+                    backgroundColor: sortOption != CustomerSortOption.nameAsc
+                        ? const Color(0xFFD1FAE5)
+                        : Colors.white,
+                    side: BorderSide(
+                      color: sortOption != CustomerSortOption.nameAsc
+                          ? const Color(0xFF6EE7B7)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                    onPressed: () => _showSortSheet(sortOption),
+                  ),
+                ),
                 _balanceChip('Tümü', 'all'),
                 _balanceChip('Borçlu', 'debt'),
                 _balanceChip('Alacaklı', 'credit'),
@@ -208,6 +261,17 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                       onPressed: () => ref
                           .read(customerBalanceFilterProvider.notifier)
                           .state = CustomerBalanceFilter.all,
+                    ),
+                  ),
+                if (sortOption != CustomerSortOption.nameAsc)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text('Sıralamayı sıfırla'),
+                      onPressed: () => ref
+                          .read(customerSortOptionProvider.notifier)
+                          .state = CustomerSortOption.nameAsc,
                     ),
                   ),
               ],
@@ -350,6 +414,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                               return _CustomerCard(
                                 customer: customer,
                                 isGrid: true,
+                                sortOption: sortOption,
                                 onTap: () => context.push(
                                     '/customers/detail/${customer.id}'),
                               );
@@ -379,6 +444,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                             return _CustomerCard(
                               customer: customer,
                               isGrid: false,
+                              sortOption: sortOption,
                               onTap: () => context.push(
                                   '/customers/detail/${customer.id}'),
                             );
@@ -588,6 +654,231 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
 
     if (!mounted || result == null) return;
     ref.read(customerBalanceFilterProvider.notifier).state = result;
+  }
+
+  String _sortOptionLabel(CustomerSortOption option) => switch (option) {
+        CustomerSortOption.nameAsc => 'İsim (A - Z)',
+        CustomerSortOption.nameDesc => 'İsim (Z - A)',
+        CustomerSortOption.oldestDebt => 'Borç Tarihi (En Eski)',
+        CustomerSortOption.newestDebt => 'Borç Tarihi (En Yeni)',
+        CustomerSortOption.highestDebt => 'Borç Tutarı (En Yüksek)',
+        CustomerSortOption.lowestDebt => 'Borç Tutarı (En Düşük)',
+      };
+
+  String _sortOptionShortLabel(CustomerSortOption option) => switch (option) {
+        CustomerSortOption.nameAsc => 'Sırala: A-Z',
+        CustomerSortOption.nameDesc => 'Sırala: Z-A',
+        CustomerSortOption.oldestDebt => 'En Eski Borç',
+        CustomerSortOption.newestDebt => 'En Yeni Borç',
+        CustomerSortOption.highestDebt => 'En Yüksek Borç',
+        CustomerSortOption.lowestDebt => 'En Düşük Borç',
+      };
+
+  Future<void> _showSortSheet(CustomerSortOption currentSort) async {
+    var pendingSort = currentSort;
+
+    final result = await showModalBottomSheet<CustomerSortOption>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: .58,
+          minChildSize: .40,
+          maxChildSize: .85,
+          expand: false,
+          builder: (context, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setSheetState) {
+                return Material(
+                  color: POSColors.card,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadii.lg),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                          AppSpacing.sm,
+                          AppSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_vert_rounded, color: _kGreen),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Müşteri Sıralama',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Kapat',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
+                          children: [
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.nameAsc,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary:
+                                  const Icon(Icons.sort_by_alpha_rounded),
+                              title: const Text('İsim (A - Z)'),
+                              subtitle: const Text(
+                                  'Alfabetik artan sıra (Varsayılan)'),
+                              activeColor: _kGreen,
+                            ),
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.nameDesc,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary:
+                                  const Icon(Icons.sort_by_alpha_rounded),
+                              title: const Text('İsim (Z - A)'),
+                              subtitle:
+                                  const Text('Alfabetik azalan sıra'),
+                              activeColor: _kGreen,
+                            ),
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.oldestDebt,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary: const Icon(
+                                Icons.history_rounded,
+                                color: POSColors.red,
+                              ),
+                              title: const Text('Borç Tarihi (En Eski)'),
+                              subtitle: const Text(
+                                  'En uzun süredir borçlu olanlar önce gelir'),
+                              activeColor: _kGreen,
+                            ),
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.newestDebt,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary: const Icon(
+                                Icons.update_rounded,
+                                color: POSColors.red,
+                              ),
+                              title: const Text('Borç Tarihi (En Yeni)'),
+                              subtitle: const Text(
+                                  'En son borçlanan müşteriler önce gelir'),
+                              activeColor: _kGreen,
+                            ),
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.highestDebt,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary: const Icon(
+                                Icons.trending_up_rounded,
+                                color: POSColors.red,
+                              ),
+                              title: const Text('Borç Tutarı (En Yüksek)'),
+                              subtitle: const Text(
+                                  'En çok borcu olan müşteriler önce gelir'),
+                              activeColor: _kGreen,
+                            ),
+                            RadioListTile<CustomerSortOption>(
+                              value: CustomerSortOption.lowestDebt,
+                              groupValue: pendingSort,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setSheetState(() => pendingSort = val);
+                                }
+                              },
+                              secondary: const Icon(
+                                Icons.trending_down_rounded,
+                                color: POSColors.greenDark,
+                              ),
+                              title: const Text('Borç Tutarı (En Düşük)'),
+                              subtitle: const Text(
+                                  'En az borcu olan müşteriler önce gelir'),
+                              activeColor: _kGreen,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: const BoxDecoration(
+                          color: POSColors.card,
+                          border: Border(
+                            top: BorderSide(color: POSColors.border),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (pendingSort != CustomerSortOption.nameAsc)
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    CustomerSortOption.nameAsc,
+                                  ),
+                                  child: const Text('Varsayılana Sıfırla'),
+                                ),
+                              ),
+                            if (pendingSort != CustomerSortOption.nameAsc)
+                              const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => Navigator.pop(
+                                  context,
+                                  pendingSort,
+                                ),
+                                child: const Text('Uygula'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null) return;
+    ref.read(customerSortOptionProvider.notifier).state = result;
   }
 
   Future<void> _showDueInstallmentsSheet() async {
@@ -874,11 +1165,13 @@ class _CustomerCard extends StatelessWidget {
   final CustomerEntity customer;
   final bool isGrid;
   final VoidCallback onTap;
+  final CustomerSortOption? sortOption;
 
   const _CustomerCard({
     required this.customer,
     required this.onTap,
     this.isGrid = false,
+    this.sortOption,
   });
 
   @override
@@ -1039,6 +1332,34 @@ class _CustomerCard extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _kTextSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (isDebt &&
+                          (customer.oldestDebtDate != null ||
+                              customer.latestDebtDate != null))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_outlined,
+                                  size: 12, color: Color(0xFFDC2626)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  sortOption == CustomerSortOption.newestDebt &&
+                                          customer.latestDebtDate != null
+                                      ? 'Son borç: ${DateFormat('dd.MM.yyyy').format(customer.latestDebtDate!)}'
+                                      : 'Borç: ${DateFormat('dd.MM.yyyy').format((customer.oldestDebtDate ?? customer.latestDebtDate)!)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFDC2626),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,

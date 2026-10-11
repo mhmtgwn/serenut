@@ -256,5 +256,99 @@ void main() {
       expect(clearCustomers.length, 1);
       expect(clearCustomers.first.id, customerId);
     });
+
+    test(
+        'customer sorting options (oldestDebt, newestDebt, highestDebt, name) work correctly',
+        () async {
+      final db = await databaseManager.getDatabase();
+
+      // Create test customers
+      await customerRepository.create(CustomerEntity(
+        id: 'sort-cust-1',
+        name: 'Ali Yılmaz',
+        phone: '05550000001',
+        balance: 0.0,
+        createdAt: DateTime.now(),
+      ));
+      await customerRepository.create(CustomerEntity(
+        id: 'sort-cust-2',
+        name: 'Berk Öztürk',
+        phone: '05550000002',
+        balance: 0.0,
+        createdAt: DateTime.now(),
+      ));
+      await customerRepository.create(CustomerEntity(
+        id: 'sort-cust-3',
+        name: 'Canan Demir',
+        phone: '05550000003',
+        balance: 0.0,
+        createdAt: DateTime.now(),
+      ));
+
+      // Customer 1: Older debt (2024-01-10), -500 TL
+      await db.insert('financial_transactions', {
+        'id': 'ft-sort-1',
+        'type': 'manual_debt',
+        'customer_id': 'sort-cust-1',
+        'amount': 500.0,
+        'paid_amount': 0.0,
+        'debt_amount': 500.0,
+        'created_at': '2024-01-10T10:00:00.000',
+        'is_deleted': 0,
+      });
+
+      // Customer 2: Newer debt (2024-06-15), -1000 TL
+      await db.insert('financial_transactions', {
+        'id': 'ft-sort-2',
+        'type': 'manual_debt',
+        'customer_id': 'sort-cust-2',
+        'amount': 1000.0,
+        'paid_amount': 0.0,
+        'debt_amount': 1000.0,
+        'created_at': '2024-06-15T10:00:00.000',
+        'is_deleted': 0,
+      });
+
+      // Customer 3 has no debt
+
+      // Test 1: oldestDebt sort
+      final oldestList = await customerRepository.findFiltered(
+        sortOption: CustomerSortOption.oldestDebt,
+      );
+      final sortMatchesOldest = oldestList
+          .where((c) => c.id.startsWith('sort-cust-'))
+          .map((c) => c.id)
+          .toList();
+      expect(sortMatchesOldest.first, 'sort-cust-1'); // Ali has oldest debt (Jan 2024)
+      expect(sortMatchesOldest[1], 'sort-cust-2'); // Berk has June 2024 debt
+      expect(sortMatchesOldest[2], 'sort-cust-3'); // Canan has no debt
+
+      final cust1 = oldestList.firstWhere((c) => c.id == 'sort-cust-1');
+      expect(cust1.oldestDebtDate, isNotNull);
+      expect(cust1.oldestDebtDate?.year, 2024);
+      expect(cust1.oldestDebtDate?.month, 1);
+
+      // Test 2: newestDebt sort
+      final newestList = await customerRepository.findFiltered(
+        sortOption: CustomerSortOption.newestDebt,
+      );
+      final sortMatchesNewest = newestList
+          .where((c) => c.id.startsWith('sort-cust-'))
+          .map((c) => c.id)
+          .toList();
+      expect(sortMatchesNewest.first, 'sort-cust-2'); // Berk has newest debt (June 2024)
+      expect(sortMatchesNewest[1], 'sort-cust-1'); // Ali has Jan 2024 debt
+
+      // Test 3: highestDebt sort
+      final highestList = await customerRepository.findFiltered(
+        sortOption: CustomerSortOption.highestDebt,
+      );
+      final sortMatchesHighest = highestList
+          .where((c) => c.id.startsWith('sort-cust-'))
+          .map((c) => c.id)
+          .toList();
+      expect(sortMatchesHighest.first, 'sort-cust-2'); // Berk owes 1000 TL
+      expect(sortMatchesHighest[1], 'sort-cust-1'); // Ali owes 500 TL
+    });
   });
 }

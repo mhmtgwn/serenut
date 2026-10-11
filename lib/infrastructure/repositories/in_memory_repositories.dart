@@ -398,6 +398,7 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
     CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
+    CustomerSortOption sortOption = CustomerSortOption.nameAsc,
     int? limit,
     int? offset,
   }) async {
@@ -416,6 +417,60 @@ class InMemoryCustomerRepository implements ICustomerRepository {
           CustomerBalanceFilter.all => true,
         });
     var list = results.toList();
+    switch (sortOption) {
+      case CustomerSortOption.nameAsc:
+        list.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case CustomerSortOption.nameDesc:
+        list.sort(
+            (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      case CustomerSortOption.oldestDebt:
+        list.sort((a, b) {
+          final aHas = a.balance < -0.009 && a.oldestDebtDate != null;
+          final bHas = b.balance < -0.009 && b.oldestDebtDate != null;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          if (aHas && bHas) {
+            final cmp = a.oldestDebtDate!.compareTo(b.oldestDebtDate!);
+            if (cmp != 0) return cmp;
+          }
+          return a.balance.compareTo(b.balance);
+        });
+        break;
+      case CustomerSortOption.newestDebt:
+        list.sort((a, b) {
+          final aHas = a.balance < -0.009 && a.latestDebtDate != null;
+          final bHas = b.balance < -0.009 && b.latestDebtDate != null;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          if (aHas && bHas) {
+            final cmp = b.latestDebtDate!.compareTo(a.latestDebtDate!);
+            if (cmp != 0) return cmp;
+          }
+          return a.balance.compareTo(b.balance);
+        });
+        break;
+      case CustomerSortOption.highestDebt:
+        list.sort((a, b) {
+          final aHas = a.balance < -0.009;
+          final bHas = b.balance < -0.009;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          return a.balance.compareTo(b.balance);
+        });
+        break;
+      case CustomerSortOption.lowestDebt:
+        list.sort((a, b) {
+          final aHas = a.balance < -0.009;
+          final bHas = b.balance < -0.009;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          return b.balance.compareTo(a.balance);
+        });
+        break;
+    }
     if (offset != null) {
       if (offset < list.length) {
         list = list.sublist(offset);

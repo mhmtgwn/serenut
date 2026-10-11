@@ -37,11 +37,20 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<CustomerEntity?> findById(String id) async {
-    final rows = await _executor.query(
-      'customers',
-      where: 'id = ? AND is_active = 1',
-      whereArgs: [id],
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT c.*,
+        (SELECT MIN(ft.created_at) FROM financial_transactions ft
+         WHERE ft.customer_id = c.id
+           AND ft.debt_amount > 0
+           AND COALESCE(ft.is_deleted, 0) = 0) AS oldest_debt_date,
+        (SELECT MAX(ft.created_at) FROM financial_transactions ft
+         WHERE ft.customer_id = c.id
+           AND ft.debt_amount > 0
+           AND COALESCE(ft.is_deleted, 0) = 0) AS latest_debt_date
+      FROM customers c
+      WHERE c.id = ? AND c.is_active = 1
+      LIMIT 1
+    ''', [id]);
     if (rows.isEmpty) return null;
     return CustomerEntity.fromMap(rows.first);
   }
@@ -145,17 +154,29 @@ class SqliteCustomerRepository implements ICustomerRepository {
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
     CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
+    CustomerSortOption sortOption = CustomerSortOption.nameAsc,
     int? limit,
     int? offset,
   }) async {
+    final limitClause = limit != null ? ' LIMIT $limit' : '';
+    final offsetClause = offset != null ? ' OFFSET $offset' : '';
+
     if (searchQuery == null || searchQuery.trim().isEmpty) {
-      final rows = await _executor.query(
-        'customers',
-        where: "is_active = 1 AND id != ''${_balanceWhere(balanceFilter)}",
-        orderBy: 'normalized_name ASC',
-        limit: limit,
-        offset: offset,
-      );
+      final rows = await _executor.rawQuery('''
+        SELECT c.*,
+          (SELECT MIN(ft.created_at) FROM financial_transactions ft
+           WHERE ft.customer_id = c.id
+             AND ft.debt_amount > 0
+             AND COALESCE(ft.is_deleted, 0) = 0) AS oldest_debt_date,
+          (SELECT MAX(ft.created_at) FROM financial_transactions ft
+           WHERE ft.customer_id = c.id
+             AND ft.debt_amount > 0
+             AND COALESCE(ft.is_deleted, 0) = 0) AS latest_debt_date
+        FROM customers c
+        WHERE c.is_active = 1 AND c.id != ''${_balanceWhere(balanceFilter, prefix: 'c.')}
+        ORDER BY ${_orderBy(sortOption)}
+        $limitClause$offsetClause
+      ''');
       return rows.map((row) => CustomerEntity.fromMap(row)).toList();
     }
 
@@ -175,7 +196,10 @@ class SqliteCustomerRepository implements ICustomerRepository {
       normalizedPhone: cleanPhone,
     ))
         .where((row) => _matchesBalance(row, balanceFilter))
-        .toList(growable: false);
+        .toList(growable: true);
+
+    _sortRowMatches(matches, sortOption, normalizedQuery);
+
     final start = (offset ?? 0).clamp(0, matches.length);
     final end = limit == null
         ? matches.length
@@ -213,12 +237,114 @@ class SqliteCustomerRepository implements ICustomerRepository {
     return _summaryFromRows(rows);
   }
 
-  static String _balanceWhere(CustomerBalanceFilter filter) => switch (filter) {
-        CustomerBalanceFilter.debt => ' AND balance < -0.009',
-        CustomerBalanceFilter.credit => ' AND balance > 0.009',
-        CustomerBalanceFilter.clear => ' AND ABS(balance) <= 0.009',
+  static String _balanceWhere(CustomerBalanceFilter filter,
+          {String prefix = ''}) =>
+      switch (filter) {
+        CustomerBalanceFilter.debt => ' AND ${prefix}balance < -0.009',
+        CustomerBalanceFilter.credit => ' AND ${prefix}balance > 0.009',
+        CustomerBalanceFilter.clear => ' AND ABS(${prefix}balance) <= 0.009',
         CustomerBalanceFilter.all => '',
       };
+
+  static String _orderBy(CustomerSortOption sortOption) => switch (sortOption) {
+        CustomerSortOption.nameAsc => 'c.normalized_name ASC, c.name ASC',
+        CustomerSortOption.nameDesc => 'c.normalized_name DESC, c.name DESC',
+        CustomerSortOption.oldestDebt =>
+          'CASE WHEN c.balance < -0.009 AND oldest_debt_date IS NOT NULL THEN 0 ELSE 1 END, oldest_debt_date ASC, c.balance ASC',
+        CustomerSortOption.newestDebt =>
+          'CASE WHEN c.balance < -0.009 AND latest_debt_date IS NOT NULL THEN 0 ELSE 1 END, latest_debt_date DESC, c.balance ASC',
+        CustomerSortOption.highestDebt =>
+          'CASE WHEN c.balance < -0.009 THEN 0 ELSE 1 END, c.balance ASC',
+        CustomerSortOption.lowestDebt =>
+          'CASE WHEN c.balance < -0.009 THEN 0 ELSE 1 END, c.balance DESC',
+      };
+
+  static void _sortRowMatches(
+    List<Map<String, dynamic>> matches,
+    CustomerSortOption sortOption,
+    String query,
+  ) {
+    switch (sortOption) {
+      case CustomerSortOption.nameAsc:
+        matches.sort((a, b) {
+          int rank(Map<String, dynamic> row) {
+            final name = (row['name']?.toString() ?? '').toLowerCase();
+            final email = (row['email']?.toString() ?? '').toLowerCase();
+            if (name.startsWith(query)) return 0;
+            if (name.contains(query)) return 1;
+            if (email.startsWith(query)) return 2;
+            if (email.contains(query)) return 3;
+            return 4;
+          }
+
+          final rankComparison = rank(a).compareTo(rank(b));
+          if (rankComparison != 0) return rankComparison;
+          return (a['name']?.toString() ?? '')
+              .compareTo(b['name']?.toString() ?? '');
+        });
+        break;
+      case CustomerSortOption.nameDesc:
+        matches.sort((a, b) => (b['name']?.toString() ?? '')
+            .compareTo(a['name']?.toString() ?? ''));
+        break;
+      case CustomerSortOption.oldestDebt:
+        matches.sort((a, b) {
+          final aBal = (a['balance'] as num?)?.toDouble() ?? 0.0;
+          final bBal = (b['balance'] as num?)?.toDouble() ?? 0.0;
+          final aDate = a['oldest_debt_date']?.toString();
+          final bDate = b['oldest_debt_date']?.toString();
+          final aHas = aBal < -0.009 && aDate != null && aDate.isNotEmpty;
+          final bHas = bBal < -0.009 && bDate != null && bDate.isNotEmpty;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          if (aHas && bHas) {
+            final c = aDate!.compareTo(bDate!);
+            if (c != 0) return c;
+          }
+          return aBal.compareTo(bBal);
+        });
+        break;
+      case CustomerSortOption.newestDebt:
+        matches.sort((a, b) {
+          final aBal = (a['balance'] as num?)?.toDouble() ?? 0.0;
+          final bBal = (b['balance'] as num?)?.toDouble() ?? 0.0;
+          final aDate = a['latest_debt_date']?.toString();
+          final bDate = b['latest_debt_date']?.toString();
+          final aHas = aBal < -0.009 && aDate != null && aDate.isNotEmpty;
+          final bHas = bBal < -0.009 && bDate != null && bDate.isNotEmpty;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          if (aHas && bHas) {
+            final c = bDate!.compareTo(aDate!);
+            if (c != 0) return c;
+          }
+          return aBal.compareTo(bBal);
+        });
+        break;
+      case CustomerSortOption.highestDebt:
+        matches.sort((a, b) {
+          final aBal = (a['balance'] as num?)?.toDouble() ?? 0.0;
+          final bBal = (b['balance'] as num?)?.toDouble() ?? 0.0;
+          final aHas = aBal < -0.009;
+          final bHas = bBal < -0.009;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          return aBal.compareTo(bBal);
+        });
+        break;
+      case CustomerSortOption.lowestDebt:
+        matches.sort((a, b) {
+          final aBal = (a['balance'] as num?)?.toDouble() ?? 0.0;
+          final bBal = (b['balance'] as num?)?.toDouble() ?? 0.0;
+          final aHas = aBal < -0.009;
+          final bHas = bBal < -0.009;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
+          return bBal.compareTo(aBal);
+        });
+        break;
+    }
+  }
 
   static bool _matchesBalance(
     Map<String, dynamic> row,
@@ -272,11 +398,20 @@ class SqliteCustomerRepository implements ICustomerRepository {
     String query, {
     String? normalizedPhone,
   }) async {
-    final candidates = await _executor.query(
-      'customers',
-      where: "is_active = 1 AND id != ''",
-      orderBy: 'name ASC',
-    );
+    final candidates = await _executor.rawQuery('''
+      SELECT c.*,
+        (SELECT MIN(ft.created_at) FROM financial_transactions ft
+         WHERE ft.customer_id = c.id
+           AND ft.debt_amount > 0
+           AND COALESCE(ft.is_deleted, 0) = 0) AS oldest_debt_date,
+        (SELECT MAX(ft.created_at) FROM financial_transactions ft
+         WHERE ft.customer_id = c.id
+           AND ft.debt_amount > 0
+           AND COALESCE(ft.is_deleted, 0) = 0) AS latest_debt_date
+      FROM customers c
+      WHERE c.is_active = 1 AND c.id != ''
+      ORDER BY c.name ASC
+    ''');
     final matches = candidates.where((row) {
       final name = _normalizeTurkish(row['name']?.toString() ?? '');
       final email = _normalizeTurkish(row['email']?.toString() ?? '');
@@ -289,22 +424,6 @@ class SqliteCustomerRepository implements ICustomerRepository {
           (normalizedPhone?.isNotEmpty == true &&
               phone.contains(normalizedPhone!));
     }).toList();
-    matches.sort((a, b) {
-      int rank(Map<String, dynamic> row) {
-        final name = _normalizeTurkish(row['name']?.toString() ?? '');
-        final email = _normalizeTurkish(row['email']?.toString() ?? '');
-        if (name.startsWith(query)) return 0;
-        if (name.contains(query)) return 1;
-        if (email.startsWith(query)) return 2;
-        if (email.contains(query)) return 3;
-        return 4;
-      }
-
-      final rankComparison = rank(a).compareTo(rank(b));
-      if (rankComparison != 0) return rankComparison;
-      return _normalizeTurkish(a['name']?.toString() ?? '')
-          .compareTo(_normalizeTurkish(b['name']?.toString() ?? ''));
-    });
     return matches;
   }
 
