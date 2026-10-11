@@ -16,7 +16,8 @@ void main() {
     setUp(() async {
       final dbDir = await getDatabasesPath();
       dbPath = join(dbDir, 'serenut_migration_test.db');
-      backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
+      final dbFileName = basenameWithoutExtension(dbPath);
+      backupPath = join(dbDir, '${dbFileName}_upgrade_backup.db');
 
       // Ensure clean start
       final file = File(dbPath);

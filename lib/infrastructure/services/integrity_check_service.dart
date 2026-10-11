@@ -203,11 +203,16 @@ class IntegrityCheckService {
       }
 
       // 2. Fallback: upgrade backup
-      final String upgradePath = join(dbDir, 'serenut_pos_upgrade_backup.db');
-      final File upgradeBackup = File(upgradePath);
+      final String dbFileName = basenameWithoutExtension(dbPath);
+      final File isolatedUpgradeBackup =
+          File(join(dbDir, '${dbFileName}_upgrade_backup.db'));
+      final File legacyUpgradeBackup =
+          File(join(dbDir, 'serenut_pos_upgrade_backup.db'));
+      final File? upgradeBackup = (await isolatedUpgradeBackup.exists())
+          ? isolatedUpgradeBackup
+          : (await legacyUpgradeBackup.exists() ? legacyUpgradeBackup : null);
 
-      final File? sourceFile = latestBackupFile ??
-          (await upgradeBackup.exists() ? upgradeBackup : null);
+      final File? sourceFile = latestBackupFile ?? upgradeBackup;
 
       if (sourceFile == null) {
         debugPrint(

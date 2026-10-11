@@ -800,20 +800,19 @@ class DatabaseManager {
       if (await shmFile.exists()) {
         await shmFile.delete();
       }
-      final backupFile =
-          File(join(dirname(path), 'serenut_pos_upgrade_backup.db'));
-      if (await backupFile.exists()) {
-        await backupFile.delete();
-      }
-      final backupWal =
-          File(join(dirname(path), 'serenut_pos_upgrade_backup.db-wal'));
-      if (await backupWal.exists()) {
-        await backupWal.delete();
-      }
-      final backupShm =
-          File(join(dirname(path), 'serenut_pos_upgrade_backup.db-shm'));
-      if (await backupShm.exists()) {
-        await backupShm.delete();
+      final dbFileName = basenameWithoutExtension(path);
+      for (final candidate in [
+        '${dbFileName}_upgrade_backup.db',
+        '${dbFileName}_safe_snapshot.db',
+        'serenut_pos_upgrade_backup.db',
+        'serenut_pos_safe_snapshot.db',
+      ]) {
+        final f = File(join(dirname(path), candidate));
+        if (await f.exists()) await f.delete();
+        final fw = File(join(dirname(path), '$candidate-wal'));
+        if (await fw.exists()) await fw.delete();
+        final fs = File(join(dirname(path), '$candidate-shm'));
+        if (await fs.exists()) await fs.delete();
       }
       final bakFile = File('$path.bak');
       if (await bakFile.exists()) {
