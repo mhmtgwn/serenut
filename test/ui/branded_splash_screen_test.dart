@@ -39,7 +39,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Başlatma tamamlanamadı'), findsOneWidget);
+    expect(find.text('Sistem Başlatılamadı'), findsOneWidget);
     expect(find.text('Bağlantı kurulamadı'), findsOneWidget);
     await tester.tap(find.text('Tekrar Dene'));
     expect(retried, isTrue);
