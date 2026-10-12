@@ -268,11 +268,11 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
       }
 
       await client.query('COMMIT');
-      return { status: 200, activation, billingPeriod, invoice };
+      return { status: 200 as const, activation, billingPeriod, invoice };
     });
 
-    if (outcome.status !== 200) {
-      return res.status(outcome.status).json(outcome.body);
+    if (outcome.status !== 200 || !outcome.activation || !outcome.invoice) {
+      return res.status(outcome.status).json((outcome as any).body);
     }
 
     const { activation, billingPeriod, invoice } = outcome;
