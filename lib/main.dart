@@ -39,14 +39,46 @@ void main() async {
       options.enableAutoSessionTracking = true;
     },
     appRunner: () async {
-      final bootstrap = await AppBootstrap.initPreApp();
-      runApp(
-        ProviderScope(
-          observers: bootstrap.observers,
-          overrides: bootstrap.overrides,
-          child: const MyApp(),
-        ),
-      );
+      try {
+        final bootstrap = await AppBootstrap.initPreApp();
+        runApp(
+          ProviderScope(
+            observers: bootstrap.observers,
+            overrides: bootstrap.overrides,
+            child: const MyApp(),
+          ),
+        );
+      } catch (e, st) {
+        final hash = (e.toString().hashCode.abs() % 0xFFFFFF)
+            .toRadixString(16)
+            .toUpperCase();
+        final refCode = 'ERR-${hash.padLeft(6, '0')}';
+        try {
+          unawaited(Sentry.captureException(
+            e,
+            stackTrace: st,
+            withScope: (scope) {
+              scope.setTag('error_reference', refCode);
+              scope.setTag('error_source', 'pre_app_bootstrap');
+            },
+          ));
+        } catch (_) {
+          // Sentry failure is non-blocking
+        }
+        runApp(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: BrandedSplashScreen(
+              status: 'Sistem Başlatılamadı',
+              error:
+                  'Sistem bileşenleri başlatılırken bir aksaklık oluştu.\nDurum teknik ekibimize otomatik olarak iletildi.',
+              errorReference: refCode,
+              technicalDetails: e.toString(),
+              onRetry: () => main(),
+            ),
+          ),
+        );
+      }
     },
   );
 }
@@ -61,6 +93,8 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   bool _checkingIntegrity = true;
   String? _integrityError;
+  String? _integrityRefCode;
+  String? _integrityTechnicalDetails;
   bool _checkingVersion = true;
   bool _forceUpdateRequired = false;
   String _latestVersion = '';
@@ -143,6 +177,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _integrityError = result.errorMessage;
+          _integrityRefCode = result.errorReference;
+          _integrityTechnicalDetails = result.technicalDetails;
           _checkingIntegrity = false;
         });
       }
@@ -165,6 +201,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void _retryStartupChecks() {
     setState(() {
       _integrityError = null;
+      _integrityRefCode = null;
+      _integrityTechnicalDetails = null;
       _checkingIntegrity = true;
       _checkingVersion = true;
     });
@@ -307,6 +345,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           status: status,
           detail: detail,
           error: _integrityError,
+          errorReference: _integrityRefCode,
+          technicalDetails: _integrityTechnicalDetails,
           onRetry: _integrityError != null ? _retryStartupChecks : null,
         ),
       );

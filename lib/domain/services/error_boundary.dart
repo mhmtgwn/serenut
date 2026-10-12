@@ -7,10 +7,17 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
 class ErrorBoundary {
   static final _telemetry = TelemetryService();
+
+  static String _generateErrorReference(String error) {
+    final hash =
+        (error.hashCode.abs() % 0xFFFFFF).toRadixString(16).toUpperCase();
+    return 'ERR-${hash.padLeft(6, '0')}';
+  }
 
   /// Install ALL global error handlers. Call from `main()` before `runApp()`.
   ///
@@ -31,6 +38,7 @@ class ErrorBoundary {
     // ── 1. Flutter framework errors (widget build, layout, rendering) ────────
     FlutterError.onError = (FlutterErrorDetails details) async {
       final isMissingPlugin = details.exception is MissingPluginException;
+      final refCode = _generateErrorReference(details.exception.toString());
 
       // Enrich with additional context from FlutterErrorDetails
       final enrichedContext = [
@@ -43,8 +51,27 @@ class ErrorBoundary {
         details.exception,
         details.stack ?? StackTrace.empty,
         context: enrichedContext,
+        correlationId: refCode,
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
+
+      if (!isMissingPlugin) {
+        try {
+          unawaited(Sentry.captureException(
+            details.exception,
+            stackTrace: details.stack,
+            withScope: (scope) {
+              scope.setTag('error_reference', refCode);
+              scope.setTag('error_source', 'FlutterError.onError');
+              if (details.library != null) {
+                scope.setTag('library', details.library!);
+              }
+            },
+          ));
+        } catch (_) {
+          // Sentry failure is non-blocking
+        }
+      }
 
       // Do not show red screen for MissingPluginException
       if (kDebugMode && !isMissingPlugin) {
@@ -54,17 +81,18 @@ class ErrorBoundary {
 
     // User-friendly fallback widget when a widget build fails (replaces default red/grey box)
     ErrorWidget.builder = (FlutterErrorDetails details) {
+      final refCode = _generateErrorReference(details.exception.toString());
       return Material(
         color: Colors.transparent,
         child: Center(
           child: Container(
             margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                  color: const Color(0xFF0F766E).withValues(alpha: 0.2)),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x14000000),
@@ -73,24 +101,42 @@ class ErrorBoundary {
                 ),
               ],
             ),
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    color: Color(0xFFF59E0B), size: 40),
-                SizedBox(height: 8),
-                Text(
+                const Icon(Icons.shield_outlined,
+                    color: Color(0xFF0F766E), size: 36),
+                const SizedBox(height: 8),
+                const Text(
                   'Arayüz Yüklenirken Bir Aksaklık Oluştu',
                   style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Color(0xFF1E293B)),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Hata kaydı otomatik olarak geliştirici ekibe iletildi.',
+                const SizedBox(height: 4),
+                const Text(
+                  'Hata kaydı otomatik olarak teknik ekibimize iletildi.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: SelectableText(
+                    'Referans: $refCode',
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -102,13 +148,30 @@ class ErrorBoundary {
     // ── 2. Platform-level / unhandled async errors ────────────────────────────
     PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
       final isMissingPlugin = error is MissingPluginException;
+      final refCode = _generateErrorReference(error.toString());
 
       _telemetry.logError(
         error,
         stack,
         context: 'PlatformDispatcher.onError',
+        correlationId: refCode,
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
+
+      if (!isMissingPlugin) {
+        try {
+          unawaited(Sentry.captureException(
+            error,
+            stackTrace: stack,
+            withScope: (scope) {
+              scope.setTag('error_reference', refCode);
+              scope.setTag('error_source', 'PlatformDispatcher.onError');
+            },
+          ));
+        } catch (_) {
+          // Sentry failure is non-blocking
+        }
+      }
 
       if (isMissingPlugin) return true; // Handled gracefully, do not crash
 
@@ -133,14 +196,29 @@ class ErrorBoundary {
           if (pair is! List || pair.length < 2) return;
           final errorStr = pair[0]?.toString() ?? 'Unknown isolate error';
           final stackStr = pair[1]?.toString() ?? '';
+          final refCode = _generateErrorReference(errorStr);
           await _telemetry.logStructured(
             event: 'isolate_uncaught_error',
             level: LogLevel.critical,
+            correlationId: refCode,
             metadata: {
               'error_message': errorStr,
               'stack_trace': stackStr.split('\n').take(10).join('\n'),
             },
           );
+          try {
+            unawaited(Sentry.captureMessage(
+              'Uncaught isolate error: $errorStr',
+              level: SentryLevel.fatal,
+              withScope: (scope) {
+                scope.setTag('error_reference', refCode);
+                scope.setTag('error_source', 'isolate_uncaught_error');
+                scope.setContexts('stack', {'trace': stackStr});
+              },
+            ));
+          } catch (_) {
+            // Sentry failure is non-blocking
+          }
         }).sendPort,
       );
     }

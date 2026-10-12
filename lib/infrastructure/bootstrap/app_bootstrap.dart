@@ -19,6 +19,7 @@ import 'package:serenutos/domain/services/auth_service.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/error_boundary.dart';
 import 'package:serenutos/domain/services/license_service.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -63,10 +64,14 @@ class BootstrapResult {
 class StartupDiagnosticsResult {
   final bool isSuccess;
   final String? errorMessage;
+  final String? errorReference;
+  final String? technicalDetails;
 
   const StartupDiagnosticsResult({
     required this.isSuccess,
     this.errorMessage,
+    this.errorReference,
+    this.technicalDetails,
   });
 }
 
@@ -252,6 +257,12 @@ class AppBootstrap {
     );
   }
 
+  static String _generateErrorReference(String error) {
+    final hash =
+        (error.hashCode.abs() % 0xFFFFFF).toRadixString(16).toUpperCase();
+    return 'ERR-${hash.padLeft(6, '0')}';
+  }
+
   /// Uygulama açılışında veritabanı bütünlüğünü, donanımı ve yazıcı kuyruklarını denetler.
   static Future<StartupDiagnosticsResult> runStartupDiagnostics(
       WidgetRef ref) async {
@@ -262,9 +273,31 @@ class AppBootstrap {
       if (!report.isAllPass) {
         final repaired = await diag.attemptDatabaseRepair();
         if (!repaired) {
+          final rawIssues = report.issues.join(' | ');
+          final refCode = _generateErrorReference(rawIssues);
+
+          try {
+            unawaited(TelemetryService().logError(
+              Exception('Startup integrity failure: $rawIssues'),
+              StackTrace.current,
+              context: 'startup_integrity_diagnostics',
+              correlationId: refCode,
+            ));
+            unawaited(Sentry.captureMessage(
+              'Startup integrity failure ($refCode): $rawIssues',
+              level: SentryLevel.fatal,
+            ));
+          } catch (_) {
+            // Sentry/Telemetry reporting failure is non-blocking
+          }
+
           return StartupDiagnosticsResult(
             isSuccess: false,
-            errorMessage: report.issues.join('\n'),
+            errorMessage:
+                'Veritabanı veya sistem bileşenleri hazırlanırken bir sorun oluştu.\n'
+                'Hata detayları teknik ekibimize otomatik olarak iletildi.',
+            errorReference: refCode,
+            technicalDetails: rawIssues,
           );
         }
       }
@@ -337,11 +370,36 @@ class AppBootstrap {
       }
 
       return const StartupDiagnosticsResult(isSuccess: true);
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('Integrity diagnostics run failure: $e');
+      final rawError = e.toString();
+      final refCode = _generateErrorReference(rawError);
+
+      try {
+        unawaited(TelemetryService().logError(
+          e,
+          st,
+          context: 'startup_integrity_diagnostics_unhandled',
+          correlationId: refCode,
+        ));
+        unawaited(Sentry.captureException(
+          e,
+          stackTrace: st,
+          withScope: (scope) {
+            scope.setTag('error_reference', refCode);
+            scope.setTag('error_source', 'startup_diagnostics');
+          },
+        ));
+      } catch (_) {
+        // Sentry/Telemetry reporting failure is non-blocking
+      }
+
       return StartupDiagnosticsResult(
         isSuccess: false,
-        errorMessage: e.toString(),
+        errorMessage: 'Sistem başlatılırken beklenmeyen bir hata oluştu.\n'
+            'Durum teknik ekibimize otomatik olarak iletildi.',
+        errorReference: refCode,
+        technicalDetails: rawError,
       );
     }
   }
