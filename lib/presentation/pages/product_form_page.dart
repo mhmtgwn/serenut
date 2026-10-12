@@ -279,7 +279,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     final allCategories = ref.watch(categoryPoolProvider);
@@ -1168,7 +1170,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               );
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     ref.invalidate(productCategoriesProvider);
     ref.invalidate(productCategoriesStateProvider);
   }

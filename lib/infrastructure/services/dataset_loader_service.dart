@@ -109,7 +109,7 @@ class DatasetLoaderService {
       }
 
       // Open connection to dataset database (read-only mode)
-      _activeDb = await DatabaseManager()
+      _activeDb = await DatabaseManager.instance
           .openDatabaseConnection(sqlitePath, readOnly: true);
       _activeVersion = version;
       await _prefs.setString('active_dataset_version', version);

@@ -5,7 +5,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/cart_persistence_service.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
@@ -21,7 +20,7 @@ final cartPersistenceServiceProvider = Provider<CartPersistenceService>((ref) {
 });
 
 final auditLoggerProvider = Provider<AuditLogger>((ref) {
-  return AuditLogger(DatabaseManager());
+  return AuditLogger();
 });
 
 // NOT: syncQueueProvider ve reconciliationProvider kaldırıldı.

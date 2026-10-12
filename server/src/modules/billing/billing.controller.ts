@@ -5,9 +5,11 @@ import { IyzicoService, loadIyzicoConfig } from './iyzico.service';
 import { logger } from '../../config/logger';
 import { webhookLimiter } from '../../middleware/rate-limit.middleware';
 
-loadIyzicoConfig(pgPool).catch(err => {
-  logger.warn('Failed to load iyzico config at startup:', err);
-});
+if (process.env.NODE_ENV !== 'test') {
+  loadIyzicoConfig(pgPool).catch(err => {
+    logger.warn('Failed to load iyzico config at startup:', err);
+  });
+}
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -15,42 +17,20 @@ import { CommercialLifecycleService } from './commercial_lifecycle.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { BillingDomainService } from './billing-domain.service';
+import bankTransferRouter from './billing.bank-transfer.routes';
 
 const router = Router();
+router.use(bankTransferRouter);
 
 // ── RLS YARDIMCILARI ─────────────────────────────────────────────────────────
 async function runBypassingRLS(sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  return BillingDomainService.runBypassingRLS(sql, params);
 }
 
 // Helper to write admin audit log
 
 async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  return BillingDomainService.runWithTenantContext(companyId, sql, params);
 }
 
 /**
@@ -137,30 +117,6 @@ router.get('/effective-plans', authenticateUser, async (req: AuthenticatedReques
   } catch (err) { return res.status(500).json({error:'server_error'}); }
 });
 
-// ── BANK ACCOUNTS (Platform-level — sysadmin manages, all authenticated read) ──
-
-/**
- * @openapi
- * /api/v1/billing/bank-accounts:
- *   get:
- *     summary: List active bank accounts for bank transfer payment
- *     security:
- *       - BearerAuth: []
- */
-router.get('/bank-accounts', authenticateUser, async (req, res: Response) => {
-  try {
-    const includeInactive = req.query.all === 'true' && (req as AuthenticatedRequest).user?.roles?.includes('sysadmin');
-    const result = await runBypassingRLS(
-      `SELECT id, bank_name, account_holder, iban, currency, branch_name, instructions, is_active, display_order
-       FROM payment_bank_accounts ${includeInactive ? '' : 'WHERE is_active = TRUE'} ORDER BY display_order ASC`
-    );
-    return res.json(result.rows);
-  } catch (err) {
-    logger.error('Error fetching bank accounts:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
 async function isIyzicoEnabled(): Promise<boolean> {
   try {
     const result = await runBypassingRLS("SELECT is_enabled FROM payment_providers WHERE id = 'iyzico' LIMIT 1");
@@ -169,8 +125,6 @@ async function isIyzicoEnabled(): Promise<boolean> {
     return process.env.IYZICO_ENABLED === 'true';
   }
 }
-
-// ── DYNAMIC PAYMENT METHODS ───────────────────────────────────────────────────
 
 /**
  * @openapi
@@ -197,46 +151,6 @@ router.get('/payment-methods', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'server_error' });
   }
 });
-
-router.post('/bank-accounts', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
-  const { bank_name, account_holder, iban, currency, branch_name, instructions, display_order } = req.body;
-  if (!bank_name || !account_holder || !iban) {
-    return res.status(400).json({ error: 'missing_fields', message: 'Banka adı, hesap sahibi ve IBAN zorunludur.' });
-  }
-  try {
-    const id = `pba-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    const result = await runBypassingRLS(
-      `INSERT INTO payment_bank_accounts (id, bank_name, account_holder, iban, currency, branch_name, instructions, display_order, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [id, bank_name, account_holder, iban, currency || 'TRY', branch_name || null, instructions || null, display_order || 0, req.user!.id]
-    );
-    return res.status(201).json(result.rows[0]);
-  } catch (err) {
-    logger.error('Error creating bank account:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-router.put('/bank-accounts/:id', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-  const { bank_name, account_holder, iban, currency, branch_name, instructions, is_active, display_order } = req.body;
-  try {
-    const result = await runBypassingRLS(
-      `UPDATE payment_bank_accounts
-       SET bank_name=$1, account_holder=$2, iban=$3, currency=$4, branch_name=$5,
-           instructions=$6, is_active=$7, display_order=$8, updated_at=NOW()
-       WHERE id=$9 RETURNING *`,
-      [bank_name, account_holder, iban, currency || 'TRY', branch_name, instructions, is_active ?? true, display_order ?? 0, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'not_found' });
-    return res.json(result.rows[0]);
-  } catch (err) {
-    logger.error('Error updating bank account:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-// ── BANK TRANSFER FLOW ────────────────────────────────────────────────────────
 
 /**
  * @openapi
@@ -329,134 +243,6 @@ router.post('/request-bank-transfer', authenticateUser, requirePermission('billi
   } finally {
     client.release();
   }
-});
-
-/**
- * @openapi
- * /api/v1/billing/notify-transfer:
- *   post:
- *     summary: Customer notifies that bank transfer has been sent
- *     security:
- *       - BearerAuth: []
- */
-router.post('/notify-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
-  const user = req.user!;
-  const { invoice_id, sender_name, sender_bank, transfer_date, transfer_description } = req.body;
-  if (!invoice_id) {
-    return res.status(400).json({ error: 'missing_fields', message: 'Fatura ID zorunludur.' });
-  }
-  try {
-    const result = await runBypassingRLS(
-      `UPDATE bank_transfer_notifications
-       SET sender_name=$1, sender_bank=$2, transfer_date=$3, transfer_description=$4,
-           status='pending_review', updated_at=NOW()
-       WHERE invoice_id=$5 AND company_id=$6 AND status='pending'
-         AND EXISTS (SELECT 1 FROM invoices i WHERE i.id=$5 AND i.status='pending' AND (i.expires_at IS NULL OR i.expires_at > NOW()))
-       RETURNING reference_code`,
-      [sender_name || null, sender_bank || null, transfer_date || null, transfer_description || null, invoice_id, user.company_id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'notification_not_found', message: 'Havale bildirimi bulunamadı veya zaten işleme alındı.' });
-    }
-    await runBypassingRLS('UPDATE invoices SET expires_at=NULL, updated_at=NOW() WHERE id=$1 AND company_id=$2', [invoice_id, user.company_id]);
-    return res.json({ success: true, message: 'Havale bildiriminiz alındı. Yöneticilerimiz ödemeyi inceleyecektir.', reference_code: result.rows[0].reference_code });
-  } catch (err) {
-    logger.error('Error updating bank transfer notification:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-/**
- * @openapi
- * /api/v1/admin/pending-transfers:
- *   get:
- *     summary: List pending bank transfer approvals (sysadmin only)
- *     security:
- *       - BearerAuth: []
- */
-router.get('/admin/pending-transfers', authenticateUser, requireRole('sysadmin'), async (req, res: Response) => {
-  try {
-    const result = await runBypassingRLS(`
-      SELECT btn.id, btn.reference_code, btn.sender_name, btn.sender_bank,
-             btn.transfer_date, btn.status, btn.created_at,
-             inv.id as invoice_id, inv.amount, inv.invoice_number, inv.billing_details,
-             c.id as company_id, c.name as company_name, c.email as company_email,
-             pba.bank_name, pba.iban
-      FROM bank_transfer_notifications btn
-      JOIN invoices inv ON inv.id = btn.invoice_id
-      JOIN companies c ON c.id = btn.company_id
-      LEFT JOIN payment_bank_accounts pba ON pba.id = btn.bank_account_id
-      WHERE btn.status = 'pending_review'
-      ORDER BY btn.created_at DESC
-      LIMIT 100
-    `);
-    return res.json(result.rows);
-  } catch (err) {
-    logger.error('Error fetching pending transfers:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-router.post('/transfer-requests/:invoiceId/cancel', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const result = await client.query(
-      `UPDATE invoices SET status='cancelled', updated_at=NOW()
-       WHERE id=$1 AND company_id=$2 AND status='pending'
-       RETURNING id`, [req.params.invoiceId, req.user!.company_id]
-    );
-    if (!result.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'request_not_cancellable', message: 'Bu ödeme talebi artık iptal edilemez.' });
-    }
-    await client.query(
-      `UPDATE bank_transfer_notifications SET status='cancelled', updated_at=NOW()
-       WHERE invoice_id=$1 AND status='pending'`, [req.params.invoiceId]
-    );
-    await client.query('COMMIT');
-    return res.json({ success: true });
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    logger.error('Transfer request cancellation failed:', error);
-    return res.status(500).json({ error: 'server_error' });
-  } finally { client.release(); }
-});
-
-router.put('/admin/invoices/:id/reject-payment', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
-  const note = String(req.body?.note || '').trim();
-  if (note.length < 3) return res.status(400).json({ error: 'rejection_note_required', message: 'Red gerekçesi zorunludur.' });
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const invoice = await client.query(
-      `UPDATE invoices SET status='rejected', updated_at=NOW()
-       WHERE id=$1 AND status='pending' RETURNING company_id`, [req.params.id]
-    );
-    if (!invoice.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'invoice_not_rejectable' });
-    }
-    await client.query(
-      `UPDATE bank_transfer_notifications
-       SET status='rejected', admin_note=$1, reviewed_by=$2, reviewed_at=NOW(), updated_at=NOW()
-       WHERE invoice_id=$3 AND status='pending_review'`,
-      [note, req.user!.id, req.params.id]
-    );
-    await client.query(
-      `INSERT INTO audit_logs (id,company_id,user_id,user_name,action,entity,entity_id,new_value)
-       VALUES ($1,$2,$3,'Admin','REJECTED_BANK_WIRE_PAYMENT','invoice',$4,$5)`,
-      [BillingDomainService.opaqueId('al'), invoice.rows[0].company_id, req.user!.id, req.params.id, JSON.stringify({ note })]
-    );
-    await client.query('COMMIT');
-    return res.json({ success: true, message: 'Havale bildirimi reddedildi.' });
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    logger.error('Transfer rejection failed:', error);
-    return res.status(500).json({ error: 'server_error' });
-  } finally { client.release(); }
 });
 
 /**
@@ -930,135 +716,6 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     error: 'legacy_webhook_removed',
     message: 'Ödeme sonuçları yalnızca sağlayıcıdan doğrulanan checkout callback akışıyla işlenir.',
   });
-});
-
-/**
- * @openapi
- * /api/v1/admin/invoices/{id}/approve-payment:
- *   put:
- *     summary: Manually approve a bank wire payment for an invoice (Admin only)
- *     security:
- *       - BearerAuth: []
- */
-router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params;
-  const adminUserId = req.user!.id;
-
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-    // 1. Lock invoice row to prevent double-approval
-    const invoiceRes = await client.query(
-      'SELECT * FROM invoices WHERE id = $1 FOR UPDATE',
-      [id]
-    );
-    if (invoiceRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'invoice_not_found', message: 'Fatura bulunamadı.' });
-    }
-
-    const invoice = invoiceRes.rows[0];
-    if (invoice.status === 'paid') {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'already_paid', message: 'Bu fatura zaten daha önce onaylandı.' });
-    }
-    const transferClaim = await client.query(
-      `SELECT id,reference_code FROM bank_transfer_notifications WHERE invoice_id=$1 AND status='pending_review' FOR UPDATE`,
-      [id]
-    );
-    if (!transferClaim.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'transfer_not_pending_review', message: 'Onay bekleyen havale bildirimi bulunamadı.' });
-    }
-
-    // All payment channels finalize through the same atomic lifecycle.
-    const activation = await CommercialLifecycleService.finalizeInvoicePayment(
-      client, id, 'bank_transfer', adminUserId,
-      { amount: Number(invoice.amount), currency: BillingDomainService.invoiceDetails(invoice).currency || 'TRY',
-        referenceCode: transferClaim.rows[0].reference_code },
-    );
-
-    await client.query(`
-      UPDATE bank_transfer_notifications
-      SET status = 'approved', reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW()
-      WHERE invoice_id = $2 AND status = 'pending_review'
-    `, [adminUserId, id]);
-
-    const billingPeriod = BillingDomainService.normalizePeriod(
-      BillingDomainService.invoiceDetails(invoice).billingPeriod
-    );
-
-    // 6. Write Admin Audit Log (Inside Transaction, non-blocking)
-    try {
-      const auditId = BillingDomainService.opaqueId('aud');
-      const invoiceAfter = { ...invoice, status: 'paid', paid_at: new Date() };
-      await client.query(
-        `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
-          auditId,
-          invoice.company_id,
-          adminUserId,
-          'APPROVED_BANK_WIRE_PAYMENT',
-          'invoices',
-          id,
-          JSON.stringify(invoice),
-          JSON.stringify(invoiceAfter),
-          req.ip || 'admin_panel'
-        ]
-      );
-    } catch (auditErr) {
-      logger.error('Failed to write admin audit log inside transaction:', auditErr);
-    }
-
-    // 7. Send Notification (Inside Transaction, non-blocking, dynamic phone lookup)
-    try {
-      const companyRes = await client.query('SELECT phone FROM companies WHERE id = $1', [invoice.company_id]);
-      const recipientPhone = companyRes.rows[0]?.phone;
-
-      if (recipientPhone && recipientPhone.trim() !== '') {
-        const notifId = BillingDomainService.opaqueId('notif');
-        await client.query(`
-          INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
-          VALUES ($1, $2, 'sms', $3, 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
-        `, [notifId, invoice.company_id, recipientPhone]);
-      } else {
-        logger.warn(`No phone number found for company ${invoice.company_id}. Skipping SMS notification.`);
-      }
-    } catch (smsErr) {
-      logger.error('Failed to queue SMS notification inside transaction:', smsErr);
-    }
-
-    await client.query('COMMIT');
-
-    // Notify open POS and portal sessions immediately. Offline clients refresh
-    // their entitlement on their next connection/heartbeat.
-    await RealtimeBroadcastService.publishEvent(invoice.company_id, 'LicenseUpdated', {
-      subscriptionId: activation.subscriptionId,
-      entitlementId: activation.entitlementId,
-      invoiceId: id,
-      status: 'active',
-      billingPeriod,
-    });
-
-    logger.info(`Invoice ${id} bank wire approved by admin ${req.user?.email}`);
-    return res.json({
-      success: true,
-      message: 'Ödeme başarıyla onaylandı ve abonelik aktif edildi.',
-      billing_period: billingPeriod,
-      subscription_id: activation.subscriptionId,
-      entitlement_id: activation.entitlementId,
-      license_valid_until: activation.validUntil.toISOString(),
-    });
-  } catch (err: any) {
-    await client.query('ROLLBACK').catch(() => {});
-    logger.error('Error approving invoice payment:', err);
-    return res.status(500).json({ error: 'server_error', message: 'Ödeme onaylanırken sunucu hatası oluştu.' });
-  } finally {
-    client.release();
-  }
 });
 
 export default router;

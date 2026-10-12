@@ -130,7 +130,9 @@ class SalesTab extends ConsumerWidget {
       try {
         final repo = await ref.read(settingsRepositoryProvider.future);
         settings = await repo.getSettings();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     if (!context.mounted) return;
     if (summary == null || categories == null || settings == null) {

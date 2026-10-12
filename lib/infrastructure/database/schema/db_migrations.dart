@@ -1120,6 +1120,153 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 59 && newVersion >= 59) {
+          // 1. One-time data repair for legacy bugged transactions (Faz 3)
+          await txn.execute('''
+            UPDATE financial_transactions
+               SET is_deleted = 1, amount = 0, debt_amount = 0, paid_amount = 0
+             WHERE id IN (
+               'trans-cancel-17908835323535612843',
+               'trans-17912015326941994179',
+               'trans-17912015157808181703',
+               'trans-17913948343510403903'
+             ) AND COALESCE(is_deleted, 0) = 0
+          ''');
+          // 2. Heal historical installment plans where manual_debt was written with financed instead of totalAmount
+          try {
+            await txn.execute('''
+              UPDATE financial_transactions
+                 SET amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id),
+                     debt_amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id)
+               WHERE type = 'manual_debt'
+                 AND reference_id IN (SELECT id FROM customer_installment_plans WHERE down_payment > 0)
+                 AND EXISTS (
+                   SELECT 1 FROM customer_installment_plans p
+                    WHERE p.id = financial_transactions.reference_id
+                      AND ABS(p.total_amount - financial_transactions.debt_amount) > 0.001
+                 )
+            ''');
+          } catch (e) {
+            handleMigrationError(e, 59);
+          }
+
+          await txn.insert('app_migration_history', {
+            'version': 59,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 60 && newVersion >= 60) {
+          // Faz 1: Expand phase — Add integer minor currency (kurus) columns
+          // 1. products table
+          try {
+            await txn.execute('ALTER TABLE products ADD COLUMN price_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE products ADD COLUMN purchase_price_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          await txn.execute('''
+            UPDATE products 
+               SET price_minor = CAST(ROUND(price * 100) AS INTEGER),
+                   purchase_price_minor = CAST(ROUND(purchase_price * 100) AS INTEGER)
+          ''');
+
+          // 2. customers table
+          try {
+            await txn.execute('ALTER TABLE customers ADD COLUMN balance_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE customers ADD COLUMN credit_limit_minor INTEGER');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          await txn.execute('''
+            UPDATE customers 
+               SET balance_minor = CAST(ROUND(balance * 100) AS INTEGER),
+                   credit_limit_minor = CASE WHEN credit_limit IS NOT NULL THEN CAST(ROUND(credit_limit * 100) AS INTEGER) ELSE NULL END
+          ''');
+
+          // 3. financial_transactions table
+          try {
+            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN paid_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN debt_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          await txn.execute('''
+            UPDATE financial_transactions 
+               SET amount_minor = CAST(ROUND(amount * 100) AS INTEGER),
+                   paid_amount_minor = CAST(ROUND(paid_amount * 100) AS INTEGER),
+                   debt_amount_minor = CAST(ROUND(debt_amount * 100) AS INTEGER)
+          ''');
+
+          // 4. sales table
+          try {
+            await txn.execute('ALTER TABLE sales ADD COLUMN total_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE sales ADD COLUMN paid_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE sales ADD COLUMN refunded_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE sales ADD COLUMN discount_amount_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          await txn.execute('''
+            UPDATE sales 
+               SET total_amount_minor = CAST(ROUND(total_amount * 100) AS INTEGER),
+                   paid_amount_minor = CAST(ROUND(paid_amount * 100) AS INTEGER),
+                   refunded_amount_minor = CAST(ROUND(refunded_amount * 100) AS INTEGER),
+                   discount_amount_minor = CAST(ROUND(discount_amount * 100) AS INTEGER)
+          ''');
+
+          // 5. sale_items table
+          try {
+            await txn.execute('ALTER TABLE sale_items ADD COLUMN unit_price_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          try {
+            await txn.execute('ALTER TABLE sale_items ADD COLUMN subtotal_minor INTEGER DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 60);
+          }
+          await txn.execute('''
+            UPDATE sale_items 
+               SET unit_price_minor = CAST(ROUND(unit_price * 100) AS INTEGER),
+                   subtotal_minor = CAST(ROUND(subtotal * 100) AS INTEGER)
+          ''');
+
+          await txn.insert('app_migration_history', {
+            'version': 60,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing
@@ -1130,7 +1277,9 @@ class DatabaseMigrations {
           'status': 'failed',
           'error_message': err.toString()
         });
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
       rethrow;
     }
 

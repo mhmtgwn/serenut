@@ -108,7 +108,7 @@ class PersistentPrintQueue {
 
   String get _tableName => _testTableName ?? 'print_queue';
 
-  Future<Database> _getDb() => DatabaseManager().getDatabase();
+  Future<Database> _getDb() => DatabaseManager.instance.getDatabase();
 
   /// Helper to ensure custom test tables exist (mostly for tests using unique keys)
   Future<void> _ensureTable(Database db) async {

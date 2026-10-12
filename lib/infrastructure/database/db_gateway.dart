@@ -74,7 +74,9 @@ class DbGatewayImpl implements DbGateway {
     _writeQueue = () async {
       try {
         await previous;
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
 
       try {
         final result = await DatabaseManager.retryOnLock(action);

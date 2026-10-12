@@ -37,7 +37,7 @@ class BackupService implements IBackupService {
       final backupFileName = 'serenut_pos_backup_$timestamp.db';
       final backupPath = join(backupsDir.path, backupFileName);
 
-      final Database db = await DatabaseManager().getDatabase();
+      final Database db = await DatabaseManager.instance.getDatabase();
 
       // Verify database integrity before creating a backup copy
       final List<Map<String, dynamic>> integrityResult =
@@ -57,7 +57,7 @@ class BackupService implements IBackupService {
         await db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
 
         final dbPath = DatabaseManager.overrideDatabasePath ??
-            join(await DatabaseManager().getDatabasesPath(), 'serenut_pos.db');
+            join(await DatabaseManager.instance.getDatabasesPath(), 'serenut_pos.db');
         final dbFile = File(dbPath);
 
         if (!await dbFile.exists()) {
@@ -86,7 +86,7 @@ class BackupService implements IBackupService {
       DatabaseManager.isWriteLocked = false;
 
       try {
-        final auditRepo = SqliteAuditRepository(DatabaseManager());
+        final auditRepo = SqliteAuditRepository(DatabaseManager.instance);
         await auditRepo.logEvent(AuditEvent(
           id: const Uuid().v4(),
           eventType: 'system_backup',
@@ -171,7 +171,7 @@ class BackupService implements IBackupService {
       throw Exception('Geri yüklenecek yedek dosyası bulunamadı.');
     }
 
-    final dbManager = DatabaseManager();
+    final dbManager = DatabaseManager.instance;
 
     // Verify it is a valid sqlite file and can be opened
     Database? tempDb;
@@ -286,7 +286,9 @@ class BackupService implements IBackupService {
         notes: 'Veritabanı yedekten geri yüklendi: ${basename(backupPath)}',
         timestamp: DateTime.now(),
       ));
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     return true;
   }

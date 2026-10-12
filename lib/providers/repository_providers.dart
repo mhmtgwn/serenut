@@ -15,6 +15,8 @@ import 'package:serenutos/domain/services/report_service.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
 import 'package:serenutos/domain/services/dashboard_service.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
+import 'package:serenutos/domain/repositories/i_business_profile_repository.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_business_profile_repository.dart';
 
 // ── Late Sprint Imports (Sprint 7, 8, 9, 10) ──
 import 'package:serenutos/infrastructure/repositories/cloud_analytics_repository.dart';
@@ -173,4 +175,11 @@ final portalRepositoryProvider = Provider<PortalRepository>((ref) {
 final installmentRepositoryProvider = Provider<IInstallmentRepository>((ref) {
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteInstallmentRepository(gateway);
+});
+
+// ── Business Profile Repository Provider ──
+final businessProfileRepositoryProvider =
+    Provider<IBusinessProfileRepository>((ref) {
+  final gateway = ref.watch(dbGatewayProvider);
+  return SqliteBusinessProfileRepository(gateway);
 });

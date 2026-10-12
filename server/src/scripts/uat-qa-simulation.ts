@@ -46,7 +46,9 @@ async function runUatSuite() {
       // Ignore if constraint doesn't have unique index on user_id, role_id
       try {
         await pgPool.query("INSERT INTO user_roles (user_id, role_id) SELECT 'user-sysadmin', 'role-sysadmin' WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = 'user-sysadmin' AND role_id = 'role-sysadmin')");
-      } catch (__) {}
+      } catch (err) {
+        console.warn('Fallback user_roles seed note:', err);
+      }
     }
 
     const userSeed = await pgPool.query(`

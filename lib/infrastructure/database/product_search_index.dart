@@ -54,11 +54,15 @@ class ProductSearchIndex {
       ]) {
         try {
           await db.execute('DROP TRIGGER IF EXISTS $trigger');
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       try {
         await db.execute('DROP TABLE IF EXISTS product_search_fts');
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
       return false;
     }
   }

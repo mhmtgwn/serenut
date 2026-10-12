@@ -174,7 +174,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
       try {
         final repo = await ref.read(settingsRepositoryProvider.future);
         settings = await repo.getSettings();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     if (settings == null) {
       if (!mounted) return;

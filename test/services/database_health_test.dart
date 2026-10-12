@@ -112,7 +112,9 @@ void main() {
           paid_amount REAL NOT NULL DEFAULT 0,
           debt_amount REAL NOT NULL DEFAULT 0,
           reference_id TEXT,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          is_deleted INTEGER NOT NULL DEFAULT 0,
+          is_synced INTEGER NOT NULL DEFAULT 0
         )
       ''');
 

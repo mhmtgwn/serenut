@@ -1,3 +1,4 @@
+import 'package:serenutos/providers/database_provider.dart';
 // lib/providers/sync_provider.dart
 // Serenut OS — Offline Sync Riverpod Provider + AppLifecycle Trigger
 // Created: 24 Jun 2026
@@ -11,7 +12,6 @@ import 'package:serenutos/infrastructure/sync_v4/sync_v4_service.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 import 'package:serenutos/domain/services/sync_state_machine.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
@@ -114,7 +114,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   Future<void> refreshPendingCount() async {
     if (kIsWeb) return;
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await _ref.read(databaseProvider.future);
       final count = await SyncOutboxV4.getPendingCount(db);
       var conflictCount = 0;
       try {
@@ -129,7 +129,26 @@ class SyncNotifier extends StateNotifier<SyncState>
         pendingOutboxCount: count,
         unresolvedConflictCount: conflictCount,
       );
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
+  }
+
+  /// Returns unresolved sync conflict records from SQLite.
+  Future<List<Map<String, Object?>>> getUnresolvedConflicts({int limit = 100}) async {
+    if (kIsWeb) return const [];
+    try {
+      final db = await _ref.read(databaseProvider.future);
+      return await db.rawQuery('''
+        SELECT entity_type, entity_id, server_revision, detected_at
+        FROM sync_conflicts_v4
+        WHERE resolved_at IS NULL
+        ORDER BY detected_at DESC
+        LIMIT ?
+      ''', [limit]);
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Translates low-level technical sync errors into actionable Turkish messages for cashiers.
@@ -163,7 +182,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   /// Force a full re-sync from server by clearing the last sync timestamp cursor.
   Future<void> forceFullSync() async {
     try {
-      final db = kIsWeb ? null : await DatabaseManager().getDatabase();
+      final db = kIsWeb ? null : await _ref.read(databaseProvider.future);
       await db
           ?.delete('sync_cursor_v4', where: 'key = ?', whereArgs: ['global']);
     } catch (e, st) {
@@ -324,7 +343,7 @@ class SyncNotifier extends StateNotifier<SyncState>
 
     state = state.copyWith(status: SyncStatus.syncing);
     try {
-      final db = kIsWeb ? null : await DatabaseManager().getDatabase();
+      final db = kIsWeb ? null : await _ref.read(databaseProvider.future);
       final machine = SyncStateMachine(db: db);
       _machine = machine;
 

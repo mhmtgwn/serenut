@@ -8,14 +8,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/sms_provider.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/controllers/sms_controller.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart'; // FullScreenSettingsPage
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/sms_message_analyzer.dart';
-import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_sub_widgets.dart';
@@ -136,9 +134,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   }
 
   Future<void> _loadInterruptedLogs() async {
-    final logRepo = ref.read(smsLogRepositoryProvider);
-    await logRepo.resetStuckJobs();
-    final logs = await logRepo.getUnknownLogs();
+    final smsController = ref.read(smsControllerProvider);
+    final logs = await smsController.loadInterruptedLogs();
     if (mounted) {
       setState(() {
         interruptedLogs = logs;
@@ -153,40 +150,16 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       isSendingBulk = true;
     });
 
-    final smsService = ref.read(smsServiceProvider);
-    final logRepo = ref.read(smsLogRepositoryProvider);
-
-    int sentCount = 0;
-    int failedCount = 0;
-
-    final logsToResend = List<SmsLogEntry>.from(interruptedLogs);
-
-    for (final log in logsToResend) {
-      await logRepo.updateStatus(log.id, SmsLogStatus.sending);
-
-      final success = await smsService.sendSms(log.phone, log.message);
-      if (success) {
-        sentCount++;
-        await logRepo
-            .updateStatus(log.id, SmsLogStatus.sent, sentAt: DateTime.now())
-            .onError((_, __) {});
-      } else {
-        failedCount++;
-        await logRepo
-            .updateStatus(
-              log.id,
-              SmsLogStatus.failed,
-              errorMessage: 'Resend failed',
-            )
-            .onError((_, __) {});
-      }
-    }
+    final smsController = ref.read(smsControllerProvider);
+    final res = await smsController.resendInterruptedLogs(interruptedLogs);
+    final sentCount = res.sentCount;
+    final failedCount = res.failedCount;
 
     if (mounted) {
       AppNotificationHost.show(
         SnackBar(
           content:
-              Text('Gönderildi: $sentCount âœ… | Başarısız: $failedCount âŒ'),
+              Text('Gönderildi: $sentCount ✅ | Başarısız: $failedCount ❌'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -202,10 +175,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   }
 
   Future<void> _discardInterruptedLogs() async {
-    final logRepo = ref.read(smsLogRepositoryProvider);
-    for (final log in interruptedLogs) {
-      await logRepo.updateStatus(log.id, SmsLogStatus.cancelled);
-    }
+    final smsController = ref.read(smsControllerProvider);
+    await smsController.discardInterruptedLogs(interruptedLogs);
     if (mounted) {
       AppNotificationHost.show(
         const SnackBar(
@@ -219,8 +190,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Future<void> _checkPermissionsAndLoadSims() async {
     if (mounted) setState(() => checkingPermissions = true);
-    final smsService = ref.read(smsServiceProvider);
-    final granted = await smsService.hasSimPermissions();
+    final smsController = ref.read(smsControllerProvider);
+    final granted = await smsController.hasSimPermissions();
     if (mounted) {
       setState(() {
         hasPermissions = granted;
@@ -257,8 +228,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Future<void> _requestPermissions() async {
     setState(() => checkingPermissions = true);
-    final smsService = ref.read(smsServiceProvider);
-    await smsService.requestSimPermissions();
+    final smsController = ref.read(smsControllerProvider);
+    await smsController.requestSimPermissions();
     await _checkPermissionsAndLoadSims();
   }
 
@@ -428,7 +399,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         }
         return list;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return defaultTemplates;
   }
 
@@ -450,11 +423,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Future<void> _sendBulkDebtReminder(BuildContext context) async {
     try {
-      final customerRepo = await ref.read(customerRepositoryProvider.future);
-      final customers = await customerRepo.findAll();
-      final logRepo = ref.read(smsLogRepositoryProvider);
-
-      final activeLogs = await logRepo.getActiveCampaignLogs();
+      final smsController = ref.read(smsControllerProvider);
+      final customers = await smsController.getAllCustomers();
+      final activeLogs = await smsController.getActiveDebtCampaignLogs();
       List<String> pendingIds = [];
 
       int sentCount = 0;
@@ -502,7 +473,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         if (resumeConfirm == null) return;
         if (resumeConfirm == true) {
           isResume = true;
-          final allCampaignLogs = await logRepo.getRecentLogs(limit: 1000);
+          final allCampaignLogs = await smsController.getRecentLogs(limit: 1000);
           sentCount = allCampaignLogs
               .where(
                 (e) =>
@@ -521,7 +492,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               .where((e) => e.eventType == 'bulk_debt_reminder')
               .length;
         } else {
-          await logRepo.cancelActiveCampaignLogs();
+          await smsController.cancelActiveCampaignLogs();
           pendingIds = [];
         }
       }
@@ -556,13 +527,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         pendingIds = activeDebtors.map((c) => c.id.toString()).toList();
 
         // Mark any previous campaign logs cancelled to be clean
-        await logRepo.cancelActiveCampaignLogs();
+        await smsController.cancelActiveCampaignLogs();
 
         // Insert all pending logs into SQLite (this creates the campaign state machine in SQLite)
         for (final customer in activeDebtors) {
           final debtAmount = customer.balance.abs();
           final message = _balanceReminderMessage(customer.name, debtAmount);
-          await logRepo.insertLog(
+          await smsController.insertLog(
             SmsLogEntry(
               id: 'bulk_debt_${customer.id}',
               phone: customer.phone,
@@ -603,14 +574,14 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
                       // Set status to sending in database for current batch
                       for (final debtor in currentBatchDebtors) {
-                        await logRepo.updateStatus(
+                        await smsController.updateLogStatus(
                           'bulk_debt_${debtor.id}',
                           SmsLogStatus.sending,
                         );
                       }
 
                       final debtReminderService =
-                          await ref.read(debtReminderServiceProvider.future);
+                          await smsController.getDebtReminderService();
                       final currentSettings = widget.settings.copyWith(
                         smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
                         smsAutoDebtReminderMinAmount:
@@ -636,8 +607,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                             final success = res.smsSuccess || res.waSuccess;
                             if (success) {
                               sentCount++;
-                              await logRepo
-                                  .updateStatus(
+                              await smsController
+                                  .updateLogStatus(
                                     'bulk_debt_${customer.id}',
                                     SmsLogStatus.sent,
                                     sentAt: DateTime.now(),
@@ -645,8 +616,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   .onError((_, __) {});
                             } else {
                               failedCount++;
-                              await logRepo
-                                  .updateStatus(
+                              await smsController
+                                  .updateLogStatus(
                                     'bulk_debt_${customer.id}',
                                     SmsLogStatus.failed,
                                     errorMessage: 'Gönderim başarısız',
@@ -655,8 +626,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                             }
                           } catch (err) {
                             failedCount++;
-                            await logRepo
-                                .updateStatus(
+                            await smsController
+                                .updateLogStatus(
                                   'bulk_debt_${customer.id}',
                                   SmsLogStatus.failed,
                                   errorMessage: err.toString(),
@@ -668,7 +639,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
                       if (isBulkCancelled) {
                         // Mark all remaining pending and sending logs as cancelled
-                        await logRepo.cancelActiveCampaignLogs();
+                        await smsController.cancelActiveCampaignLogs();
                         break;
                       }
 
@@ -927,8 +898,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Future<void> _sendBulkAnnouncement(BuildContext context) async {
     try {
-      final customerRepo = await ref.read(customerRepositoryProvider.future);
-      final customers = await customerRepo.findAll();
+      final smsController = ref.read(smsControllerProvider);
+      final customers = await smsController.getAllCustomers();
       final targets =
           customers.where((c) => c.phone.trim().isNotEmpty).toList();
 
@@ -953,46 +924,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
       if (confirmText == null || confirmText.isEmpty) return;
 
-      final smsService = ref.read(smsServiceProvider);
-      final logRepo = ref.read(smsLogRepositoryProvider);
-
-      int sentCount = 0;
-      for (final customer in targets) {
-        final message = confirmText.replaceAll('{customer}', customer.name);
-
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final logId = const Uuid().v4();
-        await logRepo.insertLog(
-          SmsLogEntry(
-            id: logId,
-            phone: customer.phone,
-            eventType: 'bulk_announcement',
-            message: message,
-            createdAt: DateTime.now(),
-          ),
-        );
-
-        smsService.sendSms(customer.phone, message).then((success) {
-          logRepo
-              .updateStatus(
-                logId,
-                success ? SmsLogStatus.sent : SmsLogStatus.failed,
-                sentAt: success ? DateTime.now() : null,
-                errorMessage: success ? null : 'Send failed',
-              )
-              .ignore();
-        }).onError((e, _) {
-          logRepo
-              .updateStatus(
-                logId,
-                SmsLogStatus.failed,
-                errorMessage: e.toString(),
-              )
-              .ignore();
-        });
-        sentCount++;
-      }
+      final sentCount = await smsController.sendBulkAnnouncement(
+        targets: targets,
+        confirmText: confirmText,
+      );
 
       if (context.mounted) {
         AppNotificationHost.show(
@@ -1018,8 +953,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   }
 
   Future<void> _retryFailedDebtMessages(BuildContext context) async {
-    final logRepository = ref.read(smsLogRepositoryProvider);
-    final failed = await logRepository.getFailedCampaignLogs();
+    final smsController = ref.read(smsControllerProvider);
+    final failed = await smsController.getFailedDebtCampaignLogs();
     if (failed.isEmpty) {
       if (context.mounted) {
         AppNotificationHost.show(
@@ -1052,22 +987,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     );
     if (approved != true) return;
 
-    var sent = 0;
-    for (final entry in failed) {
-      await logRepository.incrementRetry(entry.id);
-      await logRepository.updateStatus(entry.id, SmsLogStatus.sending);
-      final success = await ref
-          .read(smsServiceProvider)
-          .sendSms(entry.phone, entry.message);
-      await logRepository.updateStatus(
-        entry.id,
-        success ? SmsLogStatus.sent : SmsLogStatus.failed,
-        sentAt: success ? DateTime.now() : null,
-        errorMessage: success ? null : 'Retry failed',
-      );
-      if (success) sent++;
-      await Future<void>.delayed(const Duration(seconds: 1));
-    }
+    final sent = await smsController.retryFailedDebtLogs(failed);
     if (context.mounted) {
       AppNotificationHost.show(
         SnackBar(

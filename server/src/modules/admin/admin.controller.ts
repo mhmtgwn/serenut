@@ -2255,8 +2255,8 @@ router.get('/dashboard/queue-health', async (req: AuthenticatedRequest, res: Res
   try {
     let notificationQueue: any = null;
     let billingQueue: any = null;
-    try { notificationQueue = getNotificationQueue(); } catch (_) {}
-    try { billingQueue = getBillingQueue(); } catch (_) {}
+    try { notificationQueue = getNotificationQueue(); } catch (err) { logger.warn('Notification queue unavailable', { err }); }
+    try { billingQueue = getBillingQueue(); } catch (err) { logger.warn('Billing queue unavailable', { err }); }
 
     async function getQueueCounts(q: any) {
       if (!q) return { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 };
@@ -2417,7 +2417,9 @@ router.post('/tickets/:id/sla-escalate', async (req: AuthenticatedRequest, res: 
           title: `SLA İhlali: Destek Bileti #${req.params.id}`,
           body: `"${ticket.title}" başlıklı destek biletiniz ${Math.floor(hoursElapsed)} saattir çözümsüz kaldı. Önceliği yükseltildi.`
         });
-      } catch (_) {}
+      } catch (err) {
+        logger.warn('Failed to enqueue SLA escalation notification', { err, ticketId: req.params.id });
+      }
 
       await writeAdminAudit(req.user!.id, 'SLA_ESCALATED', 'support_tickets', req.params.id, null, {
         hoursElapsed: parseFloat(hoursElapsed.toFixed(1)), threshold, previousPriority: ticket.priority

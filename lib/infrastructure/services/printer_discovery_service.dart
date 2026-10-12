@@ -75,7 +75,9 @@ class PrinterDiscoveryService {
           );
         }).toList();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     // 2. Slow fallback: PowerShell (only if FFI enumeration returned empty)
     // -EncodedCommand to prevent Dart/shell from stripping the $ signs.

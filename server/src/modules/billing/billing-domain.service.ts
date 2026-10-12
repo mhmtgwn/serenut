@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { PoolClient, QueryResultRow } from 'pg';
+import { PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { pgPool } from '../../config/database';
 
 export type BillingPeriod = 'monthly' | 'yearly';
 
@@ -15,6 +16,45 @@ export interface BillingQuote {
 }
 
 export class BillingDomainService {
+  static async withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await pgPool.connect();
+    try {
+      return await fn(client);
+    } finally {
+      client.release();
+    }
+  }
+
+  static async runBypassingRLS<R extends QueryResultRow = any>(sql: string, params: any[] = []): Promise<QueryResult<R>> {
+    return this.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      try {
+        const res = await client.query<R>(sql, params);
+        await client.query('COMMIT');
+        return res;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
+    });
+  }
+
+  static async runWithTenantContext<R extends QueryResultRow = any>(companyId: string, sql: string, params: any[] = []): Promise<QueryResult<R>> {
+    return this.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
+      try {
+        const res = await client.query<R>(sql, params);
+        await client.query('COMMIT');
+        return res;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
+    });
+  }
+
   static normalizePeriod(value: unknown): BillingPeriod {
     return value === 'yearly' ? 'yearly' : 'monthly';
   }
@@ -126,7 +166,7 @@ export class BillingDomainService {
     await client.query('SELECT pg_advisory_xact_lock($1)', [year * 1009 + 73]);
     const result = await client.query(
       `SELECT COALESCE(MAX(NULLIF(regexp_replace(invoice_number, '^INV-[0-9]{4}-', ''), '')::BIGINT), 0) + 1 AS sequence
-       FROM invoices WHERE invoice_number LIKE $1`,
+      FROM invoices WHERE invoice_number LIKE $1`,
       [`INV-${year}-%`]
     );
     return `INV-${year}-${String(result.rows[0].sequence).padStart(8, '0')}`;

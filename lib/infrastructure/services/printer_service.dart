@@ -1183,7 +1183,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             if (bytes.isNotEmpty) return bytes;
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
 
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 3);
@@ -1201,7 +1203,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
               final metaFile = File('${supportDir.path}/cached_business_logo.url');
               await logoFile.writeAsBytes(bytes);
               await metaFile.writeAsString(logoPath.trim());
-            } catch (_) {}
+            } catch (_) {
+              // Ignored: fallback or safe default applied
+            }
             return bytes;
           }
         }
@@ -1213,7 +1217,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             final bytes = await logoFile.readAsBytes();
             if (bytes.isNotEmpty) return bytes;
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       } finally {
         client.close(force: true);
       }

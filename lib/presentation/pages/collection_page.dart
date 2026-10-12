@@ -14,8 +14,6 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/repository_providers.dart';
-import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -40,12 +38,7 @@ class CollectionPage extends ConsumerStatefulWidget {
   ConsumerState<CollectionPage> createState() => _CollectionPageState();
 }
 
-final collectionCustomerDetailProvider =
-    FutureProvider.family<CustomerEntity?, String>((ref, id) async {
-  if (id.isEmpty) return null;
-  final repo = await ref.watch(customerRepositoryProvider.future);
-  return repo.findById(id);
-});
+final collectionCustomerDetailProvider = customerDetailProvider;
 
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _formKey = GlobalKey<FormState>();
@@ -693,42 +686,29 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
 
-    AuthorizedCardPayment? cardPayment;
     try {
-      if (_selectedMethod == 'card') {
-        cardPayment =
-            await ref.read(physicalCardPaymentServiceProvider).authorize(
-                  amount: _enteredAmount,
-                  idempotencyKey:
-                      'collection-${widget.customerId}-${DateTime.now().microsecondsSinceEpoch}',
-                );
-      }
       await ref
           .read(collectionCustomersControllerProvider.notifier)
-          .recordCollection(
+          .submitCollection(
             customerId: widget.customerId,
             amount: _enteredAmount,
             method: _selectedMethod,
             notes: _noteController.text.trim().isEmpty
                 ? null
                 : _noteController.text.trim(),
-            terminalMetadata: cardPayment?.ledgerMetadata,
           );
-      if (cardPayment != null) {
-        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
-              cardPayment,
-              contextId: 'collection-${widget.customerId}',
-            );
-      }
 
       // Get the settings and the updated customer (which now has updated balance)
       var settings = ref.read(settingsNotifierProvider).valueOrNull ??
           ref.read(settingsNotifierProvider).value;
       if (settings == null) {
         try {
-          final repo = await ref.read(settingsRepositoryProvider.future);
-          settings = await repo.getSettings();
-        } catch (_) {}
+          await ref.read(settingsNotifierProvider.notifier).loadSettings();
+          settings = ref.read(settingsNotifierProvider).valueOrNull ??
+              ref.read(settingsNotifierProvider).value;
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       final updatedCustomers =
           ref.read(collectionCustomersControllerProvider).value;
@@ -783,11 +763,6 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         );
       }
     } catch (e) {
-      if (cardPayment != null) {
-        await ref
-            .read(physicalCardPaymentServiceProvider)
-            .markUnreconciled(cardPayment, e);
-      }
       if (mounted) {
         AppNotificationHost.show(
           SnackBar(

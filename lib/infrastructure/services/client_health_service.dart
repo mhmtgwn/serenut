@@ -18,7 +18,7 @@ class ClientHealthService {
 
     // 1. Database check
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
       final res = await db.rawQuery('SELECT 1');
       if (res.isNotEmpty) {
         report['database'] = 'up';

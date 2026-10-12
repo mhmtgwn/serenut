@@ -74,7 +74,9 @@ class SharedPreferencesSettingsRepository implements ISettingsRepository {
       try {
         final map = (jsonDecode(raw) as Map).cast<String, dynamic>();
         return Settings.fromMap(map);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     return Settings(
       businessName: 'Serenut OS',

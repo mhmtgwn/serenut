@@ -271,7 +271,9 @@ class _SalesPageState extends ConsumerState<SalesPage>
         if (settings?.soundNotificationEnabled ?? false) {
           SystemSound.play(SystemSoundType.click);
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
 
       ref.invalidate(dashboardProvider);
       ref.invalidate(productsControllerProvider);
@@ -347,7 +349,9 @@ class _SalesPageState extends ConsumerState<SalesPage>
       try {
         final repo = await ref.read(settingsRepositoryProvider.future);
         settings = await repo.getSettings();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     if (settings == null) {
       _showErrorSnackBar('Yazıcı ayarları yüklenemedi.');

@@ -1,19 +1,15 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
-import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
-import 'package:serenutos/presentation/widgets/update_dialog.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/presentation/controllers/about_controller.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -40,8 +36,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
   @override
   Widget build(BuildContext context) {
     final licStatus = ref.watch(licenseStatusProvider);
-    final licenseService = ref.watch(licenseServiceProvider);
-    final licenseInfo = licenseService.getLicenseInfo();
+    final licenseInfo = ref.watch(aboutControllerProvider).getLicenseInfo();
     final licenseStatus = licStatus.status;
     final remainingDays = licStatus.daysLeft;
     final expiryDate = licStatus.expiryDate ?? licenseInfo?.expiryDate;
@@ -200,18 +195,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
   Future<void> _sendDiagnosticReport() async {
     setState(() => _sendingDiagnostics = true);
     try {
-      final lic = ref.read(licenseServiceProvider).getLicenseInfo();
-      await Sentry.captureMessage(
-        'Kullanıcı Manuel Sistem Teşhis Raporu Gönderdi',
-        level: SentryLevel.info,
-        withScope: (scope) {
-          scope.setTag('report_type', 'manual_user_feedback');
-          if (lic != null) {
-            scope.setTag('merchant_id', lic.merchantId);
-            scope.setTag('license_tier', lic.tier.name);
-          }
-        },
-      );
+      await ref.read(aboutControllerProvider).sendDiagnosticReport();
       if (mounted) {
         AppNotificationHost.show(
           const SnackBar(
@@ -306,26 +290,9 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         setState(() => _lastResult = 'Uygulamanız güncel.');
         return;
       }
-      await showUpdateDialog(
-        context: context,
-        updateInfo: UpdateInfo(
-          hasUpdate: true,
-          isForceUpdate: info.isForceUpdate,
-          latestVersion: info.latestVersion,
-          minRequiredVersion: info.minRequiredVersion,
-          downloadUrl: info.downloadUrl,
-          sha256Hash: info.sha256Hash,
-          signature: info.signature,
-          fileSizeBytes: info.fileSizeBytes,
-          releaseNotes: info.releaseNotes,
-          channel: 'stable',
-        ),
-        releaseManager: ref.read(releaseManagerServiceProvider),
-        platform: Platform.isAndroid ? 'android' : 'windows',
-        jwtToken: ref.read(authServiceProvider).getJwtToken(),
-        deviceId:
-            ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
-      );
+      await ref
+          .read(aboutControllerProvider)
+          .presentUpdateDialog(context, info);
     } catch (error) {
       if (mounted) setState(() => _lastResult = 'Kontrol başarısız: $error');
     } finally {

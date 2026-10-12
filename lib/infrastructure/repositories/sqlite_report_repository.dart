@@ -219,7 +219,9 @@ class SqliteReportRepository implements IReportRepository {
       for (final r in catRows) {
         categoryNames[r['id'].toString()] = r['name'] as String;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     return rows.asMap().entries.map((entry) {
       final i = entry.key;

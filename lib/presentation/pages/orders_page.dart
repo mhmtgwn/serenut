@@ -124,7 +124,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
       final counts =
           await ref.read(ordersControllerProvider.notifier).getStatusCounts();
       if (mounted) setState(() => _statusCounts = counts);
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   void _onScroll() {

@@ -71,7 +71,9 @@ class TcpPrintTransport implements PrintTransport {
     } finally {
       try {
         await socket?.close();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
   }
 }

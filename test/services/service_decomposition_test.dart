@@ -16,6 +16,7 @@ import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 
 class FakeSecurityGate implements SecurityGate {
   @override
@@ -83,13 +84,7 @@ void main() {
       );
 
       // Clean start: clear tables and add fresh mock data
-      await db.update('ledger_bypass_flag', {'active': 1});
-      await db.delete('sale_items');
-      await db.delete('sales');
-      await db.delete('financial_transactions');
-      await db.delete('customers');
-      await db.delete('products');
-      await db.update('ledger_bypass_flag', {'active': 0});
+      await DataResetService.clearOperationalTables(db);
 
       // Create test product (quantity: 10, price: 100)
       await productRepo.create(ProductEntity(

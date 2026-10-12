@@ -39,6 +39,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
     _loadSettings();
   }
 
+  Future<void> loadSettings() => _loadSettings();
+
   Future<void> _loadSettings() async {
     try {
       final repo = await ref.read(settingsRepositoryProvider.future);

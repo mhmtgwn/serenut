@@ -3,17 +3,30 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
 
 /// Shared, transaction-safe cleanup primitives used by both the reset UI and
 /// Sync V4's server-issued reset barrier.
 class DataResetService {
   const DataResetService._();
 
+  /// Safely wipes and recreates the local SQLite database.
+  static Future<void> resetLocalDatabase() async {
+    final dbManager = DatabaseManager.instance;
+    await dbManager.resetDatabase();
+  }
+
   static Future<void> clearOperationalTables(
     DatabaseExecutor db, {
     bool clearSyncState = true,
   }) async {
-    await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
+    // Drop immutable triggers temporarily to permit complete administrative wipe
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_delete');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_update');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_delete');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_update');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_insert');
     try {
       // Refund and inventory rows reference sale/product aggregates and must
       // be removed before their parents.
@@ -36,7 +49,7 @@ class DataResetService {
         await _deleteIfPresent(db, 'sync_conflicts_v4');
       }
     } finally {
-      await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
+      await DatabaseTriggers.createTriggers(db);
     }
   }
 

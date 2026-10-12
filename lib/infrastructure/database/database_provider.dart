@@ -25,21 +25,12 @@ import 'package:serenutos/config/utils.dart';
 class DatabaseManager {
   static final _instance = DatabaseManager._();
   factory DatabaseManager() => _instance;
+  static DatabaseManager get instance => _instance;
   DatabaseManager._();
 
   static const String customerBalanceSql = '''
-    SELECT COALESCE(SUM(
-      CASE 
-        WHEN type = 'sale' THEN -debt_amount
-        WHEN type = 'manual_debt' THEN -debt_amount
-        WHEN type = 'payment' THEN paid_amount
-        WHEN type = 'cancellation' THEN debt_amount
-        WHEN type = 'collection' THEN paid_amount
-        WHEN type = 'refund' AND paid_amount = 0 THEN amount
-        ELSE 0
-      END
-    ), 0.0) as expected
-    FROM financial_transactions
+    SELECT COALESCE(SUM(balance_effect), 0.0) as expected
+    FROM v_customer_ledger_effect
     WHERE customer_id = ?
   ''';
 
@@ -47,7 +38,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 58;
+  static const int databaseVersion = 60;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -125,7 +116,9 @@ class DatabaseManager {
     _database = await _databaseFuture;
     try {
       await _database!.rawQuery('PRAGMA busy_timeout = 30000');
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     await _verifyDatabaseSchemaInvariants(_database!);
     await DatabaseTriggers.verifyAndRepairTriggers(_database!);
     await _reconcileAllCustomerBalances(_database!);
@@ -136,83 +129,31 @@ class DatabaseManager {
   /// Reconciles all customer balances against the append-only ledger on database startup.
   Future<void> _reconcileAllCustomerBalances(Database db) async {
     try {
-      // 1. One-time data repair: Invalidate known erroneously generated duplicate/bugged transactions
-      await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-      try {
-        await db.rawUpdate('''
-          UPDATE financial_transactions
-             SET is_deleted = 1, amount = 0, debt_amount = 0, paid_amount = 0
-           WHERE id IN (
-             'trans-cancel-17908835323535612843',
-             'trans-17912015326941994179',
-             'trans-17912015157808181703',
-             'trans-17913948343510403903'
-           ) AND COALESCE(is_deleted, 0) = 0
-        ''');
-      } finally {
-        await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-      }
-
-      // 1.5. Heal historical installment plans where manual_debt was written with financed instead of totalAmount
-      await db.rawUpdate('''
-        UPDATE financial_transactions
-           SET amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id),
-               debt_amount = (SELECT p.total_amount FROM customer_installment_plans p WHERE p.id = financial_transactions.reference_id)
-         WHERE type = 'manual_debt'
-           AND reference_id IN (SELECT id FROM customer_installment_plans WHERE down_payment > 0)
-           AND EXISTS (
-             SELECT 1 FROM customer_installment_plans p
-              WHERE p.id = financial_transactions.reference_id
-                AND ABS(p.total_amount - financial_transactions.debt_amount) > 0.001
-           )
-      ''');
-
-      // 2. Reconcile customer balances with ledger (clamping float noise < 0.01 to exact 0.0)
-      await db.rawUpdate('''
+      // 1. Reconcile customer balances with ledger (clamping float noise < 0.01 to exact 0.0)
+      // (Legacy bugged transactions and historical installment plan repairs moved to Migration 59)
+      final repairedCount = await db.rawUpdate('''
         UPDATE customers
            SET balance = COALESCE((
              SELECT CASE
-               WHEN ABS(SUM(CASE
-                 WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                 WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                 WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                 WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                 ELSE 0
-               END)) < 0.009 THEN 0.0
-               ELSE SUM(CASE
-                 WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                 WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                 WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                 WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                 ELSE 0
-               END)
+               WHEN ABS(SUM(balance_effect)) < 0.009 THEN 0.0
+               ELSE SUM(balance_effect)
              END
-               FROM financial_transactions ft
-              WHERE ft.customer_id = customers.id
-                AND COALESCE(ft.is_deleted, 0) = 0
-           ), 0)
+               FROM v_customer_ledger_effect v
+              WHERE v.customer_id = customers.id
+           ), 0.0)
           WHERE ABS(balance - COALESCE((
               SELECT CASE
-                WHEN ABS(SUM(CASE
-                  WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                  WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                  WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                  WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                  ELSE 0
-                END)) < 0.009 THEN 0.0
-                ELSE SUM(CASE
-                  WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                  WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-                  WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-                  WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                  ELSE 0
-                END)
+                WHEN ABS(SUM(balance_effect)) < 0.009 THEN 0.0
+                ELSE SUM(balance_effect)
               END
-                FROM financial_transactions ft
-               WHERE ft.customer_id = customers.id
-                 AND COALESCE(ft.is_deleted, 0) = 0
-            ), 0)) > 0.001
+                FROM v_customer_ledger_effect v
+               WHERE v.customer_id = customers.id
+            ), 0.0)) > 0.001
       ''');
+      if (repairedCount > 0) {
+        debugPrint(
+            '[DatabaseManager] ⚠️ Bakiye sapması tespit edildi: $repairedCount müşterinin bakiyesi deftere eşitlendi.');
+      }
     } catch (e) {
       debugPrint('[DatabaseManager] Customer balance reconciliation error: $e');
     }
@@ -221,6 +162,10 @@ class DatabaseManager {
   /// Standardizes all existing customer names to Turkish uppercase on database startup.
   Future<void> _standardizeCustomerNamesToTurkishUppercase(Database db) async {
     try {
+      final unnormalized = await db.rawQuery(
+          "SELECT 1 FROM customers WHERE (normalized_name IS NULL OR normalized_name = '') AND name != '' LIMIT 1");
+      if (unnormalized.isEmpty) return;
+
       final rows = await db.rawQuery(
           "SELECT id, name FROM customers WHERE id != '' AND name != ''");
       final batch = db.batch();
@@ -337,7 +282,9 @@ class DatabaseManager {
       } finally {
         await raf.close();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return 0;
   }
 
@@ -356,7 +303,9 @@ class DatabaseManager {
         if (!await dbDir.exists()) {
           await dbDir.create(recursive: true);
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     // Safe SQLCipher / Encrypted database recovery
@@ -509,7 +458,9 @@ class DatabaseManager {
         onConfigure: (db) async {
           try {
             await db.rawQuery('PRAGMA busy_timeout = 30000');
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
           await db.execute('PRAGMA foreign_keys = ON');
           try {
             await db.rawQuery('PRAGMA journal_mode = WAL');
@@ -531,7 +482,9 @@ class DatabaseManager {
           // Ensure address column exists on customers table
           try {
             await db.execute('ALTER TABLE customers ADD COLUMN address TEXT;');
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
 
           // Older databases can contain anonymous sales before the system
           // customer was introduced. Materialize it before checking relations.
@@ -619,6 +572,30 @@ class DatabaseManager {
             END AS credit
           FROM financial_transactions
         ''');
+
+        await db.execute('DROP VIEW IF EXISTS v_customer_ledger_effect');
+        await db.execute('''
+          CREATE VIEW v_customer_ledger_effect AS
+          SELECT 
+            id,
+            customer_id,
+            type,
+            amount,
+            paid_amount,
+            debt_amount,
+            reference_id,
+            created_at,
+            is_deleted,
+            CASE 
+              WHEN COALESCE(is_deleted, 0) != 0 THEN 0.0
+              WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+              WHEN type IN ('payment', 'collection') THEN paid_amount
+              WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+              WHEN type = 'refund' AND paid_amount = 0 THEN amount
+              ELSE 0.0
+            END AS balance_effect
+          FROM financial_transactions;
+        ''');
       } catch (_) {
         // View might fail if table does not exist in initial configuration
       }
@@ -669,12 +646,16 @@ class DatabaseManager {
             onConfigure: (db) async {
               try {
                 await db.rawQuery('PRAGMA busy_timeout = 30000');
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
               await db.execute('PRAGMA foreign_keys = ON');
               try {
                 await db.rawQuery('PRAGMA journal_mode = WAL');
                 await db.execute('PRAGMA synchronous = NORMAL');
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
             },
           );
         } catch (recoveryErr, recoverySt) {
@@ -708,7 +689,9 @@ class DatabaseManager {
       onConfigure: (db) async {
         try {
           await db.rawQuery('PRAGMA busy_timeout = 30000');
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
         if (onConfigure != null) await onConfigure(db);
       },
       onCreate: onCreate,
@@ -869,7 +852,7 @@ class DatabaseManager {
   /// Default: 90-day retention.
   ///
   /// ```dart
-  /// await DatabaseManager().purgeOldAuditLogs();
+  /// await DatabaseManager.instance.purgeOldAuditLogs();
   /// ```
   Future<int> purgeOldAuditLogs({int retentionDays = 90}) async {
     final db = await getDatabase();

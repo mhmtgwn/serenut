@@ -1277,7 +1277,9 @@ class TsplCanvasLabelEngine {
           if (file.existsSync()) {
             effectiveLogoBytes = file.readAsBytesSync();
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       if (effectiveLogoBytes == null) {
         // Check default Serenut OS branding lockup
@@ -1287,14 +1289,18 @@ class TsplCanvasLabelEngine {
           if (defaultLockup.existsSync()) {
             effectiveLogoBytes = defaultLockup.readAsBytesSync();
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       if (effectiveLogoBytes != null && effectiveLogoBytes.isNotEmpty) {
         try {
           final codec = await ui.instantiateImageCodec(effectiveLogoBytes);
           final frame = await codec.getNextFrame();
           logoImage = frame.image;
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
     }
 
@@ -1656,7 +1662,9 @@ class TsplCanvasLabelEngine {
             );
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     unitPainter.paint(canvas, Offset(leftMargin.toDouble(), actualUnitY));

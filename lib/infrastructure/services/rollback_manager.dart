@@ -202,6 +202,6 @@ class RollbackManager {
   }
 
   Future<String> getDatabasesPath() async {
-    return DatabaseManager().getDatabasesPath();
+    return DatabaseManager.instance.getDatabasesPath();
   }
 }

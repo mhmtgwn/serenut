@@ -18,10 +18,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/repository_providers.dart';
-import 'package:serenutos/domain/services/inventory_service.dart'
-    show SaleItemInput;
-import 'package:serenutos/presentation/controllers/sales_controller.dart'
-    show paymentServiceProvider, inventoryServiceProvider;
+import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
@@ -195,7 +192,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
           try {
             final repo = await ref.read(customerRepositoryProvider.future);
             cust = await repo.findById(order.customerId);
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
         }
         if (cust == null) {
           final customers = ref.read(ordersCustomersControllerProvider).value;

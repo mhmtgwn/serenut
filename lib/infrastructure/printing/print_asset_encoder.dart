@@ -37,7 +37,9 @@ class PrintAssetEncoder {
               }
             }
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
 
         // 2. Not in disk cache or URL was updated by user: fetch once and persist to disk
         final client = HttpClient()
@@ -60,7 +62,9 @@ class PrintAssetEncoder {
                 final metaFile = File('${supportDir.path}/cached_business_logo.url');
                 await logoFile.writeAsBytes(bytes);
                 await metaFile.writeAsString(source.trim());
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
               return bytes;
             }
           }
@@ -73,7 +77,9 @@ class PrintAssetEncoder {
               final bytes = await logoFile.readAsBytes();
               if (bytes.isNotEmpty) return bytes;
             }
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
         } finally {
           client.close(force: true);
         }

@@ -289,7 +289,9 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 final repo =
                     await container.read(settingsRepositoryProvider.future);
                 safeSettings = await repo.getSettings();
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
             }
             if (safeSettings == null) return;
             CustomerEntity? customer;
@@ -298,7 +300,9 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
                 final custRepo =
                     await container.read(customerRepositoryProvider.future);
                 customer = await custRepo.findById(widget.order.customerId);
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
             }
             final finalCustomer = customer ??
                 CustomerEntity(

@@ -283,7 +283,9 @@ class AuthService {
                     return localUser;
                   }
                 }
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
             }
 
             final body = e.responseBody;
@@ -721,7 +723,9 @@ class AuthService {
       });
       if (history.length > 10) history.removeRange(10, history.length);
       await _prefs.setString(_logoutHistoryKey, jsonEncode(history));
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     // Log to telemetry
     try {
@@ -735,7 +739,9 @@ class AuthService {
           'user_id': _currentUser?.id,
         },
       );
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   // ── REMEMBER ME CREDENTIALS ───────────────────────────────────────────────

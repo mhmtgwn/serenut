@@ -96,7 +96,7 @@ class AuditLogger {
             ? gatewayOrDbManager
             : (gatewayOrDbManager is DatabaseManager
                 ? DbGatewayImpl(gatewayOrDbManager)
-                : DbGatewayImpl(DatabaseManager()));
+                : DbGatewayImpl(DatabaseManager.instance));
 
   Future<void> logAction({
     required String action,
@@ -137,7 +137,9 @@ class AuditLogger {
         Map<String, dynamic> parsed = {};
         try {
           parsed = jsonDecode(detailsRaw) as Map<String, dynamic>;
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
         return {
           'id': r['id'],
           'action': r['action'],

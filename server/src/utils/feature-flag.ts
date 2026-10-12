@@ -51,7 +51,9 @@ export class FeatureFlagManager {
       } finally {
         client.release();
       }
-    } catch (_) {}
+    } catch (err: any) {
+      logger.error(`Error acquiring database connection for feature flags: ${err.message}`);
+    }
 
     // 3. Check wildcard defaults
     if (this.defaultFlags['*'] && this.defaultFlags['*'].includes(featureKey)) {

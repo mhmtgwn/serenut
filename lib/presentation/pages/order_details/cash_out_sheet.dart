@@ -21,7 +21,9 @@ Future<void> triggerOrderDeliveryPrint(
     try {
       final repo = await read(settingsRepositoryProvider.future);
       settings = await repo.getSettings();
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
   if (settings == null) return;
 
@@ -31,7 +33,9 @@ Future<void> triggerOrderDeliveryPrint(
       try {
         final custRepo = await read(customerRepositoryProvider.future);
         customer = await custRepo.findById(order.customerId);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     final cachedProducts = read(productsControllerProvider).valueOrNull ?? [];
@@ -216,7 +220,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
     AuthorizedCardPayment? cardPayment;
     try {
-      final paymentService = await ref.read(paymentServiceProvider.future);
+      final actions = ref.read(orderDetailsActionsProvider);
       final cardAmount = _selectedMethod == 'card'
           ? remaining
           : _selectedMethod == 'karma'
@@ -225,12 +229,11 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       final hasPos =
           ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
       if (cardAmount > 0 && hasPos) {
-        cardPayment =
-            await ref.read(physicalCardPaymentServiceProvider).authorize(
-                  amount: cardAmount,
-                  idempotencyKey:
-                      'order-payment-${widget.order.id}-${widget.totalPaid.toStringAsFixed(2)}',
-                );
+        cardPayment = await actions.authorizeCardPayment(
+          amount: cardAmount,
+          idempotencyKey:
+              'order-payment-${widget.order.id}-${widget.totalPaid.toStringAsFixed(2)}',
+        );
       }
       final cardMetadata = cardAmount <= 0
           ? null
@@ -241,7 +244,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
       if (_selectedMethod == 'cash') {
         if (remaining > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: remaining,
@@ -253,7 +256,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         }
       } else if (_selectedMethod == 'card') {
         if (remaining > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: remaining,
@@ -269,7 +272,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final kCard = _karmaCard;
 
         if (kCash > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: kCash,
@@ -281,7 +284,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           currentPaid += kCash;
         }
         if (kCard > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: kCard,
@@ -294,10 +297,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       }
 
       if (cardPayment != null) {
-        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
-              cardPayment,
-              contextId: widget.order.id,
-            );
+        await actions.commitCardPayment(
+          cardPayment,
+          contextId: widget.order.id,
+        );
       }
 
       final bool canMarkDelivered = widget.markDelivered;
@@ -367,7 +370,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 final repo =
                     await container.read(settingsRepositoryProvider.future);
                 settings = await repo.getSettings();
-              } catch (_) {}
+              } catch (_) {
+                // Ignored: fallback or safe default applied
+              }
             }
             final safeSettings = settings;
             if (safeSettings != null) {
@@ -377,7 +382,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   final custRepo =
                       await container.read(customerRepositoryProvider.future);
                   customer = await custRepo.findById(customerId);
-                } catch (_) {}
+                } catch (_) {
+                  // Ignored: fallback or safe default applied
+                }
               }
 
               final receiptItems = orderRef.items.map((item) {

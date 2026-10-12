@@ -335,10 +335,14 @@ class TelemetryService {
             if (seenIds.add(key)) {
               list.add(ev);
             }
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     // Merge in-memory queue so newly emitted session events are always included
     for (final ev in _inMemoryQueue) {
@@ -374,6 +378,8 @@ class TelemetryService {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 }

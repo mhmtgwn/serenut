@@ -431,7 +431,9 @@ class ProductEntity {
         'name': name,
         'description': description,
         'price': price,
+        'price_minor': (price * 100).round(),
         'purchase_price': purchasePrice,
+        'purchase_price_minor': (purchasePrice * 100).round(),
         'quantity': quantity,
         'min_stock': minStock,
         'brand': brand,
@@ -545,6 +547,7 @@ class CustomerEntity {
         'address': address ?? '',
         'phone': phone,
         'balance': balance,
+        'balance_minor': (balance * 100).round(),
         'created_at': createdAt.toIso8601String(),
       };
 
@@ -611,8 +614,11 @@ class SaleEntity {
         'id': id,
         'customer_id': customerId,
         'total_amount': totalAmount,
+        'total_amount_minor': (totalAmount * 100).round(),
         'paid_amount': paidAmount,
+        'paid_amount_minor': (paidAmount * 100).round(),
         'discount_amount': discountAmount,
+        'discount_amount_minor': (discountAmount * 100).round(),
         'payment_method': paymentMethod,
         'status': status,
         'created_at': createdAt.toIso8601String(),
@@ -716,8 +722,11 @@ class FinancialTransactionEntity {
         'type': type,
         'customer_id': customerId,
         'amount': amount,
+        'amount_minor': (amount * 100).round(),
         'paid_amount': paidAmount,
+        'paid_amount_minor': (paidAmount * 100).round(),
         'debt_amount': debtAmount,
+        'debt_amount_minor': (debtAmount * 100).round(),
         'date': date.toIso8601String(),
         'reference_id': referenceId,
         'metadata': metadata,
@@ -752,7 +761,9 @@ class FinancialTransactionEntity {
             try {
               final decoded = jsonDecode(m);
               if (decoded is Map) return Map<String, dynamic>.from(decoded);
-            } catch (_) {}
+            } catch (_) {
+              // Ignored: fallback or safe default applied
+            }
           }
           return null;
         }(),

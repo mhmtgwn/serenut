@@ -221,7 +221,9 @@ if (-not \$success) {
       });
       try {
         await tempFile.delete();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
       return res.exitCode == 0;
     } catch (e) {
       debugPrint('PowerShell fallback printing failed: $e');
@@ -597,12 +599,16 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
         _getDefaultPrinter = _dylib.lookupFunction<
             GetDefaultPrinterWUtf16Func, GetDefaultPrinterWDartFunc>(
             'GetDefaultPrinterW');
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
       try {
         _enumPrinters = _dylib.lookupFunction<
             EnumPrintersWFunc, EnumPrintersWDartFunc>(
             'EnumPrintersW');
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
   }
 

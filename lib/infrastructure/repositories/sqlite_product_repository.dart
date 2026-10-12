@@ -270,7 +270,9 @@ class SqliteProductRepository implements IProductRepository {
       await _gateway.transaction(() async {
         try {
           await _executor.execute('PRAGMA defer_foreign_keys = ON;');
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
 
         // Fetch original created_at to preserve product creation timestamp
         final oldRows = await _executor.query(
@@ -398,83 +400,8 @@ class SqliteProductRepository implements IProductRepository {
       }
     }
 
-    // 2. Update open/deferred sale items & sale totals & customer debt/balances
-    final affectedSaleRows = await _executor.rawQuery('''
-      SELECT DISTINCT si.sale_id, s.customer_id, s.paid_amount
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE si.product_id = ? AND s.status != 'cancelled' AND s.is_deleted = 0
-        AND (s.payment_method = 'debt' OR s.paid_amount < s.total_amount)
-    ''', [productId]);
-
-    if (affectedSaleRows.isNotEmpty) {
-      await _executor.rawUpdate('''
-        UPDATE sale_items
-        SET unit_price = ?, subtotal = quantity * ?
-        WHERE product_id = ? AND sale_id IN (
-          SELECT id FROM sales WHERE status != 'cancelled' AND is_deleted = 0 AND (payment_method = 'debt' OR paid_amount < total_amount)
-        )
-      ''', [newPrice, newPrice, productId]);
-
-      final affectedCustomerIds = <String>{};
-
-      await _executor.update('ledger_bypass_flag', {'active': 1});
-      try {
-        for (final row in affectedSaleRows) {
-          final saleId = row['sale_id'] as String;
-          final customerId = row['customer_id'] as String;
-          final paidAmount = (row['paid_amount'] as num?)?.toDouble() ?? 0.0;
-
-          if (customerId.isNotEmpty) affectedCustomerIds.add(customerId);
-
-          final totalResult = await _executor.rawQuery('''
-            SELECT SUM(subtotal) as total FROM sale_items WHERE sale_id = ?
-          ''', [saleId]);
-          final newTotal =
-              (totalResult.first['total'] as num?)?.toDouble() ?? 0.0;
-          final newDebt = (newTotal - paidAmount).clamp(0.0, double.infinity);
-
-          await _executor.rawUpdate('''
-            UPDATE sales
-            SET total_amount = ?, updated_at = ?, is_synced = 0
-            WHERE id = ?
-          ''', [newTotal, nowStr, saleId]);
-
-          await _executor.rawUpdate('''
-            UPDATE financial_transactions
-            SET amount = ?, debt_amount = ?
-            WHERE reference_id = ? AND type = 'sale'
-          ''', [newTotal, newDebt, saleId]);
-        }
-      } finally {
-        await _executor.update('ledger_bypass_flag', {'active': 0});
-      }
-
-      for (final customerId in affectedCustomerIds) {
-        final debtResult = await _executor.rawQuery('''
-          SELECT SUM(debt_amount) as total_debt
-          FROM financial_transactions
-          WHERE customer_id = ? AND is_deleted = 0
-        ''', [customerId]);
-        final totalDebt =
-            (debtResult.first['total_debt'] as num?)?.toDouble() ?? 0.0;
-
-        final paymentsResult = await _executor.rawQuery('''
-          SELECT SUM(amount) as total_payments
-          FROM financial_transactions
-          WHERE customer_id = ? AND type = 'collection' AND is_deleted = 0
-        ''', [customerId]);
-        final totalPayments =
-            (paymentsResult.first['total_payments'] as num?)?.toDouble() ?? 0.0;
-
-        final newBalance = totalPayments - totalDebt;
-        await _executor.rawUpdate('''
-          UPDATE customers
-          SET balance = ?, updated_at = ?, is_synced = 0
-          WHERE id = ?
-        ''', [newBalance, nowStr, customerId]);
-      }
-    }
+    // Open/unfulfilled orders update completed. Historical completed sales and financial
+    // transactions are immutable financial facts and must never be altered retroactively.
   }
 
   @override

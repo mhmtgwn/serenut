@@ -20,7 +20,7 @@ extension SyncV4Materializer on SyncV4Service {
     }
     if (type == 'refund') {
       if (change['operation'] == 'DELETE') throw StateError('immutable_refund');
-      await this._applyRefund(db, id, payload);
+      await _applyRefund(db, id, payload);
       return;
     }
     final table = switch (type) {
@@ -79,13 +79,13 @@ extension SyncV4Materializer on SyncV4Service {
       // requires one, so use a deterministic value that is stable on replay.
       payload['order_number'] = 'SYNC-$id';
     }
-    final row = await this._normalizeRowForLocalSchema(
+    final row = await _normalizeRowForLocalSchema(
       db,
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
     if (type == 'order') {
-      await this._disambiguateOrderNumber(db, row, id);
+      await _disambiguateOrderNumber(db, row, id);
     }
     if ((type == 'order' || type == 'sale') && row['customer_id'] != null) {
       final customerId = row['customer_id'].toString().trim();
@@ -131,35 +131,12 @@ extension SyncV4Materializer on SyncV4Service {
         limit: 1,
       );
       if (existing.isNotEmpty) {
+        // Append-only ledger invariant: Existing transactions are immutable financial facts.
+        // Only synchronization metadata (is_synced) can be updated on an acknowledged record.
         final prev = existing.first;
-        final amountChanged =
-            (_syncDouble(prev['amount']) - _syncDouble(row['amount'])).abs() >
-                0.001;
-        final paidChanged =
-            (_syncDouble(prev['paid_amount']) - _syncDouble(row['paid_amount']))
-                    .abs() >
-                0.001;
-        final debtChanged =
-            (_syncDouble(prev['debt_amount']) - _syncDouble(row['debt_amount']))
-                    .abs() >
-                0.001;
-        final customerChanged =
-            prev['customer_id']?.toString() != row['customer_id']?.toString();
-        if (amountChanged || paidChanged || debtChanged || customerChanged) {
-          await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-          try {
-            await db.update(table, row, where: 'id = ?', whereArgs: [id]);
-          } finally {
-            await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-          }
-        } else if ((prev['is_synced'] as num?)?.toInt() != 1) {
-          await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-          try {
-            await db.update(table, {'is_synced': 1},
-                where: 'id = ?', whereArgs: [id]);
-          } finally {
-            await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-          }
+        if ((prev['is_synced'] as num?)?.toInt() != 1) {
+          await db.update(table, {'is_synced': 1},
+              where: 'id = ?', whereArgs: [id]);
         }
         return;
       }
@@ -219,7 +196,10 @@ extension SyncV4Materializer on SyncV4Service {
               'product_name': source['product_name'],
               'quantity': quantity,
               'unit_price': unitPrice,
+              'unit_price_minor': (unitPrice * 100).round(),
               if (type == 'sale') 'subtotal': quantity * unitPrice,
+              if (type == 'sale')
+                'subtotal_minor': ((quantity * unitPrice) * 100).round(),
               'created_at': source['created_at'] ??
                   DateTime.now().toUtc().toIso8601String(),
             },
@@ -386,6 +366,16 @@ extension SyncV4Materializer on SyncV4Service {
     }
     if (columns.contains('updated_at') && row['updated_at'] == null) {
       row['updated_at'] = row['created_at'] ?? now;
+    }
+    // Dual-write: Populate *_minor currency columns if local schema contains them
+    for (final col in columns) {
+      if (col.endsWith('_minor') && row[col] == null) {
+        final baseName = col.substring(0, col.length - 6);
+        if (source.containsKey(baseName) && source[baseName] != null) {
+          final val = _syncDouble(source[baseName]);
+          row[col] = (val * 100).round();
+        }
+      }
     }
     return row;
   }

@@ -1,3 +1,4 @@
+import 'package:serenutos/providers/database_provider.dart';
 // lib/providers/sms_provider.dart
 // Serenut OS — SMS Service Riverpod Provider
 // Created: 24 Jun 2026
@@ -8,7 +9,6 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/domain/notifications/sms_notification_handler.dart';
 import 'package:serenutos/infrastructure/repositories/sms_log_repository.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
@@ -91,7 +91,7 @@ final smsGatewayServiceProvider = Provider<SmsGatewayService>((ref) {
 
 /// Provider for SmsLogRepository
 final smsLogRepositoryProvider = Provider<SmsLogRepository>((ref) {
-  return SmsLogRepository(DatabaseManager());
+  return SmsLogRepository(ref.watch(databaseManagerProvider));
 });
 
 /// Global provider for WhatsApp outbox with automatic background flushing

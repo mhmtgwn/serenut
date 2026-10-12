@@ -7,6 +7,7 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -28,16 +29,8 @@ void main() {
       databaseManager = DatabaseManager();
       db = await databaseManager.getDatabase();
 
-      // Clean tables in correct foreign key constraint order
-      await db.update('ledger_bypass_flag', {'active': 1});
-      await db.delete('sale_items');
-      await db.delete('order_items');
-      await db.delete('sales');
-      await db.delete('orders');
-      await db.delete('financial_transactions');
-      await db.delete('customers');
-      await db.delete('products');
-      await db.update('ledger_bypass_flag', {'active': 0});
+      // Clean tables cleanly via transaction-safe DataResetService
+      await DataResetService.clearOperationalTables(db);
 
       final gateway = DbGatewayImpl(databaseManager);
       productRepo = SqliteProductRepository(gateway);
@@ -195,17 +188,17 @@ void main() {
         final orderRows = await db.query('orders', where: 'id = ?', whereArgs: [orderId]);
         expect(orderRows.first['total_amount'], equals(300.0)); // 2x 150 = 300
 
-        // Verify sale item, sale total, and financial transaction
+        // Verify completed sale item, sale total, and financial transaction remain immutable
         final saleItems = await db.query('sale_items', where: 'sale_id = ?', whereArgs: [saleId]);
-        expect(saleItems.first['unit_price'], equals(150.0));
-        expect(saleItems.first['subtotal'], equals(450.0)); // 3x 150 = 450
+        expect(saleItems.first['unit_price'], equals(100.0));
+        expect(saleItems.first['subtotal'], equals(300.0));
 
         final saleRows = await db.query('sales', where: 'id = ?', whereArgs: [saleId]);
-        expect(saleRows.first['total_amount'], equals(450.0));
+        expect(saleRows.first['total_amount'], equals(300.0));
 
         final ftRows = await db.query('financial_transactions', where: 'reference_id = ?', whereArgs: [saleId]);
-        expect(ftRows.first['amount'], equals(450.0));
-        expect(ftRows.first['debt_amount'], equals(450.0));
+        expect(ftRows.first['amount'], equals(300.0));
+        expect(ftRows.first['debt_amount'], equals(300.0));
       });
     });
 

@@ -26,9 +26,12 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
     final orphanedOrderItems =
         Sqflite.firstIntValue(orphanOrderItemsResult) ?? 0;
 
-    // 3. Orphaned Order Payments
+    // 3. Orphaned Order Payments (table may not exist in production POS schema)
     int orphanedOrderPayments = 0;
-    try {
+    final orderPaymentsTableExists = await _gateway.rawQuery('''
+      SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'order_payments' LIMIT 1
+    ''');
+    if (orderPaymentsTableExists.isNotEmpty) {
       final orphanOrderPaymentsResult = await _gateway.rawQuery('''
         SELECT COUNT(*) as cnt 
         FROM order_payments 
@@ -36,9 +39,6 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       ''');
       orphanedOrderPayments =
           Sqflite.firstIntValue(orphanOrderPaymentsResult) ?? 0;
-    } catch (_) {
-      // order_payments table does not exist in production POS schema
-      orphanedOrderPayments = 0;
     }
 
     // 4. Orphaned Transactions
@@ -78,20 +78,9 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
     final driftsResult = await _gateway.rawQuery('''
       SELECT COUNT(*) as cnt FROM (
         SELECT c.id, c.balance,
-               -- NOT: Bu bakiye toplama formulu DatabaseManager.customerBalanceSql ile senkron tutulmalidir.
-               COALESCE(SUM(
-                 CASE 
-                   WHEN ft.type = 'sale' THEN -ft.debt_amount
-                   WHEN ft.type = 'manual_debt' THEN -ft.debt_amount
-                   WHEN ft.type = 'payment' THEN ft.paid_amount
-                   WHEN ft.type = 'cancellation' THEN ft.debt_amount
-                   WHEN ft.type = 'collection' THEN ft.paid_amount
-                   WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                   ELSE 0
-                 END
-               ), 0) as expected
+               COALESCE(SUM(v.balance_effect), 0.0) as expected
         FROM customers c
-        LEFT JOIN financial_transactions ft ON c.id = ft.customer_id
+        LEFT JOIN v_customer_ledger_effect v ON c.id = v.customer_id
         GROUP BY c.id
         HAVING ABS(c.balance - expected) > 0.01
       )
@@ -144,20 +133,9 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       // 6. Recalculate and update customer balance drifts
       final driftsResult = await _gateway.rawQuery('''
         SELECT c.id,
-               -- NOT: Bu bakiye toplama formulu DatabaseManager.customerBalanceSql ile senkron tutulmalidir.
-               COALESCE(SUM(
-                 CASE 
-                   WHEN ft.type = 'sale' THEN -ft.debt_amount
-                   WHEN ft.type = 'manual_debt' THEN -ft.debt_amount
-                   WHEN ft.type = 'payment' THEN ft.paid_amount
-                   WHEN ft.type = 'cancellation' THEN ft.debt_amount
-                   WHEN ft.type = 'collection' THEN ft.paid_amount
-                   WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-                   ELSE 0
-                 END
-               ), 0) as expected
+               COALESCE(SUM(v.balance_effect), 0.0) as expected
         FROM customers c
-        LEFT JOIN financial_transactions ft ON c.id = ft.customer_id
+        LEFT JOIN v_customer_ledger_effect v ON c.id = v.customer_id
         GROUP BY c.id
         HAVING ABS(c.balance - expected) > 0.01
       ''');

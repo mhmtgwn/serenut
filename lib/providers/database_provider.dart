@@ -18,14 +18,18 @@ import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 /// ```dart
 /// final db = await ref.watch(databaseProvider.future);
 /// ```
+final databaseManagerProvider = Provider<DatabaseManager>((ref) {
+  return DatabaseManager.instance;
+});
+
 final databaseProvider = FutureProvider<Database>((ref) async {
-  final dbManager = DatabaseManager();
+  final dbManager = ref.watch(databaseManagerProvider);
   return dbManager.getDatabase();
 });
 
 /// Get DbGateway instance (lock-safe query suspension boundary)
 final dbGatewayProvider = Provider<DbGateway>((ref) {
-  final dbManager = DatabaseManager();
+  final dbManager = ref.watch(databaseManagerProvider);
   return DbGatewayImpl(dbManager);
 });
 

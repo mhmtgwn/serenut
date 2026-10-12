@@ -81,7 +81,6 @@ class InventoryService {
   /// Decreases product stock levels for the given items and publishes StockChangedEvents.
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
-      final product = await _productRepository.findById(item.productId);
       final double qtyToDeduct = (item.saleQuantity > 0)
           ? item.saleQuantity
           : item.quantity.toDouble();
@@ -104,7 +103,6 @@ class InventoryService {
   /// Increases product stock levels for the given items (returns/reversals) and publishes StockChangedEvents.
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
-      final product = await _productRepository.findById(item.productId);
       final double qtyToApply = (item.saleQuantity > 0)
           ? item.saleQuantity
           : item.quantity.toDouble();

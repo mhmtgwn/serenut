@@ -5,6 +5,7 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 
 void main() {
   databaseFactory = databaseFactoryFfi;
@@ -32,10 +33,7 @@ void main() {
     const String custId = 'concurrency-test-customer';
 
     setUp(() async {
-      await db.update('ledger_bypass_flag', {'active': 1});
-      await db.delete('financial_transactions');
-      await db.delete('customers');
-      await db.update('ledger_bypass_flag', {'active': 0});
+      await DataResetService.clearOperationalTables(db);
 
       await customerRepo.create(CustomerEntity(
         id: custId,

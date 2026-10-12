@@ -4,7 +4,7 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 class DatabaseTriggers {
-  static Future<void> createTriggers(Database db) async {
+  static Future<void> createTriggers(DatabaseExecutor db) async {
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_insert');
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_update');
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_delete');
@@ -14,9 +14,7 @@ class DatabaseTriggers {
     // Block updates to ensure ledger immutability (financial fields cannot be altered)
     await db.execute('''
       CREATE TRIGGER trg_ft_block_update BEFORE UPDATE ON financial_transactions
-      WHEN (SELECT active FROM ledger_bypass_flag LIMIT 1) = 0
-       AND NEW.is_synced != 1
-       AND (
+      WHEN (
          OLD.id != NEW.id OR
          OLD.type != NEW.type OR
          OLD.customer_id != NEW.customer_id OR
@@ -34,7 +32,6 @@ class DatabaseTriggers {
     // Block deletions to ensure ledger immutability
     await db.execute('''
       CREATE TRIGGER trg_ft_block_delete BEFORE DELETE ON financial_transactions
-      WHEN (SELECT active FROM ledger_bypass_flag LIMIT 1) = 0
       BEGIN
         SELECT RAISE(ABORT, 'Kritik Hata: Finansal defter kayıtları silinemez (Ledger Immutability).');
       END;
@@ -51,11 +48,10 @@ class DatabaseTriggers {
           NEW.id,
           c.balance,
           c.balance + CASE 
-            WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
-            WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
-            WHEN NEW.type = 'payment' THEN NEW.paid_amount
-            WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
-            WHEN NEW.type = 'collection' THEN NEW.paid_amount
+            WHEN COALESCE(NEW.is_deleted, 0) != 0 THEN 0
+            WHEN NEW.type IN ('sale', 'manual_debt') THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
+            WHEN NEW.type IN ('payment', 'collection') THEN NEW.paid_amount
+            WHEN NEW.type = 'cancellation' THEN (CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
             WHEN NEW.type = 'refund' AND NEW.paid_amount = 0 THEN NEW.amount
             ELSE 0
           END,
@@ -65,11 +61,10 @@ class DatabaseTriggers {
 
         UPDATE customers
         SET balance = balance + CASE 
-          WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
-          WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
-          WHEN NEW.type = 'payment' THEN NEW.paid_amount
-          WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
-          WHEN NEW.type = 'collection' THEN NEW.paid_amount
+          WHEN COALESCE(NEW.is_deleted, 0) != 0 THEN 0
+          WHEN NEW.type IN ('sale', 'manual_debt') THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
+          WHEN NEW.type IN ('payment', 'collection') THEN NEW.paid_amount
+          WHEN NEW.type = 'cancellation' THEN (CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
           WHEN NEW.type = 'refund' AND NEW.paid_amount = 0 THEN NEW.amount
           ELSE 0
         END
@@ -78,16 +73,15 @@ class DatabaseTriggers {
     ''');
 
     await db.execute('''
-      CREATE TRIGGER trg_ft_update AFTER UPDATE OF type, customer_id, amount, paid_amount, debt_amount ON financial_transactions
+      CREATE TRIGGER trg_ft_update AFTER UPDATE OF type, customer_id, amount, paid_amount, debt_amount, is_deleted ON financial_transactions
       BEGIN
         -- Reverse the OLD transaction effect
         UPDATE customers
         SET balance = balance - CASE 
-          WHEN OLD.type = 'sale' THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
-          WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
-          WHEN OLD.type = 'payment' THEN OLD.paid_amount
-          WHEN OLD.type = 'cancellation' THEN OLD.debt_amount
-          WHEN OLD.type = 'collection' THEN OLD.paid_amount
+          WHEN COALESCE(OLD.is_deleted, 0) != 0 THEN 0
+          WHEN OLD.type IN ('sale', 'manual_debt') THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
+          WHEN OLD.type IN ('payment', 'collection') THEN OLD.paid_amount
+          WHEN OLD.type = 'cancellation' THEN (CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
           WHEN OLD.type = 'refund' AND OLD.paid_amount = 0 THEN OLD.amount
           ELSE 0
         END
@@ -96,11 +90,10 @@ class DatabaseTriggers {
         -- Apply the NEW transaction effect
         UPDATE customers
         SET balance = balance + CASE 
-          WHEN NEW.type = 'sale' THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
-          WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
-          WHEN NEW.type = 'payment' THEN NEW.paid_amount
-          WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
-          WHEN NEW.type = 'collection' THEN NEW.paid_amount
+          WHEN COALESCE(NEW.is_deleted, 0) != 0 THEN 0
+          WHEN NEW.type IN ('sale', 'manual_debt') THEN -(CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
+          WHEN NEW.type IN ('payment', 'collection') THEN NEW.paid_amount
+          WHEN NEW.type = 'cancellation' THEN (CASE WHEN NEW.debt_amount > 0 THEN NEW.debt_amount ELSE (NEW.amount - NEW.paid_amount) END)
           WHEN NEW.type = 'refund' AND NEW.paid_amount = 0 THEN NEW.amount
           ELSE 0
         END
@@ -114,11 +107,10 @@ class DatabaseTriggers {
         -- Reverse the OLD transaction effect
         UPDATE customers
         SET balance = balance - CASE 
-          WHEN OLD.type = 'sale' THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
-          WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
-          WHEN OLD.type = 'payment' THEN OLD.paid_amount
-          WHEN OLD.type = 'cancellation' THEN OLD.debt_amount
-          WHEN OLD.type = 'collection' THEN OLD.paid_amount
+          WHEN COALESCE(OLD.is_deleted, 0) != 0 THEN 0
+          WHEN OLD.type IN ('sale', 'manual_debt') THEN -(CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
+          WHEN OLD.type IN ('payment', 'collection') THEN OLD.paid_amount
+          WHEN OLD.type = 'cancellation' THEN (CASE WHEN OLD.debt_amount > 0 THEN OLD.debt_amount ELSE (OLD.amount - OLD.paid_amount) END)
           WHEN OLD.type = 'refund' AND OLD.paid_amount = 0 THEN OLD.amount
           ELSE 0
         END

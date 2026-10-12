@@ -17,7 +17,7 @@ class TelemetryUploadService {
   Future<void> recordMetric(String name, double value,
       {Object? metadata}) async {
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
       await db.insert('client_telemetry_logs', {
         'metric_name': name,
         'metric_value': value,
@@ -34,7 +34,7 @@ class TelemetryUploadService {
   /// Query buffer rows and post them in a batch transaction payload
   Future<void> uploadMetricsBatch() async {
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
       final List<Map<String, dynamic>> records = await db.query(
         'client_telemetry_logs',
         orderBy: 'id ASC',

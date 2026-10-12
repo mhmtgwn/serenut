@@ -35,7 +35,9 @@ router.post('/upload', async (req: AuthenticatedRequest, res: Response) => {
           ? JSON.parse(metric.metadata || '{}')
           : metric.metadata;
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
-      } catch (_) {}
+      } catch (err) {
+        logger.debug('Malformed telemetry metadata payload skipped', { err });
+      }
 
       // Never persist credentials accidentally supplied by a client.
       for (const key of ['token', 'access_token', 'refresh_token', 'password', 'authorization']) {

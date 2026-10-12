@@ -121,7 +121,7 @@ class LicenseService {
   /// customer license or a silently disabled sync session.
   bool get hasVerificationKey => _rsaModulus.trim().isNotEmpty;
 
-  Future<Database> _getDb() => DatabaseManager().getDatabase();
+  Future<Database> _getDb() => DatabaseManager.instance.getDatabase();
 
   Future<void> _setSettingsValue(String column, String? value) async {
     try {
@@ -302,7 +302,9 @@ class LicenseService {
           _prefs.setString(_maxTimestampSeenKey, utcStr);
           _setSettingsValue('max_timestamp_seen', utcStr);
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     } else {
       final utcStr = utcTime.toIso8601String();
       _cachedMaxTimestampSeen = utcStr;
@@ -320,7 +322,9 @@ class LicenseService {
       try {
         final parsedDate = DateTime.parse(httpDateHeader);
         updateMaxTimestampSeen(parsedDate);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
   }
 
@@ -590,7 +594,9 @@ class LicenseService {
         await clearLicense();
         return false;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return false;
   }
 

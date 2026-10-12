@@ -3,10 +3,10 @@ part of 'sync_v4_service.dart';
 extension SyncV4Orchestration on SyncV4Service {
   Future<SyncV4Result> sync() async {
     await DatabaseManager.waitForWriteLock();
-    final db = await DatabaseManager().getDatabase();
+    final db = await DatabaseManager.instance.getDatabase();
     var companyChanged = false;
     try {
-      companyChanged = await this._syncCompanyProfile(db);
+      companyChanged = await _syncCompanyProfile(db);
     } catch (_) {
       // Company profile synchronization is retried on the next cycle and must
       // not prevent transactional sales/inventory replication.
@@ -22,9 +22,9 @@ extension SyncV4Orchestration on SyncV4Service {
         // Product images are best-effort and never block business-data sync.
       }
     }
-    await this._snapshotPreV4DataOnce(db);
-    await this._recoverUnsyncedImportedProductsOnce(db);
-    await this._recoverUnsyncedAndRejectedEntities(db);
+    await _snapshotPreV4DataOnce(db);
+    await _recoverUnsyncedImportedProductsOnce(db);
+    await _recoverUnsyncedAndRejectedEntities(db);
     await DatabaseManager.retryOnLock(() async {
       await db.rawUpdate(
           "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
@@ -37,7 +37,7 @@ extension SyncV4Orchestration on SyncV4Service {
     var failed = 0;
     final errors = <String>[];
     while (pending.isNotEmpty) {
-      final orderedPending = this._dependencyOrder(pending);
+      final orderedPending = _dependencyOrder(pending);
       await DatabaseManager.retryOnLock(() async {
         await db.update('sync_outbox_v4', {'state': 'SENDING'},
             where:
@@ -172,7 +172,7 @@ extension SyncV4Orchestration on SyncV4Service {
       final bootstrapDto = SyncBootstrapResponseDto.fromJson(
         Map<String, dynamic>.from(bootstrap.json as Map),
       );
-      final snapshot = this._dependencyOrder(
+      final snapshot = _dependencyOrder(
         bootstrapDto.changes.map((change) => change.toMap()).toList(),
       );
       productImagesNeedCleanup = snapshot.any(_isProductImageReset);
@@ -184,9 +184,9 @@ extension SyncV4Orchestration on SyncV4Service {
             if (entityType != null && entityType.isNotEmpty) {
               pulledEntityTypes.add(entityType);
             }
-            await this._apply(txn, raw);
+            await _apply(txn, raw);
           }
-          reconciled += await this._reconcileCustomerBalances(txn);
+          reconciled += await _reconcileCustomerBalances(txn);
           cursor = bootstrapDto.nextCursor;
           await txn.insert(
               'sync_cursor_v4', {'key': 'global', 'cursor': cursor},
@@ -205,7 +205,7 @@ extension SyncV4Orchestration on SyncV4Service {
         Map<String, dynamic>.from(response.json as Map),
         cursor,
       );
-      final changes = this._dependencyOrder(
+      final changes = _dependencyOrder(
         pullDto.changes.map((c) => c.toMap()).toList(),
       );
       productImagesNeedCleanup =
@@ -221,10 +221,10 @@ extension SyncV4Orchestration on SyncV4Service {
             if (entityType != null && entityType.isNotEmpty) {
               pulledEntityTypes.add(entityType);
             }
-            await this._apply(txn, rowMap);
+            await _apply(txn, rowMap);
           }
           if (changes.isNotEmpty) {
-            reconciled += await this._reconcileCustomerBalances(txn);
+            reconciled += await _reconcileCustomerBalances(txn);
           }
           await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
               conflictAlgorithm: ConflictAlgorithm.replace);
@@ -236,7 +236,7 @@ extension SyncV4Orchestration on SyncV4Service {
     }
     await DatabaseManager.retryOnLock(() async {
       await db.transaction((txn) async {
-        reconciled += await this._reconcileCustomerBalances(txn);
+        reconciled += await _reconcileCustomerBalances(txn);
       });
     });
     if (productImagesNeedCleanup && !kIsWeb) {
@@ -284,7 +284,7 @@ extension SyncV4Orchestration on SyncV4Service {
 
         final local = rows.first;
         final logo =
-            await this._portableLogo(local['business_logo']?.toString());
+            await _portableLogo(local['business_logo']?.toString());
         final localName = local['business_name']?.toString().trim();
         final localTax = local['business_tax_id']?.toString().trim();
         final patchBody = <String, dynamic>{
@@ -469,46 +469,20 @@ extension SyncV4Orchestration on SyncV4Service {
       UPDATE customers
          SET balance = COALESCE((
            SELECT CASE
-             WHEN ABS(SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-               ELSE 0
-             END)) < 0.009 THEN 0.0
-             ELSE SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-               ELSE 0
-             END)
+             WHEN ABS(SUM(balance_effect)) < 0.009 THEN 0.0
+             ELSE SUM(balance_effect)
            END
-             FROM financial_transactions ft
-            WHERE ft.customer_id = customers.id
-              AND COALESCE(ft.is_deleted, 0) = 0
-         ), 0)
+             FROM v_customer_ledger_effect v
+            WHERE v.customer_id = customers.id
+         ), 0.0)
        WHERE ABS(balance - COALESCE((
            SELECT CASE
-             WHEN ABS(SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-               ELSE 0
-             END)) < 0.009 THEN 0.0
-             ELSE SUM(CASE
-               WHEN ft.type IN ('sale', 'manual_debt') THEN -(CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
-               WHEN ft.type = 'cancellation' THEN (CASE WHEN ft.debt_amount > 0 THEN ft.debt_amount ELSE (ft.amount - ft.paid_amount) END)
-               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
-               ELSE 0
-             END)
+             WHEN ABS(SUM(balance_effect)) < 0.009 THEN 0.0
+             ELSE SUM(balance_effect)
            END
-             FROM financial_transactions ft
-            WHERE ft.customer_id = customers.id
-              AND COALESCE(ft.is_deleted, 0) = 0
-         ), 0)) > 0.000001
+             FROM v_customer_ledger_effect v
+            WHERE v.customer_id = customers.id
+         ), 0.0)) > 0.000001
     ''');
   }
 

@@ -11,6 +11,7 @@ import {
   loadReleaseSigningPolicy,
   signReleaseHash,
 } from '../../security/release-signing';
+import { logger } from '../../config/logger';
 
 const router = Router();
 
@@ -770,7 +771,11 @@ router.delete('/:id', authenticateUser, requireRole('sysadmin'), async (req: Aut
 
     const filePath = existing.rows[0].file_path;
     if (filePath && fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (_) {}
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        logger.warn('Failed to delete physical release file', { filePath, err });
+      }
     }
 
     await runBypassingRLS('DELETE FROM app_versions WHERE id = $1', [id]);

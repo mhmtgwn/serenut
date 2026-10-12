@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/controllers/order_details_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:intl/intl.dart';
@@ -49,63 +49,9 @@ const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
 
-/// Provider — build() dışında tanımlanıyor (kritik bug düzeltmesi)
-final _orderDetailProvider = FutureProvider.autoDispose
-    .family<OrderEntity?, String>((ref, orderId) async {
-  // 1. Önce hafızadaki (OrdersController) güncel siparişi kontrol et (0ms tepki hızı)
-  final inMemoryList = ref.watch(ordersControllerProvider).valueOrNull;
-  final inMemory = inMemoryList?.where((o) => o.id == orderId).firstOrNull;
-  if (inMemory != null && inMemory.items.isNotEmpty) {
-    return inMemory;
-  }
-  final repo = await ref.watch(orderRepositoryProvider.future);
-  return repo.findById(orderId);
-});
-
-final _orderPaymentInfoProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, String>((ref, orderId) async {
-  final repo = await ref.watch(financialTransactionRepositoryProvider.future);
-  var txs = await repo.getByReferenceId(orderId);
-  FinancialTransactionEntity? saleTx;
-  double totalPaid = 0.0;
-  for (final t in txs) {
-    if (t.referenceId == orderId) {
-      if (t.type == 'sale') {
-        saleTx = t;
-        totalPaid += t.paidAmount;
-      } else if (t.type == 'payment' || t.type == 'collection') {
-        totalPaid += t.paidAmount;
-      }
-    }
-  }
-
-  String customerId = saleTx?.customerId ?? '';
-  if (customerId.isEmpty) {
-    try {
-      final orderRepo = await ref.watch(orderRepositoryProvider.future);
-      final order = await orderRepo.findById(orderId);
-      if (order != null && order.customerId.isNotEmpty) {
-        customerId = order.customerId;
-      }
-    } catch (_) {}
-  }
-
-  double? customerBalance;
-  if (customerId.isNotEmpty) {
-    try {
-      final custRepo = await ref.watch(customerRepositoryProvider.future);
-      final cust = await custRepo.findById(customerId);
-      customerBalance = cust?.balance;
-    } catch (_) {}
-  }
-
-  return {
-    'saleTx': saleTx,
-    'totalPaid': totalPaid,
-    'customerBalance': customerBalance,
-    'customerId': customerId,
-  };
-});
+/// Provider altyapısı order_details_controller.dart içindedir
+final _orderDetailProvider = orderDetailProvider;
+final _orderPaymentInfoProvider = orderPaymentInfoProvider;
 
 class OrderDetailsPage extends ConsumerWidget {
   final String orderId;
@@ -212,251 +158,75 @@ class OrderDetailsPage extends ConsumerWidget {
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.print, color: _kGreen),
-                    tooltip: 'Sipariş Fişi Yazdır',
-                    onPressed: () async {
-                      var settings =
-                          settingsAsync.valueOrNull ?? settingsAsync.value;
-                      if (settings == null) {
-                        try {
-                          final repo =
-                              await ref.read(settingsRepositoryProvider.future);
-                          settings = await repo.getSettings();
-                        } catch (_) {}
-                      }
-                      if (!context.mounted) return;
-                      if (settings == null) {
-                        AppNotificationHost.show(
-                          const SnackBar(content: Text('Ayarlar yüklenemedi.')),
-                        );
-                        return;
-                      }
-
-                      try {
-                        // Load customer
-                        CustomerEntity? customerToUse = customer;
-                        if (customerToUse == null &&
-                            order.customerId.isNotEmpty) {
-                          try {
-                            final custRepo = await ref
-                                .read(customerRepositoryProvider.future);
-                            customerToUse =
-                                await custRepo.findById(order.customerId);
-                          } catch (_) {}
-                        }
-
-                        // Resolve product names
-                        final prodRepo =
-                            await ref.read(productRepositoryProvider.future);
-                        final receiptItems =
-                            await Future.wait(order.items.map((item) async {
-                          var name = (item['product_name'] ?? item['name'])
-                              ?.toString();
-                          final productId =
-                              item['product_id']?.toString() ?? '';
-                          if (name == null ||
-                              name.isEmpty ||
-                              name == productId) {
-                            if (productId.isNotEmpty) {
-                              final p = await prodRepo.findById(productId);
-                              if (p != null) name = p.name;
-                            }
-                          }
-                          name ??= 'Ürün';
-                          return {
-                            'product_id': productId,
-                            'product_name': name,
-                            'barcode': productId,
-                            'quantity': item['quantity'],
-                            'unit_price': item['unit_price'],
-                          };
-                        }));
-
-                        final effectiveCustomer =
-                            customerToUse != null && customerToUse.id.isNotEmpty
-                                ? customerToUse
-                                : (customer != null && customer.id.isNotEmpty
-                                    ? customer
-                                    : null);
-
+                    IconButton(
+                      icon: const Icon(Icons.print, color: _kGreen),
+                      tooltip: 'Sipariş Fişi Yazdır',
+                      onPressed: () async {
                         try {
                           await ref
-                              .read(printingApplicationServiceProvider)
-                              .queueOrderReceipt(
-                                order,
-                                receiptItems,
-                                effectiveCustomer,
-                                settings,
+                              .read(orderDetailsActionsProvider)
+                              .printReceipt(
+                                order: order,
+                                customer: customer,
+                                currentSettings: settingsAsync.valueOrNull ??
+                                    settingsAsync.value,
                               );
-                        } catch (queueErr) {
-                          debugPrint(
-                              'Queue print error, fallback to direct printer: $queueErr');
-                          final printerService =
-                              ref.read(printerServiceProvider);
-                          await printerService.printOrderReceipt(
-                            order,
-                            receiptItems,
-                            effectiveCustomer,
-                            settings,
+                          if (!context.mounted) return;
+                          AppNotificationHost.show(
+                            const SnackBar(
+                              content:
+                                  Text('Sipariş fişi başarıyla yazdırıldı.'),
+                              backgroundColor: POSColors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } catch (e, st) {
+                          unawaited(TelemetryService().logError(e, st,
+                              context: 'order_receipt_print'));
+                          if (!context.mounted) return;
+                          AppNotificationHost.show(
+                            SnackBar(
+                              content: Text('Yazdirma hatası: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
                           );
                         }
-
-                        if (!context.mounted) return;
-                        AppNotificationHost.show(
-                          const SnackBar(
-                            content: Text('Sipariş fişi başarıyla yazdırıldı.'),
-                            backgroundColor: POSColors.green,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      } catch (e, st) {
-                        unawaited(TelemetryService()
-                            .logError(e, st, context: 'order_receipt_print'));
-                        if (!context.mounted) return;
-                        AppNotificationHost.show(
-                          SnackBar(
-                            content: Text('Yazdirma hatası: $e'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon:
-                        const Icon(Icons.local_offer_outlined, color: _kGreen),
-                    tooltip: 'Sipariş Etiketi Yazdır',
-                    onPressed: () async {
-                      var settings =
-                          settingsAsync.valueOrNull ?? settingsAsync.value;
-                      if (settings == null) {
-                        try {
-                          final repo =
-                              await ref.read(settingsRepositoryProvider.future);
-                          settings = await repo.getSettings();
-                        } catch (_) {}
-                      }
-                      if (!context.mounted) return;
-                      if (settings == null) {
-                        AppNotificationHost.show(
-                          const SnackBar(content: Text('Ayarlar yüklenemedi.')),
-                        );
-                        return;
-                      }
-                      bool hasLabelPrinter = false;
-                      try {
-                        hasLabelPrinter = await ref
-                            .read(printingRepositoryProvider)
-                            .hasUsableDevice(PrintDocumentKind.orderLabel);
-                      } catch (_) {}
-                      if (!hasLabelPrinter) {
-                        hasLabelPrinter = (settings.labelPrinterEnabled &&
-                            ((settings.labelPrinterName?.isNotEmpty == true) ||
-                                (settings.labelPrinterIp?.isNotEmpty == true)));
-                      }
-                      if (!context.mounted) return;
-                      if (!hasLabelPrinter) {
-                        AppNotificationHost.show(
-                          const SnackBar(
-                            content: Text(
-                              'Lütfen Ayarlar sayfasından bir etiket yazıcısı tanımlayın.',
-                            ),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                        return;
-                      }
-                      CustomerEntity? customerToUse = customer;
-                      if (customerToUse == null &&
-                          order.customerId.isNotEmpty) {
-                        try {
-                          final customerRepo =
-                              await ref.read(customerRepositoryProvider.future);
-                          customerToUse =
-                              await customerRepo.findById(order.customerId);
-                        } catch (_) {}
-                      }
-                      double totalPaid = 0.0;
-                      try {
-                        final txRepo = await ref.read(
-                            financialTransactionRepositoryProvider.future);
-                        var txs = await txRepo.getByReferenceId(order.id);
-                        if (txs.isEmpty && order.customerId.isNotEmpty) {
-                          txs = await txRepo.getByCustomerId(order.customerId);
-                        }
-                        for (final t in txs) {
-                          if (t.referenceId == order.id) {
-                            if (t.type == 'sale' ||
-                                t.type == 'payment' ||
-                                t.type == 'collection') {
-                              totalPaid += t.paidAmount;
-                            }
-                          }
-                        }
-                      } catch (_) {}
-                      final prodRepo =
-                          await ref.read(productRepositoryProvider.future);
-                      final items =
-                          await Future.wait(order.items.map((item) async {
-                        final normalized = Map<String, dynamic>.from(item);
-                        final productId = item['product_id']?.toString() ?? '';
-                        var name =
-                            (item['product_name'] ?? item['name'])?.toString();
-                        if (name == null || name.isEmpty || name == productId) {
-                          if (productId.isNotEmpty) {
-                            final p = await prodRepo.findById(productId);
-                            if (p != null) name = p.name;
-                          }
-                        }
-                        normalized['product_name'] = name ?? productId;
-                        return normalized;
-                      }));
-                      try {
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.local_offer_outlined,
+                          color: _kGreen),
+                      tooltip: 'Sipariş Etiketi Yazdır',
+                      onPressed: () async {
                         try {
                           await ref
-                              .read(printingApplicationServiceProvider)
-                              .queueOrderLabel(
-                                order,
-                                items,
-                                settings,
-                                customer: customerToUse,
-                                paidAmount: totalPaid,
+                              .read(orderDetailsActionsProvider)
+                              .printLabel(
+                                order: order,
+                                customer: customer,
+                                currentSettings: settingsAsync.valueOrNull ??
+                                    settingsAsync.value,
                               );
-                        } catch (queueErr) {
-                          debugPrint(
-                              'Queue label print error, fallback to direct printer: $queueErr');
-                          final printerService =
-                              ref.read(printerServiceProvider);
-                          await printerService.printOrderLabels(
-                            order,
-                            items,
-                            settings,
-                            customer: customerToUse,
+                          if (!context.mounted) return;
+                          AppNotificationHost.show(
+                            const SnackBar(
+                              content:
+                                  Text('Sipariş etiketi başarıyla yazdırıldı.'),
+                              backgroundColor: POSColors.green,
+                            ),
+                          );
+                        } catch (error) {
+                          if (!context.mounted) return;
+                          AppNotificationHost.show(
+                            SnackBar(
+                              content: Text('Sipariş etiketi hatası: $error'),
+                              backgroundColor: Colors.red,
+                            ),
                           );
                         }
-
-                        if (!context.mounted) return;
-                        AppNotificationHost.show(
-                          const SnackBar(
-                            content: Text(
-                              'Sipariş etiketi başarıyla yazdırıldı.',
-                            ),
-                            backgroundColor: POSColors.green,
-                          ),
-                        );
-                      } catch (error) {
-                        if (!context.mounted) return;
-                        AppNotificationHost.show(
-                          SnackBar(
-                            content: Text('Sipariş etiketi hatası: $error'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                  ),
+                      },
+                    ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, color: Colors.blue),
                     tooltip: 'Siparişi Düzenle',

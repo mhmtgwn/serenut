@@ -10,6 +10,7 @@ import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 
 void main() {
   databaseFactory = databaseFactoryFfi;
@@ -42,11 +43,8 @@ void main() {
     const String custId = 'deterministic-customer';
 
     setUp(() async {
-      await db.update('ledger_bypass_flag', {'active': 1});
-      await db.delete('financial_transactions');
+      await DataResetService.clearOperationalTables(db);
       await db.delete('trigger_audit_logs');
-      await db.delete('customers');
-      await db.update('ledger_bypass_flag', {'active': 0});
 
       InMemoryDb.transactions.clear();
       InMemoryDb.customers.clear();

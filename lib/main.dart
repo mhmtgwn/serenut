@@ -1,71 +1,31 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:serenutos/config/app_platform.dart';
-import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/config/router.dart';
-import 'package:serenutos/domain/services/auth_service.dart';
-import 'package:serenutos/providers/event_providers.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/sync_provider.dart';
-import 'package:serenutos/providers/sms_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/providers/printing_providers.dart';
-import 'package:serenutos/providers/hardware_devices_provider.dart';
-import 'package:serenutos/domain/services/license_service.dart';
-import 'package:serenutos/domain/hardware/hardware_device.dart';
-import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/repository_providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/infrastructure/database/db_gateway.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
-import 'package:serenutos/infrastructure/services/password_hash_service.dart';
-import 'package:serenutos/domain/services/version_checker.dart';
-import 'package:serenutos/domain/services/error_boundary.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
-import 'package:serenutos/infrastructure/network/trusted_ca_http_overrides.dart';
-import 'package:serenutos/domain/services/device_manager.dart';
-import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:serenutos/presentation/pages/force_update_page.dart';
-import 'package:serenutos/presentation/widgets/update_dialog.dart';
+
+import 'package:serenutos/config/app_platform.dart';
+import 'package:serenutos/config/environment.dart';
+import 'package:serenutos/config/router.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/services/version_checker.dart';
+import 'package:serenutos/infrastructure/bootstrap/app_bootstrap.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
-import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
-import 'package:serenutos/presentation/widgets/app_notification_host.dart';
-import 'package:serenutos/presentation/observers/telemetry_provider_observer.dart';
-import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/presentation/pages/force_update_page.dart';
+import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
+import 'package:serenutos/presentation/widgets/update_dialog.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/event_providers.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) {
-    try {
-      final trustedRoot =
-          await rootBundle.load('assets/certificates/isrgrootx1.pem');
-      HttpOverrides.global = TrustedCaHttpOverrides(
-        trustedRoot.buffer.asUint8List(
-          trustedRoot.offsetInBytes,
-          trustedRoot.lengthInBytes,
-        ),
-      );
-    } catch (error) {
-      // A packaging mistake must never prevent the application window from
-      // opening. Network calls will surface their normal TLS error instead.
-      debugPrint('Trusted CA initialization failed: $error');
-    }
-  }
-
   final envConfig = EnvironmentConfig.current;
   await SentryFlutter.init(
     (options) {
@@ -79,159 +39,11 @@ void main() async {
       options.enableAutoSessionTracking = true;
     },
     appRunner: () async {
-      ErrorBoundary.install();
-      await initializeDateFormatting('tr_TR', null);
-
-      if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
-        sqfliteFfiInit();
-        databaseFactory = databaseFactoryFfi;
-      }
-
-      // Initialize SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-
-      // Initialize AuthService with required dependencies
-      final IUserRepository userRepository;
-      DatabaseManager? dbManager;
-      dbManager = DatabaseManager();
-      final gateway = DbGatewayImpl(dbManager);
-      userRepository = SqliteUserRepository(gateway);
-      final hashService = PasswordHashServiceImpl();
-      final apiClient = ApiClient();
-
-      final licenseService = LicenseService(prefs);
-      await licenseService.initialize();
-      if (licenseService.getLicenseInfo() != null) {
-        licenseService.startHeartbeat(apiClient);
-      }
-
-      final deviceManager = DeviceManager(prefs);
-      final fingerprintService = DeviceFingerprintService(prefs, deviceManager);
-      final settingsRepository = SqliteSettingsRepository(gateway);
-
-      // Attach device and license metadata to Sentry scope for remote diagnostics
-      try {
-        final deviceId = deviceManager.getDeviceId();
-        final license = licenseService.getLicenseInfo();
-        Sentry.configureScope((scope) {
-          scope.setTag('device_id', deviceId);
-          if (license != null) {
-            scope.setTag('merchant_id', license.merchantId);
-            scope.setTag('license_tier', license.tier.name);
-            if (license.activationId != null) {
-              scope.setTag('activation_id', license.activationId!);
-            }
-          }
-        });
-      } catch (_) {}
-
-      final authService = AuthService(
-        userRepository: userRepository,
-        hashService: hashService,
-        apiClient: apiClient,
-        deviceManager: deviceManager,
-        licenseService: licenseService,
-        deviceFingerprintService: fingerprintService,
-        cacheCompanyProfile: (company) async {
-          final prefs = await SharedPreferences.getInstance();
-          if (prefs.getBool('sync_v4_company_dirty') == true) {
-            debugPrint(
-                '[Auth] Local company changes are dirty; preserving local profile.');
-            return;
-          }
-          final current = await settingsRepository.getSettings();
-          final localIsCustomized = current.businessName.isNotEmpty &&
-              current.businessName != 'Serenut OS';
-          if (localIsCustomized) {
-            debugPrint(
-                '[Auth] Local business profile is customized ("${current.businessName}"); preserving against unversioned bootstrap.');
-            return;
-          }
-
-          final rawName = company['name']?.toString().trim();
-          final remoteName =
-              (rawName != null && rawName.isNotEmpty) ? rawName : '';
-          if (remoteName.isNotEmpty && remoteName != 'Serenut OS') {
-            final phone = company['phone']?.toString().trim();
-            final address = company['address']?.toString().trim();
-            final taxNum = company['tax_number']?.toString().trim();
-            final owner = company['owner_name']?.toString().trim();
-            final email = company['email']?.toString().trim();
-            final city = company['city']?.toString().trim();
-            final district = company['district']?.toString().trim();
-            await settingsRepository.updateSettings(current.copyWith(
-              businessName: remoteName,
-              businessPhone: (phone != null && phone.isNotEmpty)
-                  ? phone
-                  : current.businessPhone,
-              businessAddress: (address != null && address.isNotEmpty)
-                  ? address
-                  : current.businessAddress,
-              businessTaxId: (taxNum != null && taxNum.isNotEmpty)
-                  ? taxNum
-                  : current.businessTaxId,
-              ownerName: (owner != null && owner.isNotEmpty)
-                  ? owner
-                  : current.ownerName,
-              businessEmail: (email != null && email.isNotEmpty)
-                  ? email
-                  : current.businessEmail,
-              businessCity: (city != null && city.isNotEmpty)
-                  ? city
-                  : current.businessCity,
-              businessDistrict: (district != null && district.isNotEmpty)
-                  ? district
-                  : current.businessDistrict,
-            ));
-          }
-        },
-      );
-      // Global event publisher will be eagerly initialized in MyApp build
-
-      // Initialize Auth service
-      await authService.initialize();
-
-      // Perform session bootstrap & online token validation if JWT token is saved
-      if (apiClient.jwtToken != null && apiClient.jwtToken!.isNotEmpty) {
-        try {
-          await authService.checkCurrentUserSessionOnline();
-          await authService.refreshEntitlement();
-        } catch (e) {
-          debugPrint('Startup session bootstrap note: $e');
-        }
-      }
-
-      // If database contains no users, reset onboarding status to show the wizard
-      try {
-        final users = await authService.getUsers();
-        if (users.isEmpty) {
-          // Clear admin PIN from SQLite settings (single source of truth)
-          final db = await dbManager.getDatabase();
-          await db.update('settings', {
-            'admin_pin_code': null,
-            'updated_at': DateTime.now().toIso8601String()
-          });
-        }
-      } catch (e) {
-        debugPrint('Failed to check or reset onboarding status: $e');
-      }
-
-      // Initialize DatasetLoaderService
-      final datasetLoader = DatasetLoaderService(prefs);
-      await datasetLoader.init();
-
+      final bootstrap = await AppBootstrap.initPreApp();
       runApp(
         ProviderScope(
-          observers: [
-            TelemetryProviderObserver(),
-          ],
-          overrides: [
-            authServiceProvider.overrideWithValue(authService),
-            apiClientProvider.overrideWithValue(apiClient),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            datasetLoaderServiceProvider.overrideWithValue(datasetLoader),
-            licenseServiceProvider.overrideWithValue(licenseService),
-          ],
+          observers: bootstrap.observers,
+          overrides: bootstrap.overrides,
           child: const MyApp(),
         ),
       );
@@ -326,100 +138,22 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _runIntegrityDiagnostics() async {
-    try {
-      final diag = ref.read(integrityCheckServiceProvider);
-      final report = await diag.runDiagnostics();
-      if (!report.isAllPass) {
-        // Attempt automated recovery repair
-        final repaired = await diag.attemptDatabaseRepair();
-        if (!repaired) {
-          setState(() {
-            _integrityError = report.issues.join('\n');
-            _checkingIntegrity = false;
-          });
-          return;
-        }
+    final result = await AppBootstrap.runStartupDiagnostics(ref);
+    if (!result.isSuccess) {
+      if (mounted) {
+        setState(() {
+          _integrityError = result.errorMessage;
+          _checkingIntegrity = false;
+        });
       }
-
-      // Run crash recovery scan on startup
-      final recovery = ref.read(crashRecoveryManagerProvider);
-      final crashed = await recovery.checkForCrashOnStartup();
-      if (crashed) {
-        await recovery.recoverInterruptedSyncJobs();
-      }
-
-      // Sweep stuck sending SMS logs to interrupted state
-      try {
-        final smsLogRepo = ref.read(smsLogRepositoryProvider);
-        await smsLogRepo.resetStuckJobs();
-      } catch (e) {
-        debugPrint('Failed to reset stuck SMS jobs at startup: $e');
-      }
-
-      try {
-        // Import the legacy SharedPreferences hardware registry at the
-        // application boundary. SQLite schema migrations intentionally never
-        // depend on platform plugins.
-        await ref.read(hardwareDevicesProvider.future);
-      } catch (e) {
-        // Legacy import is best-effort. A corrupt obsolete registry must not
-        // prevent already-migrated SQLite devices and queued jobs from running.
-        debugPrint('Legacy hardware import failed: $e');
-      }
-
-      try {
-        // Runtime starts after the import attempt, so legacy routes are visible
-        // when available while existing v2 routes remain independently usable.
-        final printRecovery = await ref.read(printingRuntimeProvider).start();
-        final remoteConfig = ref.read(remoteConfigServiceProvider);
-        await remoteConfig.fetchAndActivate();
-        final localHardware = await ref.read(hardwareDevicesProvider.future);
-        if (remoteConfig.isSharedHardwareEnabled()) {
-          try {
-            await ref.read(sharedHardwareServiceProvider).publishPresence(
-                  localHardware
-                      .where((device) =>
-                          device.connectionType != HardwareConnectionType.cloud)
-                      .toList(growable: false),
-                );
-          } catch (presenceErr) {
-            debugPrint('Initial presence publish deferred: $presenceErr');
-          }
-          ref.read(sharedHardwareWorkerProvider).start();
-          ref.read(sharedHardwarePresenceRuntimeProvider).start();
-        }
-        if (printRecovery.safelyRequeued > 0 ||
-            printRecovery.awaitingUserCheck > 0) {
-          debugPrint(
-            'Print recovery: ${printRecovery.safelyRequeued} safely requeued, '
-            '${printRecovery.awaitingUserCheck} awaiting user confirmation.',
-          );
-        }
-      } catch (e) {
-        debugPrint('Printing runtime startup failed: $e');
-      }
-
-      // Pre-warm local SQLite repositories so products & catalog are 100% ready instantly when splash ends
-      try {
-        final settingsRepo = await ref.read(settingsRepositoryProvider.future);
-        await settingsRepo.getSettings();
-
-        final productRepo = await ref.read(productRepositoryProvider.future);
-        await productRepo.getInventorySummary();
-        await productRepo.getCategories();
-
-        final customerRepo = await ref.read(customerRepositoryProvider.future);
-        await customerRepo.count();
-      } catch (e) {
-        debugPrint('Pre-warm warning at startup: $e');
-      }
-    } catch (e) {
-      debugPrint('Integrity diagnostics run failure: $e');
+      return;
     }
 
-    setState(() {
-      _checkingIntegrity = false;
-    });
+    if (mounted) {
+      setState(() {
+        _checkingIntegrity = false;
+      });
+    }
     _checkVersion();
     _updateCheckTimer = Timer.periodic(
       const Duration(minutes: 15),

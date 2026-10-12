@@ -54,7 +54,7 @@ class CrashRecoveryManager {
   Future<int> recoverInterruptedSyncJobs() async {
     int replayed = 0;
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
 
       // sync_outbox_v4'te FAILED veya \u00e7ok uzun s\u00fcre PENDING kalm\u0131\u015f sat\u0131rlar\u0131
       // bul (birden fazla deneme yap\u0131lm\u0131\u015f ama hi\u00e7 tamamlanmam\u0131\u015f).

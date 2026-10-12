@@ -9,6 +9,10 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/domain/services/report_service.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:serenutos/domain/services/document_export_service.dart';
+
 // ════════════════════════════════════════════════════════════
 // ReportController
 // ════════════════════════════════════════════════════════════
@@ -36,6 +40,78 @@ class ReportController extends AsyncNotifier<FullReportData> {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _service.getFullReport(_range));
+  }
+
+  Future<void> exportReport({
+    required String type,
+    required DateRange range,
+  }) async {
+    final exportService = DocumentExportService();
+    String filePath;
+    String subject;
+
+    switch (type) {
+      case 'sales':
+        final repo = await ref.read(saleRepositoryProvider.future);
+        final sales = await repo.getSalesByDateRange(
+          range.from,
+          range.to,
+        );
+        filePath = await exportService.exportSalesReportExcel(
+          sales,
+          range.label,
+          'TL',
+        );
+        subject = '${range.label} Satış Raporu';
+        await exportService.shareFile(filePath, subject);
+      case 'stock':
+        final repo = await ref.read(productRepositoryProvider.future);
+        filePath = await exportService.exportStockReportExcel(
+          await repo.findAll(),
+        );
+        await exportService.shareFile(filePath, 'Stok Raporu');
+      case 'end_of_day':
+        final now = DateTime.now();
+        final start = DateTime(now.year, now.month, now.day);
+        final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+        final salesRepo = await ref.read(saleRepositoryProvider.future);
+        final dashboardRepo =
+            await ref.read(dashboardRepositoryProvider.future);
+        final summary = await dashboardRepo.getTodaySummary();
+        filePath = await exportService.exportEndOfDayReportExcel(
+          date: now,
+          totalRevenue: summary.todayRevenue,
+          totalCollected: summary.todayCollected,
+          totalDebt: summary.todayDebt,
+          salesCount: summary.totalSalesToday,
+          sales: await salesRepo.getSalesByDateRange(start, end),
+          currency: 'TL',
+        );
+        subject = 'Gün Sonu Raporu - ${DateFormat('dd.MM.yyyy').format(now)}';
+        await exportService.shareFile(filePath, subject);
+      case 'vat':
+        final repo = await ref.read(reportRepositoryProvider.future);
+        filePath = await exportService.exportVatReportExcel(
+          startDate: range.from,
+          endDate: range.to,
+          vatSummaryRows: await repo.getVatBreakdown(
+            range.from,
+            range.to,
+          ),
+          currency: 'TL',
+        );
+        await exportService.shareFile(filePath, 'KDV Matrah Raporu');
+      default:
+        if (!type.startsWith('cloud_')) return;
+        final reportType = type.substring('cloud_'.length);
+        final file = await ref
+            .read(cloudAnalyticsRepositoryProvider)
+            .exportReportCsv(type: reportType);
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          subject: 'Bulut Raporu - $reportType',
+        );
+    }
   }
 }
 

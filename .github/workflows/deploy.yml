@@ -93,10 +93,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Architecture Guard (verify technical debt ratchet)
+        run: node tool/architecture_guard.mjs
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Run release-critical Flutter tests
         run: >-
           flutter test --fail-fast
+          test/characterization/ledger_formula_parity_test.dart
           test/services/release_manager_test.dart
           test/services/payment_fsm_test.dart
           test/services/payment_terminal_orchestrator_test.dart

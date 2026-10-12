@@ -38,7 +38,9 @@ class DatabaseSchema {
         name TEXT NOT NULL,
         description TEXT,
         price REAL NOT NULL,
+        price_minor INTEGER NOT NULL DEFAULT 0,
         purchase_price REAL NOT NULL DEFAULT 0,
+        purchase_price_minor INTEGER NOT NULL DEFAULT 0,
         quantity INTEGER NOT NULL,
         min_stock INTEGER NOT NULL DEFAULT 5,
         brand TEXT NOT NULL DEFAULT '',
@@ -72,7 +74,9 @@ class DatabaseSchema {
         phone TEXT,
         address TEXT,
         balance REAL NOT NULL DEFAULT 0,
+        balance_minor INTEGER NOT NULL DEFAULT 0,
         credit_limit REAL,
+        credit_limit_minor INTEGER,
         status TEXT NOT NULL DEFAULT 'active',
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
@@ -90,7 +94,9 @@ class DatabaseSchema {
         id TEXT PRIMARY KEY,
         customer_id TEXT NOT NULL,
         total_amount REAL NOT NULL,
+        total_amount_minor INTEGER NOT NULL DEFAULT 0,
         paid_amount REAL NOT NULL DEFAULT 0,
+        paid_amount_minor INTEGER NOT NULL DEFAULT 0,
         payment_method TEXT,
         status TEXT NOT NULL DEFAULT 'completed',
         notes TEXT,
@@ -104,8 +110,10 @@ class DatabaseSchema {
         created_by TEXT,
         entitlement_snapshot TEXT,
         refunded_amount REAL NOT NULL DEFAULT 0,
+        refunded_amount_minor INTEGER NOT NULL DEFAULT 0,
         fsm_state TEXT NOT NULL DEFAULT 'completed',
         discount_amount REAL NOT NULL DEFAULT 0.0,
+        discount_amount_minor INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -119,7 +127,9 @@ class DatabaseSchema {
         product_name TEXT,
         quantity REAL NOT NULL,
         unit_price REAL NOT NULL,
+        unit_price_minor INTEGER NOT NULL DEFAULT 0,
         subtotal REAL NOT NULL,
+        subtotal_minor INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id)
@@ -133,8 +143,11 @@ class DatabaseSchema {
         type TEXT NOT NULL,
         customer_id TEXT NOT NULL,
         amount REAL NOT NULL,
+        amount_minor INTEGER NOT NULL DEFAULT 0,
         paid_amount REAL NOT NULL DEFAULT 0,
+        paid_amount_minor INTEGER NOT NULL DEFAULT 0,
         debt_amount REAL NOT NULL DEFAULT 0,
+        debt_amount_minor INTEGER NOT NULL DEFAULT 0,
         reference_id TEXT,
         description TEXT,
         metadata TEXT,
@@ -369,6 +382,30 @@ class DatabaseSchema {
           ELSE 0
         END AS credit
       FROM financial_transactions
+    ''');
+
+    // Canonical customer ledger effect view (Single source of truth for balance calculation)
+    await db.execute('''
+      CREATE VIEW IF NOT EXISTS v_customer_ledger_effect AS
+      SELECT 
+        id,
+        customer_id,
+        type,
+        amount,
+        paid_amount,
+        debt_amount,
+        reference_id,
+        created_at,
+        is_deleted,
+        CASE 
+          WHEN COALESCE(is_deleted, 0) != 0 THEN 0.0
+          WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+          WHEN type IN ('payment', 'collection') THEN paid_amount
+          WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+          WHEN type = 'refund' AND paid_amount = 0 THEN amount
+          ELSE 0.0
+        END AS balance_effect
+      FROM financial_transactions;
     ''');
 
     // Create settings table

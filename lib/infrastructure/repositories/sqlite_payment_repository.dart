@@ -492,7 +492,7 @@ class SqliteFinancialTransactionRepository
       // Find the active sale transaction for this order
       final existingRows = await _executor.query(
         'financial_transactions',
-        where: 'reference_id = ? AND type = ?',
+        where: 'reference_id = ? AND type = ? AND is_deleted = 0',
         whereArgs: [orderId, 'sale'],
         orderBy: 'logical_clock DESC, device_id DESC',
         limit: 1,
@@ -502,53 +502,66 @@ class SqliteFinancialTransactionRepository
         return 0;
       }
 
-      final txId = existingRows.first['id'] as String;
+      final prev = existingRows.first;
+      final prevTxId = prev['id'] as String;
 
-      // Temporarily activate bypass flag to permit in-place update while executing trg_ft_update
-      await _executor.update('ledger_bypass_flag', {'active': 1});
-      try {
-        final count = await _executor.update(
-          'financial_transactions',
-          {
-            'customer_id': customerId,
-            'amount': amount,
-            'paid_amount': paidAmount,
-            'debt_amount': debtAmount,
-            'is_synced': 0,
-          },
-          where: 'id = ?',
-          whereArgs: [txId],
-        );
+      final now = DateTime.timestamp();
+      final nowIso = now.toIso8601String();
 
-        if (customerId != existingRows.first['customer_id']) {
-          await _executor.update(
-            'financial_transactions',
-            {'customer_id': customerId, 'is_synced': 0},
-            where: 'reference_id = ? AND id != ?',
-            whereArgs: [orderId, txId],
-          );
-        }
+      // Append-only ledger invariant:
+      // Invalidate the superseded transaction by soft-deleting it.
+      // trg_ft_update trigger automatically reverses its balance effect on the previous customer.
+      await _executor.update(
+        'financial_transactions',
+        {
+          'is_deleted': 1,
+          'deleted_at': nowIso,
+          'is_synced': 0,
+        },
+        where: 'id = ?',
+        whereArgs: [prevTxId],
+      );
 
-        final updatedRows = await _executor.query(
-          'financial_transactions',
-          where: 'id = ?',
-          whereArgs: [txId],
-          limit: 1,
-        );
-        if (updatedRows.isNotEmpty) {
-          await SyncOutboxV4.enqueue(
-            _executor,
-            entityType: 'financial_transaction',
-            entityId: txId,
-            operation: 'UPSERT',
-            payload: updatedRows.first,
-          );
-        }
+      // Create the revised transaction entity as a new append-only entry.
+      // trg_ft_insert trigger automatically applies its balance effect on the new customer.
+      final newTxId = 'trans-rev-$orderId-${now.millisecondsSinceEpoch}';
+      final payload = {
+        'id': newTxId,
+        'type': 'sale',
+        'customer_id': customerId,
+        'amount': amount,
+        'paid_amount': paidAmount,
+        'debt_amount': debtAmount,
+        'created_at': nowIso,
+        'reference_id': orderId,
+        'payment_method': prev['payment_method'] ?? 'debt',
+        'logical_clock': ((prev['logical_clock'] as num?)?.toInt() ?? 0) + 1,
+        'device_id': prev['device_id'],
+        'description': 'Sipariş Revizyonu: $orderId',
+        'metadata': jsonEncode({'origin': 'order_revision', 'superseded_id': prevTxId}),
+        'is_deleted': 0,
+        'is_synced': 0,
+      };
 
-        return count;
-      } finally {
-        await _executor.update('ledger_bypass_flag', {'active': 0});
-      }
+      await _executor.insert('financial_transactions', payload);
+
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'financial_transaction',
+        entityId: prevTxId,
+        operation: 'DELETE',
+        payload: {'id': prevTxId, 'is_deleted': 1},
+      );
+
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'financial_transaction',
+        entityId: newTxId,
+        operation: 'UPSERT',
+        payload: payload,
+      );
+
+      return 1;
     });
   }
 
@@ -600,7 +613,7 @@ class SqliteFinancialTransactionRepository
     if (referenceId.isEmpty) return [];
     final rows = await _executor.query(
       'financial_transactions',
-      where: 'reference_id = ?',
+      where: 'reference_id = ? AND is_deleted = 0',
       whereArgs: [referenceId],
       orderBy: 'logical_clock DESC, device_id DESC',
     );

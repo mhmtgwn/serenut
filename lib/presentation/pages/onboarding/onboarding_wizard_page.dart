@@ -7,27 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/domain/models/business_profile.dart';
-import 'package:serenutos/domain/models/settings.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_business_profile_repository.dart';
-import 'package:serenutos/infrastructure/database/db_gateway.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_state.dart';
 import 'package:serenutos/presentation/pages/onboarding/steps/step1_business_info.dart';
 import 'package:serenutos/presentation/pages/onboarding/steps/step2_admin_account.dart';
 import 'package:serenutos/presentation/pages/onboarding/steps/step3_success.dart';
 import 'package:serenutos/presentation/pages/onboarding/license_activation_flow.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/controllers/onboarding_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
-import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_product_repository.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_order_repository.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
-import 'package:serenutos/domain/services/demo_data_seeder.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 // ─────────────────────────────────────────────────────────────────────────────
@@ -225,129 +212,15 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
   }
 
   Future<List<String>> _saveOnboardingData(OnboardingState state) async {
-    final prefs = ref.read(sharedPreferencesProvider);
-    final dbManager = DatabaseManager();
-    final gateway = DbGatewayImpl(dbManager);
-
-    // The server owns account, tenant and device entitlement creation.  Do this
-    // before persisting a local business so a failed registration cannot leave a
-    // device that looks configured but has no tenant to sync with.
-    _setSavingStatus('Hesabınız oluşturuluyor...');
-    final rawPassword = state.admin.password;
-    final apiClient = ref.read(apiClientProvider);
-    final registration = await apiClient.post('/auth/register', {
-      'company_name': state.business.businessName,
-      'name': state.admin.adminFullName,
-      'email': state.admin.username,
-      'password': rawPassword,
-      'phone': state.business.phone,
-      'tax_number': state.business.taxNumber,
-      'city': state.business.city,
-      'district': state.business.district,
-      'address': '${state.business.district}, ${state.business.city}',
-      'accept_terms': true,
-      'accept_privacy': true,
-      'accept_kvkk': true,
-      'accept_marketing': false,
-    });
-    if (!registration.isSuccess) {
-      throw Exception(
-        registration.json['error']?['message'] ?? 'Sunucu kayıt hatası.',
-      );
-    }
-    final recoveryCodes =
-        (registration.json['recovery_codes'] as List<dynamic>? ?? const [])
-            .map((code) => code.toString())
-            .toList(growable: false);
-    if (recoveryCodes.length != 10) {
-      throw StateError(
-          'Kurtarma kodları oluşturulamadı. Kayıt güvenle tamamlanamadı.');
-    }
-
-    // Login establishes the authenticated session, subscription cache and the
-    // canonical device activation through /auth/session-bootstrap.
-    await ref.read(authNotifierProvider.notifier).login(
-          state.admin.username,
-          rawPassword,
+    final recoveryCodes = await ref
+        .read(onboardingControllerProvider.notifier)
+        .saveOnboardingData(
+          onboardingState: state,
+          onStatusUpdate: _setSavingStatus,
         );
-    debugPrint('Onboarding: Sunucu kaydı ve cihaz aktivasyonu başarılı');
-
-    // 1. Admin kimlik bilgilerini kaydet
-    _setSavingStatus('Yerel ayarlar kaydediliyor...');
-    // PIN: SQLite settings tablosuna yaz (tek kaynak)
-    final pinHash = _hashPin(state.admin.pin);
-    // Write admin PIN to SQLite settings table (single source of truth)
-    final db = await dbManager.getDatabase();
-    final existingSettings = await db.query('settings', limit: 1);
-    if (existingSettings.isNotEmpty) {
-      await db.update('settings', {
-        'admin_pin_code': pinHash,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    }
-    await prefs.setString('admin_username', state.admin.username);
-    await prefs.setString('admin_full_name', state.admin.adminFullName);
-    // Güvenlik Düzeltmesi: admin_password_hash SharedPreferences'a SHA-256 olarak kaydedilmez.
-
-    // 2. İşletme profilini DB'ye kaydet
-    final profileRepo = SqliteBusinessProfileRepository(gateway);
-    final profile = BusinessProfile(
-      name: state.business.businessName,
-      ownerName: state.business.ownerName,
-      type: state.business.businessType,
-      phone: state.business.phone,
-      email: state.business.email.isEmpty ? null : state.business.email,
-      taxNumber:
-          state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
-      city: state.business.city,
-      district: state.business.district,
-      currency: state.business.currency,
-      taxIncluded: state.business.taxIncluded,
-      logoPath: state.business.logoPath,
-      createdAt: DateTime.now(),
-    );
-    await profileRepo.saveProfile(profile);
-
-    // 3. Settings tablosuna kaydet
-    final settingsRepo = SqliteSettingsRepository(gateway);
-    await settingsRepo.updateSettings(Settings(
-      businessName: state.business.businessName,
-      businessPhone: state.business.phone,
-      businessAddress: '${state.business.district}, ${state.business.city}',
-      businessTaxId:
-          state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
-      businessLogo: state.business.logoPath,
-      ownerName: state.business.ownerName,
-      businessEmail: state.business.email.isEmpty ? null : state.business.email,
-      businessCity: state.business.city,
-      businessDistrict: state.business.district,
-      businessType: state.business.businessType,
-      currency: state.business.currency,
-      createdAt: DateTime.now(),
-    ));
-    // 4. Tam katalog isteğe bağlı olarak Ayarlar > Veri İçeri Aktar ekranından
-    // buluttan alınır. Demo kurulum yalnız küçük ve anlaşılır örnekler üretir.
-    _setSavingStatus('Kurulum modu uygulanıyor...');
-    if (state.initialData.isDemo) {
-      await DemoDataSeeder(
-        productRepository: SqliteProductRepository(gateway),
-        customerRepository: SqliteCustomerRepository(gateway),
-        orderRepository: SqliteOrderRepository(gateway),
-        saleRepository: SqliteSaleRepository(gateway),
-      ).seed(businessType: state.business.businessType);
-    }
-
-    // 5. Onboarding tamamlandı
     _setSavingStatus('Kurulum tamamlanıyor...');
     await _persistence.markCompleted();
     return recoveryCodes;
-  }
-
-  /// Basit PIN hash'leme (HMAC-SHA256)
-  String _hashPin(String pin) {
-    final bytes = utf8.encode(pin);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
   }
 
   @override

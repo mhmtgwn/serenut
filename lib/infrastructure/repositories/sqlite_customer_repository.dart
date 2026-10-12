@@ -298,7 +298,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
           if (aHas && !bHas) return -1;
           if (!aHas && bHas) return 1;
           if (aHas && bHas) {
-            final c = aDate!.compareTo(bDate!);
+            final c = aDate.compareTo(bDate);
             if (c != 0) return c;
           }
           return aBal.compareTo(bBal);
@@ -315,7 +315,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
           if (aHas && !bHas) return -1;
           if (!aHas && bHas) return 1;
           if (aHas && bHas) {
-            final c = bDate!.compareTo(aDate!);
+            final c = bDate.compareTo(aDate);
             if (c != 0) return c;
           }
           return aBal.compareTo(bBal);
@@ -471,7 +471,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
     final result = await _executor.rawQuery(
       'SELECT COALESCE(SUM(CASE '
       "  WHEN type = 'sale' THEN amount "
-      "  WHEN type = 'manual_debt' THEN debt_amount "
+      "  WHEN type = 'manual_debt' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE amount END) "
       "  WHEN type = 'cancellation' THEN -amount "
       "  WHEN type = 'refund' THEN -amount "
       '  ELSE 0 '

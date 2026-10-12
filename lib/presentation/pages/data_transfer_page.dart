@@ -31,7 +31,6 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart'
     show InMemoryDb;
 import 'package:serenutos/providers/settings_provider.dart';
@@ -562,8 +561,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           await ref.read(authNotifierProvider.notifier).logout();
           ref.invalidate(syncProvider);
           if (!kIsWeb) {
-            final dbManager = DatabaseManager();
-            await dbManager.resetDatabase();
+            await DataResetService.resetLocalDatabase();
             final backupService = ref.read(backupServiceProvider);
             await backupService.clearAllBackups();
             await DataResetService.clearProductImages();

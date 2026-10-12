@@ -108,7 +108,6 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
     AuthorizedCardPayment? cardPayment;
     try {
       // 0. Pre-flight inventory stock verification BEFORE running card transaction or modifying state
-      final inventoryService = await ref.read(inventoryServiceProvider.future);
       final inventoryCheckItems = _cart.entries.map((e) {
         final rawQty = e.value;
         final intQty = rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
@@ -120,7 +119,9 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           unitPrice: e.key.price,
         );
       }).toList();
-      await inventoryService.verifyStockAvailability(inventoryCheckItems);
+      await ref
+          .read(ordersControllerProvider.notifier)
+          .verifyStockAvailability(inventoryCheckItems);
 
       final itemsList = _cart.entries
           .map((e) => {
@@ -173,11 +174,12 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       final hasPos =
           ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
       if (cardAmount > 0 && hasPos) {
-        cardPayment =
-            await ref.read(physicalCardPaymentServiceProvider).authorize(
-                  amount: cardAmount,
-                  idempotencyKey: 'order-card-$orderId',
-                );
+        cardPayment = await ref
+            .read(ordersControllerProvider.notifier)
+            .authorizeCardPayment(
+              amount: cardAmount,
+              idempotencyKey: 'order-card-$orderId',
+            );
       }
       final cardMetadata = cardAmount <= 0
           ? null
@@ -197,35 +199,22 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
               ...?cardMetadata,
             }
           : cardMetadata;
-      if (isEdit) {
-        await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
 
-        final paymentService = await ref.read(paymentServiceProvider.future);
-        await paymentService.reviseOrderPayment(
-          orderId: widget.existingOrder!.id,
-          oldCustomerId: widget.existingOrder!.customerId,
-          newCustomerId: _selectedCustomer!.id,
-          totalAmount: _totalAmount,
-          paidAmount: finalPaid,
-        );
-      } else {
-        await ref.read(ordersControllerProvider.notifier).addOrder(newOrder);
+      await ref.read(ordersControllerProvider.notifier).recordOrderPayment(
+            order: newOrder,
+            isEdit: isEdit,
+            existingOrder: widget.existingOrder,
+            customerId: _selectedCustomer!.id,
+            orderTotal: _totalAmount,
+            orderPaid: finalPaid,
+            paymentMethod: _paymentMethod,
+            paymentMetadata: paymentMetadata,
+          );
 
-        final paymentService = await ref.read(paymentServiceProvider.future);
-        await paymentService.processSalePayment(
-          saleId: newOrder.id,
-          customerId: _selectedCustomer!.id,
-          totalAmount: _totalAmount,
-          paidAmount: finalPaid,
-          paymentMethod: _paymentMethod,
-          terminalMetadata: paymentMetadata,
-        );
-      }
       if (cardPayment != null) {
-        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
-              cardPayment,
-              contextId: newOrder.id,
-            );
+        await ref
+            .read(ordersControllerProvider.notifier)
+            .commitCardPayment(cardPayment, contextId: newOrder.id);
       }
 
       // ── Pop dialog immediately to keep UI ultra responsive (<50ms) ──
@@ -233,8 +222,7 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       // Capture necessary providers & root container BEFORE popping the dialog
       // to eliminate "Bad state: Cannot use ref after the widget was disposed"
       final container = ProviderScope.containerOf(context);
-      final printingService = ref.read(printingApplicationServiceProvider);
-      final settingsFuture = ref.read(settingsRepositoryProvider.future);
+      final ordersNotifier = ref.read(ordersControllerProvider.notifier);
       var settings = ref.read(settingsNotifierProvider).valueOrNull ??
           ref.read(settingsNotifierProvider).value;
       final ordersCustomersNotifier =
@@ -259,7 +247,6 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
       final labelCopies = _labelCopies;
       final paymentMethod = _paymentMethod;
       final karmaResult = _karmaResult;
-      final karmaDebt = _karmaDebt;
       final notes = _notesController.text.trim();
       final totalAmount = _totalAmount;
       final receiptItems = _cart.entries
@@ -273,74 +260,28 @@ extension OrderCreationBottomBar on OrderCreationDialogState {
           .toList();
 
       unawaited(() async {
-        // Settings UI notifier'dan null gelse dahi SQLite repository'den garanti yükle
-        try {
-          settings ??= await (await settingsFuture).getSettings();
-        } catch (settingsError) {
-          debugPrint(
-              '[OrderCreationDialog] Ayarlar repository yükleme uyarısı: $settingsError');
-        }
-
-        // 1. Sipariş Etiketi Yazdırma (Bağımsız try-catch, fiş hatasından veya gecikmeden etkilenmez)
-        final activeSettings = settings;
-        if (printLabelNeeded && activeSettings != null) {
-          try {
-            final String? labelPaymentStatus;
-            if (paymentMethod == 'debt' ||
-                (paymentMethod == 'karma' && karmaDebt > 0.009)) {
-              if (finalPaid <= 0.01) {
-                labelPaymentStatus = 'Vadeli';
-              } else {
-                labelPaymentStatus =
-                    'Kısmi Ödeme (Borç: ₺${karmaDebt.toStringAsFixed(2)})';
-              }
-            } else if (finalPaid >= totalAmount - 0.01) {
-              labelPaymentStatus = 'Ödendi';
-            } else {
-              labelPaymentStatus = 'Kısmi Ödeme';
-            }
-
-            await printingService.queueOrderLabel(
-              newOrder,
-              receiptItems,
-              activeSettings,
-              customer: customer,
-              paidAmount: finalPaid,
-              previousDebt: previousDebt,
-              paymentStatusOverride: labelPaymentStatus,
-              copies: labelCopies,
-            );
-          } catch (labelError) {
-            debugPrint(
-                '[OrderCreationDialog] Sipariş etiketi kuyruğa alma hatası: $labelError');
-          }
-        }
-
-        // 2. Fiş Yazdırma (Bağımsız try-catch, etiket hatasından etkilenmez)
-        if (printReceiptNeeded && activeSettings != null) {
-          try {
-            await printingService.queueOrderReceipt(
-              newOrder,
-              receiptItems,
-              customer,
-              activeSettings,
-              paidAmount: finalPaid,
-              notes: notes,
-              paymentMethod: paymentMethod,
-              paymentBreakdown: paymentMethod == 'karma'
-                  ? {
-                      'cash_applied': karmaResult.cashApplied,
-                      'card': karmaResult.card,
-                      'debt': karmaResult.debt,
-                    }
-                  : null,
-              copies: printCopies,
-            );
-          } catch (receiptError) {
-            debugPrint(
-                '[OrderCreationDialog] Fiş kuyruğa alma hatası: $receiptError');
-          }
-        }
+        await ordersNotifier.queueOrderPrints(
+          order: newOrder,
+          receiptItems: receiptItems,
+          customer: customer,
+          settings: settings,
+          finalPaid: finalPaid,
+          previousDebt: previousDebt,
+          orderTotal: totalAmount,
+          paymentMethod: paymentMethod,
+          paymentBreakdown: paymentMethod == 'karma'
+              ? {
+                  'cash_applied': karmaResult.cashApplied,
+                  'card': karmaResult.card,
+                  'debt': karmaResult.debt,
+                }
+              : null,
+          notes: notes,
+          printLabel: printLabelNeeded,
+          printReceipt: printReceiptNeeded,
+          labelCopies: labelCopies,
+          printCopies: printCopies,
+        );
 
         // 3. Ekran yenilemeleri (Root Container üzerinden, Widget dispose'undan etkilenmez)
         try {

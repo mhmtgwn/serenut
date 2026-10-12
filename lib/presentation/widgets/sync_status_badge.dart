@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 
 class SyncStatusBadge extends ConsumerWidget {
@@ -299,7 +298,7 @@ class SyncStatusBadge extends ConsumerWidget {
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.rule_folder_outlined),
                           label: Text('$conflictCount çakışma kaydını incele'),
-                          onPressed: () => _showConflictDetailsSheet(context),
+                          onPressed: () => _showConflictDetailsSheet(context, ref),
                         ),
                       ),
                     ],
@@ -352,17 +351,8 @@ class SyncStatusBadge extends ConsumerWidget {
     );
   }
 
-  Future<void> _showConflictDetailsSheet(BuildContext context) async {
-    final conflictsFuture = () async {
-      final db = await DatabaseManager().getDatabase();
-      return db.rawQuery('''
-        SELECT entity_type, entity_id, server_revision, detected_at
-        FROM sync_conflicts_v4
-        WHERE resolved_at IS NULL
-        ORDER BY detected_at DESC
-        LIMIT 100
-      ''');
-    }();
+  Future<void> _showConflictDetailsSheet(BuildContext context, WidgetRef ref) async {
+    final conflictsFuture = ref.read(syncProvider.notifier).getUnresolvedConflicts();
 
     await showModalBottomSheet<void>(
       context: context,

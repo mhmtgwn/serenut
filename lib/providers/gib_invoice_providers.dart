@@ -1,11 +1,10 @@
+import 'package:serenutos/providers/database_provider.dart';
 // lib/providers/gib_invoice_providers.dart
 // Serenut OS — GİB e-Arşiv Riverpod Sağlayıcıları
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/models/gib_invoice_models.dart';
 import 'package:serenutos/domain/services/gib_invoice_service.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_invoice_repository.dart';
 import 'package:serenutos/infrastructure/services/gib_earsiv_client.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
@@ -46,7 +45,9 @@ class GibCredentialsNotifier extends StateNotifier<GibCredentials> {
         isTestMode: t,
         defaultVatRate: v,
       );
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   Future<void> save({
@@ -76,7 +77,7 @@ final gibCredentialsProvider =
 });
 
 final gibInvoiceRepositoryProvider = Provider<IGibInvoiceRepository>((ref) {
-  final gateway = DbGatewayImpl(DatabaseManager());
+  final gateway = ref.watch(dbGatewayProvider);
   return SqliteInvoiceRepository(gateway);
 });
 

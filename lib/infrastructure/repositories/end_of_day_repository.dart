@@ -549,7 +549,9 @@ class EndOfDayRepository {
               kCard = (breakdown['card'] as num?)?.toDouble() ?? 0.0;
               kDebt = (breakdown['debt'] as num?)?.toDouble() ?? 0.0;
             }
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
         }
 
         if (kCash == 0 && kCard == 0 && kDebt == 0) {
@@ -842,7 +844,9 @@ class EndOfDayRepository {
           ));
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     return _TransactionsDataResult(
       orderDepositCash: orderDepositCash,
@@ -884,7 +888,9 @@ class EndOfDayRepository {
           refundBalance += tot;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     return _RefundDataResult(
       refundCash: refundCash,
@@ -983,7 +989,9 @@ class EndOfDayRepository {
           updated_at TEXT NOT NULL
         )
       ''');
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   Future<_DailyExpensesResult> _fetchDailyExpenses(String dayStr) async {
@@ -1011,7 +1019,9 @@ class EndOfDayRepository {
           createdAt: r['created_at'] as String? ?? '',
         ));
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     return _DailyExpensesResult(total: total, list: list);
   }
@@ -1033,7 +1043,9 @@ class EndOfDayRepository {
           notes: rows.first['notes'] as String?,
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return null;
   }
 
@@ -1050,7 +1062,9 @@ class EndOfDayRepository {
       if (rows.isNotEmpty) {
         return (rows.first['counted_cash'] as num?)?.toDouble() ?? 0.0;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return 0.0;
   }
 

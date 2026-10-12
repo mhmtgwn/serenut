@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 /// business/ledger transaction has committed.
 class TerminalPaymentJournal {
   TerminalPaymentJournal({DatabaseManager? databaseManager})
-      : _databaseManager = databaseManager ?? DatabaseManager();
+      : _databaseManager = databaseManager ?? DatabaseManager.instance;
 
   final DatabaseManager _databaseManager;
 

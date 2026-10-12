@@ -85,7 +85,9 @@ async function verifyDr() {
       await destClient.query("INSERT INTO users (id, company_id, name, email, password_hash, is_active) VALUES ('user-sysadmin', 'serenut_cloud', 'System Admin', 'sysadmin@serenut.com', $1, true) ON CONFLICT (id) DO NOTHING", [hashSysadmin]);
       try {
         await destClient.query("INSERT INTO user_roles (user_id, role_id) VALUES ('user-sysadmin', 'role-sysadmin') ON CONFLICT (user_id, role_id) DO NOTHING");
-      } catch (_) {}
+      } catch (err) {
+        console.warn('Simulated user_roles seed note:', err);
+      }
       console.log(`✅ Simulated restoration successfully finished.`);
     }
 

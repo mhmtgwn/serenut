@@ -155,7 +155,9 @@ class SqlitePrintingRepository implements PrintingRepository {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
 
     // Web dışındaki platformlarda varsayılan yazıcı mekanizmasına izin ver
     return !kIsWeb;
@@ -291,7 +293,9 @@ class SqlitePrintingRepository implements PrintingRepository {
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
             availableDevices = [autoDev.toMap()];
-          } catch (_) {}
+          } catch (_) {
+            // Ignored: fallback or safe default applied
+          }
         }
 
         if (availableDevices.isNotEmpty) {

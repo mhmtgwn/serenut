@@ -175,7 +175,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           });
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   // ── Adım 0 doğrulama ve geçiş ──
@@ -356,7 +358,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         try {
           final body = jsonDecode(e.responseBody!) as Map<String, dynamic>;
           message = body['message'] as String? ?? message;
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       setState(() {
         _saving = false;
@@ -378,7 +382,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (img != null && mounted) {
         setState(() => _logoPath = img.path);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
   }
 
   @override

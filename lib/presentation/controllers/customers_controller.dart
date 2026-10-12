@@ -8,6 +8,7 @@ import 'package:serenutos/domain/services/pagination_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 final customerSearchQueryProvider = StateProvider<String>((ref) => '');
 final customerBalanceFilterProvider =
@@ -422,6 +423,45 @@ class CollectionCustomersController extends CustomersController {
 
     await _paginationService!.loadFirstPage(searchQuery: searchQuery);
     return _paginationService!.items;
+  }
+
+  Future<void> submitCollection({
+    required String customerId,
+    required num amount,
+    required String method,
+    String? notes,
+  }) async {
+    AuthorizedCardPayment? cardPayment;
+    try {
+      if (method == 'card') {
+        cardPayment =
+            await ref.read(physicalCardPaymentServiceProvider).authorize(
+                  amount: amount.toDouble(),
+                  idempotencyKey:
+                      'collection-$customerId-${DateTime.now().microsecondsSinceEpoch}',
+                );
+      }
+      await recordCollection(
+        customerId: customerId,
+        amount: amount.toDouble(),
+        method: method,
+        notes: notes,
+        terminalMetadata: cardPayment?.ledgerMetadata,
+      );
+      if (cardPayment != null) {
+        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
+              cardPayment,
+              contextId: 'collection-$customerId',
+            );
+      }
+    } catch (e) {
+      if (cardPayment != null) {
+        await ref
+            .read(physicalCardPaymentServiceProvider)
+            .markUnreconciled(cardPayment, e);
+      }
+      rethrow;
+    }
   }
 }
 

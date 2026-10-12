@@ -43,7 +43,9 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         customerLookup != null) {
       try {
         effectiveCustomer = await customerLookup!(sale.customerId);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     final subtotal = items.fold<double>(
@@ -105,7 +107,9 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         customerLookup != null) {
       try {
         effectiveCustomer = await customerLookup!(order.customerId);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     final subtotal = items.fold<double>(
@@ -269,7 +273,9 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         customerLookup != null) {
       try {
         effectiveCustomer = await customerLookup!(order.customerId);
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     final first = items.firstOrNull;
@@ -476,7 +482,9 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     if (!runtime.isRunning) {
       try {
         await runtime.start();
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     unawaited(runtime.processNow());
     return job;

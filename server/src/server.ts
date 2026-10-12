@@ -445,7 +445,9 @@ app.get('/health', async (req: Request, res: Response) => {
       const maintenanceVal = await redisClient.get('admin:maintenance_mode');
       isMaintenance = maintenanceVal === 'true';
     }
-  } catch (_) {}
+  } catch (err) {
+    logger.warn('Failed to query redis for maintenance mode status', { err });
+  }
   if (!isMaintenance && (global as any).maintenanceMode) {
     isMaintenance = true;
   }

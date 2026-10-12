@@ -40,7 +40,7 @@ class IntegrityCheckService {
 
     // 1. SQLite Database Checks
     try {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
 
       // PRAGMA integrity_check
       final List<Map<String, dynamic>> integrityRes =
@@ -82,7 +82,9 @@ class IntegrityCheckService {
               'timestamp': DateTime.now().toUtc().toIso8601String(),
             },
           );
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       } else {
         logBuffer.writeln('✅ DB Foreign Key Check: PASS');
       }
@@ -106,7 +108,9 @@ class IntegrityCheckService {
               'message': 'Bypass flag was stuck at 1 on startup; reset to 0.',
             },
           );
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       } else {
         logBuffer
             .writeln('✅ Security Check: Ledger bypass flag is disabled: PASS');
@@ -133,7 +137,7 @@ class IntegrityCheckService {
       }
 
       // Verify essential configuration exists in SQLite settings (single source of truth)
-      final diagnosticsDb = await DatabaseManager().getDatabase();
+      final diagnosticsDb = await DatabaseManager.instance.getDatabase();
       final pinRows = await diagnosticsDb.query('settings',
           columns: ['admin_pin_code'], limit: 1);
       final adminPin = pinRows.isNotEmpty
@@ -174,7 +178,7 @@ class IntegrityCheckService {
   /// olursa temp backup geri yüklenir.
   Future<bool> attemptDatabaseRepair() async {
     try {
-      final dbDir = await DatabaseManager().getDatabasesPath();
+      final dbDir = await DatabaseManager.instance.getDatabasesPath();
       final String dbPath = join(dbDir, 'serenut_pos.db');
 
       // 1. En son kullanıcı backup'ını bul (SerenutBackups/ klasörü)
@@ -243,7 +247,7 @@ class IntegrityCheckService {
         }
 
         // Geri yüklenen dosyayı hızlı doğrula
-        final db = await DatabaseManager().getDatabase();
+        final db = await DatabaseManager.instance.getDatabase();
         final res = await db.rawQuery('PRAGMA integrity_check');
         if (res.isEmpty || res.first.values.first != 'ok') {
           throw Exception('Geri yüklenen DB integrity check başarısız.');

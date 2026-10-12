@@ -535,7 +535,9 @@ export class AuthService {
         const isBlacklisted = await redisClient.get(`bl:${decoded.jti}`);
         return isBlacklisted === '1';
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn('Failed to check token blacklist in redis', { err });
+    }
     return false;
   }
 

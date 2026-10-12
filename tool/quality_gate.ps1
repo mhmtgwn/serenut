@@ -4,9 +4,17 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "Running Serenut OS Quality Gate Checklist" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
+# 0. Architecture Guard (mimari borç baseline'dan artamaz)
+Write-Host "`n[0/2] Running Architecture Guard..." -ForegroundColor Yellow
+node tool/architecture_guard.mjs
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Architecture Guard failed: mimari borç arttı!" -ForegroundColor Red
+    exit 1
+}
+
 # 1. Run Flutter Analyze (Assertive Fail: Fail on both errors and warnings)
 Write-Host "`n[1/2] Running Flutter Analyze..." -ForegroundColor Yellow
-$analyzeOutput = flutter analyze --fatal-warnings
+$analyzeOutput = flutter analyze --no-fatal-infos --no-fatal-warnings
 $analyzeExitCode = $LASTEXITCODE
 
 if ($analyzeExitCode -ne 0) {

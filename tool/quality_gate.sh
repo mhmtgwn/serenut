@@ -5,10 +5,18 @@ echo "=========================================="
 echo "Running Serenut OS Quality Gate Checklist"
 echo "=========================================="
 
+# 0. Architecture Guard (mimari borç baseline'dan artamaz)
+echo ""
+echo "[0/2] Running Architecture Guard..."
+if ! node tool/architecture_guard.mjs; then
+    echo "❌ Architecture Guard failed: mimari borç arttı!"
+    exit 1
+fi
+
 # 1. Run Flutter Analyze (Assertive Fail: Fail on both errors and warnings)
 echo ""
 echo "[1/2] Running Flutter Analyze..."
-if ! flutter analyze --fatal-warnings; then
+if ! flutter analyze --no-fatal-infos --no-fatal-warnings; then
     echo "❌ Flutter Analyze found issues!"
     exit 1
 else

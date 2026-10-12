@@ -12,7 +12,9 @@ class EventParser {
       if (decoded is Map<String, dynamic>) {
         return RealtimeMessage.fromMap(decoded);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return null;
   }
 
@@ -27,7 +29,9 @@ class EventParser {
           return RealtimeEvent.fromMap(decoded);
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return null;
   }
 }

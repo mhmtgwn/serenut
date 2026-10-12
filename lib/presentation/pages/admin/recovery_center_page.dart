@@ -2,13 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:serenutos/providers/recovery_provider.dart';
+import 'package:serenutos/presentation/controllers/recovery_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
-import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/domain/models/permission.dart';
@@ -58,8 +57,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
     setState(() => _isLoading = true);
     try {
       final type = _tabs[_tabController.index]['id']!;
-      final repo = ref.read(recoveryRepositoryProvider);
-      final items = await repo.getDeletedItems(type);
+      final items = await ref.read(recoveryControllerProvider).getDeletedItems(type);
       if (!mounted) return;
       setState(() {
         _deletedItems = items;
@@ -92,18 +90,13 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
-        final repo = ref.read(recoveryRepositoryProvider);
-        await repo.restore(type, id);
-
-        try {
-          final auditService = await ref.read(auditServiceProvider.future);
-          await auditService.logSystemAction(
-            'entity_restored',
-            'Tur: $type, ID: $id, Name: $name',
-            approvedByUserId: approvedByUserId,
-            approvedByUserName: approvedByUserName,
-          );
-        } catch (_) {}
+        await ref.read(recoveryControllerProvider).restoreItem(
+              type: type,
+              id: id,
+              name: name,
+              approvedByUserId: approvedByUserId,
+              approvedByUserName: approvedByUserName,
+            );
 
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);
@@ -133,18 +126,13 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
-        final repo = ref.read(recoveryRepositoryProvider);
-        await repo.purge(type, id);
-
-        try {
-          final auditService = await ref.read(auditServiceProvider.future);
-          await auditService.logSystemAction(
-            'entity_purged',
-            'Tur: $type, ID: $id, Name: $name',
-            approvedByUserId: approvedByUserId,
-            approvedByUserName: approvedByUserName,
-          );
-        } catch (_) {}
+        await ref.read(recoveryControllerProvider).purgeItem(
+              type: type,
+              id: id,
+              name: name,
+              approvedByUserId: approvedByUserId,
+              approvedByUserName: approvedByUserName,
+            );
 
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);

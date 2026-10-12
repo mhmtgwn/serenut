@@ -13,8 +13,13 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
+import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 // ─── Pagination constants ─────────────────────────────────────────────────────
 const _kPageSize = 25;
@@ -325,6 +330,149 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await refresh();
   }
 
+  Future<void> verifyStockAvailability(List<SaleItemInput> items) async {
+    final inventoryService = await ref.read(inventoryServiceProvider.future);
+    await inventoryService.verifyStockAvailability(items);
+  }
+
+  Future<AuthorizedCardPayment?> authorizeCardPayment({
+    required num amount,
+    required String idempotencyKey,
+  }) async {
+    return ref.read(physicalCardPaymentServiceProvider).authorize(
+      amount: amount.toDouble(),
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<void> commitCardPayment(
+    AuthorizedCardPayment cardPayment, {
+    required String contextId,
+  }) async {
+    await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
+      cardPayment,
+      contextId: contextId,
+    );
+  }
+
+  Future<void> recordOrderPayment({
+    required OrderEntity order,
+    required bool isEdit,
+    OrderEntity? existingOrder,
+    required String customerId,
+    required num orderTotal,
+    required num orderPaid,
+    required String paymentMethod,
+    Map<String, dynamic>? paymentMetadata,
+  }) async {
+    if (isEdit && existingOrder != null) {
+      await updateOrder(order);
+      final paymentService = await ref.read(paymentServiceProvider.future);
+      await paymentService.reviseOrderPayment(
+        orderId: existingOrder.id,
+        oldCustomerId: existingOrder.customerId,
+        newCustomerId: customerId,
+        totalAmount: orderTotal.toDouble(),
+        paidAmount: orderPaid.toDouble(),
+      );
+    } else {
+      await addOrder(order);
+      final paymentService = await ref.read(paymentServiceProvider.future);
+      await paymentService.processSalePayment(
+        saleId: order.id,
+        customerId: customerId,
+        totalAmount: orderTotal.toDouble(),
+        paidAmount: orderPaid.toDouble(),
+        paymentMethod: paymentMethod,
+        terminalMetadata: paymentMetadata,
+      );
+    }
+  }
+
+  Future<Settings?> getSettings() async {
+    try {
+      final settingsRepo = await ref.read(settingsRepositoryProvider.future);
+      return settingsRepo.getSettings();
+    } catch (e) {
+      debugPrint('[OrdersController] Ayarlar yükleme uyarısı: $e');
+      return null;
+    }
+  }
+
+  Future<void> queueOrderPrints({
+    required OrderEntity order,
+    required List<Map<String, dynamic>> receiptItems,
+    CustomerEntity? customer,
+    Settings? settings,
+    required num finalPaid,
+    required num previousDebt,
+    required num orderTotal,
+    required String paymentMethod,
+    Map<String, dynamic>? paymentBreakdown,
+    required String notes,
+    required bool printLabel,
+    required bool printReceipt,
+    required int labelCopies,
+    required int printCopies,
+  }) async {
+    settings ??= await getSettings();
+    if (settings == null) return;
+
+    final printingService = ref.read(printingApplicationServiceProvider);
+    if (printLabel) {
+      try {
+        final karmaDebt = paymentBreakdown != null
+            ? ((paymentBreakdown['debt'] as num?)?.toDouble() ?? 0.0)
+            : 0.0;
+        final String? labelPaymentStatus;
+        if (paymentMethod == 'debt' ||
+            (paymentMethod == 'karma' && karmaDebt > 0.009)) {
+          if (finalPaid <= 0.01) {
+            labelPaymentStatus = 'Vadeli';
+          } else {
+            labelPaymentStatus =
+                'Kısmi Ödeme (Borç: ₺${karmaDebt.toStringAsFixed(2)})';
+          }
+        } else if (finalPaid >= orderTotal - 0.01) {
+          labelPaymentStatus = 'Ödendi';
+        } else {
+          labelPaymentStatus = 'Kısmi Ödeme';
+        }
+
+        await printingService.queueOrderLabel(
+          order,
+          receiptItems,
+          settings,
+          customer: customer,
+          paidAmount: finalPaid.toDouble(),
+          previousDebt: previousDebt.toDouble(),
+          paymentStatusOverride: labelPaymentStatus,
+          copies: labelCopies,
+        );
+      } catch (e) {
+        debugPrint('[OrdersController] Sipariş etiketi hatası: $e');
+      }
+    }
+
+    if (printReceipt) {
+      try {
+        await printingService.queueOrderReceipt(
+          order,
+          receiptItems,
+          customer,
+          settings,
+          paidAmount: finalPaid.toDouble(),
+          notes: notes,
+          paymentMethod: paymentMethod,
+          paymentBreakdown: paymentBreakdown,
+          copies: printCopies,
+        );
+      } catch (e) {
+        debugPrint('[OrdersController] Fiş kuyruğa alma hatası: $e');
+      }
+    }
+  }
+
   List<SaleItemInput> _inventoryItems(List<Map<String, dynamic>> items) {
     return items
         .map((item) {
@@ -548,7 +696,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
               await ref.read(orderCancellationServiceProvider.future);
           await cancellationService.cancel(id: order.id);
           affectedCustomerIds.add(order.customerId);
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
 
       await _repository.delete(id);

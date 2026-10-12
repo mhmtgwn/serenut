@@ -216,7 +216,9 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
       final filtered =
           await orderRepo.findFiltered(searchQuery: query, limit: 1);
       if (filtered.isNotEmpty) return filtered.first;
-    } catch (_) {}
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
     return null;
   }
 

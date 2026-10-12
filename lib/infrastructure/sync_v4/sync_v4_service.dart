@@ -98,7 +98,7 @@ class SyncV4Service {
     if (revision <= 0) throw StateError('invalid_operational_reset_revision');
 
     if (!kIsWeb) {
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
       await db.transaction((txn) async {
         await DataResetService.clearOperationalTables(txn);
         await txn.insert(
@@ -127,7 +127,7 @@ class SyncV4Service {
 
     if (!kIsWeb) {
       await DatabaseManager.waitForWriteLock();
-      final db = await DatabaseManager().getDatabase();
+      final db = await DatabaseManager.instance.getDatabase();
       await DatabaseManager.retryOnLock(() async {
         await db.transaction((txn) async {
           await DataResetService.clearProductCatalog(txn);

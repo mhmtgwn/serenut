@@ -431,7 +431,9 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
             remainingDebt = math.min(rawRemainingDebt, customerTotalDebt);
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
 
     // Kalan borç varsa (vadeli veya kısmi ödenmiş sipariş) -> Ödeme ekranını aç!

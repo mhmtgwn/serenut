@@ -85,7 +85,9 @@ class WebSocketManager {
       try {
         _channel!.sink.add(data);
         return;
-      } catch (_) {}
+      } catch (_) {
+        // Ignored: fallback or safe default applied
+      }
     }
     _offlineQueue.add(data);
   }

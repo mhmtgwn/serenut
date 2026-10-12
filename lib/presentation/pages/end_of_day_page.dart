@@ -71,7 +71,9 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
         try {
           final repo = await ref.read(settingsRepositoryProvider.future);
           settings = await repo.getSettings();
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       if (!mounted) return;
       if (settings == null) {

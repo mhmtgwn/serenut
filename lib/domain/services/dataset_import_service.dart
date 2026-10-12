@@ -1218,7 +1218,7 @@ class DatasetImportService {
           .contains('SqliteProductRepository');
 
       if (isSqlite) {
-        final db = await DatabaseManager().getDatabase();
+        final db = await DatabaseManager.instance.getDatabase();
         final totalProducts = products.length;
         const int chunkLimit = 200;
 
@@ -1566,7 +1566,9 @@ class DatasetImportService {
           if (await f.exists()) {
             await f.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignored: fallback or safe default applied
+        }
       }
       await TelemetryService().logEvent('import', {
         'time_ms': stopwatch.elapsedMilliseconds,

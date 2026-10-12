@@ -13,7 +13,7 @@ class AuditLogService {
     DbGateway? gateway,
     DatabaseManager? dbManager,
     required AuthService authService,
-  })  : _gateway = gateway ?? DbGatewayImpl(dbManager ?? DatabaseManager()),
+  })  : _gateway = gateway ?? DbGatewayImpl(dbManager ?? DatabaseManager.instance),
         _authService = authService;
 
   /// Log an audit event securely to the database

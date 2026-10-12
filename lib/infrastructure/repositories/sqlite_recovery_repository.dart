@@ -77,21 +77,14 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
           whereArgs: [id],
         );
         // Also restore related financial transactions if soft-deleted
-        await db.transaction((txn) async {
-          try {
-            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-            await txn.update(
-              'financial_transactions',
-              {
-                'is_deleted': 0,
-              },
-              where: 'reference_id = ?',
-              whereArgs: [id],
-            );
-          } finally {
-            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-          }
-        });
+        await db.update(
+          'financial_transactions',
+          {
+            'is_deleted': 0,
+          },
+          where: 'reference_id = ?',
+          whereArgs: [id],
+        );
         break;
       case 'order':
         await db.update(
@@ -123,15 +116,8 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
           // Delete sale items
           await txn.delete('sale_items', where: 'sale_id = ?', whereArgs: [id]);
 
-          try {
-            // Delete related financial transactions (requires immutability bypass)
-            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-            await txn.delete('financial_transactions',
-                where: 'reference_id = ?', whereArgs: [id]);
-          } finally {
-            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-          }
-
+          // Append-only ledger invariant: Financial transactions are immutable historical audit facts
+          // and remain soft-deleted (is_deleted = 1). Physical deletion is prohibited.
           // Delete the sale itself
           await txn.delete('sales', where: 'id = ?', whereArgs: [id]);
         });
