@@ -5,6 +5,12 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 class DatabaseTriggers {
   static Future<void> createTriggers(DatabaseExecutor db) async {
+    final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('financial_transactions', 'customers')");
+    if (tables.length < 2) {
+      return;
+    }
+
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_insert');
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_update');
     await db.execute('DROP TRIGGER IF EXISTS trg_ft_delete');

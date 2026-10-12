@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/infrastructure/database/product_search_index.dart';
+import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
 
 class DatabaseMigrations {
   /// Handle database upgrades
@@ -21,6 +22,15 @@ class DatabaseMigrations {
         error_message TEXT
       )
     ''');
+
+    // Temporarily drop ledger immutability and balance triggers during migrations
+    // so schema expansions, column additions, and data backfills can execute cleanly.
+    // Triggers will be recreated fresh by DatabaseTriggers.createTriggers(db) at the end of upgrade.
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_insert');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_update');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_delete');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_update');
+    await db.execute('DROP TRIGGER IF EXISTS trg_ft_block_delete');
 
     try {
       await db.transaction((txn) async {
@@ -1269,6 +1279,12 @@ class DatabaseMigrations {
         }
       });
     } catch (err) {
+      // Restore triggers even if migration fails
+      try {
+        await DatabaseTriggers.createTriggers(db);
+      } catch (_) {
+        // Ignored: fallback
+      }
       // Log migration error to history outside transaction before throwing
       try {
         await db.insert('app_migration_history', {
@@ -1291,6 +1307,9 @@ class DatabaseMigrations {
     if (oldVersion < 47 && newVersion >= 47) {
       await _migratePrintingDevicesAndRoutes(db);
     }
+
+    // Recreate latest triggers
+    await DatabaseTriggers.createTriggers(db);
   }
 
   /// Merges products duplicated by the August 2026 ready catalogue, whose
