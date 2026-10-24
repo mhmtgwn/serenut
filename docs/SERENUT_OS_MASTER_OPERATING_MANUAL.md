@@ -9,8 +9,8 @@
 ## İÇİNDEKİLER
 
 1. [Sistem Mimarisi & Temel İlkeler](#1-sistem-mimarisi--temel-ilkeler)
-2. [Kullanıcı, Organizasyon (Tenant) & Cihaz Yönetimi (Kayıttan Girişe)](#2-kullanıcı-organizasyon-tenant--cihaz-yönetimi-kayıttan-girişe)
-3. [Ürün Kataloğu, Fiyatlandırma, Barkodlar & Stok Motoru](#3-ürün-kataloğu-fiyatlandırma-barkodlar--stok-motoru)
+2. [Kullanıcı, Organizasyon (Tenant), Şubeler & Cihaz Yönetimi (Kayıttan Girişe)](#2-kullanıcı-organizasyon-tenant--cihaz-yönetimi-kayıttan-girişe)
+3. [Ürün Kataloğu, Fiyatlandırma, Barkodlar, Gram Tartım & Stok Motoru](#3-ürün-kataloğu-fiyatlandırma-barkodlar--stok-motoru)
 4. [Müşteri, Cari Hesap, Veresiye, Senet, Taksit & Hızlı Tahsilat (Ledger Engine)](#4-müşteri-cari-hesap-veresiye-senet--defter-motoru-ledger-engine)
 5. [Kasa Satış, Sepet, Ödeme Motoru, Satış Detay & Sepet Kurtarma](#5-kasa-satış-sepet-ödeme-motoru--sepet-kurtarma)
 6. [Senkronizasyon Motoru (Sync V4 — Offline-First Replication)](#6-senkronizasyon-motoru-sync-v4--offline-first-replication)
@@ -19,9 +19,9 @@
 9. [e-Dönüşüm & GİB e-Arşiv / e-Fatura Portalı (0 TL Maliyetli İstemci & SMS Doğrulama)](#9-e-dönüşüm--gib-e-arşiv--e-fatura-portalı-0-tl-maliyetli-istemci)
 10. [WhatsApp Bildirim & İletişim Motoru (Evolution API & Meta Cloud)](#10-whatsapp-bildirim--iletişim-motoru-evolution-api--meta-cloud)
 11. [Android SIM Kartlı SMS Ağ Geçidi (Yerel GSM Modemi)](#11-android-sim-kartlı-sms-ağ-geçidi-yerel-gsm-modemi)
-12. [Patron Web Portalı & Canlı Ciro İzleme (Realtime WebSocket Engine)](#12-patron-web-portalı--canlı-ciro-izleme-realtime-engine)
+12. [Patron Web Portalı, Canlı Ciro İzleme & Dinamik Uzaktan Yapılandırma](#12-patron-web-portalı--canlı-ciro-izleme-realtime-engine)
 13. [Müşteri İkinci Ekranı (Customer Facing Display — HDMI & VFD)](#13-müşteri-ikinci-ekranı-customer-facing-display)
-14. [Yedekleme, Lisanslama, Teftiş (Audit), Geri Dönüşüm & Veri Aktarımı](#14-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
+14. [Yedekleme, Lisanslama (SaaS/İyzico), Teftiş (Audit), Destek & Veri Aktarımı](#14-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
 15. [Gelişmiş Raporlar & 5 Sekmeli Analitik Paneli (Reports Engine)](#15-gelişmiş-raporlar--5-sekmeli-analitik-paneli-reportspage)
 16. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#16-dağıtım-güncelleme--kriptografik-imzalama-standartları)
 17. [Gözlemlenebilirlik, Telemetri & Loglama](#17-gözlemlenebilirlik-telemetri--loglama)
@@ -180,6 +180,23 @@ Yeni bir işletme Serenut OS'a kaydolduğunda yüzlerce ürünü tek tek elle gi
   4. **Kafe:** Sıcak Kahveler, Soğuk İçecekler, Butik Tatlılar ve porsiyon bazlı menü kalemleri ilklendirilir.
 - **Tek Tıkla Tohumlama:** SQLite veritabanı kurulurken ilgili şablonun ürünleri, varsayılan KDV oranları (%1, %10, %20), satış tipleri (tartılı/adetli) ve kategorileri saniyeler içinde tabloya yazılır.
 
+### 2.7. Çoklu Şube & Depo Yönetimi Mimarisi ([Branches API & branch.controller.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/branch/branch.controller.ts))
+
+Büyüyen işletmelerin birden çok mağazasını (Merkez, Şube 1, Depo) tek çatı altından yönetmesini sağlayan kurumsal şube omurgası:
+- **Şube Veri Modeli (`branches` tablosu):**
+  - `id`: Benzersiz UUID.
+  - `company_id`: Bağlı olduğu ana organizasyon.
+  - `name`: Şube/Mağaza adı (ör. "Kadıköy Şubesi", "Merkez Depo").
+  - `address`, `phone`: Şube irtibat ve fatura adres bilgileri.
+  - `is_active`: Şubenin aktiflik durumu.
+- **Cihaz Bağlantısı (`devices.branch_id`):** Mağazada kurulan her POS kasası, mobil el terminali veya tablet donanımı belirli bir şubeye bağlanır. Cihaz o şubenin stok havuzundan satış yapar ve o şubenin kasasını işletir.
+- **Aktif Cihaz Koruma Kuralı (`COMPANY401 if active devices`):**
+  - Bir şube silinmek istendiğinde (`DELETE /api/v1/branches/:id`), sunucu önce o şubeye atanmış aktif cihaz olup olmadığını kontrol eder.
+  - Eğer şubeye bağlı aktif bir kasa varsa silme işlemi `COMPANY401: Bu şubeye bağlı aktif cihazlar bulunmaktadır. Önce cihazları başka bir şubeye aktarınız.` hatasıyla reddedilir; yetim cihaz kalması önlenir.
+- **Şube İzolasyonu vs Patron Konsolidasyonu:**
+  - Şube kasiyerleri yalnızca kendi şubelerinin günlük satışlarını, stoklarını ve kasasını görür.
+  - İşletme sahibi (SuperAdmin) ise web portalından tek ekranda tüm şubelerin hasılatını konsolide olarak izler, şubeler arasında stok transferi (`transfer_out` $\rightarrow$ `transfer_in`) başlatabilir.
+
 ---
 
 ## 3. ÜRÜN KATALOĞU, FİYATLANDIRMA, BARKODLAR & STOK MOTORU
@@ -263,6 +280,44 @@ Mağazadaki reyon düzeni ve terazili ürünler için entegre etiket basım moto
   - Xprinter, Argox, Zebra, Bixolon rulo etiket yazıcıları için **TSPL (Taiwan Semiconductor Printer Language)** ve **EPL/ZPL** doğrudan binary soket veya Windows Spooler üzerinden sürülür.
   - Sürücü gerektirmeden saf TSPL komutları (örn. `SIZE 60 mm, 40 mm`, `GAP 3 mm`, `DENSITY 8`, `BARCODE 128`, `TEXT`, `PRINT 1`) ile milimetrik netlikte termal basım yapılır.
 - **Toplu Etiket Basımı:** Ürün listesinden birden çok ürün seçilerek veya son güncellenen fiyatlar filtrelenerek tüm reyon için tek tıkla toplu raf etiketi yazdırılabilir.
+
+### 3.6. Barkod Normalizasyon Kuralları & 80ms HID Donanım Klavye Filtresi ([BarcodeStandard](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/services/barcode_standard.dart) & [BarcodeScannerMixin](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/mixins/barcode_scanner_mixin.dart))
+
+Serenut OS'ta barkod okuma rastgele bir metin kutusu girişi değildir; donanım düzeyinde akıllı filtreleme ve kurumsal standart normalizasyonu içerir:
+- **UPC-A (12 Hane) $\leftrightarrow$ EAN-13 (13 Hane) Kanonik Eşitlemesi:**
+  - UPC-A standardındaki 12 haneli bir sembol, başına `0` eklenerek EAN-13 olarak da ifade edilebilir (`0123456789012`).
+  - Sistem bu sembolleri otomatik olarak 12 haneli kanonik biçime dönüştürür (`normalize`). Böylece Excel'den içe aktarılan, el ile yazılan veya barkod tabancasıyla okutulan ürünler tek ve aynı ürüne eşleşir.
+- **EAN-8 Bozuk Excel Sıfır Onarımı (`normalizeReadyCatalog`):**
+  - Eski kataloglarda veya Excel'de sayı hücresi formatı yüzünden baştaki sıfırı düşmüş 7 haneli kodlar otomatik olarak 8 haneli geçerli EAN-8 formatına (`0xxxxxxx`) tamamlanır.
+- **Çoklu Aday Eşleştirme (`lookupCandidates`):**
+  - Barkod sorgulandığında sistem aynı anda `[normalized, raw, equivalent_alias]` alternatiflerini üretir; veritabanında tek seferde eşleştirir.
+- **80ms HID Donanım Klavye Zaman Aşımı Filtresi:**
+  - Piyasada satılan el tipi USB ve Bluetooth barkod okuyucuların %99'u bilgisayara bir "Klavye" (HID Keyboard) gibi bağlanır.
+  - Kasiyer klavyede normal yazı yazarken barkod zannedilmesini veya barkod okutulduğunda formun yanlışlıkla `Enter` ile submit edilmesini önlemek için:
+  - [BarcodeScannerMixin](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/mixins/barcode_scanner_mixin.dart), `HardwareKeyboard.instance.addHandler` ile global tuş vuruşlarını dinler.
+  - İki karakter arasındaki süre **80 milisaniyenin altındaysa** (insan parmağının erişemeyeceği makine hızı) karakterler barkod tamponuna (`_barcodeBuffer`) alınır.
+  - Sonda gelen `Enter` veya `NumpadEnter` yakalanır, UI form submit olayı tüketilerek bloke edilir (`return true`) ve doğrudan `onBarcodeScanned(code)` fonksiyonu tetiklenir.
+
+### 3.7. Gram Bazlı Tamsayı Tartım Matematiği & Sıfır Sapma Güvencesi
+
+Perakende ve kuruyemişte ondalıklı kayan nokta (`double/float`) aritmetiği kullanmak ölümcül yuvarlama hatalarına (`0.1 + 0.2 = 0.30000000000000004`) ve gün sonunda kuruş bazında kasa açıklarına yol açar. Serenut OS bu sorunu **İki Kademeli Tamsayı (Integer) Mimarisi** ile çözer:
+
+```mermaid
+graph LR
+    Scale[Elektronik Terazi: 750 Gram] --> IntGram[Miktar: 750 int]
+    Price[Kilo Fiyatı: 400,00 TL] --> IntCents[Kilo Fiyatı: 40.000 Kuruş int]
+    IntGram --> MathEngine[Kanonik Formül: 750 * 40.000 / 1000]
+    IntCents --> MathEngine
+    MathEngine --> Result[Satış Tutarı: 30.000 Kuruş = 300,00 TL]
+```
+
+1. **Tartılı Ürün Depolama:** Tartılı ürünlerde (`isWeighed == true`) miktar veritabanında ve sepet state'inde **TAMSAYI GRAM (`int`)** olarak tutulur (Örnek: 250 gram için `250`, 1.5 kg için `1500`).
+2. **Kanonik Fiyat Formülü:**
+   $$\text{Tutar (Kuruş)} = \frac{\text{Gram} \times \text{Kilo Fiyatı (Kuruş)}}{1000}$$
+3. **Sıfır Sapma & Stok Düşüşü:**
+   - Para hesabı kuruş tamsayısı ile yapılır.
+   - Stoktan düşüş anında kilogram cinsine çevrilir (`stok_kg - gram / 1000.0`).
+   - Bu sayede 100.000 satış yapılsa dahi kasada ve stokta 1 kuruş veya 1 gram yuvarlama hatası meydana gelmez.
 
 ---
 
@@ -1095,6 +1150,17 @@ graph TD
 - Patron evindeyken veya tatildeyken web portalına girip bir ürünün fiyatını veya barkodunu güncellediğinde, bu değişiklik PostgreSQL veritabanına yazılır.
 - Mağazadaki kasalar bir sonraki Sync döngüsünde (maksimum birkaç saniye içinde) yeni fiyatı otomatik çeker. Kasiyerin fiyat güncellemek için programı kapatıp açmasına gerek kalmaz!
 
+### 12.4. Dinamik Uzaktan Yapılandırma & Acil Devre Kesici ([remote-config.controller.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/remote-config/remote-config.controller.ts))
+
+Saha operasyonlarında acil durumları ve sistem güncellemelerini istemcilere yeni bir derleme göndermeden anında yöneten uzaktan yapılandırma katmanı:
+- **Merkezi Yapılandırma Dağıtımı (`GET /api/v1/remote-config`):**
+  - Sunucudaki `remote_configs` tablosundan (`key = 'global_config'`) en güncel özellik bayrakları (feature flags) çekilir.
+- **Acil Devre Kesici (Circuit Breaker):**
+  - Örneğin GİB e-Arşiv veya WhatsApp sağlayıcısında küresel bir çöküntü yaşandığında, sunucudan `circuit_breakers: { gib_portal: false }` bayrağı kapatılır.
+  - İstemciler hata fırtınasına düşmeden veya kullanıcıyı bekletmeden faturayı yerel kuyrukta tutar; dış servisi gereksiz isteklerle boğmaz.
+- **Bakım Bildirimleri & Sürüm Zorlama:**
+  - Planlı veritabanı bakımı öncesinde tüm kasaların ekranında geri sayım afişi gösterilebilir veya eski sürümde kalan kasalar için zorunlu güncelleme bayrağı (`min_required_version`) dinamik tetiklenebilir.
+
 ---
 
 ## 13. MÜŞTERİ İKİNCİ EKRANI (CUSTOMER FACING DISPLAY)
@@ -1214,6 +1280,38 @@ Birden çok kasiyerin çalıştığı mağazalarda kasa güvenliğini ve yetki s
   - `Ürünler.xlsx`: Barkod, Ürün Adı, Kategori, Alış Fiyatı, Satış Fiyatı, KDV, Stok.
   - `Müşteriler.xlsx`: Ünvan, Telefon, Adres, Vergi No, Başlangıç Bakiyesi.
   - Hatalı satırlar atlanır; başarılı satırlar canlı ilerleme çubuğu (`ImportProgressDialog`) ile içe aktarılır.
+
+### 14.11. SaaS Lisanslama, İyzico 3D Secure & Havale/EFT Yaşam Döngüsü ([commercial_lifecycle.service.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/billing/commercial_lifecycle.service.ts))
+
+İşletmelerin Serenut OS yazılım aboneliklerini ve lisans geçerliliklerini yöneten bulut faturalama altyapısı:
+- **İyzico 3D Secure Kredi Kartı Ödemesi ([iyzico.service.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/billing/iyzico.service.ts)):**
+  - Aylık veya yıllık paket yenilemelerinde BDDK ve PCI-DSS uyumlu 3D Secure doğrulaması ile tahsilat yapılır.
+  - İyzico Webhook ile ödeme anında teyit edilerek lisans bitiş tarihi otomatik uzatılır.
+- **Banka Havale / EFT Bildirimi ([billing.bank-transfer.routes.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/billing/billing.bank-transfer.routes.ts)):**
+  - Kredi kartı kullanmayan esnaf için IBAN havale bildirimi ve dekont görseli yükleme imkanı sunulur.
+  - Finans yöneticisi portal üzerinden dekontu onayladığında lisans anında aktifleşir.
+- **Otomatik e-Fatura & PDF Üretimi ([invoice_generator.service.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/billing/invoice_generator.service.ts)):**
+  - Tahsil edilen her abonelik bedeli için işletmenin kurumsal bilgilerine resmi PDF fatura üretilir ve e-posta ile iletilir.
+- **SaaS Yaşam Döngüsü Durum Makinesi (Commercial Lifecycle FSM):**
+  - `trial`: 14 günlük ücretsiz deneme süresi.
+  - `active`: Ödemesi yapılmış, tüm özelliklerin açık olduğu tam lisanslı mod.
+  - `grace_period`: Ödeme günü geçmiş veya internet kesilmiş; esnafın mağdur olmaması için **15 Günlük Kesintisiz Çalışma Toleransı**.
+  - `suspended`: Tolerans süresi dolmuş, yalnızca veri okuma ve dışa aktarmaya izin veren kısıtlı mod.
+  - `cancelled`: İşletmenin hizmeti sonlandırması ve verilerin yasal saklama süresi sonunda arşivlenmesi.
+
+### 14.12. Entegre Destek Masası & Resend E-Posta Webhook Entegrasyonu ([support.controller.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/support/support.controller.ts) & [SupportPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/support_page.dart))
+
+Esnafın teknik desteğe veya uzaktan yardıma ihtiyaç duyduğu anlarda doğrudan sistem üzerinden yardım almasını sağlayan çok kanallı yardım masası:
+- **Uygulama İçi Destek Talebi Açma:** Kasiyer veya yönetici `Ayarlar -> Destek` sayfasından ekran görüntüsü ve hata açıklaması ile anında bilet açabilir (`POST /api/v1/support/tickets`).
+- **Resend Inbound Webhook (`support@serenut.com`):**
+  - Müşteri doğrudan `support@serenut.com` adresine e-posta gönderdiğinde, **Resend Inbound Webhook** (Svix kriptografik imza doğrulamalı) gelen e-postayı yakalar.
+  - HTML metni düz yazıya dönüştürür (`plainTextFromHtml`), gönderen e-postayı şirketin yetkili kullanıcısıyla eşleştirir ve otomatik olarak bir destek bileti üretir.
+- **Destek Bilet FSM Yaşam Döngüsü:**
+  - `open`: Yeni açılan bilet, destek ekibinin kuyruğuna düşer.
+  - `in_progress`: Destek mühendisi bilet üzerinde çalışmaya başladı.
+  - `waiting_customer`: Müşteriden ek bilgi veya AnyDesk/RustDesk bağlantı onayı bekleniyor.
+  - `resolved`: Sorun giderildi ve çözüldü olarak işaretlendi.
+  - `closed`: Müşteri veya sistem tarafından kapatıldı.
 
 ---
 
