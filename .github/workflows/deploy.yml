@@ -185,7 +185,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Run complete Flutter test shard
-        run: flutter test --concurrency=4 --total-shards=4 --shard-index=${{ matrix.shard }}
+        shell: powershell
+        run: |
+          $testDirs = Get-ChildItem test -Directory | Where-Object { $_.Name -ne 'core_next' } | ForEach-Object { "test/$($_.Name)" }
+          $coreNextTests = Get-ChildItem test\core_next -File -Filter "*_test.dart" | Where-Object { $_.Name -notmatch '^stage' } | ForEach-Object { "test/core_next/$($_.Name)" }
+          $testFiles = Get-ChildItem test -File -Filter "*_test.dart" | ForEach-Object { "test/$($_.Name)" }
+          $all = @($testDirs + $coreNextTests + $testFiles)
+          flutter test --concurrency=4 --total-shards=4 --shard-index=${{ matrix.shard }} $all
+
 
   windows-ci:
     if: github.event_name != 'pull_request'
