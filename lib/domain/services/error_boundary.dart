@@ -55,24 +55,6 @@ class ErrorBoundary {
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
 
-      if (!isMissingPlugin) {
-        try {
-          unawaited(Sentry.captureException(
-            details.exception,
-            stackTrace: details.stack,
-            withScope: (scope) {
-              scope.setTag('error_reference', refCode);
-              scope.setTag('error_source', 'FlutterError.onError');
-              if (details.library != null) {
-                scope.setTag('library', details.library!);
-              }
-            },
-          ));
-        } catch (_) {
-          // Sentry failure is non-blocking
-        }
-      }
-
       // Do not show red screen for MissingPluginException
       if (kDebugMode && !isMissingPlugin) {
         FlutterError.presentError(details);
@@ -157,21 +139,6 @@ class ErrorBoundary {
         correlationId: refCode,
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
-
-      if (!isMissingPlugin) {
-        try {
-          unawaited(Sentry.captureException(
-            error,
-            stackTrace: stack,
-            withScope: (scope) {
-              scope.setTag('error_reference', refCode);
-              scope.setTag('error_source', 'PlatformDispatcher.onError');
-            },
-          ));
-        } catch (_) {
-          // Sentry failure is non-blocking
-        }
-      }
 
       if (isMissingPlugin) return true; // Handled gracefully, do not crash
 

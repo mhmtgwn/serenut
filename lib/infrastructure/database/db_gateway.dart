@@ -66,17 +66,9 @@ class DbGatewayImpl implements DbGateway {
     String caller = 'DbGateway',
   }) async {
     if (Zone.current[#sqlite_txn] != null) {
-      try {
-        return await action();
-      } catch (e, stack) {
-        TelemetryService().logError(
-          e,
-          stack,
-          context: 'sqlite_gateway:txn_nested',
-          level: LogLevel.error,
-        );
-        rethrow;
-      }
+      // Inside active transaction zone — execute directly without re-entering the queue.
+      // Callers or outer transaction blocks manage and report their own transaction lifecycle errors.
+      return await action();
     }
 
     final cutoff = DatabaseManager.cutoffMaintenanceLock;
@@ -163,12 +155,14 @@ class DbGatewayImpl implements DbGateway {
         offset: offset,
       );
     } catch (e, stack) {
-      TelemetryService().logError(
-        e,
-        stack,
-        context: 'sqlite_gateway:query:$table',
-        level: LogLevel.error,
-      );
+      if (table != 'client_telemetry_logs') {
+        TelemetryService().logError(
+          e,
+          stack,
+          context: 'sqlite_gateway:query:$table',
+          level: LogLevel.error,
+        );
+      }
       rethrow;
     }
   }

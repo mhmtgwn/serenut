@@ -490,12 +490,34 @@ class SyncNotifier extends StateNotifier<SyncState>
         );
       }
     } catch (e, st) {
-      await TelemetryService().logError(
-        e,
-        st,
-        context: 'SyncNotifier.triggerSync',
-        correlationId: _machine?.sessionId,
-      );
+      final errStr = e.toString();
+      final isSessionExpired = errStr.contains('Session expired') ||
+          errStr.contains('Status: 401') ||
+          errStr.contains('Status: 403');
+      final isNetworkIssue = e.runtimeType.toString() == 'SocketException' ||
+          errStr.contains('SocketException') ||
+          errStr.contains('No Internet connection') ||
+          errStr.contains('Connection refused') ||
+          errStr.contains('Failed host lookup') ||
+          errStr.contains('Network is unreachable');
+
+      if (!isSessionExpired && !isNetworkIssue) {
+        await TelemetryService().logError(
+          e,
+          st,
+          context: 'SyncNotifier.triggerSync',
+          correlationId: _machine?.sessionId,
+        );
+      } else {
+        await TelemetryService().logStructured(
+          event: isSessionExpired
+              ? 'sync_session_expired'
+              : 'sync_network_offline',
+          level: LogLevel.warning,
+          correlationId: _machine?.sessionId,
+          metadata: {'error': errStr},
+        );
+      }
       final rawErr = e.toString();
       state = state.copyWith(
         status: SyncStatus.error,

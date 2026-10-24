@@ -279,17 +279,35 @@ class TelemetryService {
     LogLevel level = LogLevel.error,
     String? correlationId,
   }) async {
-    unawaited(Sentry.captureException(
-      error,
-      stackTrace: stackTrace,
-      withScope: (scope) {
-        if (context != null) {
-          scope.setTag('context', context);
-        }
-        scope.setTag('level', level.name);
-        scope.setTag('correlationId', correlationId ?? 'none');
-      },
-    ));
+    final isOperationalNoise = (error.toString().contains('Session expired') ||
+        error.toString().contains('Status: 401') ||
+        error.toString().contains('Status: 403') ||
+        error is SocketException ||
+        error.toString().contains('No Internet connection') ||
+        error.toString().contains('Network is unreachable') ||
+        error.toString().contains('Connection refused'));
+
+    if ((level == LogLevel.error || level == LogLevel.critical) &&
+        !isOperationalNoise) {
+      try {
+        unawaited(Sentry.captureException(
+          error,
+          stackTrace: stackTrace,
+          withScope: (scope) {
+            if (context != null) {
+              scope.setTag('context', context);
+            }
+            scope.setTag('level', level.name);
+            scope.setTag('correlationId', correlationId ?? 'none');
+            if (correlationId != null) {
+              scope.setTag('error_reference', correlationId);
+            }
+          },
+        ));
+      } catch (_) {
+        // Sentry failure is non-blocking
+      }
+    }
 
     final eventName = context != null ? 'error:$context' : 'unhandled_exception';
 

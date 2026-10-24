@@ -3,6 +3,7 @@
 // Renamed from TelemetryService to TelemetryUploadService to avoid class
 // name collision with domain/services/telemetry_service.dart (LocalLoggingService).
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../infrastructure/database/database_provider.dart';
@@ -12,12 +13,15 @@ import '../../infrastructure/network/api_client.dart';
 class TelemetryUploadService {
   final ApiClient _apiClient;
   final DbGateway? _gateway;
+  bool _isRecording = false;
 
   TelemetryUploadService(this._apiClient, [this._gateway]);
 
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value,
       {Object? metadata}) async {
+    if (_isRecording) return;
+    _isRecording = true;
     try {
       final cutoff = DatabaseManager.cutoffMaintenanceLock;
       if (cutoff != null && !cutoff.state.isWritePermitted) {
@@ -32,16 +36,17 @@ class TelemetryUploadService {
             metadata is String ? metadata : jsonEncode(metadata ?? const {}),
       };
 
-      final gateway = _gateway;
-      if (gateway != null) {
-        await gateway.insert('client_telemetry_logs', payload);
-      } else {
+      // Always execute detached from any ongoing SQLite transaction zone
+      // to prevent using a closing/aborted transaction executor.
+      await runZoned(() async {
         final db = await DatabaseManager.instance.getDatabase();
         await db.insert('client_telemetry_logs', payload);
-      }
+      }, zoneValues: {#sqlite_txn: null});
       debugPrint('[TelemetryUpload] Recorded local metric: $name = $value');
     } catch (e) {
       debugPrint('[TelemetryUpload] Failed to record local metric: $e');
+    } finally {
+      _isRecording = false;
     }
   }
 
