@@ -189,8 +189,12 @@ jobs:
         run: |
           $all = @(Get-ChildItem -Recurse test -Filter "*_test.dart" |
             Where-Object { $_.Name -notmatch '^stage' -and $_.FullName -notmatch '[\\/]core_next[\\/]' } |
-            ForEach-Object { $_.FullName })
-          flutter test --concurrency=4 --total-shards=4 --shard-index=${{ matrix.shard }} $all
+            ForEach-Object { Resolve-Path -Relative $_.FullName })
+          $myFiles = @()
+          for ($i = ${{ matrix.shard }}; $i -lt $all.Count; $i += 4) {
+            $myFiles += $all[$i]
+          }
+          flutter test --concurrency=4 $myFiles
 
 
   windows-ci:
