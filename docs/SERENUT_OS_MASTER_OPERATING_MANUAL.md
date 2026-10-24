@@ -11,21 +11,22 @@
 1. [Sistem Mimarisi & Temel İlkeler](#1-sistem-mimarisi--temel-ilkeler)
 2. [Kullanıcı, Organizasyon (Tenant) & Cihaz Yönetimi (Kayıttan Girişe)](#2-kullanıcı-organizasyon-tenant--cihaz-yönetimi-kayıttan-girişe)
 3. [Ürün Kataloğu, Fiyatlandırma, Barkodlar & Stok Motoru](#3-ürün-kataloğu-fiyatlandırma-barkodlar--stok-motoru)
-4. [Müşteri, Cari Hesap, Veresiye, Senet & Defter Motoru (Ledger Engine)](#4-müşteri-cari-hesap-veresiye-senet--defter-motoru-ledger-engine)
-5. [Kasa Satış, Sepet, Ödeme Motoru & Sepet Kurtarma](#5-kasa-satış-sepet-ödeme-motoru--sepet-kurtarma)
+4. [Müşteri, Cari Hesap, Veresiye, Senet, Taksit & Hızlı Tahsilat (Ledger Engine)](#4-müşteri-cari-hesap-veresiye-senet--defter-motoru-ledger-engine)
+5. [Kasa Satış, Sepet, Ödeme Motoru, Satış Detay & Sepet Kurtarma](#5-kasa-satış-sepet-ödeme-motoru--sepet-kurtarma)
 6. [Senkronizasyon Motoru (Sync V4 — Offline-First Replication)](#6-senkronizasyon-motoru-sync-v4--offline-first-replication)
-7. [Donanım Entegrasyonları & Ağ Paylaşımlı Donanım (Hardware Layer)](#7-donanım-entegrasyonları--ağ-paylaşımlı-donanım-hardware-layer)
+7. [Donanım Entegrasyonları, EFT-POS Terminali & Ağ Paylaşımlı Donanım](#7-donanım-entegrasyonları--ağ-paylaşımlı-donanım-hardware-layer)
 8. [Yerel Ağda Eşler Arası (P2P) Ürün Görseli Dağıtımı (LAN Peer Service)](#8-yerel-ağda-eşler-arası-p2p-ürün-görseli-dağıtımı-lan-peer-service)
-9. [e-Dönüşüm & GİB e-Arşiv / e-Fatura Portalı (0 TL Maliyetli İstemci)](#9-e-dönüşüm--gib-e-arşiv--e-fatura-portalı-0-tl-maliyetli-istemci)
+9. [e-Dönüşüm & GİB e-Arşiv / e-Fatura Portalı (0 TL Maliyetli İstemci & SMS Doğrulama)](#9-e-dönüşüm--gib-e-arşiv--e-fatura-portalı-0-tl-maliyetli-istemci)
 10. [WhatsApp Bildirim & İletişim Motoru (Evolution API & Meta Cloud)](#10-whatsapp-bildirim--iletişim-motoru-evolution-api--meta-cloud)
 11. [Android SIM Kartlı SMS Ağ Geçidi (Yerel GSM Modemi)](#11-android-sim-kartlı-sms-ağ-geçidi-yerel-gsm-modemi)
-12. [Patron Web Portalı & Canlı Ciro İzleme (Realtime Engine)](#12-patron-web-portalı--canlı-ciro-izleme-realtime-engine)
-13. [Müşteri İkinci Ekranı (Customer Facing Display)](#13-müşteri-ikinci-ekranı-customer-facing-display)
-14. [Yedekleme, Geri Yükleme, Lisanslama & Veri Aktarımı (Migration)](#14-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
-15. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#15-dağıtım-güncelleme--kriptografik-imzalama-standartları)
-16. [Gözlemlenebilirlik, Telemetri & Loglama](#16-gözlemlenebilirlik-telemetri--loglama)
-17. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#17-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
-18. [Genişletilmiş Master Cheat Sheet Tablosu](#18-genişletilmiş-master-cheat-sheet-tablosu)
+12. [Patron Web Portalı & Canlı Ciro İzleme (Realtime WebSocket Engine)](#12-patron-web-portalı--canlı-ciro-izleme-realtime-engine)
+13. [Müşteri İkinci Ekranı (Customer Facing Display — HDMI & VFD)](#13-müşteri-ikinci-ekranı-customer-facing-display)
+14. [Yedekleme, Lisanslama, Teftiş (Audit), Geri Dönüşüm & Veri Aktarımı](#14-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
+15. [Gelişmiş Raporlar & 5 Sekmeli Analitik Paneli (Reports Engine)](#15-gelişmiş-raporlar--5-sekmeli-analitik-paneli-reportspage)
+16. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#16-dağıtım-güncelleme--kriptografik-imzalama-standartları)
+17. [Gözlemlenebilirlik, Telemetri & Loglama](#17-gözlemlenebilirlik-telemetri--loglama)
+18. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#18-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
+19. [Genişletilmiş Master Cheat Sheet Tablosu](#19-genişletilmiş-master-cheat-sheet-tablosu)
 
 ---
 
@@ -169,6 +170,16 @@ Sistemde iki seviyeli kimlik doğrulama bulunur:
 | **Kasiyer (Cashier)** | Satış yapma, tahsilat alma, fiş yazdırma, ürün arama, müşteri bakiyesi görme | Mali raporları göremez, kısıtlı iskonto limiti, ürün fiyatını elden değiştiremez |
 | **Depocu (Stock Clerk)** | Mal kabulü, sayım, stok hareketi girişi | Satış yapamaz, cari defter bakiyelerini göremez |
 
+### 2.6. Sektörel Hazır Ürün & Kategori Tohumlama (`IndustryTemplateRegistry`)
+
+Yeni bir işletme Serenut OS'a kaydolduğunda yüzlerce ürünü tek tek elle girmek zorunda kalmaz. Sistemde yerleşik [IndustryTemplateRegistry](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/models/industry_template.dart) motoru bulunur:
+- **Kayıt Esnasında Seçim:** İşletme kaydolurken faaliyet alanını seçer:
+  1. **Fındıkçı:** Hizmet, Kırma, Kavurma, Şekerleme & Ezme, Kremalar, Butik & Kurabiye kategorileri ve standart hizmet/kırma birim fiyatları tohumlanır.
+  2. **Market:** Temel Gıda, İçecek, Temizlik, Şarküteri, Atıştırmalık kategorileri ve popüler EAN-13 barkodlu hazır ürünler yüklenir.
+  3. **Kuruyemişçi:** Duble Antep Fıstığı, Giresun Fındığı, Kaju, Badem, Kabak Çekirdeği, Sarı Leblebi vb. tartılı (`isByWeight = true`) ve adetli ürünler tohumlanır.
+  4. **Kafe:** Sıcak Kahveler, Soğuk İçecekler, Butik Tatlılar ve porsiyon bazlı menü kalemleri ilklendirilir.
+- **Tek Tıkla Tohumlama:** SQLite veritabanı kurulurken ilgili şablonun ürünleri, varsayılan KDV oranları (%1, %10, %20), satış tipleri (tartılı/adetli) ve kategorileri saniyeler içinde tabloya yazılır.
+
 ---
 
 ## 3. ÜRÜN KATALOĞU, FİYATLANDIRMA, BARKODLAR & STOK MOTORU
@@ -241,6 +252,18 @@ Her stok değişimi bir `stock_movements` kaydı doğurur:
 4. **`waste` (Fire/Zayi):** Bozulan, kırılan ürünler stoktan açıklama ile düşülür.
 5. **`count_adjustment` (Sayım Düzeltmesi):** Periyodik fiziki sayım sonucunda tespit edilen fark sisteme işlenir.
 
+### 3.5. Barkodlu Raf Etiketi & Terazi Etiket Basım Motoru (`LabelModel` & TSPL)
+
+Mağazadaki reyon düzeni ve terazili ürünler için entegre etiket basım motoru ([LabelModel](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/models/label_model.dart)):
+- **Desteklenen Etiket Ebatları:**
+  - `40 x 25 mm`: Kompakt raf etiketi (Barkod + Fiyat + Ürün Adı).
+  - `50 x 30 mm`: Standart reyon ve paketleme etiketi (Marka, Raf Kodu, KDV, Birim Fiyat).
+  - `60 x 40 mm` & `80 x 40 mm`: Geniş terazi ve kuruyemiş poşeti etiketi (Gramaj, QR Kod, Menşei: "TÜRKİYE", Parti/Lot No, Ambalaj Tarihi).
+- **Yazıcı Dili ve Protokolü:**
+  - Xprinter, Argox, Zebra, Bixolon rulo etiket yazıcıları için **TSPL (Taiwan Semiconductor Printer Language)** ve **EPL/ZPL** doğrudan binary soket veya Windows Spooler üzerinden sürülür.
+  - Sürücü gerektirmeden saf TSPL komutları (örn. `SIZE 60 mm, 40 mm`, `GAP 3 mm`, `DENSITY 8`, `BARCODE 128`, `TEXT`, `PRINT 1`) ile milimetrik netlikte termal basım yapılır.
+- **Toplu Etiket Basımı:** Ürün listesinden birden çok ürün seçilerek veya son güncellenen fiyatlar filtrelenerek tüm reyon için tek tıkla toplu raf etiketi yazdırılabilir.
+
 ---
 
 ## 4. MÜŞTERİ, CARİ HESAP, VERESİYE, SENET & DEFTER MOTORU (LEDGER ENGINE)
@@ -295,6 +318,34 @@ Senetli satışlarda senetler ayrı bir portföy tablosunda (`promissory_notes`)
 - **`collected` (Tahsil Edildi):** Müşteri ödemesini yaptı; cari hesaba tahsilat işlenir, kasa giriş kaydı doğar.
 - **`returned_protest` (Protesto / İade Edildi):** Vadesinde ödenmeyen senet. Cari hesaba `promissory_returned` tipi ile otomatik borç yazılır.
 - **`legal` (İcrada / Hukukta):** Hukuki takibe intikal etmiş senetler.
+
+### 4.5. Müşteri Taksit Planları & Vadeli Taksit Takibi (`installment_models.dart`)
+
+Vadeli ve taksitli çalışan işletmeler için sistemde entegre taksit planlayıcı motoru ([installment_models.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/models/installment_models.dart)) bulunur:
+- **Taksit Planı Mimarisi (`CustomerInstallmentPlanEntity`):**
+  - `totalAmount`: Toplam satış tutarı.
+  - `downPayment`: Satış anında alınan nakit/kart peşinat.
+  - `financedAmount`: Kalan taksitlendirilecek bakiye (`totalAmount - downPayment`).
+  - `installmentCount`: Taksit adedi (ör. 3, 6, 12 ay).
+- **Aylık Taksit Hareketleri (`CustomerInstallmentEntity`):**
+  - Her bir taksit bağımsız bir vade tarihi (`dueDate`), taksit tutarı (`amount`), ödenen miktar (`paidAmount`) ve ödeme tarihi taşır.
+  - Taksit durumları: `pending` (Vadesi bekleniyor), `partial` (Kısmi ödendi), `paid` (Tamamı ödendi), `overdue` (Vadesi geçti!).
+- **Otomatik Hatırlatma & Bakiye Entegrasyonu:** Taksit vadesi yaklaştığında veya geciktiğinde, sistem cari hesap üzerinden müşteriye otomatik WhatsApp/SMS ödeme hatırlatması gönderebilir.
+
+### 4.6. Hızlı Müşteri Tahsilatı & Ödeme Alma Sayfası ([CollectionPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/collection_page.dart))
+
+Cari hesaplardan nakit veya kartla para tahsilatı yapıldığında, kasiyerin hatasız ve anında işlem yapmasını sağlayan tam ekran tahsilat konsolu:
+
+- **Canlı Bakiye Önizlemesi (Live Balance Preview):**
+  - Kasiyer tutar alanına rakam yazdıkça ekran üçlü simülasyonla güncellenir:
+    1. **Mevcut Borç:** Müşterinin cari hesap bakiyesi (ör. `1.250,00 ₺`).
+    2. **Tahsil Edilen:** Girilen ödeme miktarı (ör. `500,00 ₺`).
+    3. **Kalan Borç:** İşlem onaylandığında müşterinin kalacak net borcu (ör. `750,00 ₺` yeşil gösterge).
+- **Ödeme Türü Seçimi:** Tek dokunuşla **Nakit** veya **Kredi Kartı** seçimi.
+- **ESC/POS Tahsilat Makbuzu Basımı (`CustomerPaymentReceipt`):**
+  - `_printReceipt` anahtarı açık olduğunda, tahsilat onaylandığı anda termal yazıcıdan resmi firma başlıklı, müşteri adı, ödenen tutar, kalan bakiye ve işlem zamanı içeren tahsilat makbuzu basılır.
+- **Anında WhatsApp / SMS Tahsilat Dekontu:**
+  - Tahsilat deftere (`ledger_entries`) yazıldığı anda müşterinin cep telefonuna dijital ödeme dekontu ve güncel kalan bakiye özeti WhatsApp üzerinden iletilir.
 
 ---
 
@@ -353,19 +404,67 @@ Sistem esnek ödeme kombinasyonlarını destekler:
   - İade bedeli nakit ödendiyse kasadan nakit çıkışı (`cash_transactions.type = 'refund'`) yapılır.
   - Veresiye satışın iadesiyse müşterinin cari hesabına alacak (`sale_return_credit`) yazılır.
 
-### 5.6. Gün Sonu ve Z-Raporu (Kasa Kapanışı)
+### 5.6. Gün Sonu Kapatma, Kasa Sayımı, Küpür Denetimi & X/Z Raporları ([EndOfDayPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/end_of_day_page.dart))
 
-1. **Gün Açılışı:** Kasaya sabah bırakılan devir nakit girilir.
-2. **Gün İçi:** Kasa girişleri (tahsilat, nakit ekleme) ve çıkışları (masraf ödemesi, mal alımı) kaydedilir.
-3. **Gün Sonu Kapanışı (Z-Raporu):**
-   - Kasiyer kasadaki fiziki parayı sayar ve girer.
-   - Sistem gün boyunca yapılan:
-     - Toplam Nakit Satışlar
-     - Toplam Kredi Kartı Satışları
-     - Toplam Veresiye Satışlar
-     - Toplam Tahsilatlar ve Masrafları hesaplar.
-   - Beklenen Kasa ile Sayılan Kasa karşılaştırılır; varsa **Kasa Fazlası** veya **Kasa Eksiği** raporda belirtilir.
-   - Z-Raporu termal yazıcıdan yazdırılır, `daily_registers` tablosunda kilitlenerek gün kapatılır ve **otomatik olarak işletme sahibinin WhatsApp'ına özet mesaj olarak gönderilir**.
+Serenut OS'ta gün sonu işlemi basit bir toplam alma değil; paranın kuruşu kuruşuna sayıldığı, kasa kaçaklarının engellendiği ve resmi mali kapanışın mühürlendiği çok adımlı bir denetim sürecidir:
+
+#### A. Banknot & Madeni Para Küpür Sayımı (Denomination Count)
+- Kasiyer gün sonunda kasayı sayarken düz rakam yazmak zorunda değildir; sistem entegre bir **Küpür Sayım Tablosu** sunar:
+  - **Kağıt Paralar:** ₺200, ₺100, ₺50, ₺20, ₺10, ₺5 adetleri girilir.
+  - **Madeni Paralar:** ₺1, ₺0,50, ₺0,25 adetleri girilir.
+  - Sistem girilen adetler üzerinden **Fiili Sayılan Nakit Tutarını** otomatik hesaplar.
+
+#### B. Kasa Farkı (Fazla / Noksan) Tespiti
+- **Sistem Beklentisi (Teorik Kasa):** $\text{Devir Nakit} + \text{Nakit Satışlar} + \text{Nakit Cari Tahsilatlar} - \text{Nakit Masraflar/Ödemeler} - \text{Nakit İadeler}$.
+- **Kasa Farkı Formülü:** $\text{Kasa Farkı} = \text{Fiili Sayılan Nakit} - \text{Sistem Beklentisi}$.
+  - **Fark = 0,00 ₺:** Kasa tam tutmaktadır (Yeşil onay).
+  - **Fark > 0 (Kasa Fazlası):** Kasada sistemden fazla para vardır (Mavi uyarı).
+  - **Fark < 0 (Kasa Noksanı):** Kasada eksik para vardır (Kırmızı uyarı — kasiyere veya yöneticiye açıklama notu zorunlu tutulabilir).
+
+#### C. X-Raporu vs Z-Raporu Ayrımı
+| Rapor Türü | Amacı & Sayacı | Kullanım Zamanı |
+|---|---|---|
+| **X-Raporu (Ara Denetim)** | Sayaçları sıfırlamaz, günü kapatmaz. O ana kadarki ara ciroyu ve kasa durumunu gösterir. | Vardiya değişiminde, öğle arasında veya müdür kasayı saymak istediğinde. |
+| **Z-Raporu (Resmi Mali Kapanış)** | **Z Sayacını 1 artırır**, o günkü tüm satış ve ödemeleri kilitler (`daily_registers.is_closed = 1`), dönemi kapatır. | Gece mağaza kapandığında vardiyanın resmi bitişinde. |
+
+#### D. Çıktı & WhatsApp Otomasyonu
+- Z-Raporu onaylandığı anda termal yazıcıdan resmi döküm fişi basılır.
+- Eşzamanlı olarak arka planda **Bölüm 10'da açıklanan `end_of_day_report` olayı tetiklenir** ve işletme sahibinin/patronun cep telefonuna günün toplam cirosu, nakit, kart, veresiye ve kasa farkı WhatsApp mesajı olarak anında düşer!
+
+---
+
+### 5.7. Sipariş & Teslimat Yönetimi Motoru ([OrdersPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/orders_page.dart) & [OrderEntity](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/repositories/base_repository.dart#L812-L949))
+
+Perakende ve toptanda paket servis, telefonla sipariş veya ileri tarihli teslimatlar için entegre sipariş motoru:
+
+```mermaid
+stateDiagram-v2
+    [*] --> created: 1. Sipariş Alındı (Telefon / Kasa / Web)
+    created --> preparing: 2. Mutfakta / Depoda Hazırlanıyor
+    preparing --> ready: 3. Paketlendi & Teslime Hazır
+    ready --> shipped: 4. Kuryeye Verildi / Yola Çıktı
+    shipped --> delivered: 5. Müşteriye Teslim Edildi & Tahsilat
+    created --> cancelled: İptal Edildi
+    preparing --> cancelled: İptal Edildi
+    ready --> cancelled: İptal Edildi
+```
+
+- **Sipariş Numaratörü (`orderNumber`):** Şube bazlı okunabilir sipariş kodları (ör. `M1-ord-20261024-004`).
+- **Gecikme Takibi (`isOverdue`):** Siparişin beklenen teslim saati (`expectedDeliveryDate`) geçtiyse ve durum hala `delivered` olmadıysa sipariş listesinde kırmızı yanıp söner ve kasiyere uyarı verir.
+- **In-Place Sipariş Güncelleme (`updateOrderSaleTransaction`):** Müşteri telefon edip siparişe ürün eklettiğinde veya çıkardığında, sistem eski kaydı silip yenisini açmaz; var olan sipariş kaydını ve bağlı finansal hareketleri atomik olarak günceller.
+- **Müşteri Bildirim Tetikleyicisi:** Sipariş durumu her değiştiğinde (`created` $\rightarrow$ `preparing` $\rightarrow$ `ready` $\rightarrow$ `shipped` $\rightarrow$ `delivered`), müşterinin cep telefonuna ilgili durumun emojili WhatsApp/SMS bildirimi otomatik olarak iletilir.
+
+### 5.8. Satış Geçmişi & Detay Yönetimi ([SalesHistoryPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/sales_history_page.dart) & [SaleDetailsPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/sale_details_page.dart))
+
+Geçmişte yapılmış tüm satış fişlerinin sorgulandığı, incelendiği ve işlem gördüğü merkezi yönetim modülü:
+
+- **Çok Kriterli Filtreleme:** Tarih aralığı, ödeme türü (Nakit, Kart, Veresiye), satış durumu (Tamamlandı, İade Edildi, İptal) ve tutara göre anlık arama.
+- **Detaylı Fiş Dökümü:** Satış kimliği (`#ABC123XY`), kasiyer adı, satır bazlı ürünler, birim fiyatlar, uygulanan iskonto miktarı, KDV oranları ve ödeme türü dağılımı.
+- **Tek Tıkla e-Arşiv Fatura Kesme (`CreateGibInvoiceDialog.show`):**
+  - Müşteri fiş kestikten sonra fatura talep ederse, satış detayından tek tıkla resmi GİB e-Arşiv portalı fatura sihirbazı açılır. Satıştaki kalemler otomatik faturaya aktarılır.
+- **Termal Fiş Kopyası (Reprint):** İstemci, istenen herhangi bir geçmiş fişin kopyasını termal yazıcıdan anında yeniden basabilir.
+- **WhatsApp / SMS Dijital Fiş Paylaşımı:** Fiş detayından müşterinin telefonuna dijital fiş PDF/metin linki tek tıkla gönderilir.
+- **Kısmi ve Tam İade Akışı:** Müşteri 3 üründen 1 tanesini getirdiğinde, satış detayından sadece o ürün seçilerek iade fişi kesilir; stok ve kasa/cari hesap otomatik eşitlenir.
 
 ---
 
@@ -462,6 +561,34 @@ Kasaya bağlı terazi ürün tartımında hızı ve doğruluğu sağlar.
 - İkinci Kasa (ör. Android el terminali veya Kasa 2) satış yaptığında doğrudan ana kasaya veya bulut kuyruğuna bir `ClaimedHardwareJob` gönderir.
 - Ana Kasa kuyruktaki işi alır, yerel termal yazıcısından fişi basar veya teraziden okuduğu ağırlığı Kasa 2'ye aktarır.
 
+### 7.5. Banka POS & EFT-POS Terminal Motoru ([PhysicalCardPaymentService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/providers/payment_terminal_provider.dart) & [IPaymentTerminalAdapter](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/hardware/payment_terminal_service.dart))
+
+Kasada kredi kartı ile ödeme alındığında, tutarı harici bir banka POS cihazına el ile girmek hem kasiyer hatasına (fazla/eksik çekim) hem de kasa kaçaklarına yol açar. Serenut OS, kasayı doğrudan EFT-POS cihazına bağlayan entegre bir ödeme motoru barındırır:
+
+- **Bağlantı Kanalları & Protokoller:**
+  - **Seri Port (RS-232 / USB Virtual COM):** `SerialPaymentTerminalAdapter` (Port Adı, Baud Rate, Vendor).
+  - **Yerel Ağ / TCP-IP:** `TcpPaymentTerminalAdapter` (Host IP, Port, Vendor).
+  - **Desteklenen Protokol & Cihazlar:** PAX (PAX D230 vb.), Ingenico, Beko / Arçelik ÖKC, TechPOS.
+- **Two-Phase Commit & İki Aşamalı Güvence ([PaymentFsm](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/services/payment_fsm.dart) & [TerminalPaymentJournal](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/terminal_payment_journal.dart)):**
+  - Kasiyer ekrandan "Kartla Öde" dediğinde Serenut OS POS terminaline tutarı ve benzersiz `idempotencyKey` değerini gönderir.
+  - POS cihazı müşteriden kartı okutmasını / şifre girmesini ister.
+  - **Kritik Finansal Kural:** Bankadan onay (`AuthorizedCardPayment` - AuthCode, BatchNo, STAN) dönmeden yerel deftere veya satış tablosuna ASLA ödeme kaydı atılamaz.
+  - Banka onay verdiğinde işlem atomik olarak `TerminalPaymentJournal` günlüğüne işlenir ve satış tamamlanır.
+- **Manüel Kart Fallback Modu:**
+  - İşletmede donanım köprüsü bulunmadığında veya POS arızalandığında sistem `manualLedgerMetadata(context: 'manual')` moduyla manüel kart kaydı almaya izin verir.
+
+### 7.6. Donanım Teşhis & Test Konsolu ([HardwareTestPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/hardware_test_page.dart))
+
+Kurulum ve teknik servis anında sahada donanım sorunlarını saniyeler içinde çözmek için tasarlanmış canlı test arayüzü:
+
+- **Canlı Cihaz Listesi & Durum Takibi:** Bağlı yazıcılar, teraziler, barkod okuyucular ve paylaşımlı cihazların `online` / `offline` durumu yeşil/kırmızı rozetlerle gösterilir.
+- **COM Port & Baud Rate Tarama:** Sistem bağlı tüm sanal ve fiziksel COM portlarını otomatik listeler; doğru port ve hız ayarını tek tıkla uygular.
+- **Canlı Terazi Testi:** Terazinin o anki ağırlık akışını ekranda gösterir; `ST` (Kararlı) ve `US` (Hareketli) bayraklarının tepki hızını test eder.
+- **Termal Yazıcı & Çekmece Testi:**
+  - "Test Fişi Bas" butonu: CP857 Türkçe harf testi, 1D/2D barkod çizimi ve grafik bitmap baskı testi yapar.
+  - "Çekmece Aç" butonu: ESC/POS kick darbesi (`\x1b\x70...`) göndererek nakit çekmecesinin mekanik açılışını test eder.
+- **Ağda Paylaşılan Donanımları Keşfetme (`_openSharedPrinters`):** Mağaza yerel ağındaki diğer kasaların paylaştığı tüm termal yazıcı ve terazileri mDNS/LAN üzerinden anında keşfeder.
+
 ---
 
 ## 8. YEREL AĞDA EŞLER ARASI (P2P) ÜRÜN GÖRSELİ DAĞITIMI (LAN PEER SERVICE)
@@ -521,6 +648,43 @@ sequenceDiagram
 
 - **KDV & Matrah Dağılımı:** Kasa fişindeki her KDV oranı (%1, %10, %20) GİB kurallarına uygun olarak matrah ve KDV ayrımına tabi tutulur.
 - **İptal & Gider Pusulası:** İade durumlarında faturanın GİB portalı üzerinden resmi iptal isteği (`EARSIV_PORTAL_FATURA_IPTAL`) gönderilebilir.
+
+### 9.1. GİB e-Arşiv Portal Giriş Bilgileri ([GibSettingsDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/widgets/gib_settings_dialog.dart))
+
+İşletmelerin GİB e-Arşiv portalına bağlanması için gereken yapılandırma penceresi:
+- **Kullanıcı Adı & Şifre:** Maliye'den alınan resmi portal kullanıcı kodu ve şifresi girilir. Şifre cihazda güvenli depolanır.
+- **Test Modu Anahtarı (`isTestMode`):**
+  - Gerçek Mod: `https://earsivportal.efatura.gov.tr/earsiv-services/dispatch`
+  - Test Modu: `https://earsivportaltest.efatura.gov.tr/earsiv-services/dispatch` (Sahada eğitim ve test yaparken mali sonuç doğurmadan fatura denemesi yapmayı sağlar).
+- **Varsayılan KDV Oranı:** İşletmenin ağırlıklı KDV oranı (örn. %1, %10, %20) seçilir.
+- **"Bağlantıyı Test Et" Butonu:** Girilen kimlik bilgileriyle anında canlı GİB oturum açma testi (`GibEArsivClient.login`) çalıştırılır; başarılıysa yeşil "Bağlantı Başarılı (Token Alındı)" rozeti verir.
+
+### 9.2. Kasa Satışından Fatura Kesme ([CreateGibInvoiceDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/invoice/create_gib_invoice_dialog.dart))
+
+Satış anında veya satış detayından çağrılan fatura düzenleme sihirbazı:
+- **Alıcı Doğrulaması:**
+  - **TCKN (11 Hane) / VKN (10 Hane):** TCKN/VKN girildiğinde format algoritması otomatik kontrol edilir.
+  - **Alıcı Ünvanı / Ad Soyad:** Bireysel müşteride Ad-Soyad, kurumsal müşteride resmi Ticaret Ünvanı.
+  - **Vergi Dairesi & İl/İlçe:** Fatura başlığı için zorunlu alanlar.
+- **Fatura Tipi:**
+  - `SATIS`: Standart perakende/toptan mal satışı.
+  - `IADE`: Müşteriden iade alınan mallar için gider pusulası yerine e-Arşiv iade faturası.
+  - `TEVKIFAT`: Tevkifatlı kamu veya kurumsal satışlar.
+  - `ISTISNA`: İhracat veya KDV muafiyetli işlemler.
+- **Fatura Kalemleri & İskonto:** Kasa sepetindeki tüm ürünler, adetleri, birim fiyatları, uygulanan satır iskontoları ve her kalemin KDV oranı otomatik fatura satırlarına dönüştürülür.
+
+### 9.3. GİB SMS Onay Kodu Girişi & Resmi İmzalama
+
+1. Serenut OS faturayı GİB sistemine taslak olarak kaydeder (`EARSIV_PORTAL_FATURA_OLUSTUR`).
+2. GİB sunucusu işletme sahibinin maliyede kayıtlı cep telefonuna 6 haneli bir SMS onay kodu gönderir.
+3. Kasiyerin ekranında açılan popup'a gelen SMS kodu girilir (`EARSIV_PORTAL_SMS_ONAY`).
+4. GİB sistemi faturayı resmi Mali Mühür ile imzalar ve resmi `GIB2026000000001` fatura numarasını verir.
+
+### 9.4. Fatura Çıktısı, Termal Bilgi Fişi & WhatsApp İletimi
+
+- **e-Arşiv PDF İndirme:** İmzalanan fatura GİB sunucusundan anında orijinal HTML/PDF formatında çekilir.
+- **Termal Bilgi Fişi:** 80mm veya 58mm termal yazıcıdan faturanın resmi karekodunu, ETTN (Evrensel Tekil Tanımlama Numarası) kodunu ve mali özetini içeren termal bilgi fişi basılır.
+- **WhatsApp / SMS Fatura İletimi:** Tek tıkla müşterinin cep telefonuna faturanın doğrudan PDF indirme bağlantısı WhatsApp veya SMS üzerinden gönderilir (Kağıt ve kargo maliyeti 0 TL).
 
 ---
 
@@ -917,9 +1081,134 @@ Kasada ödeme yapan müşterinin sepetini, indirimlerini ve para üstünü görm
 - [DataTransferPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/data_transfer_page.dart) üzerinden işletmelerin eski yazılımlarından (Akınsoft, Mikro, Logo, NarBarkod vb.) dışa aktardığı Excel (`.xlsx`), CSV veya JSON dosyaları içe aktarılır.
 - Ürün adları, barkodlar, birimler, alış/satış fiyatları ve mevcut stoklar kuruş modeline dönüştürülerek içe alınır.
 
+### 14.4. Veritabanı Sağlık Denetimi & Kendi Kendini Onarma (`IDatabaseHealthRepository` / Self-Healing)
+
+Çevrimdışı çalışan POS sistemlerinde elektrik kesintisi veya donanım çökmesi sonucu oluşabilecek veri tutarsızlıklarını tespit eden ve arka planda kullanıcıya hissettirmeden onaran otomatik mekanizma:
+- **Yetim Kalem Denetimi (Orphaned Items):** Satış üst kaydı silinmiş veya yarım kalmış sepet satırlarını tespit eder ve temizler.
+- **Negatif Stok Telafisi:** İstemcide çevrimdışı satış sırasında stok eksiye düştüyse (`stock_qty < 0`), sistem ürün hareket geçmişini tarayarak düzeltme mutasyonu üretir.
+- **Defter & Bakiye Uyuşmazlığı Otomatik Mutabakatı:** Müşterinin `balance_cents` önbellek değeri ile `ledger_entries` toplamı uyuşmuyorsa, kanonik formülü tek işlemde çalıştırarak bakiyeyi matematiksel gerçeğe eşitler.
+
+### 14.5. Kriptografik Denetim İzi & Audit Log Teftiş Merkezi ([AuditCenterPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/admin/audit_center_page.dart) & [AuditLogService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/services/audit_log_service.dart))
+
+Kasiyerlerin ve yöneticilerin yaptığı her hassas işlemin silinemez ve değiştirilemez şekilde kayıt altına alındığı teftiş merkezi:
+- **Kriptografik SHA-256 Zinciri (`_integrityVerified`):** Her denetim kaydı bir önceki kaydın hash'ine bağlıdır (Blockchain/Merkle benzeri zincirleme). Veritabanından satır silinirse veya SQLite açılıp bir rakam elle değiştirilirse bütünlük mührü kırılır ve ekran kırmızı alarm verir.
+- **17 Kritik Olay Tipi:**
+  - Ürün & Fiyat: `product_created`, `price_changed`, `product_updated`, `product_deleted`
+  - Müşteri & Cari: `customer_created`, `customer_updated`, `customer_deleted`, `payment_recorded`
+  - Satış & Kasa: `sale_created`, `items_returned` (İadeler)
+  - Sipariş: `order_created`, `order_updated`, `order_deleted`, `order_status_updated`
+  - Sistem: `system_backup`, `system_restore`
+- **Filtreleme & Arama:** Kasiyer bazlı, tarih aralıklı veya olay tipine göre saniyeler içinde arama yapılabilir.
+
+### 14.6. Geri Dönüşüm & Kurtarma Merkezi ([RecoveryCenterPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/admin/recovery_center_page.dart))
+
+Kasiyerin yanlışlıkla sildiği bir ürünü, müşteriyi veya siparişi panik yaşamadan kurtarmayı sağlayan sistem:
+- **Soft-Delete (Tombstone) Prensibi:** Serenut OS'ta hiçbir kayıt ilk silme işleminde fiziksel olarak veritabanından silinmez (`is_deleted = 1` ve `deleted_at = timestamp` işaretlenir).
+- **4 Ayrı Kurtarma Sekmesi:**
+  1. **Ürünler:** Yanlışlıkla silinen ürünler barkodları ve stoklarıyla listelenir.
+  2. **Müşteriler:** Silinen müşteriler eski bakiye ve defter hareketleriyle listelenir.
+  3. **Satışlar:** İptal edilen veya silinen satış kayıtları.
+  4. **Siparişler:** İptal edilmiş paket/teslimat siparişleri.
+- **Tek Tıkla Kurtarma (`Restore`):** "Kurtar" butonuna basıldığı anda kayıt anında aktif çalışma ekranlarına geri döner.
+- **Kalıcı İmha (`Purge`):** Yalnızca yetkili yöneticinin ikinci bir onay vermesi durumunda veritabanından kalıcı olarak temizlenir.
+
+### 14.7. Güvenli Yedekleme & Geri Yükleme Yönetimi ([BackupManagePage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/backup_manage_page.dart) & [BackupService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/backup_service.dart))
+
+- **Tek Tıkla Anlık Yedek (`.serenutbak`):** Veritabanı, ürün fotoğrafları ve sistem yapılandırması sıkıştırılmış ve bütünlüğü doğrulanmış tek bir arşiv dosyası olarak paketlenir.
+- **Güvenli Geri Yükleme (Restore):**
+  - Geçmiş bir yedek dosyası seçildiğinde sistem önce mevcut veritabanının acil durum anlık görüntüsünü alır.
+  - Seçilen yedeği açar, `PRAGMA integrity_check` doğrulaması yapar ve sistemi temiz bir şekilde eski tarihe döndürür.
+- **Yedek Dosyası Paylaşımı:** Oluşturulan yedek tek tıkla e-posta, WhatsApp veya USB belleğe aktarılabilir.
+
+### 14.8. Canlı Önizlemeli Görsel Barkod & Etiket Tasarım Editörü ([LabelTemplateEditorPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/label_template_editor_page.dart))
+
+İşletmelerin raf ve ürün etiketlerini kod yazmadan görsel olarak özelleştirmesini sağlayan etkileşimli editör:
+- **Canlı Önizleme Tuvali (Live Canvas):** Yapılan her ayar (yazı boyutu, alan açma/kapama) ekrandaki simüle edilmiş etikette anında değişir.
+- **Ürün Etiketi Alan Kontrolleri:**
+  - Firma Ünvanı Gösterilsin mi? (Aç/Kapat)
+  - Marka Bilgisi Gösterilsin mi? (Aç/Kapat)
+  - Barkod Çizgileri & EAN-13 Kodu Gösterilsin mi? (Aç/Kapat)
+  - Satış Fiyatı & KDV Dahil İbaresi Gösterilsin mi? (Aç/Kapat)
+  - Font Boyutu: `Küçük`, `Orta`, `Büyük`
+- **Sipariş & Koli Etiketi Alan Kontrolleri:**
+  - Müşteri Adı, Sipariş Numarası, Tarih/Saat, Kalem Sayısı ve Toplam Tutar alanlarını açıp kapatabilme.
+- **Fiziki Etiket Boyut Seçici:** `40 x 25 mm`, `50 x 30 mm`, `60 x 40 mm` veya özel milimetrik ölçü tanımı.
+- **"Yazıcıda Test Et" Butonu:** Yapılan tasarımı TSPL komut setine dönüştürerek bağlı etiket yazıcısına tek bir test baskısı gönderir.
+
+### 14.9. Personel, Kasiyer Yetki Matrisi & Hızlı PIN Kodu ([UserManagementDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/widgets/user_management_dialog.dart))
+
+Birden çok kasiyerin çalıştığı mağazalarda kasa güvenliğini ve yetki sınırlarını belirleyen modül:
+- **Kullanıcı Rolleri:**
+  - `Admin (Yönetici)`: Tüm ayarlara, raporlara, silme ve maliyet görme yetkilerine tam erişim.
+  - `Cashier (Kasiyer)`: Yalnızca kasa satış, tahsilat ve sipariş ekranlarına erişim.
+- **4-6 Haneli Hızlı PIN Kodu:** Kasiyerlerin klavyeden veya dokunmatik sayısal tuş takımından şifre yazmadan hızlıca kasayı devralmasını sağlar.
+- **Hassas İşlem Kısıtlamaları:**
+  - Kasiyer iskonto uygulayabilir mi? (Maksimum iskonto yüzdesi belirlenebilir).
+  - Kasiyer satış fişi veya satır iptal edebilir mi? (Kapalıysa müdür PIN kodu isteme zorunluluğu).
+  - Kasiyer gün sonu Z-raporu alabilir mi?
+  - Kasiyer alış maliyetlerini ve kar marjlarını görebilir mi? (Varsayılan olarak kasiyere gizlidir).
+
+### 14.10. Telefon Rehberinden Müşteri Çekme & Toplu Veri Aktarımı ([DataTransferPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/data_transfer_page.dart) & [ContactImportPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/data_transfer/contact_import_page.dart))
+
+- **Rehberden Tek Tıkla Müşteri Aktarımı:** Android kasalarda telefon rehberine erişim izni verilerek (`flutter_contacts`), esnafın telefonundaki yüzlerce müşteriyi tek tıkla Serenut OS cari kartlarına dönüştürür.
+- **Excel & CSV İçe / Dışa Aktarım Sihirbazı:**
+  - `Ürünler.xlsx`: Barkod, Ürün Adı, Kategori, Alış Fiyatı, Satış Fiyatı, KDV, Stok.
+  - `Müşteriler.xlsx`: Ünvan, Telefon, Adres, Vergi No, Başlangıç Bakiyesi.
+  - Hatalı satırlar atlanır; başarılı satırlar canlı ilerleme çubuğu (`ImportProgressDialog`) ile içe aktarılır.
+
 ---
 
-## 15. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
+## 15. GELİŞMİŞ RAPORLAR & 5 SEKMELİ ANALİTİK PANELİ ([ReportsPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/reports_page.dart))
+
+Serenut OS'un raporlama motoru, işletmenin finansal röntgenini çeken ve tek ekranda 5 ana uzmanlık sekmesi sunan kapsamlı bir analitik merkezidir:
+
+```mermaid
+graph TD
+    subgraph "RAPORLAR & ANALİTİK MERKEZİ (ReportsPage)"
+        Tab1["1. Satışlar Sekmesi (SalesTab): Ciro, Ortalama Sepet, Saatlik Isı Haritası"]
+        Tab2["2. Ürünler Sekmesi (_ProductsTab): Çok Satanlar, Brüt Kâr, Ölü Stok"]
+        Tab3["3. Alacaklar Sekmesi (_ReceivablesTab): Yaşlandırma & Risk Analizi"]
+        Tab4["4. Analitik Sekmesi (_AnalyticsTab): Büyüme Trendi, KDV Matrahı"]
+        Tab5["5. Gün Sonu Kasa (EndOfDayPage): Küpür Sayımı, X/Z Kapanışı"]
+    end
+    Tab1 --> Export["Tek Tıkla Excel (.xlsx) & PDF Dışa Aktarım"]
+    Tab2 --> Export
+    Tab3 --> Export
+    Tab4 --> Export
+    Tab5 --> Export
+```
+
+### 15.1. Satışlar Sekmesi (`SalesTab`)
+- **Dönem Filtreleri:** `Bugün`, `Dün`, `Bu Hafta`, `Bu Ay`, `Geçen Ay`, `Özel Tarih Aralığı`.
+- **Temel Metrik Kartları:** Toplam Hasılat (Ciro), Toplam Fiş/Satış Adedi, Ortalama Sepet Tutarı (Sepet Büyüklüğü).
+- **Ödeme Dağılım Grafiği:** Nakit, Kredi Kartı ve Açık Hesap (Veresiye) cirolarının pasta dilim dağılımı.
+- **Saatlik Satış Eğrisi (FL Chart):** Günün hangi saatlerinde yoğunluk yaşandığını gösteren tepe noktası analizi (personel vardiya planlaması için kritik).
+
+### 15.2. Ürünler & Kârlılık Sekmesi (`_ProductsTab`)
+- **En Çok Satanlar (Top Sellers):** Mağazaya en çok ciro ve adet kazandıran lokomotif ürünlerin sıralaması.
+- **Brüt Kâr Marjı Analizi:** Her kalemin alış maliyeti ile satış fiyatı arasındaki brüt kâr tutarı ve marj yüzdesi.
+- **Kritik Stok Uyarı Listesi:** Mağazada minimum stok eşiğinin altına inmiş ürünler sarı/kırmızı bayraklarla öne çıkarılır.
+- **Sıfır Satan / Ölü Stoklar:** Son 30/60 gündür rafta bekleyen ve hiç satılmayan sermaye bağlayıcı ürünlerin tespiti.
+
+### 15.3. Alacaklar & Yaşlandırma Sekmesi (`_ReceivablesTab`)
+- **Toplam Piyasa Alacağı:** Piyasada işletmeye borçlu olan tüm müşterilerin toplam bakiye yekûnu.
+- **Borç Yaşlandırma Piramidi:**
+  - `0 - 30 Gün`: Yeni vadeli normal alacaklar.
+  - `31 - 60 Gün`: Dikkat edilmesi gereken alacaklar.
+  - `60+ Gün`: Vadesi geçmiş, yüksek riskli takip alacakları.
+- **En Borçlu Müşteriler Listesi:** Risk limiti dolan veya vadesini aksatan carilerin tek tıkla WhatsApp hatırlatma butonları ile listelenmesi.
+
+### 15.4. Analitik & Trendler Sekmesi (`_AnalyticsTab`)
+- **Dönemsel Büyüme Karşılaştırması:** Seçili dönemin bir önceki dönemle (Bu hafta vs Geçen hafta) yüzdesel ciro ve işlem sayısı karşılaştırması.
+- **KDV Dilim Dağılım Tablosu:** Muhasebeciye doğrudan teslim edilmek üzere %1, %10 ve %20 KDV dilimlerinin net matrahı ve hesaplanan KDV tutarları.
+- **İade Oranı Göstergesi:** Toplam satışa oranla yapılan iade yüzdesi (kalite veya müşteri memnuniyeti takibi).
+
+### 15.5. Dışa Aktarma & Rapor Paylaşımı (`DocumentExportService`)
+- Rapor ekranındaki tüm tablolar tek bir butona basılarak kurumsal başlıklı **Excel (`.xlsx`)** tablosu veya grafikli **PDF raporu** olarak masaüstüne kaydedilebilir veya patronun WhatsApp'ına iletilebilir.
+
+---
+
+## 16. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
 
 Bu bölüm, `AGENTS.md` ve `docs/release-update-runbook.md` belgelerinde tanımlanan **zorunlu güvenlik ve yayın kurallarını** içerir.
 
