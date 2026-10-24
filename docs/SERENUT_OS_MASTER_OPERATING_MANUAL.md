@@ -1409,7 +1409,7 @@ graph TD
     VerifyRsa -- Başarısız --> Abort[Dosyayı Hemen Sil & Hata Günlüğü Üret]
 ```
 
-### 15.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
+### 16.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
 
 - **`+` İletimi Yasaktır (Dosya Adları & Public UI - AGENTS.md Kural 2):**
   - Kullanıcıya sunulan veya web sitesinden indirilen dosyalarda `+` içeren dahili Flutter derleme numarası **ASLA KULLANILAMAZ** (Örnek: `SerenutOS-v1.3.144+299.exe` YASAKTIR).
@@ -1417,7 +1417,7 @@ graph TD
     - Görünen ve İndirilen Dosya Adı: `SerenutOS-v1.3.144.exe` ve `SerenutOS-v1.3.144.apk`.
   - `pubspec.yaml` içerisindeki `+299` yapısı sadece dahili `versionCode` ve CI takibi içindir; yayın araçları ve indirme servisleri bunu otomatik semantik formata (`v1.3.144`) çevirir.
 
-### 15.2. Değişmez İmza Sözleşmesi & OTA Standardı
+### 16.2. Değişmez İmza Sözleşmesi & OTA Standardı
 
 1. **Android Paket İmzası (Keystore):**
    - Sertifika Parmak İzi (SHA-256): `server/release-signing-policy.json` dosyasındaki `androidPackageCertificateSha256` değeri ile birebir eşleşmelidir. Eşleşmeyen APK yayınlanamaz.
@@ -1431,18 +1431,26 @@ graph TD
 5. **Yayın Doğrulama:**
    - Her yayın sonrasında `node scripts/verify_published_release.js X.Y.Z+B` çalıştırılarak imza ve hash VPS üzerinde tam test edilmeden yayın tamamlanmış sayılmaz.
 
+### 16.3. İstemci İçi Güncelleme & Zorunlu Güncelleme Kilidi ([ForceUpdatePage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/force_update_page.dart) & [UpdateDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/update_dialog.dart))
+
+- **Otomatik Arka Plan Denetimi:** İstemci açıldığında ve periyodik olarak `GET /api/v1/updates/check` çağrısıyla en güncel sürümü sorgular.
+- **İsteğe Bağlı Güncelleme (`UpdateDialog`):** Yeni bir ara sürüm çıktığında kasiyeri rahatsız etmeden başlık çubuğunda yeşil güncelleme butonu belirir; kasiyer uygun olduğunda tek tıkla indirip kurabilir.
+- **Kritik Zorunlu Güncelleme Kilidi (`ForceUpdatePage`):**
+  - Sunucu `isForceUpdate: true` veya `current_version < minRequiredVersion` döndürdüğünde, uygulama tüm normal satış ve işlem sayfalarını kilitler ve zorunlu güncelleme ekranına yönlendirir.
+  - Kasiyer bu ekranı atlayamaz veya kapatamaz; "Güncellemeyi Başlat" butonuna tıklandığında paket indirilir, SHA-256 hash ve RSA-4096 dijital imzası yerel public key ile doğrulanır, eski sürüm üzerine temiz kurulum başlatılarak uygulama yeniden açılır.
+
 ---
 
-## 16. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
+## 17. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
 
-### 16.1. Yerel Loglama (Structured JSONL)
+### 17.1. Yerel Loglama (Structured JSONL)
 
 İstemci tüm çalışma loglarını işletim sistemine özel yerel dizinde saklar:
 - **Windows:** `%APPDATA%\Serenut OS Software Technologies A.Ş\Serenut OS\logs\app.log`
 - **Android:** `/data/user/0/com.serenutos.pos/files/logs/app.log`
 - **Log Formatı:** JSON Lines (her satırda timestamp, level, subsystem, correlation_id, message, payload).
 
-### 16.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
+### 17.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
 
 Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 - **Filtreleme Kuralları (`beforeSend`):**
@@ -1451,9 +1459,9 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 
 ---
 
-## 17. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
+## 18. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
 
-### 17.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
+### 18.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
 
 **Belirti:** Satışlar yapılıyor ancak web panelinde veya diğer kasalarda görünmüyor. Sağ üst köşedeki bulut simgesi kırmızı/sarı.
 1. **İnternet ve Sunucu Erişimi Kontrolü:**
@@ -1472,7 +1480,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ağ düzeldiğinde sistem otomatik push yapar.
    - Acil durumlarda Ayarlar -> Senkronizasyon -> "Şimdi Eşitle" butonuna basılır.
 
-### 17.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
+### 18.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
 
 **Belirti:** Müşteri kartında bakiye 500 TL yazıyor ancak hareket listesi toplandığında 400 TL çıkıyor.
 1. **İnceleme:** `customers.balance_cents` önbellek kolonu harici bir işlem veya kesinti yüzünden güncelliğini yitirmiş olabilir.
@@ -1489,7 +1497,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. Bakiye anında matematiksel olarak defterin gerçek toplamına eşitlenir.
 
-### 17.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
+### 18.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
 
 **Belirti:** `database is locked` veya `disk I/O error`.
 1. **Bütünlük Kontrolü:**
@@ -1504,7 +1512,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. **Kurtarma:** Uygulama tamamen kapatılır, `%APPDATA%\...\databases\core_next` dizinindeki veritabanının yedeği alınır ve uygulama yeniden başlatılır.
 
-### 17.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
+### 18.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
 
 1. **Bağlantı Kontrolü:**
    - USB yazıcı ise Windows Aygıt Yöneticisi'nde doğru yazıcı kuyruğu seçili mi?
@@ -1513,13 +1521,13 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ayarlar -> Yazıcı Ayarları -> "Karakter Kod Sayfası" seçeneğini `CP857` yapın.
    - Sorun çözülmezse "Grafik/Resim Olarak Yazdır" seçeneğini açın (tüm karakterleri piksel olarak dökeceğinden %100 kusursuz Türkçe basacaktır).
 
-### 17.5. Senaryo 5: Terazi Ağırlığı Okumuyor
+### 18.5. Senaryo 5: Terazi Ağırlığı Okumuyor
 
 1. Windows Aygıt Yöneticisi -> Bağlantı Noktaları (COM & LPT) altında terazi USB-Serial çeviricinin COM portunu (ör. `COM3`) kontrol edin.
 2. Başka bir uygulamanın COM portunu işgal etmediğinden emin olun (COM portları tekil erişimlidir).
 3. Ayarlar -> Donanım -> Terazi ekranından Baud Rate'in `9600` ve modelin doğru seçildiğini doğrulayın.
 
-### 17.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
+### 18.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
 
 **Belirti:** Güncelleme iniyor ancak "İmza doğrulanamadı" uyarısıyla iptal ediliyor.
 1. İndirilen dosyanın SHA-256 hash'i sunucudaki hash ile uyuşmuyor olabilir (eksik indirme / proxy araya girmesi).
@@ -1527,13 +1535,13 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Windows: `%TEMP%\serenut_updates` veya `%APPDATA%\...\updates` dizinini silin.
 3. Cihazın sürümünün köprü sürüm gerektirip gerektirmediğini (`1.3.10+91` altı mı?) kontrol edin.
 
-### 17.7. Senaryo 7: GİB e-Arşiv Portalı Fatura İmzalamıyor / Hata Veriyor
+### 18.7. Senaryo 7: GİB e-Arşiv Portalı Fatura İmzalamıyor / Hata Veriyor
 
 1. **GİB Portal Bakımı:** GİB portalı yoğunluk veya bakım saatlerinde (genelde gece 00:00 - 02:00) yanıt vermeyebilir. İstemcideki faturayı "Taslaklara Kaydet" ile yerelde tutun; portal açıldığında tek tıkla toplu imzalayın.
 2. **SMS Doğrulama Zaman Aşımı:** SMS onay kodu 180 saniye içinde girilmelidir. Zaman aşımına uğradıysa yeni SMS isteği tetikleyin.
 3. **Mükellef TCKN/VKN Kontrolü:** Alıcı TCKN veya VKN'si 10 ya da 11 hane olmalı, e-Fatura mükellefi olan kurumlara e-Arşiv değil doğrudan e-Fatura kesilmelidir.
 
-### 17.8. Senaryo 8: WhatsApp Bağlantısı Koptu / Mesaj Gitmiyor
+### 18.8. Senaryo 8: WhatsApp Bağlantısı Koptu / Mesaj Gitmiyor
 
 **Belirti:** Satış fişleri veya Z-raporu WhatsApp'a düşmüyor. Portalda WhatsApp durumu `disconnected` veya `reauthorization_required`.
 1. **Bağlantı Tipini Kontrol Edin:**
@@ -1545,7 +1553,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. **Failover (Yedek Hat):** WhatsApp kapalı olduğunda sistemin otomatik olarak SIM SMS Gateway'e geçip geçmediğini kontrol edin (`NOTIFICATION_ENABLED_CHANNELS=whatsapp,sms`).
 
-### 17.9. Senaryo 9: Web Portalı Canlı Ciro Akışı Güncellenmiyor (WebSocket Düşmesi)
+### 18.9. Senaryo 9: Web Portalı Canlı Ciro Akışı Güncellenmiyor (WebSocket Düşmesi)
 
 **Belirti:** Kasada satış yapılıyor ama patronun web ekranındaki canlı ciro artmıyor.
 1. Web tarayıcısının F12 Konsolunda `WebSocket connection failed: wss://api.serenut.com/ws` hatası var mı bakın.
@@ -1555,19 +1563,19 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    pm2 restart serenut-server
    ```
 
-### 17.10. Senaryo 10: Müşteri İkinci Ekranı Görüntü Vermiyor
+### 18.10. Senaryo 10: Müşteri İkinci Ekranı Görüntü Vermiyor
 
 1. Windows Masaüstü $\rightarrow$ Ekran Ayarları altında ikinci monitörün **"Bu ekranları genişlet" (Extend Desktop)** olarak ayarlandığından emin olun ("Bu ekranları yinele/Duplicate" modu kullanılmamalıdır).
 2. Serenut OS Ayarlar $\rightarrow$ Ekran Ayarları $\rightarrow$ "Müşteri Ekranını Etkinleştir" anahtarını açın ve hedef monitörü seçin.
 3. İkinci ekranda reklam slaytları için bir görsel klasörü seçildiğini doğrulayın.
 
-### 17.11. Senaryo 11: Android SIM SMS Gateway Mesaj Göndermiyor
+### 18.11. Senaryo 11: Android SIM SMS Gateway Mesaj Göndermiyor
 
 1. Kasadaki Android cihazda Serenut OS arka plan çalışma ve pil optimizasyonu istisnasının verildiğini kontrol edin (Android sistemi uygulamayı uyutmamalıdır).
 2. Cihazın SIM kartında SMS paketi veya TL bakiyesi olduğunu doğrulayın.
 3. Uygulama Ayarları $\rightarrow$ "Bu cihazı SIM SMS Ağ Geçidi yap" anahtarının açık olduğunu kontrol edin.
 
-### 17.12. Senaryo 12: VPS Production Sunucusu Acil Müdahale Komutları
+### 18.12. Senaryo 12: VPS Production Sunucusu Acil Müdahale Komutları
 
 ```bash
 # Sunucu durumunu kontrol et
@@ -1583,12 +1591,12 @@ pm2 reload serenut-server
 sudo -u postgres psql -d serenut_production -c "SELECT count(*), state FROM pg_stat_activity GROUP BY state;"
 
 # Yayındaki sürümü doğrula
-node scripts/verify_published_release.js 1.3.144+299
+node scripts/verify_published_release.js 1.3.144+300
 ```
 
 ---
 
-## 18. GENİŞLETİLMİŞ MASTER CHEAT SHEET TABLOSU
+## 19. GENİŞLETİLMİŞ MASTER CHEAT SHEET TABLOSU
 
 | Alan | Kanonik Kural | İlgili Dosya / Kod |
 |---|---|---|
@@ -1614,3 +1622,4 @@ node scripts/verify_published_release.js 1.3.144+299
 
 ---
 *Bu el kitabı Serenut OS geliştirici ve operasyon ekipleri için birincil ve bağlayıcı referanstır. Her yeni mimari kararda ve sürüm geçişinde güncellenmelidir.*
+
