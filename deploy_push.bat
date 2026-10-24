@@ -15,7 +15,7 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo [2/4] OTA Release Anahtar Surekliligi Kontrolu...
-node scripts\verify_release_key_continuity.js HEAD~3
+node scripts\verify_release_key_continuity.js origin/main
 if %ERRORLEVEL% neq 0 (
     echo ❌ Release key continuity dogrulamasi basarisiz!
     pause
