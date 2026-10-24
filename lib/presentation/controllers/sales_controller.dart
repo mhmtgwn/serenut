@@ -19,6 +19,7 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
   final productRepo = await ref.watch(productRepositoryProvider.future);
@@ -100,6 +101,46 @@ final orderCancellationServiceProvider =
   );
 });
 
+/// Core Next Satış Motoru Özellik Bayrağı (Varsayılan: false)
+final coreNextSalesEngineEnabledProvider =
+    StateProvider<bool>((ref) => false, name: 'coreNextSalesEngineEnabledProvider');
+
+/// Core Next Satış Yönlendirici Fonksiyon Arayüzü
+typedef CoreNextSaleExecutor = Future<SaleEntity?> Function({
+  required String customerId,
+  required List<SaleItemInput> items,
+  required String paymentMethod,
+  double? paidAmount,
+  double? discountAmount,
+  String? idempotencyKey,
+  String? cashierName,
+  Map<String, dynamic>? terminalMetadata,
+  String? userId,
+  String? userRole,
+  dynamic actor,
+});
+
+/// Core Next Satış Yönlendirici Sağlayıcısı (Varsayılan: null)
+final coreNextSaleExecutorProvider =
+    Provider<CoreNextSaleExecutor?>((ref) => null, name: 'coreNextSaleExecutorProvider');
+
+/// Core Next İade Yönlendirici Fonksiyon Arayüzü
+typedef CoreNextRefundExecutor = Future<void> Function({
+  required String saleId,
+  required List<SaleItemInput> itemsToReturn,
+  required String refundMethod,
+  required String reason,
+  String? idempotencyKey,
+  String? userId,
+  String? cashierName,
+  String? userRole,
+  dynamic actor,
+});
+
+/// Core Next İade Yönlendirici Sağlayıcısı (Varsayılan: null)
+final coreNextRefundExecutorProvider =
+    Provider<CoreNextRefundExecutor?>((ref) => null, name: 'coreNextRefundExecutorProvider');
+
 class SalesController extends AsyncNotifier<List<SaleEntity>> {
   late ISaleRepository _saleRepository;
   late SalesService _salesService;
@@ -125,19 +166,44 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       try {
+        final cutoff = DatabaseManager.cutoffMaintenanceLock;
+        if (cutoff != null && !cutoff.state.isWritePermitted) {
+          cutoff.assertWritePermitted(operation: 'SalesController.createSale');
+        }
+
         final currentUser = ref.read(currentUserProvider);
         final cashierName = currentUser?.name ?? 'Kasiyer';
 
-        created = await _salesService.createSale(
-          customerId: customerId,
-          items: items,
-          paymentMethod: paymentMethod,
-          paidAmount: paidAmount,
-          discountAmount: discountAmount,
-          idempotencyKey: idempotencyKey,
-          createdBy: cashierName,
-          terminalMetadata: terminalMetadata,
-        );
+        final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
+        if (isCoreNextEnabled) {
+          final coreNextExecutor = ref.read(coreNextSaleExecutorProvider);
+          if (coreNextExecutor == null) {
+            throw StateError('CoreNext satış motoru etkinleştirildi ancak motor sağlayıcısı henüz bağlanmamış.');
+          }
+          created = await coreNextExecutor(
+            customerId: customerId,
+            items: items,
+            paymentMethod: paymentMethod,
+            paidAmount: paidAmount,
+            discountAmount: discountAmount,
+            idempotencyKey: idempotencyKey,
+            cashierName: cashierName,
+            terminalMetadata: terminalMetadata,
+            userId: currentUser?.id,
+            userRole: currentUser?.role?.name,
+          );
+        } else {
+          created = await _salesService.createSale(
+            customerId: customerId,
+            items: items,
+            paymentMethod: paymentMethod,
+            paidAmount: paidAmount,
+            discountAmount: discountAmount,
+            idempotencyKey: idempotencyKey,
+            createdBy: cashierName,
+            terminalMetadata: terminalMetadata,
+          );
+        }
         if (created != null) {
           try {
             final auditService = await ref.read(auditServiceProvider.future);
@@ -159,7 +225,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       return _saleRepository.findAll();
     });
     if (state.hasError) {
-      // print('🔴 SalesController.createSale state error: ${state.error}');
+      throw state.error!;
     }
     if (created != null && customerId.isNotEmpty) {
       ref.invalidate(customersControllerProvider);
@@ -184,13 +250,36 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
+      final cutoff = DatabaseManager.cutoffMaintenanceLock;
+      if (cutoff != null && !cutoff.state.isWritePermitted) {
+        cutoff.assertWritePermitted(operation: 'SalesController.returnItems');
+      }
       final sale = await _saleRepository.findById(saleId);
-      await _salesService.returnItems(
-        saleId: saleId,
-        itemsToReturn: itemsToReturn,
-        refundMethod: refundMethod,
-        reason: reason,
-      );
+      final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
+      if (isCoreNextEnabled) {
+        final coreNextRefundExecutor = ref.read(coreNextRefundExecutorProvider);
+        if (coreNextRefundExecutor == null) {
+          throw StateError('CoreNext iade motoru etkinleştirildi ancak motor sağlayıcısı henüz bağlanmamış.');
+        }
+        final currentUser = ref.read(currentUserProvider);
+        final cashierName = currentUser?.name ?? 'Yetkili Kasiyer';
+        await coreNextRefundExecutor(
+          saleId: saleId,
+          itemsToReturn: itemsToReturn,
+          refundMethod: refundMethod,
+          reason: reason,
+          userId: currentUser?.id,
+          cashierName: cashierName,
+          userRole: currentUser?.role?.name,
+        );
+      } else {
+        await _salesService.returnItems(
+          saleId: saleId,
+          itemsToReturn: itemsToReturn,
+          refundMethod: refundMethod,
+          reason: reason,
+        );
+      }
       try {
         final auditService = await ref.read(auditServiceProvider.future);
         await auditService.logEvent(
@@ -226,6 +315,17 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
+      final cutoff = DatabaseManager.cutoffMaintenanceLock;
+      if (cutoff != null && !cutoff.state.isWritePermitted) {
+        cutoff.assertWritePermitted(operation: 'SalesController.recordPartialPayment');
+      }
+      final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
+      if (isCoreNextEnabled) {
+        throw UnsupportedError(
+          'Core Next pilot modunda vadeli satışa tekil kısmi ödeme (recordPartialPayment) doğrudan desteklenmemektedir. '
+          'Cari tahsilatı müşteri detay sayfasından (Tahsilat Yap) yürütülmelidir.',
+        );
+      }
       final sale = await _saleRepository.findById(saleId);
       await _salesService.recordPayment(
           saleId: saleId,
@@ -257,10 +357,11 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       }
       return _saleRepository.findAll();
     });
-    if (!state.hasError) {
-      ref.invalidate(salesHistoryControllerProvider);
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
+    if (state.hasError) {
+      throw state.error!;
     }
+    ref.invalidate(salesHistoryControllerProvider);
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
   }
 
   Future<void> refresh() async {

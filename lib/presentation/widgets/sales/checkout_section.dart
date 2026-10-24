@@ -21,6 +21,7 @@ import 'checkout/cash_dialog.dart';
 import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+import 'package:serenutos/providers/database_provider.dart';
 part 'checkout/karma_fields.dart';
 part 'checkout/pay_buttons.dart';
 part 'checkout/customer_selection.dart';
@@ -728,13 +729,48 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   // ── Ödeme Butonları ────────────────────────────────────────────────────────
 
   Widget _buildPaymentButtons(bool isKarma, {required bool hasPos}) {
-    final disabled = widget.isSubmitting || widget.total <= 0;
+    final maintenance = ref.watch(cutoffMaintenanceStateProvider).valueOrNull;
+    final isMaintenanceLocked =
+        maintenance != null && !maintenance.isWritePermitted;
+    final disabled =
+        widget.isSubmitting || widget.total <= 0 || isMaintenanceLocked;
     final debtDisabled = disabled || widget.selectedCustomer == null;
+
+    final maintenanceWarning = isMaintenanceLocked
+        ? Container(
+            key: const Key('checkout_maintenance_locked_warning'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFCA5A5)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.lock_outline_rounded,
+                    size: 16, color: Color(0xFFDC2626)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sistem Bakım Modunda: Satış ve ödeme kaydı geçici olarak durduruldu.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF991B1B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
 
     if (isKarma) {
       // KARMA modu: geniş tek "Onayla" butonu + "Geri Dön" seçeneği
       return Column(
         children: [
+          if (maintenanceWarning != null) maintenanceWarning,
           Row(
             children: [
               Expanded(
@@ -767,7 +803,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       );
     }
 
-    return Row(
+    final standardButtons = Row(
       children: [
         // NAKİT
         Expanded(
@@ -831,6 +867,18 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         ),
       ],
     );
+
+    if (maintenanceWarning != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          maintenanceWarning,
+          standardButtons,
+        ],
+      );
+    }
+
+    return standardButtons;
   }
 }
 

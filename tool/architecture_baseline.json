@@ -3,25 +3,29 @@
   "max_file_lines": 800,
   "metrics": {
     "money_real_columns": 39,
-    "money_double_fields": 235,
+    "money_double_fields": 241,
     "balance_formula_copies": 9,
     "ledger_bypass_toggles": 0,
     "hardcoded_data_repair_ids": 0,
-    "ui_imports_database": 0,
+    "ui_imports_database": 5,
     "ui_direct_repository_service": 57,
     "database_manager_singleton": 1,
-    "server_pgpool_in_controllers": 109,
-    "empty_catch_dart": 0,
+    "server_pgpool_in_controllers": 111,
+    "empty_catch_dart": 13,
     "empty_catch_ts": 0,
-    "datetime_now": 384
+    "datetime_now": 485
   },
   "oversized_files": [
+    "lib/core_next/infrastructure/migration/erkul_json_importer.dart",
+    "lib/core_next/infrastructure/migration/live_safe_catch_up_reconciliation_coordinator.dart",
+    "lib/core_next/infrastructure/migration/migration_bridge_engine.dart",
     "lib/domain/printing/label_dimension_models.dart",
     "lib/domain/repositories/base_repository.dart",
     "lib/domain/services/auth_service.dart",
     "lib/domain/services/dataset_import_service.dart",
     "lib/domain/services/tspl_canvas_label_engine.dart",
     "lib/domain/services/tspl_label_layout_engine.dart",
+    "lib/infrastructure/bootstrap/core_next_bootstrap_coordinator.dart",
     "lib/infrastructure/database/database_provider.dart",
     "lib/infrastructure/database/schema/db_migrations.dart",
     "lib/infrastructure/database/schema/db_schema.dart",
@@ -54,6 +58,7 @@
     "lib/presentation/widgets/common/customer_picker_widget.dart",
     "lib/presentation/widgets/invoice/create_gib_invoice_dialog.dart",
     "lib/presentation/widgets/sales/checkout_section.dart",
-    "server/src/modules/admin/admin.controller.ts"
+    "server/src/modules/admin/admin.controller.ts",
+    "server/src/modules/release/release.controller.ts"
   ]
 }

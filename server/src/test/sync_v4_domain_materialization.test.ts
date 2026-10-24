@@ -1,10 +1,13 @@
 import { pgPool } from '../config/database';
 import { runMigrations } from '../migrations';
 import { applyDomainMutation } from '../modules/sync_v4/sync-v4.routes';
+import { assertIsolatedTestDatabase } from '../config/test-db-guard';
 
 async function run() {
   const setupClient = await pgPool.connect();
   try {
+    // FAIL-CLOSED GÜVENLİK BARİYERİ: Hedef veritabanının onaylı bir test DB olduğu kanıtlanmadan şema silinemez!
+    await assertIsolatedTestDatabase(setupClient);
     await setupClient.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;');
   } finally {
     setupClient.release();

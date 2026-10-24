@@ -301,8 +301,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                             outOfStock
                                                 ? 'Tükendi'
                                                 : (isLowStock
-                                                    ? '${p.quantity} adet'
-                                                    : '${p.quantity}'),
+                                                    ? '${p.formattedQuantity} adet'
+                                                    : p.formattedQuantity),
                                             style: TextStyle(
                                               fontSize: 9,
                                               color: badgeTextColor,
@@ -468,7 +468,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
       AppNotificationHost.show(
         SnackBar(
           content:
-              Text('"${p.name}" stokta bulunmamaktadır (Stok: ${p.quantity}).'),
+              Text('"${p.name}" stokta bulunmamaktadır (Stok: ${p.formattedQuantity}).'),
           backgroundColor: _kRed,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,

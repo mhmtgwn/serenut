@@ -10,6 +10,7 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/bootstrap/app_bootstrap.dart';
+import 'package:serenutos/infrastructure/bootstrap/core_next_bootstrap_coordinator.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
@@ -17,6 +18,7 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
+import 'package:serenutos/presentation/widgets/migration_consent_dialog.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/event_providers.dart';
@@ -154,6 +156,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _updateCheckTimer?.cancel();
+    // Bekleyen onay talebi varsa güvenli biçimde reddet (postpone)
+    final pendingConsent = ref.read(coreNextConsentRequestProvider);
+    if (pendingConsent != null && !pendingConsent.completer.isCompleted) {
+      pendingConsent.completer.complete(MigrationConsentDecision.postponed);
+    }
     // Temiz kapanışı kaydet — lock dosyası silindi, sonraki başlatmada
     // yanlış crash tespiti yapılmaz.
     ref.read(crashRecoveryManagerProvider).markAppCleanShutdown();
@@ -216,20 +223,32 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _checkVersion() async {
-    VersionCheckResult? info;
+    UpdateInfo? info;
     var required = false;
     try {
-      await VersionChecker.getAppVersion();
-      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
-      required = await checker
-          .checkForceUpdateRequired()
+      final currentVer = await VersionChecker.getAppVersion();
+      final releaseManager = ref.read(releaseManagerServiceProvider);
+      final lic = ref.read(licenseServiceProvider).getLicenseInfo();
+      final deviceId =
+          lic?.activationId ?? ref.read(deviceManagerProvider).getDeviceId();
+      final companyId = lic?.merchantId;
+      final jwtToken = ref.read(authServiceProvider).getJwtToken();
+
+      info = await releaseManager
+          .checkForUpdates(
+            currentVersion: currentVer,
+            platform: AppPlatform.releaseKey,
+            deviceId: deviceId,
+            companyId: companyId,
+            jwtToken: jwtToken,
+          )
           .timeout(const Duration(seconds: 12));
-      info =
-          await checker.getVersionInfo().timeout(const Duration(seconds: 12));
-      if (info != null && required) {
+
+      if (info.hasUpdate) {
+        required = info.isForceUpdate;
         _latestVersion = info.latestVersion;
-        _releaseNotes = info.releaseNotes;
-        _downloadUrl = info.downloadUrl;
+        _releaseNotes = info.releaseNotes ?? '';
+        _downloadUrl = info.downloadUrl ?? '';
         _sha256Hash = info.sha256Hash;
         _signature = info.signature;
         _fileSizeBytes = info.fileSizeBytes;
@@ -246,7 +265,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
     }
 
-    if (!required && info != null) {
+    if (!required && info != null && info.hasUpdate) {
       await _offerOptionalUpdate(info);
     }
   }
@@ -255,19 +274,30 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (_updateCheckRunning || _checkingVersion || _forceUpdateRequired) return;
     _updateCheckRunning = true;
     try {
-      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
-      final info = await checker.getVersionInfo();
-      if (info == null ||
-          !VersionChecker.isVersionOlder(
-              VersionChecker.currentVersion, info.latestVersion)) {
-        return;
-      }
+      final currentVer = await VersionChecker.getAppVersion();
+      final releaseManager = ref.read(releaseManagerServiceProvider);
+      final lic = ref.read(licenseServiceProvider).getLicenseInfo();
+      final deviceId =
+          lic?.activationId ?? ref.read(deviceManagerProvider).getDeviceId();
+      final companyId = lic?.merchantId;
+      final jwtToken = ref.read(authServiceProvider).getJwtToken();
+
+      final info = await releaseManager.checkForUpdates(
+        currentVersion: currentVer,
+        platform: AppPlatform.releaseKey,
+        deviceId: deviceId,
+        companyId: companyId,
+        jwtToken: jwtToken,
+      );
+
+      if (!info.hasUpdate) return;
+
       if (info.isForceUpdate) {
         if (!mounted) return;
         setState(() {
           _latestVersion = info.latestVersion;
-          _releaseNotes = info.releaseNotes;
-          _downloadUrl = info.downloadUrl;
+          _releaseNotes = info.releaseNotes ?? '';
+          _downloadUrl = info.downloadUrl ?? '';
           _sha256Hash = info.sha256Hash;
           _signature = info.signature;
           _fileSizeBytes = info.fileSizeBytes;
@@ -281,9 +311,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _offerOptionalUpdate(VersionCheckResult info) async {
-    if (!VersionChecker.isVersionOlder(
-            VersionChecker.currentVersion, info.latestVersion) ||
+  Future<void> _offerOptionalUpdate(UpdateInfo info) async {
+    if (!info.hasUpdate ||
         _updateDialogVisible ||
         _lastPromptedVersion == info.latestVersion) {
       return;
@@ -296,18 +325,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       try {
         await showUpdateDialog(
           context: context,
-          updateInfo: UpdateInfo(
-            hasUpdate: true,
-            isForceUpdate: false,
-            latestVersion: info.latestVersion,
-            minRequiredVersion: info.minRequiredVersion,
-            downloadUrl: info.downloadUrl,
-            sha256Hash: info.sha256Hash,
-            signature: info.signature,
-            fileSizeBytes: info.fileSizeBytes,
-            releaseNotes: info.releaseNotes,
-            channel: 'stable',
-          ),
+          updateInfo: info,
           releaseManager: ref.read(releaseManagerServiceProvider),
           platform: AppPlatform.releaseKey,
           jwtToken: ref.read(authServiceProvider).getJwtToken(),
@@ -323,18 +341,28 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (_checkingIntegrity || _checkingVersion || _integrityError != null) {
+      final migrationProgress = ref.watch(coreNextMigrationProgressProvider);
+      final consentRequest = ref.watch(coreNextConsentRequestProvider);
       final String status;
       final String? detail;
+      final double? progress;
 
       if (_integrityError != null) {
         status = 'Sistem kontrol ediliyor';
         detail = null;
+        progress = null;
+      } else if (migrationProgress != null) {
+        status = migrationProgress.stageTitle;
+        detail = migrationProgress.detail;
+        progress = migrationProgress.progress;
       } else if (_checkingIntegrity) {
         status = 'Sistem kontrol ediliyor';
         detail = 'Verileriniz ve yarım kalan işlemler güvenle hazırlanıyor.';
+        progress = null;
       } else {
         status = 'Uygulama hazırlanıyor';
         detail = 'Sürüm ve güvenlik kontrolleri tamamlanıyor.';
+        progress = null;
       }
 
       return MaterialApp(
@@ -344,10 +372,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         home: BrandedSplashScreen(
           status: status,
           detail: detail,
+          progress: progress,
           error: _integrityError,
           errorReference: _integrityRefCode,
           technicalDetails: _integrityTechnicalDetails,
           onRetry: _integrityError != null ? _retryStartupChecks : null,
+          overlay: consentRequest != null
+              ? MigrationConsentDialog(
+                  sourceDbPath: consentRequest.sourceDbPath,
+                  targetDbPath: consentRequest.targetDbPath,
+                  estimatedProductCount: consentRequest.estimatedProductCount,
+                  estimatedCustomerCount: consentRequest.estimatedCustomerCount,
+                  onDecision: (decision) {
+                    if (!consentRequest.completer.isCompleted) {
+                      consentRequest.completer.complete(decision);
+                    }
+                    ref.read(coreNextConsentRequestProvider.notifier).state = null;
+                  },
+                )
+              : null,
         ),
       );
     }

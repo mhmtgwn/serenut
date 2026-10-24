@@ -23,12 +23,16 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/migration/cutoff_maintenance_lock.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/network/trusted_ca_http_overrides.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
+import 'package:serenutos/infrastructure/services/integrity_check_service.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/infrastructure/bootstrap/core_next_bootstrap_coordinator.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/presentation/observers/telemetry_provider_observer.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -38,6 +42,9 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/infrastructure/bootstrap/pilot_cutover_gate.dart';
+import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/core_next/infrastructure/database/dual_database_routing_coordinator.dart';
 
 /// Pre-app başlatma sonucu
 class BootstrapResult {
@@ -48,6 +55,7 @@ class BootstrapResult {
   final LicenseService licenseService;
   final List<Override> overrides;
   final List<ProviderObserver> observers;
+  final PilotGateResult? pilotGateResult;
 
   const BootstrapResult({
     required this.prefs,
@@ -57,6 +65,7 @@ class BootstrapResult {
     required this.licenseService,
     required this.overrides,
     required this.observers,
+    this.pilotGateResult,
   });
 }
 
@@ -79,7 +88,10 @@ class AppBootstrap {
   AppBootstrap._();
 
   /// Uygulama ayağa kalkmadan önceki temel altyapıyı hazırlar.
-  static Future<BootstrapResult> initPreApp() async {
+  static Future<BootstrapResult> initPreApp({
+    PilotCutoverGate? pilotGate,
+    String? requestedTenantId,
+  }) async {
     WidgetsFlutterBinding.ensureInitialized();
 
     // 1. Güvenilen CA Sertifikası
@@ -110,6 +122,21 @@ class AppBootstrap {
 
     // 4. Kalıcı Depolama & Çekirdek Servisler
     final prefs = await SharedPreferences.getInstance();
+
+    // 4.1. Merkezi Kesim Bakım Kilidi & Kalıcı Durum Yükleme
+    try {
+      final cutoffLock = CutoffMaintenanceLock(
+        storage: SharedPreferencesMaintenanceStorage.withInstance(prefs),
+      );
+      await cutoffLock.initializeFromStorage();
+      DatabaseManager.cutoffMaintenanceLock = cutoffLock;
+    } catch (e) {
+      debugPrint('[Bootstrap] Cutoff lock initialization fallback: $e');
+      DatabaseManager.cutoffMaintenanceLock = CutoffMaintenanceLock(
+        storage: SharedPreferencesMaintenanceStorage.withInstance(prefs),
+      );
+    }
+
     final dbManager = DatabaseManager.instance;
     final gateway = DbGatewayImpl(dbManager);
     final userRepository = SqliteUserRepository(gateway);
@@ -238,18 +265,67 @@ class AppBootstrap {
     final datasetLoader = DatasetLoaderService(prefs);
     await datasetLoader.init();
 
+    // 11. Core Next Pilot Cutover Kapısı (Fail-Closed Değerlendirme)
+    PilotCutoverGate.defaultOverrideGenerator ??= ({
+      required String requestedTenantId,
+      required String legacyDbPath,
+      required String targetDbPath,
+      required bool enableSalesEngine,
+      DatabaseFactory? dbFactory,
+    }) async {
+      final coordinator = const DualDatabaseRoutingCoordinator();
+      final routing = await coordinator.resolveAndOpen(
+        requestedTenantId: requestedTenantId,
+        legacyDbPath: legacyDbPath,
+        targetDbPath: targetDbPath,
+        migrationStateCompleted: true,
+        dbFactory: dbFactory,
+      );
+      if (!routing.isSuccess || routing.targetDatabase == null) return null;
+      return [
+        ...DualDatabaseRoutingCoordinator.createRepositoryOverrides(
+          coreDb: routing.targetDatabase!,
+          enableSalesEngine: enableSalesEngine,
+        ),
+        coreNextSalesEngineEnabledProvider.overrideWith((ref) => enableSalesEngine),
+      ];
+    };
+
+    final gate = pilotGate ?? const PilotCutoverGate();
+    final effectiveTenantId =
+        requestedTenantId ?? licenseService.getLicenseInfo()?.merchantId;
+    final pilotResult = await gate.evaluate(
+      prefs: prefs,
+      requestedTenantId: effectiveTenantId,
+    );
+
+    if (pilotResult.isPilotActive) {
+      debugPrint(
+          '[AppBootstrap] 🚀 Core Next Pilot Yönlendirmesi AKTİF: ${pilotResult.reason}');
+      try {
+        await dbManager.close();
+      } catch (e) {
+        debugPrint('[AppBootstrap] Note on dbManager reset: $e');
+      }
+    } else {
+      debugPrint(
+          '[AppBootstrap] 🛡️ Core Next Pilot Kapalı (Legacy Aktif): ${pilotResult.reason}');
+    }
+
     return BootstrapResult(
       prefs: prefs,
       authService: authService,
       apiClient: apiClient,
       datasetLoader: datasetLoader,
       licenseService: licenseService,
+      pilotGateResult: pilotResult,
       overrides: [
         authServiceProvider.overrideWithValue(authService),
         apiClientProvider.overrideWithValue(apiClient),
         sharedPreferencesProvider.overrideWithValue(prefs),
         datasetLoaderServiceProvider.overrideWithValue(datasetLoader),
         licenseServiceProvider.overrideWithValue(licenseService),
+        ...pilotResult.overrides,
       ],
       observers: [
         TelemetryProviderObserver(),
@@ -265,11 +341,19 @@ class AppBootstrap {
 
   /// Uygulama açılışında veritabanı bütünlüğünü, donanımı ve yazıcı kuyruklarını denetler.
   static Future<StartupDiagnosticsResult> runStartupDiagnostics(
-      WidgetRef ref) async {
+      dynamic ref) async {
     try {
-      // 1. Veritabanı Bütünlüğü ve Onarım
+      // 1. Veritabanı Bütünlüğü ve Onarım (Kritik Kontrol)
       final diag = ref.read(integrityCheckServiceProvider);
-      final report = await diag.runDiagnostics();
+      final report = await diag.runDiagnostics().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => IntegrityReport(
+              isDatabaseHealthy: false,
+              isFileSystemHealthy: false,
+              issues: const ['Veritabanı bütünlük kontrolü zaman aşımına uğradı (10s)'],
+              logs: 'TIMEOUT',
+            ),
+          );
       if (!report.isAllPass) {
         final repaired = await diag.attemptDatabaseRepair();
         if (!repaired) {
@@ -302,33 +386,129 @@ class AppBootstrap {
         }
       }
 
-      // 2. Çökme Kurtarma Taraması
-      final recovery = ref.read(crashRecoveryManagerProvider);
-      final crashed = await recovery.checkForCrashOnStartup();
-      if (crashed) {
-        await recovery.recoverInterruptedSyncJobs();
+      // 1.1 Core Next Geçiş Durumu Kontrolü ve Güvenli Koordinasyon
+      try {
+        final coordinator = ref.read(coreNextBootstrapCoordinatorProvider);
+        final migrationState = await coordinator.getPersistentState();
+        if (migrationState == CoreNextMigrationState.failedBlocked) {
+          debugPrint('[AppBootstrap] ⚠️ Core Next migration kalıcı blokaj durumunda. Legacy akış korunuyor.');
+        } else if (ref.read(coreNextMigrationRunnerProvider) != null &&
+            migrationState != CoreNextMigrationState.completed) {
+          debugPrint('[AppBootstrap] 🚀 Core Next migration runner aktif. Koordinasyon başlatılıyor...');
+          final consentRequester = ref.read(coreNextConsentRequesterProvider);
+          final result = await coordinator.coordinate(
+            autonomousMode: true,
+            consentRequester: consentRequester,
+            onProgress: (progress) {
+              ref.read(coreNextMigrationProgressProvider.notifier).state = progress;
+            },
+          );
+          if (!result.isSuccess) {
+            debugPrint('[AppBootstrap] ⚠️ Core Next koordinasyonu başarısız: ${result.errorMessage}. Legacy akış korunuyor.');
+          }
+        }
+      } catch (e) {
+        debugPrint('[AppBootstrap] Core Next coordinator check note: $e');
       }
 
-      // 3. Takılı Kalan SMS Kuyruğunu Süpürme
+      // 1.2 Bekleyen / Yarım Kalmış Rollback Kontrolü (Fail-Closed Güvenlik Kilidi)
+      try {
+        final prefs = ref.read(sharedPreferencesProvider);
+        final rollbackState = prefs.getString('core_next_rollback_state');
+        if (rollbackState == 'in_progress' || rollbackState == 'failed_blocked') {
+          debugPrint('[AppBootstrap] ⚠️ Bekleyen/Yarım kalmış rollback tespit edildi ($rollbackState).');
+          if (PilotCutoverGate.safeRollbackRunner != null) {
+            final legacyDb = await DatabaseManager.instance.getDatabase();
+            final targetDbPath = prefs.getString(CoreNextBootstrapCoordinator.prefKeyBackupPath) ?? 'core_next.db';
+            final license = ref.read(licenseServiceProvider).getLicenseInfo();
+            final tenantId = license?.merchantId ?? 'nutopia';
+
+            final recoveryResult = await PilotCutoverGate.recoverPendingRollback(
+              prefs: prefs,
+              legacyDb: legacyDb,
+              coreDb: targetDbPath,
+              tenantId: tenantId,
+            );
+            if (!recoveryResult.isSuccess) {
+              return StartupDiagnosticsResult(
+                isSuccess: false,
+                errorMessage: 'Kritik Durum: Önceki oturumda veritabanı geri dönüşü yarım kalmış ve otomatik kurtarılamamıştır.\n'
+                    'Veri kaybını önlemek için sistem açılışı durduruldu.\nHata: ${recoveryResult.errorMessage}',
+                errorReference: 'ERR-ROLLBACK-RECOVERY-FAILED',
+                technicalDetails: recoveryResult.errorMessage,
+              );
+            }
+          } else {
+            return StartupDiagnosticsResult(
+              isSuccess: false,
+              errorMessage: 'Kritik Durum: Önceki oturumda veritabanı geri dönüşü yarım kaldı ($rollbackState).\n'
+                  'Core Next verilerinin kaybolmasını önlemek için sistem güvenli olarak kilitlendi.\n'
+                  'Lütfen teknik destek ile iletişime geçin.',
+              errorReference: 'ERR-ROLLBACK-INCOMPLETE',
+              technicalDetails: 'core_next_rollback_state: $rollbackState',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[AppBootstrap] Rollback state check error: $e');
+      }
+
+      // 2. Çökme Kurtarma Taraması (Güvenli Zaman Aşımı)
+      try {
+        final recovery = ref.read(crashRecoveryManagerProvider);
+        final crashed = await recovery.checkForCrashOnStartup().timeout(
+              const Duration(seconds: 4),
+              onTimeout: () => false,
+            );
+        if (crashed) {
+          await recovery.recoverInterruptedSyncJobs().timeout(
+                const Duration(seconds: 4),
+                onTimeout: () => 0,
+              );
+        }
+      } catch (e) {
+        debugPrint('[AppBootstrap] Crash recovery note: $e');
+      }
+
+      // 3. Takılı Kalan SMS Kuyruğunu Süpürme (Non-blocking, Bounded Timeout)
       try {
         final smsLogRepo = ref.read(smsLogRepositoryProvider);
-        await smsLogRepo.resetStuckJobs();
+        await smsLogRepo.resetStuckJobs().timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('[AppBootstrap] SMS stuck jobs reset timed out (3s); continuing boot safely.');
+              },
+            );
       } catch (e) {
         debugPrint('Failed to reset stuck SMS jobs at startup: $e');
       }
 
       // 4. Donanım Kayıtları ve Yazdırma Runtime Başlatma
       try {
-        await ref.read(hardwareDevicesProvider.future);
+        await ref.read(hardwareDevicesProvider.future).timeout(
+              const Duration(seconds: 3),
+              onTimeout: () => <HardwareDevice>[],
+            );
       } catch (e) {
         debugPrint('Legacy hardware import failed: $e');
       }
 
       try {
-        final printRecovery = await ref.read(printingRuntimeProvider).start();
+        final printRecovery = await ref.read(printingRuntimeProvider).start().timeout(
+              const Duration(seconds: 4),
+              onTimeout: () => const PrintRecoverySummary(safelyRequeued: 0, awaitingUserCheck: 0),
+            );
         final remoteConfig = ref.read(remoteConfigServiceProvider);
-        await remoteConfig.fetchAndActivate();
-        final localHardware = await ref.read(hardwareDevicesProvider.future);
+        await remoteConfig.fetchAndActivate().timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('[AppBootstrap] RemoteConfig fetch timed out (3s); continuing with cached config.');
+              },
+            );
+        final localHardware = await ref.read(hardwareDevicesProvider.future).timeout(
+              const Duration(seconds: 3),
+              onTimeout: () => <HardwareDevice>[],
+            );
         if (remoteConfig.isSharedHardwareEnabled()) {
           try {
             await ref.read(sharedHardwareServiceProvider).publishPresence(
@@ -336,7 +516,7 @@ class AppBootstrap {
                       .where((device) =>
                           device.connectionType != HardwareConnectionType.cloud)
                       .toList(growable: false),
-                );
+                ).timeout(const Duration(seconds: 3));
           } catch (presenceErr) {
             debugPrint('Initial presence publish deferred: $presenceErr');
           }
@@ -354,19 +534,33 @@ class AppBootstrap {
         debugPrint('Printing runtime startup failed: $e');
       }
 
-      // 5. Yerel Depoları Ön Isıtma (Pre-warm)
+      // 5. Yerel Depoları Ön Isıtma (Pre-warm) (İzole, Hata Güvenli ve Zaman Aşımı Korumalı)
       try {
-        final settingsRepo = await ref.read(settingsRepositoryProvider.future);
-        await settingsRepo.getSettings();
-
-        final productRepo = await ref.read(productRepositoryProvider.future);
-        await productRepo.getInventorySummary();
-        await productRepo.getCategories();
-
-        final customerRepo = await ref.read(customerRepositoryProvider.future);
-        await customerRepo.count();
+        final settingsRepo = await ref.read(settingsRepositoryProvider.future).timeout(
+              const Duration(seconds: 3),
+            );
+        await settingsRepo.getSettings().timeout(const Duration(seconds: 3));
       } catch (e) {
-        debugPrint('Pre-warm warning at startup: $e');
+        debugPrint('Settings pre-warm warning at startup: $e');
+      }
+
+      try {
+        final productRepo = await ref.read(productRepositoryProvider.future).timeout(
+              const Duration(seconds: 3),
+            );
+        await productRepo.getInventorySummary().timeout(const Duration(seconds: 3));
+        await productRepo.getCategories().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Product pre-warm warning at startup: $e');
+      }
+
+      try {
+        final customerRepo = await ref.read(customerRepositoryProvider.future).timeout(
+              const Duration(seconds: 3),
+            );
+        await customerRepo.count().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Customer pre-warm warning at startup: $e');
       }
 
       return const StartupDiagnosticsResult(isSuccess: true);

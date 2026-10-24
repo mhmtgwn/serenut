@@ -173,12 +173,45 @@ export async function upsertSale(
     throw new Error("invalid_sale");
   }
   const prior = await client.query(
-    "SELECT id FROM sales WHERE id = $1 AND company_id = $2 FOR UPDATE",
+    "SELECT id, total_amount, paid_amount, payment_method, customer_id FROM sales WHERE id = $1 AND company_id = $2 FOR UPDATE",
     [id, companyId],
   );
   // A completed sale is an immutable financial fact. Replayed materialization
-  // is a no-op; later changes must be represented by a refund/reversal.
-  if (prior.rowCount) return;
+  // with identical payload is an idempotent no-op; altered payload must be rejected.
+  if (prior.rowCount) {
+    const existing = prior.rows[0];
+    const clientTotal = numberValue(payload, "total_amount", Number.NaN);
+    const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
+    const totalMatch = Number.isFinite(clientTotal) && Math.abs(Number(existing.total_amount) - clientTotal) <= 0.05;
+    const paidMatch = Number.isFinite(paidAmount) && Math.abs(Number(existing.paid_amount) - Math.min(paidAmount, clientTotal)) <= 0.05;
+    const methodMatch = existing.payment_method === paymentMethod;
+    const customerMatch = (existing.customer_id || null) === (customerId || null);
+
+    if (!totalMatch || !paidMatch || !methodMatch || !customerMatch) {
+      throw new Error("sale_payload_conflict");
+    }
+
+    const priorItems = await client.query(
+      "SELECT product_id, quantity FROM sale_items WHERE sale_id = $1 AND company_id = $2 ORDER BY id ASC",
+      [id, companyId],
+    );
+    if (Array.isArray(payload.items)) {
+      if (priorItems.rowCount !== payload.items.length) {
+        throw new Error("sale_payload_conflict");
+      }
+      for (let i = 0; i < payload.items.length; i++) {
+        const item = payload.items[i];
+        const existingItem = priorItems.rows[i];
+        if (!item || typeof item !== "object") throw new Error("invalid_mutation");
+        const prodId = stringValue(item as Record<string, unknown>, "product_id");
+        const qty = numberValue(item as Record<string, unknown>, "quantity", Number.NaN);
+        if (existingItem.product_id !== prodId || Math.abs(Number(existingItem.quantity) - qty) > 0.001) {
+          throw new Error("sale_payload_conflict");
+        }
+      }
+    }
+    return;
+  }
   if (customerId) {
     const customer = await client.query(
       "SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_deleted = false",

@@ -33,14 +33,32 @@ import 'package:serenutos/providers/service_providers.dart';
 // ════════════════════════════════════════════════════════════
 
 // ── Repository Providers ──
+/// Core Next Ürün Deposu Sağlayıcısı (Varsayılan: null)
+/// Core Next aktif olduğunda CoreNextProductRepository buraya atanır.
+final coreNextProductRepositoryProvider =
+    Provider<IProductRepository?>((ref) => null, name: 'coreNextProductRepositoryProvider');
+
 final productRepositoryProvider =
     FutureProvider<IProductRepository>((ref) async {
+  final coreRepo = ref.watch(coreNextProductRepositoryProvider);
+  if (coreRepo != null) {
+    return coreRepo;
+  }
   return SqliteProductRepository(
       ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
 });
 
+/// Core Next Müşteri Deposu Sağlayıcısı (Varsayılan: null)
+/// Core Next aktif olduğunda CoreNextCustomerRepository buraya atanır.
+final coreNextCustomerRepositoryProvider =
+    Provider<ICustomerRepository?>((ref) => null, name: 'coreNextCustomerRepositoryProvider');
+
 final customerRepositoryProvider =
     FutureProvider<ICustomerRepository>((ref) async {
+  final coreRepo = ref.watch(coreNextCustomerRepositoryProvider);
+  if (coreRepo != null) {
+    return coreRepo;
+  }
   return SqliteCustomerRepository(ref.watch(dbGatewayProvider));
 });
 
@@ -50,12 +68,31 @@ final customerSearchServiceProvider =
   return CustomerSearchService(repo);
 });
 
+/// Core Next Satış Deposu Sağlayıcısı (Varsayılan: null)
+/// Core Next satış motoru aktif olduğunda CoreNextSaleRepository buraya atanır.
+final coreNextSaleRepositoryProvider =
+    Provider<ISaleRepository?>((ref) => null, name: 'coreNextSaleRepositoryProvider');
+
 final saleRepositoryProvider = FutureProvider<ISaleRepository>((ref) async {
+  final coreRepo = ref.watch(coreNextSaleRepositoryProvider);
+  if (coreRepo != null) {
+    return coreRepo;
+  }
   return SqliteSaleRepository(ref.watch(dbGatewayProvider));
 });
 
+/// Core Next Finansal Hareket Deposu Sağlayıcısı (Varsayılan: null)
+/// Core Next aktif olduğunda CoreNextFinancialTransactionRepository buraya atanır.
+final coreNextFinancialTransactionRepositoryProvider =
+    Provider<IFinancialTransactionRepository?>((ref) => null,
+        name: 'coreNextFinancialTransactionRepositoryProvider');
+
 final financialTransactionRepositoryProvider =
     FutureProvider<IFinancialTransactionRepository>((ref) async {
+  final coreRepo = ref.watch(coreNextFinancialTransactionRepositoryProvider);
+  if (coreRepo != null) {
+    return coreRepo;
+  }
   final gateway = ref.watch(dbGatewayProvider);
   final licenseService = ref.watch(licenseServiceProvider);
   final deviceId = licenseService.getDeviceUuid();

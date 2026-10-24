@@ -170,6 +170,18 @@ async function main() {
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const targetChannel = process.env.RELEASE_CHANNEL || 'pilot';
+    const targetStatus = process.env.RELEASE_STATUS || (targetChannel === 'stable' ? 'active' : 'staged');
+    const targetRollout = Number.parseInt(process.env.RELEASE_ROLLOUT || (targetChannel === 'stable' ? '100' : '0'), 10);
+    const targetCompanies = (process.env.RELEASE_TARGET_COMPANIES || '')
+      .split(',')
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
+
+    if (targetChannel === 'pilot' && targetCompanies.length === 0) {
+      throw new Error('Guvenlik ihlali: Pilot yayini icin en az bir hedef sirket (RELEASE_TARGET_COMPANIES) belirtilmelidir!');
+    }
+
     for (const release of prepared) {
       const id = `rel-${release.platform}-${release.versionCode.replace(/[^a-zA-Z0-9]/g, '-')}`;
       const notes = `Serenut OS ${release.versionCode}: güvenli canlı bağlantı, kalıcı senkronizasyon tanılama ve kararlı güncelleme altyapısı.`;
@@ -179,8 +191,8 @@ async function main() {
           sha256_hash, signature, digital_signature, file_size_bytes,
           is_mandatory, min_required_version, release_notes, status,
           rollout_percentage, created_at, updated_at
-        ) VALUES ($1, $2, $3, 'stable', $4, $5, $6, $7, $7, $8,
-                  $10, NULL, $9, 'active', 100, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9,
+                  $11, NULL, $10, $12, $13, NOW(), NOW())
         ON CONFLICT (version_code, platform, channel) DO UPDATE SET
           download_url = EXCLUDED.download_url,
           file_path = EXCLUDED.file_path,
@@ -190,11 +202,12 @@ async function main() {
           file_size_bytes = EXCLUDED.file_size_bytes,
           release_notes = EXCLUDED.release_notes,
           is_mandatory = EXCLUDED.is_mandatory,
-          status = 'active', rollout_percentage = 100, updated_at = NOW()
+          status = EXCLUDED.status, rollout_percentage = EXCLUDED.rollout_percentage, updated_at = NOW()
       `, [
         id,
         release.versionCode,
         release.platform,
+        targetChannel,
         `/api/v1/updates/download/${release.platform}/version/${encodeURIComponent(release.versionCode)}`,
         release.finalPath,
         release.hash,
@@ -202,7 +215,20 @@ async function main() {
         release.size,
         notes,
         release.isMandatory,
+        targetStatus,
+        targetRollout,
       ]);
+
+      if (targetCompanies.length > 0) {
+        await client.query('DELETE FROM update_targets WHERE release_id = $1 AND target_type = \'company\'', [id]);
+        for (const companyId of targetCompanies) {
+          const tgtId = `tgt-pub-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+          await client.query(`
+            INSERT INTO update_targets (id, release_id, target_type, target_value)
+            VALUES ($1, $2, 'company', $3)
+          `, [tgtId, id, companyId]);
+        }
+      }
     }
     for (const release of prepared) {
       if (!release.reusedExistingFile) {

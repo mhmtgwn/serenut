@@ -18,6 +18,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/sales/catalog_panel.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
@@ -46,7 +47,17 @@ class SalesPage extends ConsumerStatefulWidget {
 
 class _SalesPageState extends ConsumerState<SalesPage>
     with BarcodeScannerMixin<SalesPage> {
+  bool _ensureSalesActionPermitted([String actionDescription = 'Sepet işlemi']) {
+    final maintenance = DatabaseManager.cutoffMaintenanceLock;
+    if (maintenance != null && !maintenance.state.isWritePermitted) {
+      _showErrorSnackBar('Sistem Bakım Modunda: $actionDescription geçici olarak durduruldu.');
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _handleProductSelected(ProductEntity product) async {
+    if (!_ensureSalesActionPermitted('Ürün ekleme')) return;
     if (!product.isWeighed) {
       ref.read(salesFlowProvider.notifier).addToCart(product);
       return;
@@ -107,6 +118,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
 
   @override
   void onBarcodeScanned(String barcode) {
+    if (!_ensureSalesActionPermitted('Barkodla ürün ekleme')) return;
     _searchController.clear();
     ref.read(salesProductSearchQueryProvider.notifier).state = '';
     _handleBarcodeSubmit(barcode, const []);
@@ -165,6 +177,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
   }
 
   Future<void> _submitSale() async {
+    if (!_ensureSalesActionPermitted('Satış tamamlama')) return;
     final flowState = ref.read(salesFlowProvider);
 
     if (flowState.cartQuantities.isEmpty) {
@@ -483,19 +496,23 @@ class _SalesPageState extends ConsumerState<SalesPage>
                               return CartPanel(
                                 cartQuantities: flowState.cartQuantities,
                                 cartProducts: flowState.cartProducts,
-                                onClearCart: () => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .clearCart(),
-                                onRemoveFromCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .removeFromCart(p),
+                                onClearCart: () {
+                                  if (!_ensureSalesActionPermitted('Sepeti temizleme')) return;
+                                  ref.read(salesFlowProvider.notifier).clearCart();
+                                },
+                                onRemoveFromCart: (p) {
+                                  if (!_ensureSalesActionPermitted('Ürün azaltma')) return;
+                                  ref.read(salesFlowProvider.notifier).removeFromCart(p);
+                                },
                                 onAddToCart: _handleProductSelected,
-                                onDeleteFromCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .deleteFromCart(p),
-                                onQuantityChanged: (p, qty) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .updateQuantity(p, qty),
+                                onDeleteFromCart: (p) {
+                                  if (!_ensureSalesActionPermitted('Ürün silme')) return;
+                                  ref.read(salesFlowProvider.notifier).deleteFromCart(p);
+                                },
+                                onQuantityChanged: (p, qty) {
+                                  if (!_ensureSalesActionPermitted('Miktar güncelleme')) return;
+                                  ref.read(salesFlowProvider.notifier).updateQuantity(p, qty);
+                                },
                                 checkoutSectionWidget: checkoutWidget,
                               );
                             },
@@ -555,19 +572,23 @@ class _SalesPageState extends ConsumerState<SalesPage>
                               return CartPanel(
                                 cartQuantities: flowState.cartQuantities,
                                 cartProducts: flowState.cartProducts,
-                                onClearCart: () => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .clearCart(),
-                                onRemoveFromCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .removeFromCart(p),
+                                onClearCart: () {
+                                  if (!_ensureSalesActionPermitted('Sepeti temizleme')) return;
+                                  ref.read(salesFlowProvider.notifier).clearCart();
+                                },
+                                onRemoveFromCart: (p) {
+                                  if (!_ensureSalesActionPermitted('Ürün azaltma')) return;
+                                  ref.read(salesFlowProvider.notifier).removeFromCart(p);
+                                },
                                 onAddToCart: _handleProductSelected,
-                                onDeleteFromCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .deleteFromCart(p),
-                                onQuantityChanged: (p, qty) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .updateQuantity(p, qty),
+                                onDeleteFromCart: (p) {
+                                  if (!_ensureSalesActionPermitted('Ürün silme')) return;
+                                  ref.read(salesFlowProvider.notifier).deleteFromCart(p);
+                                },
+                                onQuantityChanged: (p, qty) {
+                                  if (!_ensureSalesActionPermitted('Miktar güncelleme')) return;
+                                  ref.read(salesFlowProvider.notifier).updateQuantity(p, qty);
+                                },
                                 checkoutSectionWidget: checkoutWidget,
                               );
                             },

@@ -15,6 +15,7 @@ import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
+import 'package:serenutos/presentation/widgets/cutoff_maintenance_banner_widget.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -136,6 +137,15 @@ class AppShell extends ConsumerWidget {
       body: Stack(
         children: [
           Positioned.fill(child: navigationShell),
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: CutoffMaintenanceBannerWidget(),
+            ),
+          ),
           const Positioned(
             left: 0,
             right: 0,

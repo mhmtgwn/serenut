@@ -20,6 +20,7 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 // ─── Pagination constants ─────────────────────────────────────────────────────
 const _kPageSize = 25;
@@ -203,6 +204,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> addOrder(OrderEntity order) async {
     await future;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'OrdersController.addOrder');
+    }
     final inventory = await ref.read(inventoryServiceProvider.future);
     final gateway = ref.read(dbGatewayProvider);
     await gateway.transaction(() async {
@@ -293,6 +298,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> updateOrder(OrderEntity order) async {
     await future;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'OrdersController.updateOrder');
+    }
     final previous = await _repository.findById(order.id);
     if (previous == null) {
       throw StateError('Düzenlenecek sipariş bulunamadı: ${order.id}');
@@ -377,22 +386,31 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     } else {
       await addOrder(order);
-      final paymentService = await ref.read(paymentServiceProvider.future);
-      await paymentService.processSalePayment(
-        saleId: order.id,
-        customerId: customerId,
-        totalAmount: orderTotal.toDouble(),
-        paidAmount: orderPaid.toDouble(),
-        paymentMethod: paymentMethod,
-        terminalMetadata: paymentMetadata,
-      );
+      try {
+        final paymentService = await ref.read(paymentServiceProvider.future);
+        await paymentService.processSalePayment(
+          saleId: order.id,
+          customerId: customerId,
+          totalAmount: orderTotal.toDouble(),
+          paidAmount: orderPaid.toDouble(),
+          paymentMethod: paymentMethod,
+          terminalMetadata: paymentMetadata,
+        );
+      } catch (e) {
+        // Compensating rollback: Eğer finansal kayıt oluşturulamazsa, yarım kalmış sipariş kalmaması için sil
+        try {
+          final orderRepo = await ref.read(orderRepositoryProvider.future);
+          await orderRepo.delete(order.id);
+        } catch (_) {}
+        rethrow;
+      }
     }
   }
 
   Future<Settings?> getSettings() async {
     try {
       final settingsRepo = await ref.read(settingsRepositoryProvider.future);
-      return settingsRepo.getSettings();
+      return await settingsRepo.getSettings();
     } catch (e) {
       debugPrint('[OrdersController] Ayarlar yükleme uyarısı: $e');
       return null;
@@ -500,6 +518,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   Future<void> deleteOrder(String id,
       {String? approvedByUserId, String? approvedByUserName}) async {
     await future;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'OrdersController.deleteOrder');
+    }
     final order = await _repository.findById(id);
     if (order == null) return;
     if (order.status.toLowerCase() == 'delivered') {
@@ -675,6 +697,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   Future<int> bulkDeleteOrders(Iterable<String> ids,
       {String? approvedByUserId, String? approvedByUserName}) async {
     await future;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'OrdersController.bulkDeleteOrders');
+    }
     final idSet = ids.toSet();
     if (idSet.isEmpty) return 0;
 
@@ -919,6 +945,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     List<SaleItemInput>? itemsToRefund,
   }) async {
     await future;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'OrdersController.refundOrder');
+    }
     final order = await _repository.findById(orderId);
     if (order == null) throw StateError('Sipariş bulunamadı: $orderId');
 

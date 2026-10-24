@@ -10,21 +10,23 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockPathProviderPlatform extends PathProviderPlatform
     with MockPlatformInterfaceMixin {
-  @override
-  Future<String?> getTemporaryPath() async => '.';
+  final String tempDir;
+  MockPathProviderPlatform(this.tempDir);
 
   @override
-  Future<String?> getApplicationSupportPath() async => '.';
+  Future<String?> getTemporaryPath() async => tempDir;
 
   @override
-  Future<String?> getLibraryPath() async => '.';
+  Future<String?> getApplicationSupportPath() async => tempDir;
 
   @override
-  Future<String?> getApplicationDocumentsPath() async =>
-      Directory.current.absolute.path;
+  Future<String?> getLibraryPath() async => tempDir;
 
   @override
-  Future<String?> getExternalStoragePath() async => '.';
+  Future<String?> getApplicationDocumentsPath() async => tempDir;
+
+  @override
+  Future<String?> getExternalStoragePath() async => tempDir;
 
   @override
   Future<List<String>?> getExternalCachePaths() async => [];
@@ -35,12 +37,14 @@ class MockPathProviderPlatform extends PathProviderPlatform
       [];
 
   @override
-  Future<String?> getDownloadsPath() async => '.';
+  Future<String?> getDownloadsPath() async => tempDir;
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  PathProviderPlatform.instance = MockPathProviderPlatform();
+  final tempTestDir =
+      Directory.systemTemp.createTempSync('serenut_backup_svc_test_');
+  PathProviderPlatform.instance = MockPathProviderPlatform(tempTestDir.path);
 
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
@@ -76,6 +80,11 @@ void main() {
 
     tearDownAll(() async {
       DatabaseManager.overrideDatabasePath = null;
+      try {
+        if (tempTestDir.existsSync()) {
+          tempTestDir.deleteSync(recursive: true);
+        }
+      } catch (_) {}
     });
 
     test('backupDatabase clones the database file and saves timestamp',

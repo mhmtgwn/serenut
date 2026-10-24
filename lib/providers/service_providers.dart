@@ -121,7 +121,8 @@ final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
 /// Provides TelemetryUploadService instance (SQLite buffering + API batch upload).
 final telemetryUploadServiceProvider = Provider<TelemetryUploadService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return TelemetryUploadService(apiClient);
+  final gateway = ref.watch(dbGatewayProvider);
+  return TelemetryUploadService(apiClient, gateway);
 });
 
 /// Yerel warning/error/critical olaylarını SQLite tamponuna alır ve periyodik

@@ -3,28 +3,42 @@
 // Renamed from TelemetryService to TelemetryUploadService to avoid class
 // name collision with domain/services/telemetry_service.dart (LocalLoggingService).
 
-import '../../infrastructure/database/database_provider.dart';
-import '../../infrastructure/network/api_client.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import '../../infrastructure/database/database_provider.dart';
+import '../../infrastructure/database/db_gateway.dart';
+import '../../infrastructure/network/api_client.dart';
 
 class TelemetryUploadService {
   final ApiClient _apiClient;
+  final DbGateway? _gateway;
 
-  TelemetryUploadService(this._apiClient);
+  TelemetryUploadService(this._apiClient, [this._gateway]);
 
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value,
       {Object? metadata}) async {
     try {
-      final db = await DatabaseManager.instance.getDatabase();
-      await db.insert('client_telemetry_logs', {
+      final cutoff = DatabaseManager.cutoffMaintenanceLock;
+      if (cutoff != null && !cutoff.state.isWritePermitted) {
+        cutoff.assertWritePermitted(operation: 'TelemetryUploadService.recordMetric');
+      }
+
+      final payload = {
         'metric_name': name,
         'metric_value': value,
         'timestamp': DateTime.now().toIso8601String(),
         'metadata':
             metadata is String ? metadata : jsonEncode(metadata ?? const {}),
-      });
+      };
+
+      final gateway = _gateway;
+      if (gateway != null) {
+        await gateway.insert('client_telemetry_logs', payload);
+      } else {
+        final db = await DatabaseManager.instance.getDatabase();
+        await db.insert('client_telemetry_logs', payload);
+      }
       debugPrint('[TelemetryUpload] Recorded local metric: $name = $value');
     } catch (e) {
       debugPrint('[TelemetryUpload] Failed to record local metric: $e');
@@ -34,12 +48,27 @@ class TelemetryUploadService {
   /// Query buffer rows and post them in a batch transaction payload
   Future<void> uploadMetricsBatch() async {
     try {
-      final db = await DatabaseManager.instance.getDatabase();
-      final List<Map<String, dynamic>> records = await db.query(
-        'client_telemetry_logs',
-        orderBy: 'id ASC',
-        limit: 100, // Batch limit of 100 to prevent payload limits
-      );
+      final cutoff = DatabaseManager.cutoffMaintenanceLock;
+      if (cutoff != null && !cutoff.state.isWritePermitted) {
+        return;
+      }
+
+      final gateway = _gateway;
+      final List<Map<String, dynamic>> records;
+      if (gateway != null) {
+        records = await gateway.query(
+          'client_telemetry_logs',
+          orderBy: 'id ASC',
+          limit: 100,
+        );
+      } else {
+        final db = await DatabaseManager.instance.getDatabase();
+        records = await db.query(
+          'client_telemetry_logs',
+          orderBy: 'id ASC',
+          limit: 100, // Batch limit of 100 to prevent payload limits
+        );
+      }
 
       if (records.isEmpty) return;
 
@@ -60,10 +89,18 @@ class TelemetryUploadService {
       if (response.statusCode == 200) {
         // Clear successfully processed telemetry batches
         final List<int> ids = records.map((r) => r['id'] as int).toList();
-        await db.delete(
-          'client_telemetry_logs',
-          where: 'id IN (${ids.join(",")})',
-        );
+        if (gateway != null) {
+          await gateway.delete(
+            'client_telemetry_logs',
+            where: 'id IN (${ids.join(",")})',
+          );
+        } else {
+          final db = await DatabaseManager.instance.getDatabase();
+          await db.delete(
+            'client_telemetry_logs',
+            where: 'id IN (${ids.join(",")})',
+          );
+        }
         debugPrint(
             '[TelemetryUpload] Batch-uploaded ${ids.length} metrics to SaaS platform.');
       } else {

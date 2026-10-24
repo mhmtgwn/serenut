@@ -1361,6 +1361,13 @@ router.post('/releases/distribute', async (req: AuthenticatedRequest, res: Respo
     return res.status(400).json({ error: 'missing_fields' });
   }
 
+  if (channel === 'pilot' && (!target_tenants || !Array.isArray(target_tenants) || target_tenants.filter((t: any) => String(t).trim()).length === 0)) {
+    return res.status(400).json({
+      error: 'pilot_requires_targets',
+      message: 'Pilot kanalına dağıtım için en az bir hedef şirket belirtilmelidir.'
+    });
+  }
+
   try {
     // Check if release version exists (using app_versions table)
     const relRes = await runBypassingRLS('SELECT * FROM app_versions WHERE version_code = $1', [version]);
@@ -1395,11 +1402,59 @@ router.post('/releases/distribute', async (req: AuthenticatedRequest, res: Respo
       }
     }
 
+    // Track target companies/tenants inside update_targets table if specified
+    if (target_tenants && Array.isArray(target_tenants)) {
+      await runBypassingRLS('DELETE FROM update_targets WHERE release_id = $1 AND target_type = \'company\'', [relRes.rows[0].id]);
+      for (const tenantId of target_tenants) {
+        if (!tenantId || !String(tenantId).trim()) continue;
+        const id = `tgt-cmp-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        await runBypassingRLS(`
+          INSERT INTO update_targets (id, release_id, target_type, target_value)
+          VALUES ($1, $2, 'company', $3)
+        `, [id, relRes.rows[0].id, String(tenantId).trim()]);
+      }
+    }
+
     await writeAdminAudit(req.user!.id, 'DISTRIBUTED_RELEASE', 'app_versions', version, null, { version, channel, target_tenants, target_tiers, rollout_percentage });
 
     return res.json({ success: true });
   } catch (err) {
     console.error('Release target distribution error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Get release distribution details and configured targets
+router.get('/releases/:version/targets', async (req: AuthenticatedRequest, res: Response) => {
+  const { version } = req.params;
+  try {
+    const relRes = await runBypassingRLS('SELECT id, version_code, platform, channel, rollout_percentage, status FROM app_versions WHERE version_code = $1', [version]);
+    if (relRes.rows.length === 0) {
+      return res.status(404).json({ error: 'release_version_not_found' });
+    }
+    const releaseId = relRes.rows[0].id;
+    const targets = await runBypassingRLS(
+      'SELECT id, target_type, target_value, created_at FROM update_targets WHERE release_id = $1 ORDER BY created_at ASC',
+      [releaseId]
+    );
+    const targetTenants = targets.rows.filter((r: any) => r.target_type === 'company').map((r: any) => r.target_value);
+    const targetTiers = targets.rows.filter((r: any) => r.target_type === 'license_tier').map((r: any) => r.target_value);
+    const targetDevices = targets.rows.filter((r: any) => r.target_type === 'device').map((r: any) => r.target_value);
+
+    return res.json({
+      version,
+      release_id: releaseId,
+      platform: relRes.rows[0].platform,
+      channel: relRes.rows[0].channel,
+      rollout_percentage: relRes.rows[0].rollout_percentage,
+      status: relRes.rows[0].status,
+      target_tenants: targetTenants,
+      target_tiers: targetTiers,
+      target_devices: targetDevices,
+      total_targets: targets.rows.length,
+    });
+  } catch (err) {
+    console.error('Get release targets error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });

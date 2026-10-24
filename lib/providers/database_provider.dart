@@ -8,6 +8,7 @@ import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
+import 'package:serenutos/infrastructure/migration/cutoff_maintenance_lock.dart';
 
 /// ============================================================
 /// Database Provider
@@ -152,3 +153,15 @@ final sqliteOrderRepositoryProvider =
 /// Same provider names, same interfaces, same behavior
 /// Only the underlying implementation changes.
 /// ============================================================
+
+/// Central Cutoff Maintenance State Stream Provider for UI reactive banners
+final cutoffMaintenanceStateProvider =
+    StreamProvider<CutoffMaintenanceState>((ref) async* {
+  final lock = DatabaseManager.cutoffMaintenanceLock;
+  if (lock == null) {
+    yield const CutoffMaintenanceState();
+    return;
+  }
+  yield lock.state;
+  yield* lock.stateStream;
+});

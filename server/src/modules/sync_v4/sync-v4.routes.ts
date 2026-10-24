@@ -130,10 +130,14 @@ router.post("/push", async (req, res) => {
         throw new Error("stale_before_operational_reset");
       }
       const prior = await client.query(
-        "SELECT revision FROM sync_v4_changes WHERE tenant_id = $1 AND mutation_id = $2::uuid",
+        "SELECT revision, payload FROM sync_v4_changes WHERE tenant_id = $1 AND mutation_id = $2::uuid",
         [user.company_id, mutation.mutation_id],
       );
       if (prior.rowCount) {
+        const prevPayload = prior.rows[0].payload as Record<string, unknown> | null;
+        if (prevPayload && JSON.stringify(prevPayload) !== JSON.stringify(mutation.payload)) {
+          throw new Error("mutation_payload_conflict");
+        }
         results.push({
           mutation_id: mutation.mutation_id,
           revision: Number(prior.rows[0].revision),

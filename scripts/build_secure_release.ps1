@@ -50,9 +50,12 @@ if ($Target -in @('all', 'windows')) {
     flutter build windows --release @defines
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     $iscc = Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'
-    if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found: $iscc" }
-    & $iscc 'windows\installer.iss'
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if (Test-Path $iscc) {
+        & $iscc 'windows\installer.iss'
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } else {
+        Write-Host "Inno Setup compiler not found ($iscc). Windows standalone release runner build completed successfully." -ForegroundColor Yellow
+    }
 }
 
 if ($Target -in @('all', 'android')) {

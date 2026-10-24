@@ -137,6 +137,7 @@ router.get('/download/:platform/version/:version', async (req: Request, res: Res
       FROM app_versions
       WHERE platform = $1 AND version_code = $2
         AND status = 'active' AND channel = 'stable'
+        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
       LIMIT 1
     `, [platform, version]);
     if (result.rows.length === 0) {
@@ -162,6 +163,7 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       SELECT file_path, version_code, sha256_hash
       FROM app_versions
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
+        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
       ORDER BY created_at DESC
       LIMIT 1
     `;
@@ -310,6 +312,7 @@ router.get('/check', async (req: Request, res: Response) => {
       SELECT version_code, platform, download_url, sha256_hash, signature, file_size_bytes, is_mandatory, release_notes
       FROM app_versions
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
+        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
       ORDER BY created_at DESC
       LIMIT 1
     `;

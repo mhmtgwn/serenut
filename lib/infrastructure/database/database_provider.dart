@@ -14,6 +14,7 @@ import 'package:serenutos/infrastructure/database/schema/db_schema.dart';
 import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
 import 'package:serenutos/infrastructure/database/schema/db_migrations.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/infrastructure/migration/cutoff_maintenance_lock.dart';
 
 /// ════════════════════════════════════════════════════════════
 /// Database Manager
@@ -41,17 +42,36 @@ class DatabaseManager {
   static const int databaseVersion = 60;
 
   static String? overrideDatabasePath;
+  static String? overrideCoreNextDatabasePath;
   static bool isWriteLocked = false;
 
+  /// Opsiyonel Core Next veritabanı yönlendirme hook'u (Varsayılan: null — Legacy akış korunur)
+  static Future<String?> Function()? databaseRoutingHook;
+
+  /// Merkezi Kesim Kilidi (Varsayılan: null — kilit bağlandığında write-guard aktifleşir)
+  static CutoffMaintenanceLock? cutoffMaintenanceLock;
+
   /// Waits until [isWriteLocked] is cleared.
+  /// Throws [CutoffMaintenanceActiveException] if a cutoff lock is active.
   /// Throws [DatabaseLockedException] if timeout is exceeded.
-  static Future<void> waitForWriteLock({int timeoutSeconds = 30}) async {
+  static Future<void> waitForWriteLock({
+    int timeoutSeconds = 30,
+    String operation = 'DatabaseManager.waitForWriteLock',
+  }) async {
+    final cutoff = cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: operation);
+    }
+
     final bool isTest =
         !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
     final int maxAttempts =
         isTest ? 2 : (timeoutSeconds * 20); // 50ms intervals
     int attempts = 0;
-    while (isWriteLocked) {
+    while (isWriteLocked || (cutoffMaintenanceLock != null && !cutoffMaintenanceLock!.state.isWritePermitted)) {
+      if (cutoffMaintenanceLock != null && !cutoffMaintenanceLock!.state.isWritePermitted) {
+        cutoffMaintenanceLock!.assertWritePermitted(operation: operation);
+      }
       attempts++;
       if (attempts >= maxAttempts) {
         throw DatabaseLockedException(
@@ -113,7 +133,13 @@ class DatabaseManager {
       return _database!;
     }
     _databaseFuture ??= _initializeDatabase();
-    _database = await _databaseFuture;
+    try {
+      _database = await _databaseFuture;
+    } catch (e) {
+      _databaseFuture = null;
+      _database = null;
+      rethrow;
+    }
     try {
       await _database!.rawQuery('PRAGMA busy_timeout = 30000');
     } catch (_) {
@@ -288,9 +314,61 @@ class DatabaseManager {
     return 0;
   }
 
+  /// Checks whether the database file at [path] belongs to Core Next schema.
+  ///
+  /// Performs authentic schema verification:
+  /// 1. Reads user_version (Core Next schemaVersion = 3).
+  /// 2. If user_version matches, inspects tables using a read-only connection
+  ///    to verify required Core Next tables (e.g. 'ledger_entries', 'sync_events')
+  ///    and absence of legacy tables (e.g. 'financial_transactions').
+  Future<bool> _isCoreNextDatabase(String path) async {
+    final file = File(path);
+    if (!await file.exists() || await file.length() < 512) {
+      return false;
+    }
+    try {
+      final userVersion = await _readDatabaseUserVersion(path);
+      if (userVersion == 3) {
+        Database? inspectDb;
+        try {
+          inspectDb = await openDatabase(
+            path,
+            readOnly: true,
+            singleInstance: false,
+          );
+          final tables = await inspectDb.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ledger_entries', 'sync_events', 'financial_transactions')",
+          );
+          final tableNames = tables.map((t) => t['name'] as String).toSet();
+          if (tableNames.contains('ledger_entries') || tableNames.contains('sync_events')) {
+            return true;
+          }
+        } finally {
+          if (inspectDb != null && inspectDb.isOpen) {
+            await inspectDb.close();
+          }
+        }
+      }
+    } catch (_) {
+      // Ignored: fallback or safe default applied
+    }
+    return false;
+  }
+
   /// Initialize database and create schema
   Future<Database> _initializeDatabase() async {
-    final String path = overrideDatabasePath ??
+    String? resolvedByHook;
+    if (databaseRoutingHook != null) {
+      try {
+        resolvedByHook = await databaseRoutingHook!();
+      } catch (e) {
+        debugPrint(
+            '[DatabaseManager] ⚠️ Database routing hook error: $e. Falling back to legacy.');
+      }
+    }
+
+    final String path = resolvedByHook ??
+        overrideDatabasePath ??
         ((!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST'))
             ? inMemoryDatabasePath
             : join(await getDatabasesPath(), _databaseName));
@@ -399,6 +477,15 @@ class DatabaseManager {
     if (isDiskDb) {
       final dbFile = File(path);
       if (await dbFile.exists() && await _isDatabaseFile(path)) {
+        // Schema boundary guard: Refuse to open Core Next database via legacy DatabaseManager
+        if (await _isCoreNextDatabase(path)) {
+          throw IncompatibleDatabaseSchemaException(
+            'Şema sınırı ihlali: "$path" dosyasının Core Next şemasına ait olduğu doğrulandı (user_version: 3, Core Next tabloları mevcut). '
+            'Legacy DatabaseManager (şema sürümü $databaseVersion) bu veritabanına bağlanamaz ve legacy migration/trigger uygulayamaz. '
+            'Core Next veritabanı CoreAppDatabase üzerinden açılmalıdır.',
+          );
+        }
+
         final dbDir = dirname(path);
         final dbFileName = basenameWithoutExtension(path);
         safeSnapshotPath = join(dbDir, '${dbFileName}_safe_snapshot.db');
@@ -433,6 +520,13 @@ class DatabaseManager {
               '[DatabaseManager] ⚠️ Pre-upgrade version check failed: $e');
           TelemetryService()
               .logError(e, st, context: 'db_pre_upgrade_version_check');
+        }
+
+        if (currentVersion > databaseVersion) {
+          throw IncompatibleDatabaseSchemaException(
+            'Bilinmeyen veya daha yüksek şema sürümü: $currentVersion > $databaseVersion. '
+            'Güvensiz açılış veya şema geri alma engellendi (fail-closed).',
+          );
         }
 
         if (currentVersion > 0 && currentVersion < databaseVersion) {
@@ -704,11 +798,25 @@ class DatabaseManager {
   Future<String> getDatabasesPath() async {
     final bool isWindows = !kIsWeb && Platform.isWindows;
     if (isWindows) {
-      final appSupportDir = await getApplicationSupportDirectory();
-      return join(appSupportDir.path, 'databases');
+      try {
+        final appSupportDir = await getApplicationSupportDirectory();
+        return join(appSupportDir.path, 'databases');
+      } catch (_) {
+        return databaseFactory.getDatabasesPath();
+      }
     } else {
       return databaseFactory.getDatabasesPath();
     }
+  }
+
+  /// Get authoritative path for legacy database (serenut_pos.db)
+  Future<String> getLegacyDatabasePath() async {
+    return overrideDatabasePath ?? join(await getDatabasesPath(), _databaseName);
+  }
+
+  /// Get authoritative path for Core Next database (serenut_core_v2.db)
+  Future<String> getCoreNextDatabasePath() async {
+    return overrideCoreNextDatabasePath ?? join(await getDatabasesPath(), 'serenut_core_v2.db');
   }
 
   /// Create database schema
@@ -890,4 +998,12 @@ class DatabaseLockedException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class IncompatibleDatabaseSchemaException implements Exception {
+  final String message;
+  const IncompatibleDatabaseSchemaException(this.message);
+
+  @override
+  String toString() => 'IncompatibleDatabaseSchemaException: $message';
 }

@@ -38,6 +38,42 @@ class AboutController {
     );
   }
 
+  Future<UpdateInfo> checkForUpdate() async {
+    final releaseManager = _ref.read(releaseManagerServiceProvider);
+    final lic = getLicenseInfo();
+    final deviceId =
+        lic?.activationId ?? _ref.read(deviceManagerProvider).getDeviceId();
+    final companyId = lic?.merchantId;
+    final jwtToken = _ref.read(authServiceProvider).getJwtToken();
+    final currentVer = await VersionChecker.getAppVersion();
+
+    return releaseManager.checkForUpdates(
+      currentVersion: currentVer,
+      platform: Platform.isAndroid ? 'android' : 'windows',
+      deviceId: deviceId,
+      companyId: companyId,
+      jwtToken: jwtToken,
+    );
+  }
+
+  Future<bool> presentReleaseUpdateDialog(
+    BuildContext context,
+    UpdateInfo info,
+  ) async {
+    final releaseManager = _ref.read(releaseManagerServiceProvider);
+    final jwtToken = _ref.read(authServiceProvider).getJwtToken();
+    final deviceId = getLicenseInfo()?.activationId;
+
+    return showUpdateDialog(
+      context: context,
+      updateInfo: info,
+      releaseManager: releaseManager,
+      platform: Platform.isAndroid ? 'android' : 'windows',
+      jwtToken: jwtToken,
+      deviceId: deviceId,
+    );
+  }
+
   Future<bool> presentUpdateDialog(
     BuildContext context,
     VersionCheckResult info,

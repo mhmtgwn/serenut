@@ -2,7 +2,12 @@ import 'package:sqflite/sqflite.dart';
 import 'database_executor.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 
-Future<void> _checkLock() async {
+Future<void> _checkLock({bool isInsideTransaction = false}) async {
+  if (isInsideTransaction) {
+    // In-flight transactions are already tracked at the root level by the drainer.
+    // They must be permitted to complete and drain cleanly without mid-flight disruption.
+    return;
+  }
   await DatabaseManager.waitForWriteLock();
 }
 
@@ -160,7 +165,7 @@ class TransactionExecutorImpl implements DbExecutor {
     String? nullColumnHack,
     ConflictAlgorithm? conflictAlgorithm,
   }) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.insert(
       table,
       values,
@@ -177,7 +182,7 @@ class TransactionExecutorImpl implements DbExecutor {
     List<Object?>? whereArgs,
     ConflictAlgorithm? conflictAlgorithm,
   }) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.update(
       table,
       values,
@@ -193,7 +198,7 @@ class TransactionExecutorImpl implements DbExecutor {
     String? where,
     List<Object?>? whereArgs,
   }) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.delete(
       table,
       where: where,
@@ -203,7 +208,7 @@ class TransactionExecutorImpl implements DbExecutor {
 
   @override
   Future<void> execute(String sql, [List<Object?>? arguments]) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.execute(sql, arguments);
   }
 
@@ -217,19 +222,19 @@ class TransactionExecutorImpl implements DbExecutor {
 
   @override
   Future<int> rawInsert(String sql, [List<Object?>? arguments]) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.rawInsert(sql, arguments);
   }
 
   @override
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.rawUpdate(sql, arguments);
   }
 
   @override
   Future<int> rawDelete(String sql, [List<Object?>? arguments]) async {
-    await _checkLock();
+    await _checkLock(isInsideTransaction: true);
     return _transaction.rawDelete(sql, arguments);
   }
 }

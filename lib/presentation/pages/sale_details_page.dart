@@ -11,6 +11,7 @@ import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -506,6 +507,54 @@ class SaleDetailsPage extends ConsumerWidget {
 
   void _showPartialPaymentDialog(
       BuildContext context, WidgetRef ref, SaleEntity sale, double remaining) {
+    final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
+    if (isCoreNextEnabled) {
+      if (sale.customerId.isNotEmpty &&
+          sale.customerId != 'customer-pesin-default') {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF2563EB)),
+                SizedBox(width: 8),
+                Text('Cari Tahsilat Yönlendirmesi'),
+              ],
+            ),
+            content: const Text(
+              'Core Next satış motorunda tekil fiş üzerinden kısmi borç kapatma yerine '
+              'müşteri cari defter tahsilatı kullanılmaktadır.\n\n'
+              'Müşterinin tahsilat sayfasına gitmek istiyor musunuz?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Vazgeç'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.push('/customers/${sale.customerId}/collect');
+                },
+                child: const Text('Tahsilat Ekranına Git'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        AppNotificationHost.show(
+          const SnackBar(
+            content: Text(
+              'İsimsiz veya peşin satışlar için tekil kısmi ödeme desteklenmemektedir.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => _PartialPaymentDialog(
@@ -678,23 +727,34 @@ class SaleDetailsPage extends ConsumerWidget {
                                   unitPrice: ri.unitPrice,
                                 ))
                             .toList();
-                        await ref
-                            .read(salesControllerProvider.notifier)
-                            .returnItems(
-                              saleId: sale.id,
-                              itemsToReturn: items,
-                              refundMethod: refundMethod,
-                              reason: reason,
+                        try {
+                          await ref
+                              .read(salesControllerProvider.notifier)
+                              .returnItems(
+                                saleId: sale.id,
+                                itemsToReturn: items,
+                                refundMethod: refundMethod,
+                                reason: reason,
+                              );
+                          ref.invalidate(saleDetailProvider(sale.id));
+                          if (context.mounted) {
+                            AppNotificationHost.show(
+                              SnackBar(
+                                content: Text(
+                                    'İade tamamlandı. ${refundTotal.toStringAsFixed(2)} TL iade edildi.'),
+                                backgroundColor: Colors.orange,
+                              ),
                             );
-                        ref.invalidate(saleDetailProvider(sale.id));
-                        if (context.mounted) {
-                          AppNotificationHost.show(
-                            SnackBar(
-                              content: Text(
-                                  'İade tamamlandı. ${refundTotal.toStringAsFixed(2)} TL iade edildi.'),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppNotificationHost.show(
+                              SnackBar(
+                                content: Text('İade işlemi tamamlanamadı: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         }
                       }
                     : null,

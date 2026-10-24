@@ -1,6 +1,10 @@
 part of 'sync_v4_service.dart';
 
 extension SyncV4Materializer on SyncV4Service {
+  @visibleForTesting
+  Future<void> applyChangeForTesting(Transaction db, Map<String, dynamic> change) =>
+      _apply(db, change);
+
   Future<void> _apply(Transaction db, Map<String, dynamic> change) async {
     final type = change['entity_type'] as String;
     final payload = Map<String, dynamic>.from(change['payload'] as Map);
@@ -196,7 +200,8 @@ extension SyncV4Materializer on SyncV4Service {
               'product_name': source['product_name'],
               'quantity': quantity,
               'unit_price': unitPrice,
-              'unit_price_minor': (unitPrice * 100).round(),
+              if (type == 'sale')
+                'unit_price_minor': (unitPrice * 100).round(),
               if (type == 'sale') 'subtotal': quantity * unitPrice,
               if (type == 'sale')
                 'subtotal_minor': ((quantity * unitPrice) * 100).round(),

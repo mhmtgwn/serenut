@@ -19,6 +19,7 @@ import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
+import 'package:serenutos/config/utils.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -858,7 +859,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_stockFormat.format(product.quantity)} ${product.unit}',
+                        '${product.formattedQuantity} ${product.unit}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -914,7 +915,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
           Expanded(
             child: _SummaryChip(
               label: 'Stok Değeri',
-              value: '₺${totalStockValue.toStringAsFixed(2)}',
+              value: totalStockValue.toTurkishCurrency(),
               count: '$criticalStockCount Kritik',
               color: _kAmber,
               bg: _kAmberLight,

@@ -388,6 +388,10 @@ class ProductEntity {
 
   bool get isWeighed => saleType == 'weighed';
 
+  /// Miktar bilgisini IEEE-754 kayan nokta artıklarından (.00000004 veya .99999998)
+  /// arındırılmış Türkçe sayı formatında döndürür (ör. 13.276,65 veya 10).
+  String get formattedQuantity => quantity.toTurkishQuantity();
+
   ProductEntity copyWith({
     String? id,
     String? name,
@@ -836,8 +840,16 @@ class OrderEntity {
     this.discountAmount = 0.0,
   });
 
-  String get displayNumber =>
-      orderNumber.isNotEmpty ? orderNumber : id.toShortId;
+  String get displayNumber {
+    if (orderNumber.isNotEmpty) {
+      if (orderNumber.contains('-ord-')) {
+        final prefix = orderNumber.split('-ord-').first;
+        if (prefix.isNotEmpty) return prefix;
+      }
+      return orderNumber;
+    }
+    return id.toShortId;
+  }
 
   bool get isOverdue {
     if (expectedDeliveryDate == null) return false;

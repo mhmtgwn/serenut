@@ -5,6 +5,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { pgPool } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { AuthService } from '../auth/auth.service';
 import {
   assertReleaseSigningContinuity,
   loadReleaseSigningKey,
@@ -193,6 +194,24 @@ router.get('/check', async (req: Request, res: Response) => {
 
   const releaseChannel = channel || 'stable';
 
+  // Authenticate company from JWT to prevent client spoofing (never trust client declaration alone)
+  let verifiedCompanyId: string | null = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = AuthService.verifyAccessToken(token);
+      if (decoded && decoded.company_id) {
+        if (company_id && company_id !== decoded.company_id) {
+          return res.status(401).json({ error: 'tenant_mismatch', message: 'Şirket kimliği yetki tokenı ile uyuşmuyor.' });
+        }
+        verifiedCompanyId = decoded.company_id;
+      }
+    } catch (_) {
+      return res.status(401).json({ error: 'invalid_token', message: 'Geçersiz veya süresi dolmuş yetki tokenı.' });
+    }
+  }
+
   try {
     // Fetch latest active release for this platform + channel
     const releasesRes = await pgPool.query(`
@@ -222,28 +241,58 @@ router.get('/check', async (req: Request, res: Response) => {
     // Find the first release this device qualifies for
     let eligibleRelease = null;
     for (const release of releasesRes.rows) {
-      // Check rollout percentage
-      if (device_id && !isDeviceInRollout(device_id, release.rollout_percentage)) continue;
+      // 1. Rollout check: If rollout is 0%, release is strictly held back for all callers
+      const rollout = Number.parseInt(String(release.rollout_percentage ?? '100'), 10);
+      if (rollout <= 0) continue;
 
-      // Check targeting — if no targets defined, this release is public
-      if (parseInt(release.target_count, 10) > 0 && device_id && company_id) {
-        const targetCheck = await pgPool.query(`
-          SELECT id FROM update_targets
-          WHERE release_id = $1 AND (
-            (target_type = 'company' AND target_value = $2) OR
-            (target_type = 'device' AND target_value = $3)
-          )
-        `, [release.id, company_id, device_id]);
+      // 2. Partial rollout (<100%) requires device_id for deterministic placement
+      if (rollout < 100) {
+        if (!device_id) continue;
+        if (!isDeviceInRollout(device_id, rollout)) continue;
+      }
 
-        if (targetCheck.rows.length === 0) {
+      // 3. Fail-closed on non-stable channels: Pilot/staged releases MUST have explicit targets.
+      // If target_count is 0 on a non-stable channel, it is unconfigured and cannot be served publicly.
+      if (release.channel !== 'stable' && parseInt(release.target_count, 10) === 0) {
+        continue;
+      }
+
+      // 4. Fail-closed targeting check: if targets are defined, caller MUST explicitly match
+      if (parseInt(release.target_count, 10) > 0) {
+        if (!verifiedCompanyId && !device_id) {
+          // Anonymous or untrusted check cannot receive targeted/pilot release
+          continue;
+        }
+
+        let isMatch = false;
+        if (verifiedCompanyId || device_id) {
+          const targetCheck = await pgPool.query(`
+            SELECT id FROM update_targets
+            WHERE release_id = $1 AND (
+              ($2::text IS NOT NULL AND target_type = 'company' AND target_value = $2) OR
+              ($3::text IS NOT NULL AND target_type = 'device' AND target_value = $3)
+            )
+          `, [release.id, verifiedCompanyId || null, device_id || null]);
+          if (targetCheck.rows.length > 0) {
+            isMatch = true;
+          }
+        }
+
+        if (!isMatch && verifiedCompanyId) {
           // Check license tier targeting
           const tierCheck = await pgPool.query(`
             SELECT ut.id FROM update_targets ut
             JOIN license_entitlements le ON le.company_id = $1 AND (CASE WHEN le.plan_id LIKE '%pro%' THEN 'pro' ELSE 'basic' END) = ut.target_value AND le.status IN ('active', 'trial')
             WHERE ut.release_id = $2 AND ut.target_type = 'license_tier'
             LIMIT 1
-          `, [company_id, release.id]);
-          if (tierCheck.rows.length === 0) continue;
+          `, [verifiedCompanyId, release.id]);
+          if (tierCheck.rows.length > 0) {
+            isMatch = true;
+          }
+        }
+
+        if (!isMatch) {
+          continue;
         }
       }
 
@@ -337,6 +386,39 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
         await requireActiveDeviceActivation(user.company_id, activationId);
       } catch (err: any) {
         return res.status(403).json({ error: err.message });
+      }
+    }
+
+    // Verify targeting if this release is restricted to specific companies or devices
+    const targetCountRes = await pgPool.query(
+      'SELECT COUNT(*) as c FROM update_targets WHERE release_id = $1',
+      [releaseId]
+    );
+    // Verify non-stable release has explicit targets configured
+    if (release.channel !== 'stable' && parseInt(targetCountRes.rows[0].c, 10) === 0) {
+      return res.status(403).json({
+        error: 'unconfigured_pilot',
+        message: 'Hedefi belirlenmemiş pilot sürüm indirilemez.'
+      });
+    }
+
+    if (parseInt(targetCountRes.rows[0].c, 10) > 0) {
+      const matchCheck = await pgPool.query(`
+        SELECT id FROM update_targets
+        WHERE release_id = $1 AND (
+          (target_type = 'company' AND target_value = $2) OR
+          ($3::text IS NOT NULL AND target_type = 'device' AND target_value = $3) OR
+          (target_type = 'license_tier' AND target_value = (
+            SELECT (CASE WHEN plan_id LIKE '%pro%' THEN 'pro' ELSE 'basic' END)
+            FROM license_entitlements WHERE company_id = $2 AND status IN ('active', 'trial') LIMIT 1
+          ))
+        )
+      `, [releaseId, user.company_id, activationId || null]);
+      if (matchCheck.rows.length === 0) {
+        return res.status(403).json({
+          error: 'unauthorized_target',
+          message: 'Bu sürüm şirketiniz veya cihazınız için yetkilendirilmemiştir.'
+        });
       }
     }
 

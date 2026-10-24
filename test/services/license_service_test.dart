@@ -98,6 +98,11 @@ void main() {
       expect(uuid2, uuid1); // Should be persistent
     });
 
+    test('default constructor has verification key configured', () {
+      final defaultService = LicenseService(prefs);
+      expect(defaultService.hasVerificationKey, isTrue);
+    });
+
     test('verifyLicenseToken succeeds with valid token', () {
       final uuid = licenseService.getDeviceUuid();
       final expiry = DateTime.now().add(const Duration(days: 30));

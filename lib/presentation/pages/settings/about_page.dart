@@ -6,7 +6,6 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/presentation/controllers/about_controller.dart';
-import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -274,25 +273,15 @@ class _AboutPageState extends ConsumerState<AboutPage> {
       _lastResult = null;
     });
     try {
-      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
-      final info = await checker.getVersionInfo();
+      final info = await ref.read(aboutControllerProvider).checkForUpdate();
       if (!mounted) return;
-      if (info == null) {
-        setState(() => _lastResult =
-            'Güncelleme sunucusuna ulaşılamadı. Daha sonra tekrar deneyin.');
-        return;
-      }
-      final hasUpdate = VersionChecker.isVersionOlder(
-        VersionChecker.currentVersion,
-        info.latestVersion,
-      );
-      if (!hasUpdate) {
+      if (!info.hasUpdate) {
         setState(() => _lastResult = 'Uygulamanız güncel.');
         return;
       }
       await ref
           .read(aboutControllerProvider)
-          .presentUpdateDialog(context, info);
+          .presentReleaseUpdateDialog(context, info);
     } catch (error) {
       if (mounted) setState(() => _lastResult = 'Kontrol başarısız: $error');
     } finally {

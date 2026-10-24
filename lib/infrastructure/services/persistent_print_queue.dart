@@ -4,6 +4,7 @@
 // Created: 12 Jul 2026 (Migrated to SQLite)
 
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/services/i_printer_service.dart';
@@ -102,8 +103,9 @@ class PersistentPrintQueue {
 
   final String? testKey;
   final String? _testTableName;
+  final DbGateway? gateway;
 
-  PersistentPrintQueue({this.testKey})
+  PersistentPrintQueue({this.testKey, this.gateway})
       : _testTableName = testKey != null ? 'print_queue_$testKey' : null;
 
   String get _tableName => _testTableName ?? 'print_queue';
@@ -139,6 +141,11 @@ class PersistentPrintQueue {
     String deviceId = 'receipt-printer-primary',
   }) {
     return _lock.run(() async {
+      final cutoff = DatabaseManager.cutoffMaintenanceLock;
+      if (cutoff != null && !cutoff.state.isWritePermitted) {
+        cutoff.assertWritePermitted(operation: 'PersistentPrintQueue.enqueue');
+      }
+
       final job = PersistedPrintJob(
         id: '${DateTime.now().microsecondsSinceEpoch}_${++_idCounter}',
         title: title,
@@ -204,6 +211,10 @@ class PersistentPrintQueue {
 
   /// Mark a job as currently printing (prevents duplicate processing).
   Future<void> markPrinting(String id) async {
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'PersistentPrintQueue.markPrinting');
+    }
     final db = await _getDb();
     await _ensureTable(db);
     await db.update(
@@ -216,6 +227,10 @@ class PersistentPrintQueue {
 
   /// Mark a job as successfully printed.
   Future<void> markDone(String id) async {
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'PersistentPrintQueue.markDone');
+    }
     final db = await _getDb();
     await _ensureTable(db);
     await db.update(
@@ -229,6 +244,10 @@ class PersistentPrintQueue {
   /// Mark a job as failed and increment retry count.
   /// If retryCount >= maxRetries, marks as abandoned.
   Future<void> markFailed(String id, {String? error}) async {
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'PersistentPrintQueue.markFailed');
+    }
     final db = await _getDb();
     await _ensureTable(db);
 

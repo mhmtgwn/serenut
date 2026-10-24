@@ -72,7 +72,7 @@ class _CatalogProductCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              product.category.toUpperCase(),
+                              product.category.toTurkishUpperCase,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -98,8 +98,8 @@ class _CatalogProductCard extends StatelessWidget {
                                   : outOfStock
                                       ? 'Tükendi'
                                       : (isLowStock
-                                          ? '${product.quantity} adet'
-                                          : '${product.quantity}'),
+                                          ? '${product.formattedQuantity} adet'
+                                          : product.formattedQuantity),
                               style: TextStyle(
                                 fontSize: 9,
                                 color: badgeTextColor,

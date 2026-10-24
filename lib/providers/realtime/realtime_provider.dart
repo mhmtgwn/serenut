@@ -55,7 +55,7 @@ final connectionManagerProvider = Provider<ConnectionManager>((ref) {
     apiClient: apiClient,
     wsBaseUrl: EnvironmentConfig.current.wsBaseUrl,
     onStatusChanged: (status) {
-      notifier.updateStatus(status);
+      Future.microtask(() => notifier.updateStatus(status));
     },
     telemetryUpload: telemetryUpload,
   );
@@ -103,7 +103,7 @@ final realtimeNotificationsStreamProvider =
   final user = ref.watch(currentUserProvider);
   if (user == null) return const Stream.empty();
 
-  ref.read(connectionManagerProvider).connect();
+  Future.microtask(() => ref.read(connectionManagerProvider).connect());
 
   return repo.subscribeToTopic(user.companyId, 'notifications');
 });
@@ -114,7 +114,7 @@ final realtimeAutoSyncProvider = Provider<void>((ref) {
   if (user == null) return;
 
   final repo = ref.watch(realtimeRepositoryProvider);
-  ref.read(connectionManagerProvider).connect();
+  Future.microtask(() => ref.read(connectionManagerProvider).connect());
 
   final subOrders = repo.subscribeToTopic(user.companyId, 'orders').listen((_) {
     unawaited(ref.read(syncProvider.notifier).triggerSync());

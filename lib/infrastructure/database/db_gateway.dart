@@ -41,19 +41,30 @@ class DbGatewayImpl implements DbGateway {
 
   /// Wait for write lock to clear before starting queries or writes.
   /// Bypassed inside active transaction zones.
-  Future<void> _waitForWriteLock({bool isWrite = false}) async {
+  Future<void> _waitForWriteLock({
+    bool isWrite = false,
+    String operation = 'DbGateway.write',
+  }) async {
     if (Zone.current[#sqlite_txn] != null) {
       return;
     }
     if (!isWrite) {
       return;
     }
-    await DatabaseManager.waitForWriteLock();
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: operation);
+    }
+    await DatabaseManager.waitForWriteLock(operation: operation);
   }
 
   /// Serialize write operations to guarantee FIFO single-writer safety.
   /// Bypassed inside active transaction zones to prevent deadlocks.
-  Future<T> _executeSerialized<T>(Future<T> Function() action) async {
+  Future<T> _executeSerialized<T>(
+    Future<T> Function() action, {
+    String operationType = 'write',
+    String caller = 'DbGateway',
+  }) async {
     if (Zone.current[#sqlite_txn] != null) {
       try {
         return await action();
@@ -68,6 +79,22 @@ class DbGatewayImpl implements DbGateway {
       }
     }
 
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null) {
+      return await cutoff.drainer.runTrackedWrite(
+        operationType: operationType,
+        caller: caller,
+        action: () => _executeSerializedInternal(action),
+        isWritePermitted: () =>
+            cutoff.state.isWritePermitted && !DatabaseManager.isWriteLocked,
+        currentPhase: () => cutoff.state.phase,
+      );
+    }
+
+    return await _executeSerializedInternal(action);
+  }
+
+  Future<T> _executeSerializedInternal<T>(Future<T> Function() action) async {
     final completer = Completer<T>();
     final previous = _writeQueue;
 
@@ -154,7 +181,7 @@ class DbGatewayImpl implements DbGateway {
     ConflictAlgorithm? conflictAlgorithm,
   }) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'insert:$table');
       final executor = await _getExecutor();
       return executor.insert(
         table,
@@ -162,7 +189,7 @@ class DbGatewayImpl implements DbGateway {
         nullColumnHack: nullColumnHack,
         conflictAlgorithm: conflictAlgorithm,
       );
-    });
+    }, operationType: 'insert:$table', caller: 'DbGateway.insert');
   }
 
   @override
@@ -174,7 +201,7 @@ class DbGatewayImpl implements DbGateway {
     ConflictAlgorithm? conflictAlgorithm,
   }) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'update:$table');
       final executor = await _getExecutor();
       return executor.update(
         table,
@@ -183,7 +210,7 @@ class DbGatewayImpl implements DbGateway {
         whereArgs: whereArgs,
         conflictAlgorithm: conflictAlgorithm,
       );
-    });
+    }, operationType: 'update:$table', caller: 'DbGateway.update');
   }
 
   @override
@@ -193,23 +220,23 @@ class DbGatewayImpl implements DbGateway {
     List<Object?>? whereArgs,
   }) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'delete:$table');
       final executor = await _getExecutor();
       return executor.delete(
         table,
         where: where,
         whereArgs: whereArgs,
       );
-    });
+    }, operationType: 'delete:$table', caller: 'DbGateway.delete');
   }
 
   @override
   Future<void> execute(String sql, [List<Object?>? arguments]) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'execute');
       final executor = await _getExecutor();
       return executor.execute(sql, arguments);
-    });
+    }, operationType: 'execute', caller: 'DbGateway.execute');
   }
 
   @override
@@ -218,7 +245,7 @@ class DbGatewayImpl implements DbGateway {
     List<Object?>? arguments,
   ]) async {
     try {
-      await _waitForWriteLock(isWrite: false);
+      await _waitForWriteLock(isWrite: false, operation: 'rawQuery');
       final executor = await _getExecutor();
       return await executor.rawQuery(sql, arguments);
     } catch (e, stack) {
@@ -235,28 +262,28 @@ class DbGatewayImpl implements DbGateway {
   @override
   Future<int> rawInsert(String sql, [List<Object?>? arguments]) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'rawInsert');
       final executor = await _getExecutor();
       return executor.rawInsert(sql, arguments);
-    });
+    }, operationType: 'rawInsert', caller: 'DbGateway.rawInsert');
   }
 
   @override
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'rawUpdate');
       final executor = await _getExecutor();
       return executor.rawUpdate(sql, arguments);
-    });
+    }, operationType: 'rawUpdate', caller: 'DbGateway.rawUpdate');
   }
 
   @override
   Future<int> rawDelete(String sql, [List<Object?>? arguments]) async {
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'rawDelete');
       final executor = await _getExecutor();
       return executor.rawDelete(sql, arguments);
-    });
+    }, operationType: 'rawDelete', caller: 'DbGateway.rawDelete');
   }
 
   @override
@@ -266,7 +293,7 @@ class DbGatewayImpl implements DbGateway {
     }
 
     return await _executeSerialized(() async {
-      await _waitForWriteLock(isWrite: true);
+      await _waitForWriteLock(isWrite: true, operation: 'transaction');
 
       final parentDeferred =
           Zone.current[#deferred_events] as List<DomainEvent>?;
@@ -294,6 +321,6 @@ class DbGatewayImpl implements DbGateway {
       }
 
       return result;
-    });
+    }, operationType: 'transaction', caller: 'DbGateway.transaction');
   }
 }

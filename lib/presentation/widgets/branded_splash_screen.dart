@@ -15,6 +15,7 @@ class BrandedSplashScreen extends StatefulWidget {
   final String? errorReference;
   final String? technicalDetails;
   final VoidCallback? onRetry;
+  final Widget? overlay;
 
   const BrandedSplashScreen({
     super.key,
@@ -25,6 +26,7 @@ class BrandedSplashScreen extends StatefulWidget {
     this.errorReference,
     this.technicalDetails,
     this.onRetry,
+    this.overlay,
   });
 
   @override
@@ -343,6 +345,13 @@ class _BrandedSplashScreenState extends State<BrandedSplashScreen>
                     ),
               ),
             ),
+            if (widget.overlay != null)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  child: Center(child: widget.overlay!),
+                ),
+              ),
           ],
         ),
       ),

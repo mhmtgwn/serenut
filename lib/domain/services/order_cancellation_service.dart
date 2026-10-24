@@ -86,22 +86,24 @@ class OrderCancellationService {
         await _inventoryService.increaseStock(restoredItems);
       }
 
-      // 3. Process Ledger Reversal
-      await _paymentService.processSaleCancellation(
-        saleId: id,
-        customerId: customerId,
-        totalAmount: totalAmount,
-        paidAmount: paidAmount,
-      );
-
-      // 3.1 Sipariş için daha önce fiilen ödeme/tahsilat yapılmışsa, para müşterinin cari hesabına alacak olarak iade edilir
-      if (actualMoneyPaid > 0.009 && customerId.isNotEmpty) {
-        await _paymentService.processRefund(
+      // 3. Process Ledger Reversal (Yalnızca siparişe ait daha önce bir finansal kayıt oluşmuşsa)
+      if (saleTx != null || subsequentPayments.isNotEmpty) {
+        await _paymentService.processSaleCancellation(
           saleId: id,
           customerId: customerId,
-          refundTotal: actualMoneyPaid,
-          refundMethod: 'balance',
+          totalAmount: totalAmount,
+          paidAmount: paidAmount,
         );
+
+        // 3.1 Sipariş için daha önce fiilen ödeme/tahsilat yapılmışsa, para müşterinin cari hesabına alacak olarak iade edilir
+        if (actualMoneyPaid > 0.009 && customerId.isNotEmpty) {
+          await _paymentService.processRefund(
+            saleId: id,
+            customerId: customerId,
+            refundTotal: actualMoneyPaid,
+            refundMethod: 'balance',
+          );
+        }
       }
 
       // 4. Verify Ledger invariant

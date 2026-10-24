@@ -1,4 +1,5 @@
 import 'package:serenutos/providers/database_provider.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 // lib/providers/sync_provider.dart
 // Serenut OS — Offline Sync Riverpod Provider + AppLifecycle Trigger
 // Created: 24 Jun 2026
@@ -71,6 +72,12 @@ class SyncState {
 }
 
 // ── Sync Notifier ─────────────────────────────────────────────────────────────
+/// Core Next Senkronizasyon Yürütücü Fonksiyon Arayüzü
+typedef CoreNextSyncExecutor = Future<void> Function();
+
+/// Core Next Senkronizasyon Yürütücü Sağlayıcısı (Varsayılan: null)
+final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) => null);
+
 class SyncNotifier extends StateNotifier<SyncState>
     with WidgetsBindingObserver {
   final Ref _ref;
@@ -181,6 +188,10 @@ class SyncNotifier extends StateNotifier<SyncState>
 
   /// Force a full re-sync from server by clearing the last sync timestamp cursor.
   Future<void> forceFullSync() async {
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      cutoff.assertWritePermitted(operation: 'SyncNotifier.forceFullSync');
+    }
     try {
       final db = kIsWeb ? null : await _ref.read(databaseProvider.future);
       await db
@@ -287,6 +298,38 @@ class SyncNotifier extends StateNotifier<SyncState>
   /// Trigger sync manually (e.g., after a sale is created).
   Future<void> triggerSync() async {
     if (_resetInProgress) return;
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      debugPrint('[SyncNotifier] Kesim/bakım kilidi aktif (${cutoff.state.phase}). Senkronizasyon bekletiliyor.');
+      return;
+    }
+    final isCoreNextEnabled = _ref.read(coreNextSalesEngineEnabledProvider);
+    if (isCoreNextEnabled) {
+      final coreNextSync = _ref.read(coreNextSyncExecutorProvider);
+      if (coreNextSync != null) {
+        if (state.status == SyncStatus.syncing) {
+          _syncRequestedWhileRunning = true;
+          return;
+        }
+        state = state.copyWith(status: SyncStatus.syncing);
+        try {
+          await coreNextSync();
+          state = state.copyWith(
+            status: SyncStatus.success,
+            lastSyncAt: DateTime.now(),
+            lastError: null,
+          );
+        } catch (e) {
+          final errStr = e.toString();
+          state = state.copyWith(
+            status: SyncStatus.error,
+            lastError: errStr,
+            userFriendlyError: _humanizeSyncError(errStr),
+          );
+        }
+        return;
+      }
+    }
     final service = _syncService;
     if (service == null) return;
     if (state.status == SyncStatus.syncing) {

@@ -8,6 +8,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/services/cart_persistence_service.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(
@@ -205,6 +206,18 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
   };
 
   void _dispatch(SalesFlowEvent event) {
+    final cutoff = DatabaseManager.cutoffMaintenanceLock;
+    if (cutoff != null && !cutoff.state.isWritePermitted) {
+      if (event == SalesFlowEvent.addProduct ||
+          event == SalesFlowEvent.removeProduct ||
+          event == SalesFlowEvent.clearCart ||
+          event == SalesFlowEvent.submitPayment) {
+        cutoff.assertWritePermitted(
+          operation: 'SalesFlowController._dispatch:${event.name}',
+        );
+      }
+    }
+
     final allowedTransitions = _transitions[state.status];
     if (allowedTransitions == null || !allowedTransitions.containsKey(event)) {
       throw StateError(

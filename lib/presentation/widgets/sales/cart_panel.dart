@@ -7,6 +7,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
 const _kGreen = POSColors.green;
@@ -373,7 +374,7 @@ class _CartItemState extends State<_CartItem>
                       Text(
                           widget.product.isWeighed
                               ? '${(widget.quantity / 1000).toStringAsFixed(3)} kg'
-                              : '${widget.quantity}',
+                              : widget.quantity.toTurkishQuantity(),
                           style: const TextStyle(
                               color: _kTextSecondary,
                               fontSize: 11,
@@ -422,7 +423,7 @@ class _CartItemState extends State<_CartItem>
                       child: SizedBox(
                         width: 32,
                         child: Text(
-                          '${widget.quantity}',
+                          widget.quantity.toTurkishQuantity(),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                               fontWeight: FontWeight.w900, fontSize: 15),
