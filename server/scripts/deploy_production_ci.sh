@@ -82,7 +82,11 @@ if ! curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:
   exit 1
 fi
 
-$COMPOSE exec -T backend node dist/scripts/publish-release.js batch "$VERSION" \
+$COMPOSE exec -T \
+  -e RELEASE_CHANNEL="${RELEASE_CHANNEL:-stable}" \
+  -e RELEASE_STATUS="${RELEASE_STATUS:-active}" \
+  -e RELEASE_ROLLOUT="${RELEASE_ROLLOUT:-100}" \
+  backend node dist/scripts/publish-release.js batch "$VERSION" \
   "$INCOMING_DIR/android/app-release.apk" \
   "$INCOMING_DIR/windows/SerenutOSSetup.exe" false
 metadata=$(curl --fail --silent --show-error \
