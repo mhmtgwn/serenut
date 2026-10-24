@@ -347,6 +347,17 @@ Cari hesaplardan nakit veya kartla para tahsilatı yapıldığında, kasiyerin h
 - **Anında WhatsApp / SMS Tahsilat Dekontu:**
   - Tahsilat deftere (`ledger_entries`) yazıldığı anda müşterinin cep telefonuna dijital ödeme dekontu ve güncel kalan bakiye özeti WhatsApp üzerinden iletilir.
 
+### 4.7. Müşteri Detay, Bankacılık Stili Hesap Ekstresi & Akıllı Borç Hatırlatma Motoru ([CustomerDetailsPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/customer_details_page.dart) & [DebtReminderService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/services/debt_reminder_service.dart))
+
+- **Bankacılık Stili Ekstre Kartı:** Müşteri detayına girildiğinde en üstte canlı bakiye kartı, altında ise banka dekontu netliğinde kronolojik işlem hareketleri (Tarih, işlem türü, borç, alacak, bakiye) listelenir.
+- **Manuel Vadeli / Taksitli Borç Tanımlama (`_showManualDebtDialog`):**
+  - Müşteriye kasa dışından (ör. toptan sevkiyat veya sözleşmeli iş) borç kaydı girildiğinde peşinat tutarı, taksit adedi, ilk taksit vadesi ve ödeme yöntemi belirlenebilir; resmi borç senedi/makbuzu termalden basılabilir.
+- **Cari Hesap Ekstresi Dışa Aktarma (`export_bottom_sheet.dart`):**
+  - Müşteriyle hesap mutabakatı yapmak için tek dokunuşla tüm geçmiş hareketler **Excel (`.xlsx`)** tablosuna veya kurumsal başlıklı **PDF hesap ekstresine** dönüştürülür; müşterinin WhatsApp'ına tek tıkla gönderilebilir.
+- **Akıllı Mükerrerlik Korumalı Borç Hatırlatma ([DebtReminderService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/services/debt_reminder_service.dart)):**
+  - Sistem vadesi geçmiş müşterilere toplu WhatsApp/SMS borç hatırlatması gönderirken esnafı mahcup etmeyecek akıllı bir filtre uygular:
+  - `skippedRecentCount`: Son X gün içinde zaten hatırlatma mesajı gitmiş müşteriler otomatik atlanır; aynı müşteriye her gün mükerrer mesaj gidip taciz veya spam algısı oluşması engellenir.
+
 ---
 
 ## 5. KASA SATIŞ, SEPET, ÖDEME MOTORU & SEPET KURTARMA
@@ -466,6 +477,34 @@ Geçmişte yapılmış tüm satış fişlerinin sorgulandığı, incelendiği ve
 - **WhatsApp / SMS Dijital Fiş Paylaşımı:** Fiş detayından müşterinin telefonuna dijital fiş PDF/metin linki tek tıkla gönderilir.
 - **Kısmi ve Tam İade Akışı:** Müşteri 3 üründen 1 tanesini getirdiğinde, satış detayından sadece o ürün seçilerek iade fişi kesilir; stok ve kasa/cari hesap otomatik eşitlenir.
 
+### 5.9. Canlı Terazi Tartımı, Dara Alma & Tartılı Ürün Akışı ([LiveScaleDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/sales/live_scale_dialog.dart))
+
+Kuruyemiş, şarküteri, manav ve kasap reyonlarında tartımlı satışların hatasız yürütülmesi için entegre tartım ekranı:
+- **Otomatik Algılama (`product.isWeighed == true`):** Kasiyer dokunmatik ekrandan fındık, peynir vb. tartılı bir ürünü seçtiğinde sistem doğrudan tartım penceresini açar.
+- **Canlı Ağırlık Akışı (Gram):** Elektronik teraziden seri port üzerinden okunan anlık gramaj dev puntolarla gösterilir.
+- **Dara Alma (Tare):** Ekranda yer alan "Dara Al" butonu ile poşet, kap veya kutu ağırlığı sıfırlanabilir.
+- **Kararlılık Kilidi:** Terazi titrerken (`US` Unstable) satış butonu kilitlenir; ibre durup `ST` (Stable) olduğunda gramaj yeşile döner ve sepet satırına eklenir.
+
+### 5.10. Hızlı QR & Barkod Operasyon Merkezi ([QrOrderScannerDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/home/qr_order_scanner_dialog.dart))
+
+Ana sayfadaki ve satış ekranındaki "QR Tara" butonuyla açılan çok amaçlı donanım tarama konsolu:
+- **Çoklu Giriş Desteği:**
+  - **Kamera (Mobil / Tablet / PC Webcam):** `mobile_scanner` ile QR ve 1D barkodları kameradan anında yakalar.
+  - **USB / HID El Tipi Barkod Okuyucu:** Kablolu/kablosuz barkod tabancası ile anında tetiklenir.
+  - **Klavye Girişi:** Barkod etiketi yırtık veya okunamaz durumdaysa fiş numarasını el ile yazma alanı.
+- **Akıllı Yönlendirme:**
+  - Okutulan kod bir sipariş fişi ise anında **[OrderDetailsPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/order_details_page.dart)** ekranına zıplar (kurye teslimatı veya paket hazırlama hızlanır).
+  - Okutulan kod bir satış fişi ise anında **[SaleDetailsPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/sale_details_page.dart)** ekranını açar (iade veya fatura kesme).
+  - Okutulan kod bir ürün barkodu ise doğrudan sepete ekler.
+
+### 5.11. 4 Adımlı Sipariş Oluşturma Sihirbazı ([OrderCreationDialog](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/orders/widgets/order_creation_dialog.dart))
+
+Telefonla paket servis veya ileri tarihli sipariş alırken kasiyeri adım adım yönlendiren güvenli sihirbaz:
+- **1. Adım (Müşteri Seçimi - `step_customer.dart`):** Mevcut carilerden arama veya tek ekranda yeni müşteri kartı açma.
+- **2. Adım (Ürün Seçimi - `step_product_selection.dart`):** Reyon/kategori bazlı ürün arama, barkod okutma ve hızlı seçim.
+- **3. Adım (Sepet & İskonto - `step_cart.dart`):** Ürün miktarlarını düzenleme, tartılı gramaj girişi, kalem veya sepet bazlı % / ₺ iskonto uygulama (`DiscountDialog`).
+- **4. Adım (Ödeme & Teslimat - `step_checkout.dart`):** Ödeme yöntemi seçimi (Nakit, Kart, Veresiye, Karma Ödeme), teslimat adresi, kurye teslim saati ve mutfak notu. Onaylandığında otomatik mutfak sipariş fişi basılır.
+
 ---
 
 ## 6. SENKRONİZASYON MOTORU (SYNC V4 — OFFLINE-FIRST REPLICATION)
@@ -510,6 +549,26 @@ Ağ kopması durumunda istemci aynı mutasyonu tekrar gönderebilir.
 
 - **Kural:** Sunucu zaman damgası otoritesi ile Deterministik **Last-Write-Wins (LWW)** uygulanır.
 - **Silinmeler (Tombstone):** Hiçbir satır fiziksel silinmez (`DELETE FROM ...` yapılmaz). `deleted_at = timestamp` alanı doldurulur ve diğer cihazlara bu şekilde yayılır.
+
+### 6.5. Merkezi Kesim Kilidi & Reaktif Bakım Modu ([CutoffMaintenanceLock](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/migration/cutoff_maintenance_lock.dart) & [CutoffMaintenanceBannerWidget](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/cutoff_maintenance_banner_widget.dart))
+
+Büyük sürüm geçişlerinde, geriye dönük veri mutabakatlarında veya acil durum geri yüklemelerinde veri tutarlılığını garanti altına alan **Fail-Closed Merkezi Kilit Mekanizması**:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: Normal Satış / Kasa Açık
+    Idle --> LockingRequested: Bakım / Kesim Emri Geldi
+    LockingRequested --> Draining: Devam Eden Yazmalar Boşaltılıyor (activeWriteCount > 0)
+    Draining --> Locked: Tüm Yazmalar Durduruldu (activeWriteCount == 0)
+    Locked --> Locked: Kasa Butonları Kilitli / Sarı-Turuncu Banner Aktif
+    Locked --> Idle: Bakım Tamamlandı & Kilit Kaldırıldı
+```
+
+- **Reaktif Afiş (`CutoffMaintenanceBannerWidget`):**
+  - Normal çalışma (`idle`): Afiş tamamen görünmezdir (`SizedBox.shrink`).
+  - Kilit hazırlığı (`draining`): Ekranda turuncu uyarı belirir ("Veritabanı Bakım Moduna Alınıyor — Devam eden X işlem tamamlanıyor, lütfen bekleyin...").
+  - Kilitli (`locked`): "Sistem Bakım Modunda (Yazma Koruması Aktif)" uyarısı ekranda kalır.
+- **Fail-Closed Koruması:** Kilit aktifken satış yapma, sipariş onaylama veya ödeme alma butonları arayüz seviyesinde devre dışı bırakılır (`_ensureSalesActionPermitted`); SQLite seviyesinde `assertWritePermitted` istisnası fırlatarak veritabanına yarım veya çakışan kayıt girmesini kesin olarak engeller.
 
 ---
 
