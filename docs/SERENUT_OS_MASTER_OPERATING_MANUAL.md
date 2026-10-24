@@ -1,8 +1,8 @@
 # Serenut OS — Sistem Mimarisi, Operasyonel Kullanım & Sorun Giderme Ana El Kitabı (Master Operating Manual)
 
-> **Belge Sürümü:** 2.0.0 (Definitive Master Reference)  
+> **Belge Sürümü:** 3.0.0 (The Definitive Master Architecture & Operations Manual)  
 > **Hedef Sistem:** Serenut OS İstemcisi (Desktop Windows / Android) & Serenut Cloud (Node.js/TypeScript VPS & PostgreSQL)  
-> **Amaç:** Kayıttan girişe, e-Dönüşümden (GİB e-Arşiv) donanıma, ürün yönetiminden cariye, senkronizasyondan P2P görsel aktarımına, yedeklemeden güncelleme imzalamaya kadar sistemin istisnasız tüm parçalarının ne şekilde çalıştığını açıklayan, sorun anında doğrudan referans alınabilecek nihai teknik ve operasyonel el kitabı.
+> **Amaç:** Kayıttan girişe, ürün yönetiminden cariye, donanımdan senkronizasyona, GİB e-Arşivden WhatsApp Business / Evolution QR entegrasyonuna, Patron Web Portalından Müşteri İkinci Ekranına, P2P görsel ağından kriptografik OTA sürüm imzalamaya kadar sistemin istisnasız tüm parçalarının ne şekilde çalıştığını açıklayan, sorun anında doğrudan referans alınabilecek nihai operasyonel ve teknik el kitabı.
 
 ---
 
@@ -16,12 +16,16 @@
 6. [Senkronizasyon Motoru (Sync V4 — Offline-First Replication)](#6-senkronizasyon-motoru-sync-v4--offline-first-replication)
 7. [Donanım Entegrasyonları & Ağ Paylaşımlı Donanım (Hardware Layer)](#7-donanım-entegrasyonları--ağ-paylaşımlı-donanım-hardware-layer)
 8. [Yerel Ağda Eşler Arası (P2P) Ürün Görseli Dağıtımı (LAN Peer Service)](#8-yerel-ağda-eşler-arası-p2p-ürün-görseli-dağıtımı-lan-peer-service)
-9. [e-Dönüşüm, GİB e-Arşiv / e-Fatura & Bildirim Ağ Geçitleri](#9-e-dönüşüm-gib-e-arşiv--e-fatura--bildirim-ağ-geçitleri)
-10. [Yedekleme, Geri Yükleme, Lisanslama & Veri Aktarımı (Migration)](#10-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
-11. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#11-dağıtım-güncelleme--kriptografik-imzalama-standartları)
-12. [Gözlemlenebilirlik, Telemetri & Loglama](#12-gözlemlenebilirlik-telemetri--loglama)
-13. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#13-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
-14. [Genişletilmiş Hızlı Erişim Kontrol Listesi (Master Cheat Sheet)](#14-genişletilmiş-hızlı-erişim-kontrol-listesi-master-cheat-sheet)
+9. [e-Dönüşüm & GİB e-Arşiv / e-Fatura Portalı (0 TL Maliyetli İstemci)](#9-e-dönüşüm--gib-e-arşiv--e-fatura-portalı-0-tl-maliyetli-istemci)
+10. [WhatsApp Bildirim & İletişim Motoru (Evolution API & Meta Cloud)](#10-whatsapp-bildirim--iletişim-motoru-evolution-api--meta-cloud)
+11. [Android SIM Kartlı SMS Ağ Geçidi (Yerel GSM Modemi)](#11-android-sim-kartlı-sms-ağ-geçidi-yerel-gsm-modemi)
+12. [Patron Web Portalı & Canlı Ciro İzleme (Realtime Engine)](#12-patron-web-portalı--canlı-ciro-izleme-realtime-engine)
+13. [Müşteri İkinci Ekranı (Customer Facing Display)](#13-müşteri-ikinci-ekranı-customer-facing-display)
+14. [Yedekleme, Geri Yükleme, Lisanslama & Veri Aktarımı (Migration)](#14-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
+15. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#15-dağıtım-güncelleme--kriptografik-imzalama-standartları)
+16. [Gözlemlenebilirlik, Telemetri & Loglama](#16-gözlemlenebilirlik-telemetri--loglama)
+17. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#17-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
+18. [Genişletilmiş Master Cheat Sheet Tablosu](#18-genişletilmiş-master-cheat-sheet-tablosu)
 
 ---
 
@@ -38,6 +42,7 @@ graph TD
         Ledger[Çift Taraflı Defter Motoru]
         HW[Donanım: Yazıcı, Terazi, Barkod, Paylaşımlı Cihazlar]
         P2P[P2P Görsel Dağıtımı: UDP 48732 / HTTP 48731]
+        CustDisp[Müşteri 2. Ekranı - HDMI/VFD]
         GIB[GİB e-Arşiv Portalı İstemcisi]
         SMS[SIM Kartlı SMS Gateway]
         SQLite[(Yerel Standart SQLite)]
@@ -54,6 +59,10 @@ graph TD
         Gateway[Node.js / Express Gateway]
         SyncV4[Sync V4 Senkronizasyon Motoru]
         AuthSvc[Kimlik Doğrulama & Tenant İzolasyonu]
+        WAPIEvo[WhatsApp Evolution API - QR Gateway]
+        WAPIMeta[WhatsApp Meta Cloud API - WABA]
+        Realtime[Realtime WebSocket Hub]
+        WebPortal[Patron Web Yönetim Portalı]
         OTA[OTA Sürüm Dağıtım & İmza Doğrulama]
         Postgres[(PostgreSQL Ana Veritabanı)]
     end
@@ -62,6 +71,7 @@ graph TD
     Domain --> SalesEngine
     Domain --> Ledger
     Domain --> HW
+    Domain --> CustDisp
     Domain --> GIB
     Domain --> SMS
     HW --> LAN
@@ -71,16 +81,19 @@ graph TD
     SQLite --> Outbox
     Outbox --> HTTPS
     HTTPS --> Gateway
-    WSS --> Gateway
+    WSS --> Realtime
+    Realtime --> WebPortal
     Gateway --> SyncV4
     Gateway --> AuthSvc
+    Gateway --> WAPIEvo
+    Gateway --> WAPIMeta
     Gateway --> OTA
     SyncV4 --> Postgres
 ```
 
 ### 1.1. Temel Mimari Kararlar
 
-1. **SQLCipher'ın Kaldırılması & Standart SQLite (AGENTS.md Kural 1):**
+1. **SQLCipher'ın Kaldırılması & Standart SQLite ([AGENTS.md Kural 1](file:///c:/Users/ecz/proje/shaman/shaman_new/.agents/AGENTS.md)):**
    - Mobil (Android) ve masaüstü (Windows) istemcilerinde şifreli `sqflite_sqlcipher` motoru tamamen kaldırılmıştır.
    - Yerel veritabanı motoru standart, şifresiz `sqflite` / `sqflite_common_ffi`'dir.
    - Veri güvenliği işletim sistemi izinleri (Android `/data/user/0/...` sandbox ve Windows `%APPDATA%` kullanıcı ACL'leri) ve VPS tarafındaki şifreli PostgreSQL bağlantısı ile sağlanır.
@@ -128,7 +141,7 @@ sequenceDiagram
 ### 2.3. Cihaz Aktivasyonu & Donanım Parmak İzi (`device_fingerprint`)
 
 Bir cihazın bir kasayı yönetebilmesi için organizasyon ile eşleştirilmesi gerekir:
-1. İstemci ilk açılışında CPU ID, Anakart Seri No, Disk UUID ve MAC adresinden kriptografik bir `device_fingerprint` üretir (`DeviceFingerprintService`).
+1. İstemci ilk açılışında CPU ID, Anakart Seri No, Disk UUID ve MAC adresinden kriptografik bir `device_fingerprint` üretir ([DeviceFingerprintService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/device_fingerprint_service.dart)).
 2. Yönetici portalından veya ana kasadan bir **Cihaz Aktivasyon Kodu / Eşleştirme Tokeni** alınır.
 3. İstemci `POST /api/v1/devices/activate` isteği ile aktivasyon kodunu ve donanım parmak izini gönderir.
 4. Sunucu cihazı doğrular ve cihaza özel `device_token` tahsis eder. Bu token yerel SQLite `app_settings` tablosunda ve güvenli depolama alanında saklanır.
@@ -145,7 +158,7 @@ Sistemde iki seviyeli kimlik doğrulama bulunur:
 #### B. Kasiyer Hızlı Giriş (4 Haneli PIN Kodu)
 - Kasa operasyonlarında kasiyer değişimi çok hızlı olmalıdır.
 - Kullanıcının 4 haneli PIN kodu yerel SQLite veritabanında tuzlanmış (salted) PBKDF2/Argon2 özeti olarak saklanır.
-- **Offline PIN Doğrulama:** İnternet olmasa dahi kasiyer PIN kodunu girdiğinde yerel veritabanındaki hash ile karşılaştırılır ve anında oturum açılır (`PasswordHashService`).
+- **Offline PIN Doğrulama:** İnternet olmasa dahi kasiyer PIN kodunu girdiğinde yerel veritabanındaki hash ile karşılaştırılır ve anında oturum açılır ([PasswordHashService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/password_hash_service.dart)).
 
 ### 2.5. Rol Bazlı Yetkilendirme (RBAC)
 
@@ -352,7 +365,7 @@ Sistem esnek ödeme kombinasyonlarını destekler:
      - Toplam Veresiye Satışlar
      - Toplam Tahsilatlar ve Masrafları hesaplar.
    - Beklenen Kasa ile Sayılan Kasa karşılaştırılır; varsa **Kasa Fazlası** veya **Kasa Eksiği** raporda belirtilir.
-   - Z-Raporu termal yazıcıdan yazdırılır ve `daily_registers` tablosunda kilitlenerek gün kapatılır.
+   - Z-Raporu termal yazıcıdan yazdırılır, `daily_registers` tablosunda kilitlenerek gün kapatılır ve **otomatik olarak işletme sahibinin WhatsApp'ına özet mesaj olarak gönderilir**.
 
 ---
 
@@ -417,7 +430,7 @@ Termal yazıcılar müşteri fişi, bilgi fişi, mutfak sipariş fişi ve gün s
   - **Bluetooth:** Mobil cihazlarda SPP (Serial Port Profile) bağlantısı.
 - **Türkçe Karakter Desteği:**
   - Yazıcının donanım karakter tablosuna göre `CP857` (PC857) kod sayfası dönüşümü yapılır (`ç, ğ, ı, ö, ş, ü, İ`).
-  - Türkçe font ROM'u bulunmayan ucuz yazıcılarda sistem otomatik olarak **Raster Grafik Baskı Moduna** geçer; fişi 203 DPI siyah-beyaz bitmap resim olarak çizer ve yazıcıya görsel olarak aktarır (`PersistentPrintQueue`).
+  - Türkçe font ROM'u bulunmayan ucuz yazıcılarda sistem otomatik olarak **Raster Grafik Baskı Moduna** geçer; fişi 203 DPI siyah-beyaz bitmap resim olarak çizer ve yazıcıya görsel olarak aktarır ([PersistentPrintQueue](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/persistent_print_queue.dart)).
 
 ### 7.2. Barkod & Etiket Yazıcısı (TSPL / ZPL)
 
@@ -481,9 +494,7 @@ graph LR
 
 ---
 
-## 9. E-DÖNÜŞÜM, GİB E-ARŞİV / E-FATURA & BİLDİRİM AĞ GEÇİTLERİ
-
-### 9.1. GİB e-Arşiv Portalı Doğrudan İstemcisi (`GibEArsivClient` — 0 TL Maliyetli)
+## 9. E-DÖNÜŞÜM & GİB E-ARŞİV / E-FATURA PORTALI (0 TL MALİYETLİ İSTEMCİ)
 
 Serenut OS, özel entegratörlere her fatura başına kontör parası ödeme zorunluluğunu ortadan kaldıran resmi bir doğrudan entegrasyona sahiptir ([GibEArsivClient](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/gib_earsiv_client.dart)):
 
@@ -511,42 +522,166 @@ sequenceDiagram
 - **KDV & Matrah Dağılımı:** Kasa fişindeki her KDV oranı (%1, %10, %20) GİB kurallarına uygun olarak matrah ve KDV ayrımına tabi tutulur.
 - **İptal & Gider Pusulası:** İade durumlarında faturanın GİB portalı üzerinden resmi iptal isteği (`EARSIV_PORTAL_FATURA_IPTAL`) gönderilebilir.
 
-### 9.2. Android SIM Kartlı SMS Ağ Geçidi Modu (`SmsGatewayService`)
+---
 
-İşletmelerin toplu SMS firmalarına para ödemesini engelleyen yerli mimari:
-- Kasada kullanılan Android cihaz (veya çekmecedeki eski bir Android telefon) sistemde **"Birincil SIM Ağ Geçidi"** olarak seçilir ([SmsGatewayService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart)).
-- Diğer tüm kasalar veya bulut sunucusu bir SMS göndermek istediğinde (ör. veresiye fiş bildirimi, bakiye ekstresi) mesajı sunucudaki SMS kuyruğuna yazar.
-- SIM kartlı Android cihaz her 20 saniyede bir `/api/v1/notifications/sms-gateway/poll` sorgusu yapar; bekleyen mesajları kendi SIM kartındaki ücretsiz SMS paketini kullanarak gerçek GSM şebekesinden müşteriye gönderir.
+## 10. WHATSAPP BİLDİRİM & İLETİŞİM MOTORU (EVOLUTION API & META CLOUD)
 
-### 9.3. WhatsApp Business Cloud API & Webhook Entegrasyonu
+Serenut OS'ta WhatsApp entegrasyonu basit bir sohbet aracı değildir; işletmenin kurumsal iletişim, tahsilat, fiş gönderme ve ciro takip omurgasıdır ([server/src/modules/whatsapp/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/)).
 
-- Satış tamamlandığında müşterinin cep telefonuna WhatsApp üzerinden dijital fiş bağlantısı ve bakiye özeti gönderilir.
-- Meta Cloud API (`graph.facebook.com/v18.0/`) üzerinden şablon mesajları iletilir; mesajın iletildi ve mavi tik (okundu) durumları WebSocket ile kasaya anında yansıtılır.
+```mermaid
+graph TD
+    subgraph "İŞLETME TETİKLEYİCİLERİ"
+        SaleEvent[Satış Yapıldı -> Fiş Gönder]
+        DebtEvent[Veresiye Açıldı -> Borç Bildir]
+        CollEvent[Tahsilat Alındı -> Makbuz Gönder]
+        ZEvent[Gün Sonu Kapanışı -> Z-Raporunu Patrona İlet]
+        OrderEvent[Sipariş Durumu: Hazırlanıyor/Kuryede]
+    end
+
+    subgraph "WHATSAPP AĞ GEÇİDİ (DUAL GATEWAY)"
+        EvoAPI[1. Evolution API Gateway: QR Kod ile WhatsApp Web Bağlantısı]
+        MetaAPI[2. Meta Cloud API: Kurumsal WABA Resmi Entegrasyonu]
+    end
+
+    subgraph "MÜŞTERİ & YÖNETİCİ"
+        CustomerPhone[Müşteri WhatsApp'ı: Dijital Fiş & Bakiye Ekstresi]
+        BossPhone[Patron WhatsApp'ı: Canlı Z-Raporu & Gün Sonu Hasılatı]
+    end
+
+    SaleEvent --> EvoAPI
+    DebtEvent --> EvoAPI
+    CollEvent --> EvoAPI
+    ZEvent --> EvoAPI
+    OrderEvent --> EvoAPI
+
+    SaleEvent -. "Büyük Kurumsal Şirketler" .-> MetaAPI
+    ZEvent -. "Büyük Kurumsal Şirketler" .-> MetaAPI
+
+    EvoAPI --> CustomerPhone
+    EvoAPI --> BossPhone
+    MetaAPI --> CustomerPhone
+    MetaAPI --> BossPhone
+```
+
+### 10.1. İkili Ağ Geçidi (Dual-Gateway) Mimarisi
+
+İşletmeler iki yöntemden birini tercih edebilir:
+
+1. **Evolution API Gateway (QR Kod ile 1 Dakikada Bağlantı):**
+   - Şirket sahibi hiçbir Meta Developer hesabı açmadan, vergi levhası doğrulatmadan kendi cep telefonundaki normal WhatsApp veya WhatsApp Business uygulamasını sisteme bağlar.
+   - Yönetim portalında "WhatsApp'ı Bağla" denildiğinde `POST /api/v1/whatsapp/evolution/instance` çağrılır ve ekrana bir **QR Kod** basılır (`GET /api/v1/whatsapp/evolution/qr`).
+   - Telefonun WhatsApp uygulamasından "Bağlı Cihazlar $\rightarrow$ Cihaz Bağla" ile QR kod okutulur. Durum `open` olur ve şirket hemen kendi numarasından mesaj atmaya başlar!
+2. **Meta Cloud API Gateway (Resmi Kurumsal WABA):**
+   - Meta Business Manager üzerinden Embedded Signup (`Configuration ID: 2051947882108806`) ile kurumsal onaylı hat bağlanır.
+   - Onaylanmış `UTILITY` şablonları üzerinden gönderim yapılır.
+
+### 10.2. Otomatik Tetiklenen Olaylar ve Şablonlar
+
+| Olay Adı | Alıcı | İçerik ve Amacı |
+|---|---|---|
+| `sale_created` | Müşteri | Satış tamamlandığında ürün kalemleri, toplam tutar ve dijital fiş bağlantısı gider. |
+| `debt_created` | Müşteri | Veresiye satış yapıldığında yeni borç tutarı ve güncel toplam bakiye bildirilir. |
+| `collection_recorded` | Müşteri | Nakit veya kredi kartıyla tahsilat alındığında borçtan düşüldüğünü belgeleyen dijital makbuz gider. |
+| `balance_reminder` | Müşteri | Vadesi geçen veresiye hesaplara tek tıkla nezaket hatırlatması ve hesap özeti gönderilir. |
+| `order_shipped` / `delivered` | Müşteri | Sipariş hazırlandı veya kurye yola çıktı bilgilendirmesi. |
+| **`end_of_day_report`** | **Patron / Yönetici** | Kasiyer gün sonunda Z-Raporu aldığı anda patronun telefonuna **Günün Toplam Cirosu, Nakit, Kredi Kartı, Veresiye Dağılımı ve Kasa Farkı** anında WhatsApp mesajı olarak düşer. |
+
+### 10.3. Webhook Mimarisi & İletim Durumları (Mavi Tik)
+
+Sunucudaki `POST /api/v1/whatsapp/evolution/webhook` ve Meta webhook dinleyicisi mesajın her aşamasını takip eder:
+- `accepted`: Sunucu mesajı sıraya aldı.
+- `sent`: Mesaj WhatsApp sunucusuna iletildi (Tek gri tik).
+- `delivered`: Müşterinin telefonuna ulaştı (Çift gri tik).
+- `read`: Müşteri mesajı açıp okudu (Çift mavi tik).
+- `failed`: Numara WhatsApp kullanmıyor veya interneti kapalı; sistem otomatik olarak **Android SIM SMS Gateway'e failover yapar**!
 
 ---
 
-## 10. YEDEKLEME, GERİ YÜKLEME, LİSANSLAMA & VERİ AKTARIMI (MIGRATION)
+## 11. ANDROID SIM KARTLI SMS AĞ GEÇİDİ (YEREL GSM MODEMİ)
 
-### 10.1. Güvenli Veritabanı Yedekleme & Geri Yükleme (`BackupService`)
+İşletmelerin toplu SMS firmalarına kontör parası ödemesini engelleyen patentli yerli mimari ([SmsGatewayService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Kasa as Windows Kasa 1 / Web
+    participant Server as VPS Bildirim Kuyruğu (/api/v1/notifications)
+    participant Phone as Çekmecedeki Android Cihaz (SIM Kartlı)
+    participant GSM as Türk Telekom / Turkcell / Vodafone
+    actor Customer as Müşteri Telefonu
+
+    Kasa->>Server: Veresiye Satışı Yapıldı -> SMS Kuyruğuna Ekle
+    Note over Phone: 2. Android Servisi 20 Saniyede Bir Uyanır
+    Phone->>Server: GET /api/v1/notifications/sms-gateway/poll (device_id)
+    Server-->>Phone: 200 OK — Bekleyen 3 Adet SMS Paketi
+    Note over Phone: 3. Cihaz Kendi SIM Kartından Gönderir
+    Phone->>GSM: Android SmsManager.sendTextMessage(numara, mesaj)
+    GSM-->>Customer: Müşterinin Telefonuna Gerçek GSM SMS'i Düşer
+    Phone->>Server: POST /sms-gateway/ack (mesaj_id = sent)
+```
+
+- **Maliyet:** 0 TL (İşletme hattındaki her yöne 1000-5000 SMS paketi kullanılır).
+- **Yedeklilik:** WhatsApp kapalıysa veya müşterinin interneti yoksa bildirim motoru otomatik olarak bu kanala yönlenir.
+
+---
+
+## 12. PATRON WEB YÖNETİM PORTALI & CANLI CİRO İZLEME (REALTIME ENGINE)
+
+İşletme sahibinin mağazada olmadan işletmeyi anbean cep telefonundan veya evdeki bilgisayardan yönetmesini sağlayan web portalı ([server/src/modules/portal/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/portal/)):
+
+### 12.1. WebSocket Canlı Satış Akışı (Realtime Dashboard)
+
+- Kasiyer kasada barkod okutup satışı bitirdiği anda (50 milisaniye içinde) WebSocket kanalı (`/api/v1/realtime`) üzerinden web portalına sinyal gönderilir.
+- Patronun ekranındaki **Bugünkü Toplam Ciro, Yapılan Satış Adedi ve Kasa Grafiği** sayfa yenilenmeden canlı olarak artar.
+
+### 12.2. Konsolide Şube ve Kasa Raporları
+
+- Birden çok şubesi olan işletmelerde tüm kasaların hasılatı tek ekranda toplanır.
+- Kar / Zarar Analizi: Alış fiyatları üzerinden satılan ürünlerin net brüt kar marjı kuruşu kuruşuna gösterilir.
+- KDV Raporu: %1, %10 ve %20 KDV dilimlerine göre muhasebeye verilecek resmi KDV matrah dökümleri tek tıkla Excel/PDF olarak indirilir.
+
+### 12.3. Uzaktan Fiyat ve Ürün Yönetimi
+
+- Patron evindeyken portala girip "Fındık Fiyatını 180 TL yap" dediğinde, bu değişiklik bulut kataloğuna yazılır ve Sync V4 motoru ile mağazadaki tüm kasalara anında iner.
+
+---
+
+## 13. MÜŞTERİ İKİNCİ EKRANI (CUSTOMER FACING DISPLAY)
+
+Kasada ödeme yapan müşterinin sepetini, indirimlerini ve para üstünü görmesini sağlayan çift monitör entegrasyonu:
+
+- **Donanım Tipleri:**
+  - **HDMI İkinci Ekran:** Kasaya takılı ikinci bir 10" - 15" LCD monitör.
+  - **VFD / Seri Müşteri Göstergesi:** 2 satır 20 karakter yeşil floresan gösterge (COM Port / USB).
+- **Çalışma Modları:**
+  - **Kasa Boşken:** İşletmenin kampanyalarını, duyurularını ve kurumsal fotoğraflarını döner (Dijital Tabela / Reklam Modu).
+  - **Satış Anında:** Kasiyer ürün okuttukça okunan ürünün adı, fotoğrafı, gramajı, birim fiyatı ve ara toplam ekranda büyük puntolarla belirir.
+  - **Ödeme Alınırken:** Verilen para ve kasiyerin uzatacağı **Para Üstü** devasa rakamlarla ekrana yansıtılarak para üstü tartışmaları sıfırlanır.
+
+---
+
+## 14. YEDEKLEME, GERİ YÜKLEME, LİSANSLAMA & VERİ AKTARIMI (MIGRATION)
+
+### 14.1. Güvenli Veritabanı Yedekleme & Geri Yükleme (`BackupService`)
 
 - [BackupService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/backup_service.dart), her akşam gün sonu Z-raporu alındığında veya her yazılım güncellemesi öncesinde otomatik devreye girer.
 - **WAL Dondurma:** Yedek alınmadan önce veritabanında `PRAGMA wal_checkpoint(TRUNCATE)` çalıştırılarak `-wal` dosyasındaki tüm veri ana `.db` dosyasına dökülür.
 - **Doğrulama:** Yedek dosyasının SHA-256 hash'i hesaplanır ve `PRAGMA integrity_check` yapılarak dosyanın sağlam olduğu tescillenmeden işlem bitirilmez.
 - **Harici / Bulut Yedek:** İsteğe bağlı olarak Google Drive API entegrasyonu veya takılı bir USB belleğe `.serenut_backup` uzantılı arşiv dosyası olarak kopyalanır.
 
-### 10.2. Lisanslama ve Çevrimdışı İntibak Süresi (Offline Grace Period)
+### 14.2. Lisanslama ve Çevrimdışı İntibak Süresi (Offline Grace Period)
 
 - Lisans doğrulaması sunucunun RSA-4096 özel anahtarı ile imzalanmış bir dijital sertifika ile yapılır.
 - **İnternet Kesintisi Güvencesi:** Sürekli interneti olmayan mağazalarda kasanın kapanmasını önlemek için **15 Günlük Çevrimdışı İntibak Süresi (Grace Period)** tanımlıdır. İnternet 15 gün boyunca hiç gelmese bile kasa satış yapmaya devam eder.
 
-### 10.3. Dış Sistemlerden Veri Aktarımı (Excel / JSON Migration)
+### 14.3. Dış Sistemlerden Veri Aktarımı (Excel / JSON Migration)
 
 - [DataTransferPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/data_transfer_page.dart) üzerinden işletmelerin eski yazılımlarından (Akınsoft, Mikro, Logo, NarBarkod vb.) dışa aktardığı Excel (`.xlsx`), CSV veya JSON dosyaları içe aktarılır.
 - Ürün adları, barkodlar, birimler, alış/satış fiyatları ve mevcut stoklar kuruş modeline dönüştürülerek içe alınır.
 
 ---
 
-## 11. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
+## 15. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
 
 Bu bölüm, `AGENTS.md` ve `docs/release-update-runbook.md` belgelerinde tanımlanan **zorunlu güvenlik ve yayın kurallarını** içerir.
 
@@ -590,7 +725,7 @@ graph TD
     VerifyRsa -- Başarısız --> Abort[Dosyayı Hemen Sil & Hata Günlüğü Üret]
 ```
 
-### 11.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
+### 15.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
 
 - **`+` İletimi Yasaktır (Dosya Adları & Public UI - AGENTS.md Kural 2):**
   - Kullanıcıya sunulan veya web sitesinden indirilen dosyalarda `+` içeren dahili Flutter derleme numarası **ASLA KULLANILAMAZ** (Örnek: `SerenutOS-v1.3.144+299.exe` YASAKTIR).
@@ -598,7 +733,7 @@ graph TD
     - Görünen ve İndirilen Dosya Adı: `SerenutOS-v1.3.144.exe` ve `SerenutOS-v1.3.144.apk`.
   - `pubspec.yaml` içerisindeki `+299` yapısı sadece dahili `versionCode` ve CI takibi içindir; yayın araçları ve indirme servisleri bunu otomatik semantik formata (`v1.3.144`) çevirir.
 
-### 11.2. Değişmez İmza Sözleşmesi & OTA Standardı
+### 15.2. Değişmez İmza Sözleşmesi & OTA Standardı
 
 1. **Android Paket İmzası (Keystore):**
    - Sertifika Parmak İzi (SHA-256): `server/release-signing-policy.json` dosyasındaki `androidPackageCertificateSha256` değeri ile birebir eşleşmelidir. Eşleşmeyen APK yayınlanamaz.
@@ -614,16 +749,16 @@ graph TD
 
 ---
 
-## 12. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
+## 16. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
 
-### 12.1. Yerel Loglama (Structured JSONL)
+### 16.1. Yerel Loglama (Structured JSONL)
 
 İstemci tüm çalışma loglarını işletim sistemine özel yerel dizinde saklar:
 - **Windows:** `%APPDATA%\Serenut OS Software Technologies A.Ş\Serenut OS\logs\app.log`
 - **Android:** `/data/user/0/com.serenutos.pos/files/logs/app.log`
 - **Log Formatı:** JSON Lines (her satırda timestamp, level, subsystem, correlation_id, message, payload).
 
-### 12.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
+### 16.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
 
 Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 - **Filtreleme Kuralları (`beforeSend`):**
@@ -632,9 +767,9 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 
 ---
 
-## 13. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
+## 17. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
 
-### 13.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
+### 17.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
 
 **Belirti:** Satışlar yapılıyor ancak web panelinde veya diğer kasalarda görünmüyor. Sağ üst köşedeki bulut simgesi kırmızı/sarı.
 1. **İnternet ve Sunucu Erişimi Kontrolü:**
@@ -653,7 +788,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ağ düzeldiğinde sistem otomatik push yapar.
    - Acil durumlarda Ayarlar -> Senkronizasyon -> "Şimdi Eşitle" butonuna basılır.
 
-### 13.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
+### 17.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
 
 **Belirti:** Müşteri kartında bakiye 500 TL yazıyor ancak hareket listesi toplandığında 400 TL çıkıyor.
 1. **İnceleme:** `customers.balance_cents` önbellek kolonu harici bir işlem veya kesinti yüzünden güncelliğini yitirmiş olabilir.
@@ -670,7 +805,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. Bakiye anında matematiksel olarak defterin gerçek toplamına eşitlenir.
 
-### 13.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
+### 17.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
 
 **Belirti:** `database is locked` veya `disk I/O error`.
 1. **Bütünlük Kontrolü:**
@@ -685,7 +820,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. **Kurtarma:** Uygulama tamamen kapatılır, `%APPDATA%\...\databases\core_next` dizinindeki veritabanının yedeği alınır ve uygulama yeniden başlatılır.
 
-### 13.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
+### 17.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
 
 1. **Bağlantı Kontrolü:**
    - USB yazıcı ise Windows Aygıt Yöneticisi'nde doğru yazıcı kuyruğu seçili mi?
@@ -694,13 +829,13 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ayarlar -> Yazıcı Ayarları -> "Karakter Kod Sayfası" seçeneğini `CP857` yapın.
    - Sorun çözülmezse "Grafik/Resim Olarak Yazdır" seçeneğini açın (tüm karakterleri piksel olarak dökeceğinden %100 kusursuz Türkçe basacaktır).
 
-### 13.5. Senaryo 5: Terazi Ağırlığı Okumuyor
+### 17.5. Senaryo 5: Terazi Ağırlığı Okumuyor
 
 1. Windows Aygıt Yöneticisi -> Bağlantı Noktaları (COM & LPT) altında terazi USB-Serial çeviricinin COM portunu (ör. `COM3`) kontrol edin.
 2. Başka bir uygulamanın COM portunu işgal etmediğinden emin olun (COM portları tekil erişimlidir).
 3. Ayarlar -> Donanım -> Terazi ekranından Baud Rate'in `9600` ve modelin doğru seçildiğini doğrulayın.
 
-### 13.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
+### 17.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
 
 **Belirti:** Güncelleme iniyor ancak "İmza doğrulanamadı" uyarısıyla iptal ediliyor.
 1. İndirilen dosyanın SHA-256 hash'i sunucudaki hash ile uyuşmuyor olabilir (eksik indirme / proxy araya girmesi).
@@ -708,13 +843,47 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Windows: `%TEMP%\serenut_updates` veya `%APPDATA%\...\updates` dizinini silin.
 3. Cihazın sürümünün köprü sürüm gerektirip gerektirmediğini (`1.3.10+91` altı mı?) kontrol edin.
 
-### 13.7. Senaryo 7: GİB e-Arşiv Portalı Fatura İmzalamıyor / Hata Veriyor
+### 17.7. Senaryo 7: GİB e-Arşiv Portalı Fatura İmzalamıyor / Hata Veriyor
 
 1. **GİB Portal Bakımı:** GİB portalı yoğunluk veya bakım saatlerinde (genelde gece 00:00 - 02:00) yanıt vermeyebilir. İstemcideki faturayı "Taslaklara Kaydet" ile yerelde tutun; portal açıldığında tek tıkla toplu imzalayın.
 2. **SMS Doğrulama Zaman Aşımı:** SMS onay kodu 180 saniye içinde girilmelidir. Zaman aşımına uğradıysa yeni SMS isteği tetikleyin.
 3. **Mükellef TCKN/VKN Kontrolü:** Alıcı TCKN veya VKN'si 10 ya da 11 hane olmalı, e-Fatura mükellefi olan kurumlara e-Arşiv değil doğrudan e-Fatura kesilmelidir.
 
-### 13.8. Senaryo 8: VPS Production Sunucusu Acil Müdahale Komutları
+### 17.8. Senaryo 8: WhatsApp Bağlantısı Koptu / Mesaj Gitmiyor
+
+**Belirti:** Satış fişleri veya Z-raporu WhatsApp'a düşmüyor. Portalda WhatsApp durumu `disconnected` veya `reauthorization_required`.
+1. **Bağlantı Tipini Kontrol Edin:**
+   - **Evolution API (QR Kod Modu):** Portalda Ayarlar $\rightarrow$ Bildirimler $\rightarrow$ WhatsApp sekmesine gidin. "Yeniden Bağlan" butonuna tıklayıp çıkan QR kodu telefonunuzdaki WhatsApp uygulamasından okutun.
+   - **Meta Cloud API (Resmi WABA):** Meta Business Manager'da kayıtlı ödeme kartının süresi bitmiş veya token süresi dolmuş olabilir. Portaldan "Embedded Signup Yenile" adımı yapılır.
+2. **Kuyruktaki Mesajları Kontrol Edin:**
+   ```sql
+   SELECT status, count(*) FROM notification_queue WHERE channel = 'whatsapp' GROUP BY status;
+   ```
+3. **Failover (Yedek Hat):** WhatsApp kapalı olduğunda sistemin otomatik olarak SIM SMS Gateway'e geçip geçmediğini kontrol edin (`NOTIFICATION_ENABLED_CHANNELS=whatsapp,sms`).
+
+### 17.9. Senaryo 9: Web Portalı Canlı Ciro Akışı Güncellenmiyor (WebSocket Düşmesi)
+
+**Belirti:** Kasada satış yapılıyor ama patronun web ekranındaki canlı ciro artmıyor.
+1. Web tarayıcısının F12 Konsolunda `WebSocket connection failed: wss://api.serenut.com/ws` hatası var mı bakın.
+2. NGINX proxy üzerinde `Upgrade` ve `Connection "upgrade"` başlıklarının açık olduğunu doğrulayın.
+3. VPS üzerinde WebSocket sunucusunu yeniden başlatın:
+   ```bash
+   pm2 restart serenut-server
+   ```
+
+### 17.10. Senaryo 10: Müşteri İkinci Ekranı Görüntü Vermiyor
+
+1. Windows Masaüstü $\rightarrow$ Ekran Ayarları altında ikinci monitörün **"Bu ekranları genişlet" (Extend Desktop)** olarak ayarlandığından emin olun ("Bu ekranları yinele/Duplicate" modu kullanılmamalıdır).
+2. Serenut OS Ayarlar $\rightarrow$ Ekran Ayarları $\rightarrow$ "Müşteri Ekranını Etkinleştir" anahtarını açın ve hedef monitörü seçin.
+3. İkinci ekranda reklam slaytları için bir görsel klasörü seçildiğini doğrulayın.
+
+### 17.11. Senaryo 11: Android SIM SMS Gateway Mesaj Göndermiyor
+
+1. Kasadaki Android cihazda Serenut OS arka plan çalışma ve pil optimizasyonu istisnasının verildiğini kontrol edin (Android sistemi uygulamayı uyutmamalıdır).
+2. Cihazın SIM kartında SMS paketi veya TL bakiyesi olduğunu doğrulayın.
+3. Uygulama Ayarları $\rightarrow$ "Bu cihazı SIM SMS Ağ Geçidi yap" anahtarının açık olduğunu kontrol edin.
+
+### 17.12. Senaryo 12: VPS Production Sunucusu Acil Müdahale Komutları
 
 ```bash
 # Sunucu durumunu kontrol et
@@ -735,19 +904,24 @@ node scripts/verify_published_release.js 1.3.144+299
 
 ---
 
-## 14. GENİŞLETİLMİŞ HIZLI ERİŞİM KONTROL LİSTESİ (MASTER CHEAT SHEET)
+## 18. GENİŞLETİLMİŞ MASTER CHEAT SHEET TABLOSU
 
 | Alan | Kanonik Kural | İlgili Dosya / Kod |
 |---|---|---|
 | **Veritabanı** | Standart SQLite (SQLCipher Yasak) | [db_schema.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_schema.dart) |
 | **Para Birimi** | Kuruş / Integer (`MoneyCents`) | [money_cents.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/core_next/client_core/lib/domain/money_cents.dart) |
 | **Bakiye Formülü** | Pozitif = Borçlu, Negatif = Alacaklı | [db_triggers.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_triggers.dart) |
-| **Dosya İsimleri** | `+` Yasak (`SerenutOS-vX.Y.Z.exe`) | `AGENTS.md` Kural 2 |
+| **Dosya İsimleri** | `+` Yasak (`SerenutOS-vX.Y.Z.exe`) | [AGENTS.md Kural 2](file:///c:/Users/ecz/proje/shaman/shaman_new/.agents/AGENTS.md) |
 | **OTA İmzalama** | Dosya SHA-256 Metninin RSA İmzası | [publish-release.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/scripts/publish-release.ts) |
 | **Yayın Doğrulama** | Zorunlu Kontrol Scripti | [verify_published_release.js](file:///c:/Users/ecz/proje/shaman/shaman_new/scripts/verify_published_release.js) |
 | **Senkronizasyon** | Deep Equal JSONB (`payloadDeepEqual`) | [sync-v4.routes.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/sync_v4/sync-v4.routes.ts) |
 | **GİB e-Arşiv** | 0 TL Maliyetli Resmi Portal İstemcisi | [gib_earsiv_client.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/gib_earsiv_client.dart) |
-| **SIM SMS Gateway** | Android Telefonu Şebeke Modemi Yapma | [sms_gateway_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart) |
+| **WhatsApp Evolution** | QR Kod ile 1 Dakikada WhatsApp Bağlama | [whatsapp.controller.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/whatsapp.controller.ts) |
+| **WhatsApp Meta** | Kurumsal Resmi WABA Embedded Signup | [WHATSAPP_BUSINESS_SETUP.md](file:///c:/Users/ecz/proje/shaman/shaman_new/docs/WHATSAPP_BUSINESS_SETUP.md) |
+| **Patrona Z-Raporu** | Gün Sonu Kapanışında Otomatik WhatsApp Özeti | [end_of_day_page.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/end_of_day_page.dart) |
+| **SIM SMS Gateway** | Android Telefonu GSM SMS Modemi Yapma | [sms_gateway_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart) |
+| **Web Portalı** | Evden/Telefondan Canlı Ciro Takibi | [server/src/modules/portal/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/portal/) |
+| **Müşteri 2. Ekranı** | HDMI / VFD Çift Ekran Kasa Yansıtma | [lib/presentation/pages/](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/) |
 | **P2P Görsel Ağı** | UDP 48732 / HTTP 48731 LAN Senkronu | [product_image_peer_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/product_image_peer_service.dart) |
 | **Ortak Donanım** | Kasalar Arası Ortak Yazıcı/Terazi | [shared_hardware_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/shared_hardware_service.dart) |
 | **Sepet Kurtarma** | Elektrik Kesilse Bile Sepeti Geri Getirme | [cart_persistence_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/cart_persistence_service.dart) |
