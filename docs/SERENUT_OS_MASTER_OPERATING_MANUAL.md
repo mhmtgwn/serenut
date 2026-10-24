@@ -526,88 +526,280 @@ sequenceDiagram
 
 ## 10. WHATSAPP BİLDİRİM & İLETİŞİM MOTORU (EVOLUTION API & META CLOUD)
 
-Serenut OS'ta WhatsApp entegrasyonu basit bir sohbet aracı değildir; işletmenin kurumsal iletişim, tahsilat, fiş gönderme ve ciro takip omurgasıdır ([server/src/modules/whatsapp/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/)).
+Serenut OS'ta WhatsApp entegrasyonu basit bir sohbet penceresi değildir; işletmenin kurumsal iletişim, anlık dijital fiş paylaşımı, veresiye borç takibi, tahsilat makbuzu, e-Arşiv fatura iletimi ve akşam kasa kapanışında patrona giden Z-Raporunun omurgasıdır ([server/src/modules/whatsapp/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/)).
 
 ```mermaid
 graph TD
-    subgraph "İŞLETME TETİKLEYİCİLERİ"
-        SaleEvent[Satış Yapıldı -> Fiş Gönder]
-        DebtEvent[Veresiye Açıldı -> Borç Bildir]
-        CollEvent[Tahsilat Alındı -> Makbuz Gönder]
-        ZEvent[Gün Sonu Kapanışı -> Z-Raporunu Patrona İlet]
-        OrderEvent[Sipariş Durumu: Hazırlanıyor/Kuryede]
+    subgraph "İŞLETME TETİKLEYİCİLERİ (POS & LEDGER)"
+        SaleEvent["Satış Tamamlandı -> Dijital Fiş Gönder"]
+        DebtEvent["Veresiye Satış -> Borç & Bakiye Bildir"]
+        CollEvent["Tahsilat Alındı -> Makbuz Gönder"]
+        ReminderEvent["Vadesi Geçen Cari -> Bakiye Hatırlatması"]
+        EArsivEvent["e-Arşiv Fatura Kesildi -> PDF & Link Gönder"]
+        ZEvent["Gün Sonu Z-Raporu -> Patrona Hasılat Özeti Gönder"]
+        OrderEvent["Sipariş Durumu: Hazırlandı / Kuryede / Teslim"]
+    end
+
+    subgraph "SERENUT OS İSTEMCİSİ (WINDOWS / ANDROID)"
+        SettingsUI["Ayarlar -> SMS & WhatsApp (sms_settings_sheet.dart)"]
+        QRModal["EvolutionQRDialog: Canlı QR Kod Ekranı"]
+        ExportSheet["Cari Detay -> Dışa Aktar (export_bottom_sheet.dart)"]
     end
 
     subgraph "WHATSAPP AĞ GEÇİDİ (DUAL GATEWAY)"
-        EvoAPI[1. Evolution API Gateway: QR Kod ile WhatsApp Web Bağlantısı]
-        MetaAPI[2. Meta Cloud API: Kurumsal WABA Resmi Entegrasyonu]
+        EvoAPI["1. EVOLUTION API GATEWAY (0 TL / QR Kod / Baileys Engine)"]
+        MetaAPI["2. META CLOUD API (Resmi WABA / Kurumsal Utility Şablonları)"]
     end
 
-    subgraph "MÜŞTERİ & YÖNETİCİ"
-        CustomerPhone[Müşteri WhatsApp'ı: Dijital Fiş & Bakiye Ekstresi]
-        BossPhone[Patron WhatsApp'ı: Canlı Z-Raporu & Gün Sonu Hasılatı]
+    subgraph "VPS KUYRUK & FALLBACK MOTORU"
+        NotifQueue[("notification_queue (PostgreSQL)")]
+        NotifWorker["notification.worker.ts: Gönderim & Takip Motoru"]
+        SMSFailover["Yedek GSM Modemi: Android SIM Kartlı SMS Gateway"]
     end
 
-    SaleEvent --> EvoAPI
-    DebtEvent --> EvoAPI
-    CollEvent --> EvoAPI
-    ZEvent --> EvoAPI
-    OrderEvent --> EvoAPI
+    subgraph "ALICILAR"
+        CustomerPhone["Müşteri Cep Telefonu (WhatsApp)"]
+        BossPhone["İşletme Sahibi / Patron Telefonu (WhatsApp)"]
+    end
 
-    SaleEvent -. "Büyük Kurumsal Şirketler" .-> MetaAPI
-    ZEvent -. "Büyük Kurumsal Şirketler" .-> MetaAPI
+    SettingsUI --> QRModal
+    SaleEvent --> NotifQueue
+    DebtEvent --> NotifQueue
+    CollEvent --> NotifQueue
+    ReminderEvent --> NotifQueue
+    EArsivEvent --> NotifQueue
+    ZEvent --> NotifQueue
+    OrderEvent --> NotifQueue
+    ExportSheet -. "Doğrudan Cihaz Paylaşımı" .-> CustomerPhone
+
+    NotifQueue --> NotifWorker
+    NotifWorker --> EvoAPI
+    NotifWorker -. "Meta Seçilmişse" .-> MetaAPI
+    NotifWorker -. "WhatsApp Kapalı veya Ulaşılamazsa (Failover)" .-> SMSFailover
 
     EvoAPI --> CustomerPhone
     EvoAPI --> BossPhone
     MetaAPI --> CustomerPhone
     MetaAPI --> BossPhone
+    SMSFailover --> CustomerPhone
 ```
 
-### 10.1. İkili Ağ Geçidi (Dual-Gateway) Mimarisi
+### 10.1. İkili Ağ Geçidi (Dual-Gateway) Mimarisi Karşılaştırması
 
-İşletmeler iki yöntemden birini tercih edebilir:
+Serenut OS iki farklı WhatsApp bağlantı modunu destekler:
 
-1. **Evolution API Gateway (QR Kod ile 1 Dakikada Bağlantı):**
-   - Şirket sahibi hiçbir Meta Developer hesabı açmadan, vergi levhası doğrulatmadan kendi cep telefonundaki normal WhatsApp veya WhatsApp Business uygulamasını sisteme bağlar.
-   - Yönetim portalında "WhatsApp'ı Bağla" denildiğinde `POST /api/v1/whatsapp/evolution/instance` çağrılır ve ekrana bir **QR Kod** basılır (`GET /api/v1/whatsapp/evolution/qr`).
-   - Telefonun WhatsApp uygulamasından "Bağlı Cihazlar $\rightarrow$ Cihaz Bağla" ile QR kod okutulur. Durum `open` olur ve şirket hemen kendi numarasından mesaj atmaya başlar!
-2. **Meta Cloud API Gateway (Resmi Kurumsal WABA):**
-   - Meta Business Manager üzerinden Embedded Signup (`Configuration ID: 2051947882108806`) ile kurumsal onaylı hat bağlanır.
-   - Onaylanmış `UTILITY` şablonları üzerinden gönderim yapılır.
-
-### 10.2. Otomatik Tetiklenen Olaylar ve Şablonlar
-
-| Olay Adı | Alıcı | İçerik ve Amacı |
+| Özellik | 1. Evolution API (QR Tabanlı) | 2. Meta Cloud API (Resmi WABA) |
 |---|---|---|
-| `sale_created` | Müşteri | Satış tamamlandığında ürün kalemleri, toplam tutar ve dijital fiş bağlantısı gider. |
-| `debt_created` | Müşteri | Veresiye satış yapıldığında yeni borç tutarı ve güncel toplam bakiye bildirilir. |
-| `collection_recorded` | Müşteri | Nakit veya kredi kartıyla tahsilat alındığında borçtan düşüldüğünü belgeleyen dijital makbuz gider. |
-| `balance_reminder` | Müşteri | Vadesi geçen veresiye hesaplara tek tıkla nezaket hatırlatması ve hesap özeti gönderilir. |
-| `order_shipped` / `delivered` | Müşteri | Sipariş hazırlandı veya kurye yola çıktı bilgilendirmesi. |
-| **`end_of_day_report`** | **Patron / Yönetici** | Kasiyer gün sonunda Z-Raporu aldığı anda patronun telefonuna **Günün Toplam Cirosu, Nakit, Kredi Kartı, Veresiye Dağılımı ve Kasa Farkı** anında WhatsApp mesajı olarak düşer. |
+| **Maliyet** | **0 TL (Tamamen Ücretsiz)** | Meta görüşme ücreti (Ücretsiz kota sonrası) |
+| **Kurulum Süresi** | **1 Dakika** (Telefondan QR okutarak) | 3-7 Gün (Meta Business Onayı, Vergi Levhası vb.) |
+| **Bağlanan Numara** | Şirketin mevcut normal veya Business WhatsApp hattı | Meta tarafından onaylanmış kurumsal sabit/mobil hat |
+| **Şablon Sınırlaması** | **Yok** — Zengin emoji, kalın metin, fiş dökümü anında gönderilir | Yalnızca önceden Meta tarafından onaylanan `UTILITY` şablonları |
+| **Altyapı** | VPS üzerinde çalışan Docker `evolution-api` (Baileys) | Meta Facebook Graph API Bulutu |
+| **Kullanım Amacı** | Esnaf, market, kuruyemiş, şarküteri, KOBİ'ler | Büyük zincir marketler, holdingler |
 
-### 10.3. Webhook Mimarisi & İletim Durumları (Mavi Tik)
+### 10.2. Adım Adım WhatsApp Bağlama Kılavuzu (Kullanıcı / Kasiyer / Yönetici)
 
-Sunucudaki `POST /api/v1/whatsapp/evolution/webhook` ve Meta webhook dinleyicisi mesajın her aşamasını takip eder:
-- `accepted`: Sunucu mesajı sıraya aldı.
-- `sent`: Mesaj WhatsApp sunucusuna iletildi (Tek gri tik).
-- `delivered`: Müşterinin telefonuna ulaştı (Çift gri tik).
-- `read`: Müşteri mesajı açıp okudu (Çift mavi tik).
-- `failed`: Numara WhatsApp kullanmıyor veya interneti kapalı; sistem otomatik olarak **Android SIM SMS Gateway'e failover yapar**!
+İşletme sahibi kendi WhatsApp hattını sisteme bağlamak için şu adımları izler:
+
+1. **Arayüzden Ayarlara Giriş:**
+   - Serenut OS ana ekranında sol menüden veya sağ üst köşeden **Ayarlar** (`SettingsPage`) butonuna tıklanır.
+   - Listeden **SMS ve WhatsApp Bildirimleri** seçeneği seçilerek ayar paneli ([sms_settings_sheet.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/settings/widgets/sms_settings_sheet.dart)) açılır.
+2. **WhatsApp Bildirim Kartı ve Durum Göstergesi:**
+   - Panel açıldığında sistem otomatik olarak `GET /api/v1/whatsapp/evolution/status` sorgusu yapar.
+   - **Gri İkon ("Bağlantı durumu kontrol ediliyor..."):** Sunucu durumu kontrol ediliyor.
+   - **Yeşil Kart ("0532... bağlı ✓"):** Cihaz bağlı ve mesaj göndermeye hazır.
+   - **Amber / Turuncu Kart ("Bağlı değil — QR ile bağlayın"):** Henüz telefon bağlanmamış.
+3. **QR Kod ile Eşleştirme ([evolution_qr_dialog.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/whatsapp/evolution_qr_dialog.dart)):**
+   - **"QR Kod ile Bağlan"** butonuna tıklanır.
+   - Ekrana modern bir diyalog penceresi açılır. Sunucu arka planda `GET /api/v1/whatsapp/evolution/qr` endpoint'ini çağırır.
+   - Şirkete özel `serenut_<company_id>` instance'ı oluşturulur ve dinamik Base64 PNG formatında QR kod ekrana çizilir.
+   - **Telefon İşlemi:** İşletme sahibi kendi telefonunda WhatsApp'ı açar $\rightarrow$ **Ayarlar (veya Üç Nokta)** $\rightarrow$ **Bağlı Cihazlar (Linked Devices)** $\rightarrow$ **Cihaz Bağla** butonuna basıp kasadaki ekrandaki QR kodu kamerayla okutur.
+4. **Otomatik Tanıma ve Kapanış:**
+   - İstemci her 4 saniyede bir `GET /api/v1/whatsapp/evolution/status` ile durumu sorgular.
+   - QR kod okutulup WhatsApp el sıkışması tamamlandığı anda status `open` olur.
+   - Diyalog ekranda yeşil onay rozeti gösterir ("WhatsApp Bağlantısı Kuruldu ✓") ve 2 saniye sonra otomatik kapanır.
+5. **Bağlantıyı Güvenle Kesme:**
+   - Hat değiştirilmek istendiğinde veya cihaz satıldığında "Bağlantıyı Kes" butonuna basılır.
+   - `POST /api/v1/whatsapp/evolution/disconnect` çağrılır; sunucu instance'ı siler ve veritabanını `disconnected` durumuna çeker.
+
+### 10.3. Günlük Operasyonlarda WhatsApp Kullanım Noktaları
+
+#### A. Kasa Satış Sonrası Dijital Fiş Gönderimi
+- Satış nakit, pos veya veresiye olarak tamamlandığında satış özet dialog'unda **"WhatsApp ile Fiş Gönder"** seçeneği belirir.
+- Müşterinin telefon numarası kayıtlıysa tek tıkla müşteriye alışveriş kalemi dökümü ve dijital fiş bağlantısı iletilir.
+
+#### B. Cari Hesap / Müşteri Detay Ekranında WhatsApp İşlemleri ([customer_details_page.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/customer_details_page.dart))
+- Müşteri profilindeyken **"Dışa Aktar"** butonuna basıldığında açılan [ExportBottomSheet](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/export_bottom_sheet.dart) üzerinden:
+  - **"PDF Cari Hesap Ekstresi"**: Tüm geçmiş hareketleri, borç/alacak dökümünü içeren A4 resmi ekstre PDF olarak üretilir ve sistemin paylaşım menüsü üzerinden müşterinin WhatsApp sohbetine doğrudan dosya olarak iliştirilir.
+  - **"WhatsApp ile Bakiye Hatırlatması"**: Vadesi geçen veya açık hesabı olan müşteriye tek tıkla nazik bakiye hatırlatma mesajı gönderilir.
+
+#### C. GİB e-Arşiv Fatura Ekranından WhatsApp Gönderimi ([create_gib_invoice_dialog.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/widgets/invoice/create_gib_invoice_dialog.dart))
+- e-Arşiv fatura resmi olarak GİB portalında imzalandıktan sonra fatura detayındaki WhatsApp simgesine basılarak resmi faturanın PDF'i veya görüntüleme linki müşteriye WhatsApp üzerinden anında iletilir.
+
+#### D. Gün Sonu Kapanışında Patron WhatsApp Bildirimi (Otomatik Z-Raporu)
+- Kasiyer vardiya sonunda veya akşam mağaza kapanışında Z-Raporu aldığı anda, kasiyerin hiçbir şey yapmasına gerek kalmadan sistem arka planda **Patronun WhatsApp Numarasına** günün finansal karnesini mesaj olarak atar.
+
+### 10.4. Kanonik Mesaj Şablonları & Değişken Sözlüğü ([template_resolver.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/domain/notifications/template_resolver.dart))
+
+Mesajlarda kullanılan dinamik değişkenler:
+- `{customer}`: Müşteri Adı / Unvanı
+- `{amount}`: İşlem / Fiş Tutarı (₺ formatında)
+- `{paid}`: Kasiyere ödenen miktar
+- `{debt}`: Kalan vadeli borç miktarı
+- `{balance}`: Cari hesabın güncel toplam bakiyesi
+- `{items}`: Satın alınan ürünlerin adet/gramaj ve fiyat dökümü
+- `{business}`: İşletmenin resmi veya ticari adı
+- `{date}`: İşlemin yapıldığı gün ve saat
+- `{id}`: Fiş, makbuz veya sipariş numarası
+
+#### 1. Satış Bilgi Fişi (`sale_created`):
+```text
+🧾 *Alışveriş Fişi*
+
+Sayın *Ahmet Yılmaz*,
+Alışverişiniz başarıyla tamamlanmıştır.
+
+▫️ *Fiş No:* #40921
+▫️ *Tarih:* 24.10.2026 18:32
+
+🛍️ *Satın Alınan Ürünler:*
+• Giresun Kavrulmuş Fındık (500 gr) - ₺180,00
+• Antep Fıstığı Duble (250 gr) - ₺195,00
+
+▫️ *Ödenen:* *₺375,00*
+▫️ *Toplam Tutar:* *₺375,00*
+
+Bizi tercih ettiğiniz için teşekkür eder, iyi günlerde kullanmanızı dileriz.
+*Nutopian Fındık & Kuruyemiş*
+
+ℹ️ _Bildirimlerin tarafınıza sorunsuz ulaşabilmesi için lütfen numaramızı rehberinize kaydediniz._
+```
+
+#### 2. Veresiye / Cari Borç Bildirimi (`debt_created`):
+```text
+📋 *Cari Hesap Bilgilendirmesi*
+
+Sayın *Mehmet Güven*,
+#10852 numaralı vadeli işleminiz cari hesabınıza işlenmiştir.
+
+▫️ *İşlem Tutarı:* ₺850,00
+▫️ *Eklenen Borç:* *₺850,00*
+▫️ *Güncel Toplam Bakiyeniz:* *₺2.450,00*
+
+Detaylı hesap ekstresi ve mutabakat için bizimle iletişime geçebilirsiniz.
+*Nutopian Fındık & Kuruyemiş*
+```
+
+#### 3. Tahsilat Makbuzu (`collection_recorded`):
+```text
+✅ *Tahsilat Makbuzu*
+
+Sayın *Mehmet Güven*,
+Yapmış olduğunuz ödeme başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.
+
+▫️ *Makbuz No:* #MK-9021
+▫️ *Tahsil Edilen:* *₺1.000,00*
+▫️ *Kalan Bakiyeniz:* *₺1.450,00*
+📅 *Tarih:* 24.10.2026 16:15
+
+Ödemeniz için teşekkür ederiz.
+*Nutopian Fındık & Kuruyemiş*
+```
+
+#### 4. Bakiye Hatırlatması (`balance_reminder`):
+```text
+🔔 *Bakiye Hatırlatması*
+
+Sayın *Mehmet Güven*,
+İşletmemizdeki cari hesabınızın güncel durum özeti aşağıdadır:
+
+▫️ *Güncel Vadeli Bakiye:* *₺1.450,00*
+📅 *Tarih:* 24.10.2026
+
+Ödeme ve mutabakat işlemleriniz için işletmemizle iletişime geçebilirsiniz.
+Sağlıklı ve bereketli günler dileriz.
+*Nutopian Fındık & Kuruyemiş*
+```
+
+#### 5. Patron Gün Sonu Z-Raporu Bildirimi (`end_of_day_report`):
+```text
+📊 *GÜN SONU Z-RAPORU ÖZETİ*
+İşletme: *Nutopian Fındık (Merkez Şube)*
+Tarih: *24.10.2026 21:00*
+Kasa Görevlisi: *Kasa 1 (Ayşe Yılmaz)*
+
+💰 *GÜNLÜK TOPLAM CİRO:* *₺48.750,00*
+--------------------------------
+💵 *Nakit Tahsilat:* ₺19.200,00
+💳 *Kredi Kartı:* ₺24.350,00
+📝 *Veresiye Satış:* ₺5.200,00
+📥 *Cari Tahsilat:* ₺3.800,00
+🔄 *İade Tutarı:* ₺450,00 (2 işlem)
+--------------------------------
+📦 *Toplam Satış Adedi:* 142 fiş
+⚖️ *Tartılı Ürün Hasılatı:* ₺28.400,00
+--------------------------------
+🔒 *Kasa Durumu:* Devir: ₺1.000 | Kasa Mevcudu: ₺20.200 | Fark: ₺0,00 ✓
+```
+
+### 10.5. Sunucu Mimarisi & Evolution API v2 Motoru
+
+Bulut sunucusunda WhatsApp altyapısı şu şekilde çalışır:
+
+1. **Docker Altyapısı (`server/docker-compose.prod.yml`):**
+   - `evolution-api` konteyneri (v2.x) port `8080` üzerinde izole çalışır.
+   - Redis önbelleği oturum durumlarını (Baileys keys) RAM'de tutar; sunucu yeniden başlasa bile WhatsApp oturumu düşmez.
+2. **REST API Endpoint'leri ([whatsapp.controller.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/whatsapp.controller.ts)):**
+   - `GET /api/v1/whatsapp/evolution/qr`: QR kod PNG Base64 üretir.
+   - `GET /api/v1/whatsapp/evolution/status`: `open`, `connecting` veya `close` döndürür.
+   - `POST /api/v1/whatsapp/evolution/disconnect`: Oturumu kapatır ve veritabanını günceller.
+   - `POST /api/v1/whatsapp/events`: Kuyruğa bildirim ekler (`client_event_id` ile idempotency sağlar, aynı fiş mükerrer gitmez).
+   - `POST /api/v1/whatsapp/evolution/webhook`: Webhook dinleyicisi (API key doğrulamalı).
+3. **Baileys Durum Kodları & Tik Doğrulaması (`normalizeEvolutionMessageStatus`):**
+   - `0` $\rightarrow$ `failed` (Gönderim hatası)
+   - `1` $\rightarrow$ `pending` (Kuyrukta bekliyor)
+   - `2` $\rightarrow$ `server_ack` (WhatsApp sunucusuna ulaştı — **Tek Gri Tik**)
+   - `3` $\rightarrow$ `delivered` (Müşterinin telefonuna teslim edildi — **Çift Gri Tik**)
+   - `4` $\rightarrow$ `read` (Müşteri mesajı açıp okudu — **Çift Mavi Tik**)
+4. **KVKK & Güvenlik Koruması:**
+   - [maskPhoneForLog](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/whatsapp/evolution.service.ts#L399-L404): Sunucu loglarına telefon numaraları asla açık yazılmaz; `9055****67` şeklinde otomatik maskelenir.
+   - Tenant İzolasyonu: Her işletmenin mesajları ve instance'ı RLS (Row Level Security) ile birbirinden tamamen izoledir.
+
+### 10.6. Otomatik SMS Failover (Yedek Güvence Mantığı)
+
+Sistem bir bildirimi göndermeye çalışırken şu sırayı takip eder:
+1. Öncelikli olarak WhatsApp kontrol edilir.
+2. WhatsApp bağlıysa veya müşteri telefonunda WhatsApp varsa mesaj WhatsApp üzerinden iletilir (0 TL maliyet, zengin görsel ve biçimli metin).
+3. **Failover (Yedek Devreye Girme):** Eğer işletmenin WhatsApp oturumu düşmüşse, internet kesilmişse veya alıcı WhatsApp kullanmıyorsa `notification.worker.ts` mesajı düşürmez; otomatik olarak **11. Bölümdeki Android SIM Kartlı SMS Ağ Geçidine** veya bulut SMS kuyruğuna aktarır! Müşteri bilgilendirmesi asla kaybolmaz.
+
+### 10.7. WhatsApp Sorun Giderme Runbook'u (Troubleshooting)
+
+- **Sorun 1: "QR Kod Yüklenemiyor / Bekleyin (202 Pending)":**
+  - *Neden:* Evolution API konteyneri instance başlatırken WhatsApp Baileys anahtarlarını üretmektedir.
+  - *Çözüm:* İstemci 2 saniye aralıklarla 4 kez tekrar dener. 10 saniye içinde QR otomatik ekrana gelecektir. Sunucuda `docker logs evolution-api` incelenebilir.
+- **Sorun 2: "QR Kod Okutuldu Ama Durum 'connecting'te Kaldı":**
+  - *Neden:* Telefonun internet bağlantısı zayıftır veya WhatsApp Web oturum sınırına (maksimum 4 cihaz) ulaşılmıştır.
+  - *Çözüm:* Telefondaki WhatsApp'tan eski/kullanılmayan bağlı cihazları silin, "Bağlantıyı Kes" deyip yeni bir QR kod okutun.
+- **Sorun 3: "Mesajlar Gidiyor Ama Mavi Tik / Teslimat Bilgisi Düşmüyor":**
+  - *Neden:* Alıcı gizlilik ayarlarından "Okundu Bilgisi"ni kapatmış olabilir veya webhook URL'si VPS güvenlik duvarında engellenmiştir.
+  - *Çözüm:* `EVOLUTION_WEBHOOK_URL` ortam değişkeninin doğru VPS adresine (`https://.../api/v1/whatsapp/evolution/webhook`) baktığını teyit edin.
+- **Sorun 4: "Telefonda Birkaç Saat Sonra WhatsApp Oturumu Kapanıyor":**
+  - *Neden:* Android telefonlarda agresif "Pil Tasarrufu" veya "Bellek Temizleyici" arka planda WhatsApp'ı uyutmaktadır.
+  - *Çözüm:* Telefonda Ayarlar $\rightarrow$ Uygulamalar $\rightarrow$ WhatsApp $\rightarrow$ Pil $\rightarrow$ **"Kısıtlama Yok / Arka Planda Çalışmaya İzin Ver"** seçilmelidir.
 
 ---
 
 ## 11. ANDROID SIM KARTLI SMS AĞ GEÇİDİ (YEREL GSM MODEMİ)
 
-İşletmelerin toplu SMS firmalarına kontör parası ödemesini engelleyen patentli yerli mimari ([SmsGatewayService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart)):
+İşletmelerin harici toplu SMS firmalarına her ay binlerce lira kontör parası ödemesini engelleyen, çekmecedeki eski bir Android telefonu işletmenin resmi GSM modemine dönüştüren patentli yerli mimari ([SmsGatewayService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart)):
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Kasa as Windows Kasa 1 / Web
+    participant Kasa as Windows Kasa 1 / Tablet
     participant Server as VPS Bildirim Kuyruğu (/api/v1/notifications)
     participant Phone as Çekmecedeki Android Cihaz (SIM Kartlı)
-    participant GSM as Türk Telekom / Turkcell / Vodafone
+    participant GSM as Türk Telekom / Turkcell / Vodafone Şebekesi
     actor Customer as Müşteri Telefonu
 
     Kasa->>Server: Veresiye Satışı Yapıldı -> SMS Kuyruğuna Ekle
@@ -620,43 +812,89 @@ sequenceDiagram
     Phone->>Server: POST /sms-gateway/ack (mesaj_id = sent)
 ```
 
-- **Maliyet:** 0 TL (İşletme hattındaki her yöne 1000-5000 SMS paketi kullanılır).
-- **Yedeklilik:** WhatsApp kapalıysa veya müşterinin interneti yoksa bildirim motoru otomatik olarak bu kanala yönlenir.
+### 11.1. Nasıl Çalışır?
+- İşletme, dükkanda duran herhangi bir Android telefona Serenut OS kurar ve bir SIM kart (ör. her yöne 2.000 - 5.000 SMS içeren standart kurumsal hat) takar.
+- Ayarlar menüsünden **"Bu Cihazı SMS Ağ Geçidi Olarak Kullan"** seçeneği işaretlenir.
+- Android işletim sisteminin yerel `SmsManager` servisine bağlanır.
+- Ağdaki veya buluttaki tüm kasalardan (Windows, iOS, Web) çıkan SMS emirleri bu cihaz üzerinden gerçek GSM operatörü şebekesine basılır.
+- **Maliyet:** 0 TL ek masraf.
+- **Çift SIM Desteği:** Çift hatlı telefonlarda hangi SIM kart üzerinden gönderim yapılacağı (`smsSimSubscriptionId`) ayarlanabilir.
+- **Aylık Limit Koruması:** Operatör faturasında aşım olmaması için "Aylık Maksimum SMS Limiti" (ör. 2.500 adet) tanımlanabilir; limite yaklaşıldığında yönetici uyarılır.
 
 ---
 
-## 12. PATRON WEB YÖNETİM PORTALI & CANLI CİRO İZLEME (REALTIME ENGINE)
+## 12. PATRON WEB YÖNETİM PORTALI & CANLI CİRO İZLEME (REALTIME WEBSOCKET ENGINE)
 
-İşletme sahibinin mağazada olmadan işletmeyi anbean cep telefonundan veya evdeki bilgisayardan yönetmesini sağlayan web portalı ([server/src/modules/portal/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/portal/)):
+İşletme sahibinin fiziksel olarak mağazada olmadan, evdeki bilgisayarından veya cep telefonu tarayıcısından işletmeyi anlık yönetmesini sağlayan kurumsal web portalı ([server/src/modules/portal/](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/portal/) & `server/public/app/`):
+
+```mermaid
+graph TD
+    subgraph "MAĞAZA KASALARI"
+        Kasa1["Kasa 1 (Barkod Okundu -> Satış Bitti)"]
+        Kasa2["Kasa 2 (Tartılı Satış Yapıldı)"]
+    end
+
+    subgraph "SERENUT VPS SUNUCUSU"
+        SyncIngest["Sync V4 Alım Noktası"]
+        PostgresDB[("PostgreSQL Ana Veritabanı")]
+        RealtimeHub["realtime.ws.ts: Realtime WebSocket Hub"]
+    end
+
+    subgraph "PATRON CİHAZLARI"
+        BossMobile["Patron Cep Telefonu (Safari / Chrome)"]
+        BossLaptop["Patron Ev Bilgisayarı (Web Dashboard)"]
+    end
+
+    Kasa1 -- "POST /api/v4/sync/push (50 ms)" --> SyncIngest
+    Kasa2 -- "POST /api/v4/sync/push (50 ms)" --> SyncIngest
+    SyncIngest --> PostgresDB
+    SyncIngest -- "Canlı Satış Event Yayını" --> RealtimeHub
+    RealtimeHub -- "WSS /api/v1/realtime (Sayfa Yenilenmeden Canlı Sayaç)" --> BossMobile
+    RealtimeHub -- "WSS /api/v1/realtime (Sayfa Yenilenmeden Canlı Sayaç)" --> BossLaptop
+    BossLaptop -. "Uzaktan Fiyat Değiştir: Fındık ₺190 Yap" .-> SyncIngest
+    SyncIngest -. "Sync V4 Pull ile Kasalara İner" .-> Kasa1
+```
 
 ### 12.1. WebSocket Canlı Satış Akışı (Realtime Dashboard)
+- **Bağlantı Endpoint'i:** `wss://api.serenut.com/api/v1/realtime` (veya yerel testte `ws://localhost:3000/api/v1/realtime`).
+- **Yetkilendirme:** WebSocket handshake aşamasında geçerli kullanıcı JWT Bearer token'ı doğrulanır.
+- **Tenant Oda İzolasyonu:** Her işletmenin WebSocket kanalı kendi `company_id` odasına abonedir. Başka bir şirketin cirosu veya satışı kesinlikle diğerine sızamaz.
+- **Heartbeat & Canlılık Koruması:** Her 30 saniyede bir ping/pong kontrolü yapılır; internet kesilirse istemci otomatik olarak yeniden bağlanır (exponential backoff).
+- **Canlı Ciro Sayacı:** Kasiyer kasada satışı tamamladığı anda, patronun açık olan web ekranında hiçbir F5/yenileme yapmadan **Günlük Ciro, Yapılan İşlem Adedi ve Kasa Grafiği** anında artar.
 
-- Kasiyer kasada barkod okutup satışı bitirdiği anda (50 milisaniye içinde) WebSocket kanalı (`/api/v1/realtime`) üzerinden web portalına sinyal gönderilir.
-- Patronun ekranındaki **Bugünkü Toplam Ciro, Yapılan Satış Adedi ve Kasa Grafiği** sayfa yenilenmeden canlı olarak artar.
+### 12.2. Konsolide Çoklu Şube ve Kasa Raporları
+- Tek ekranda tüm şubelerin (Merkez, Şube 1, Depo) anlık nakit ve kart hasılatı toplanır.
+- **Kâr / Zarar Analizi:** Ürünlerin alış maliyetleri ile satış fiyatları arasındaki brüt kar marjı kuruşu kuruşuna listelenir.
+- **Resmi KDV Matrah Dağılımı:** Muhasebeciye verilmek üzere %1, %10 ve %20 KDV dilimlerine göre net matrah dökümleri tek tıkla Excel ve PDF olarak indirilir.
+- **Kritik Stok Uyarıları:** Depoda tükenmek üzere olan ürünler sarı ve kırmızı etiketlerle patronun ekranına düşer.
 
-### 12.2. Konsolide Şube ve Kasa Raporları
-
-- Birden çok şubesi olan işletmelerde tüm kasaların hasılatı tek ekranda toplanır.
-- Kar / Zarar Analizi: Alış fiyatları üzerinden satılan ürünlerin net brüt kar marjı kuruşu kuruşuna gösterilir.
-- KDV Raporu: %1, %10 ve %20 KDV dilimlerine göre muhasebeye verilecek resmi KDV matrah dökümleri tek tıkla Excel/PDF olarak indirilir.
-
-### 12.3. Uzaktan Fiyat ve Ürün Yönetimi
-
-- Patron evindeyken portala girip "Fındık Fiyatını 180 TL yap" dediğinde, bu değişiklik bulut kataloğuna yazılır ve Sync V4 motoru ile mağazadaki tüm kasalara anında iner.
+### 12.3. Uzaktan Fiyat ve Katalog Yönetimi
+- Patron evindeyken veya tatildeyken web portalına girip bir ürünün fiyatını veya barkodunu güncellediğinde, bu değişiklik PostgreSQL veritabanına yazılır.
+- Mağazadaki kasalar bir sonraki Sync döngüsünde (maksimum birkaç saniye içinde) yeni fiyatı otomatik çeker. Kasiyerin fiyat güncellemek için programı kapatıp açmasına gerek kalmaz!
 
 ---
 
 ## 13. MÜŞTERİ İKİNCİ EKRANI (CUSTOMER FACING DISPLAY)
 
-Kasada ödeme yapan müşterinin sepetini, indirimlerini ve para üstünü görmesini sağlayan çift monitör entegrasyonu:
+Kasada ödeme yapan müşterinin sepetini, indirimlerini ve para üstünü görmesini sağlayan çift monitör / müşteri göstergesi entegrasyonu:
 
-- **Donanım Tipleri:**
-  - **HDMI İkinci Ekran:** Kasaya takılı ikinci bir 10" - 15" LCD monitör.
-  - **VFD / Seri Müşteri Göstergesi:** 2 satır 20 karakter yeşil floresan gösterge (COM Port / USB).
-- **Çalışma Modları:**
-  - **Kasa Boşken:** İşletmenin kampanyalarını, duyurularını ve kurumsal fotoğraflarını döner (Dijital Tabela / Reklam Modu).
-  - **Satış Anında:** Kasiyer ürün okuttukça okunan ürünün adı, fotoğrafı, gramajı, birim fiyatı ve ara toplam ekranda büyük puntolarla belirir.
-  - **Ödeme Alınırken:** Verilen para ve kasiyerin uzatacağı **Para Üstü** devasa rakamlarla ekrana yansıtılarak para üstü tartışmaları sıfırlanır.
+### 13.1. Donanım Mimarisi & Tipleri
+1. **HDMI İkinci Ekran (Modern Grafik Ekranı):**
+   - Kasa bilgisayarına takılı 10 inç ile 15 inç arası ikinci monitör.
+   - Flutter Desktop çoklu pencere mimarisi ile çalışır. Ana ekran kasiyerdeyken, ikinci pencere müşteriye dönük ekranda tam ekran olarak açılır.
+2. **VFD / Seri Müşteri Göstergesi (Pole Display):**
+   - 2 satır 20 karakter yeşil floresan göstergeler (Epson ESC/POS veya CD5220 protokolü).
+   - Seri port (COM1..COM9) veya USB-Serial dönüştürücü üzerinden 9600 baud hızında bağlanır.
+
+### 13.2. Çalışma Modları ve Ekran Durumları
+- **1. Bekleme Modu (Kasa Boşken):**
+  - Ekranda işletmenin kurumsal logosu, indirim afişleri, günün fırsatları ve duyurular slayt gösterisi olarak döner (Dijital Tabela / Reklam Modu).
+- **2. Satış Anı Modu (Barkod Okunurken):**
+  - Kasiyer ürün okuttuğu anda ekran ikiye bölünür:
+  - Sol tarafta okunan ürünün adı, büyük ürün fotoğrafı ve birim fiyatı parlar.
+  - Sağ tarafta sepetteki ürünlerin listesi, uygulanan indirimler ve dev puntolarla **TOPLAM TUTAR** gösterilir.
+- **3. Ödeme ve Para Üstü Modu (Kasa Kapanırken):**
+  - Müşterinin uzattığı nakit para girildiğinde, ekranda dev harflerle **"ÖDENEN: ₺500,00"** ve yeşil kutu içinde **"PARA ÜSTÜ: ₺125,00"** gösterilir. Böylece para üstü anlaşmazlıkları sıfırlanır.
 
 ---
 
