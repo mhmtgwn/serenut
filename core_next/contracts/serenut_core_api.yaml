@@ -1,0 +1,406 @@
+openapi: 3.1.0
+info:
+  title: Serenut OS Core Domain Contracts
+  version: 2.0.0
+  description: >
+    Tek Tip Kaynağı (Single Source of Truth).
+    Flutter istemcisi (Dart) ve Sunucu (TypeScript/Fastify) arasındaki
+    tüm veri modellerini ve API uçlarını derleme zamanında tip-güvenli kılan ana sözleşme.
+
+components:
+  schemas:
+    # ── TEMEL DEĞER NESNELERİ (VALUE OBJECTS) ──────────────────────────────────
+    MoneyCents:
+      type: integer
+      description: >
+        Kuruş cinsinden para miktarı (1 TL = 100 kuruş).
+        Float yuvarlama hatalarını kesin olarak önler.
+      example: 12550
+
+    VatRatePercent:
+      type: integer
+      description: KDV oranı yüzdesi (0, 1, 10, 20 vb.)
+      enum: [0, 1, 8, 10, 18, 20]
+      example: 20
+
+    SyncStatus:
+      type: string
+      enum: [PENDING, SYNCED, CONFLICT, FAILED]
+      default: PENDING
+
+    PaymentType:
+      type: string
+      enum: [CASH, CREDIT_CARD, ON_ACCOUNT, BANK_TRANSFER, MIXED]
+      example: CASH
+
+    # ── 1. KATALOG & ÜRÜN MODELLERİ ───────────────────────────────────────────
+    ProductDto:
+      type: object
+      required:
+        - id
+        - barcode
+        - name
+        - priceCents
+        - vatRate
+        - stockQuantity
+        - isActive
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        barcode:
+          type: string
+          minLength: 1
+          maxLength: 32
+          example: "8690504123456"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "Doğal Dağ İnciri 500g"
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+        categoryName:
+          type: string
+          nullable: true
+        priceCents:
+          $ref: '#/components/schemas/MoneyCents'
+        costPriceCents:
+          $ref: '#/components/schemas/MoneyCents'
+          nullable: true
+        vatRate:
+          $ref: '#/components/schemas/VatRatePercent'
+        unit:
+          type: string
+          enum: [PIECE, KG, GRAM, PACKET, LITER]
+          default: PIECE
+        stockQuantity:
+          type: integer
+          description: Adet veya gram cinsinden stok
+          default: 0
+        criticalStockThreshold:
+          type: integer
+          default: 5
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+        isActive:
+          type: boolean
+          default: true
+        isDeleted:
+          type: boolean
+          default: false
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── 2. CARİ & ÇİFT TARAFLI MUHASEBE DEFTERİ (LEDGER) ──────────────────────
+    CustomerDto:
+      type: object
+      required:
+        - id
+        - name
+        - balanceCents
+        - isActive
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "Ahmet Yılmaz"
+        phone:
+          type: string
+          maxLength: 20
+          nullable: true
+          example: "+905551234567"
+        email:
+          type: string
+          format: email
+          nullable: true
+        taxNumber:
+          type: string
+          maxLength: 20
+          nullable: true
+        taxOffice:
+          type: string
+          maxLength: 100
+          nullable: true
+        balanceCents:
+          $ref: '#/components/schemas/MoneyCents'
+          description: Pozitif = Müşteri alacaklı/avans, Negatif = Müşteri borçlu
+        creditLimitCents:
+          $ref: '#/components/schemas/MoneyCents'
+          description: Maksimum vadeli borçlanma limiti
+          default: 0
+        notes:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+          default: true
+        isDeleted:
+          type: boolean
+          default: false
+        updatedAt:
+          type: string
+          format: date-time
+
+    LedgerEntryType:
+      type: string
+      enum:
+        - DEBIT_SALE          # Vadeli satıştan doğan borç
+        - CREDIT_COLLECTION   # Müşteriden yapılan nakit/kart tahsilat
+        - CREDIT_REFUND       # Müşteriye iade sonucu alacak kaydı
+        - DEBIT_ADJUSTMENT    # Manuel borç düzeltme
+        - CREDIT_ADJUSTMENT   # Manuel alacak düzeltme
+
+    LedgerEntryDto:
+      type: object
+      required:
+        - id
+        - customerId
+        - entryType
+        - amountCents
+        - balanceAfterCents
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        referenceSaleId:
+          type: string
+          format: uuid
+          nullable: true
+        entryType:
+          $ref: '#/components/schemas/LedgerEntryType'
+        amountCents:
+          $ref: '#/components/schemas/MoneyCents'
+        balanceAfterCents:
+          $ref: '#/components/schemas/MoneyCents'
+        description:
+          type: string
+          example: "Fiş No #1042 Vadeli Satış"
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── 3. SATIŞ & SEPET MODELLERİ ─────────────────────────────────────────────
+    SaleOrderItemDto:
+      type: object
+      required:
+        - id
+        - productId
+        - productName
+        - unitPriceCents
+        - quantity
+        - totalCents
+        - vatRate
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        barcode:
+          type: string
+        productName:
+          type: string
+        unitPriceCents:
+          $ref: '#/components/schemas/MoneyCents'
+        quantity:
+          type: integer
+          description: Adet veya tartı gramajı
+        discountCents:
+          $ref: '#/components/schemas/MoneyCents'
+          default: 0
+        vatRate:
+          $ref: '#/components/schemas/VatRatePercent'
+        totalCents:
+          $ref: '#/components/schemas/MoneyCents'
+
+    PaymentSplitDto:
+      type: object
+      required:
+        - type
+        - amountCents
+      properties:
+        type:
+          $ref: '#/components/schemas/PaymentType'
+        amountCents:
+          $ref: '#/components/schemas/MoneyCents'
+        referenceNote:
+          type: string
+          nullable: true
+
+    SaleOrderDto:
+      type: object
+      required:
+        - id
+        - receiptNo
+        - subtotalCents
+        - discountCents
+        - totalCents
+        - paidCents
+        - debtCents
+        - items
+        - payments
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        receiptNo:
+          type: string
+          example: "20261012-0042"
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+        subtotalCents:
+          $ref: '#/components/schemas/MoneyCents'
+        discountCents:
+          $ref: '#/components/schemas/MoneyCents'
+          default: 0
+        vatTotalCents:
+          $ref: '#/components/schemas/MoneyCents'
+          default: 0
+        totalCents:
+          $ref: '#/components/schemas/MoneyCents'
+        paidCents:
+          $ref: '#/components/schemas/MoneyCents'
+        debtCents:
+          $ref: '#/components/schemas/MoneyCents'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaleOrderItemDto'
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentSplitDto'
+        isCancelled:
+          type: boolean
+          default: false
+        cancellationReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── 4. DELTA & WATERMARK SENKRONİZASYON ─────────────────────────────────────
+    SyncEventDto:
+      type: object
+      required:
+        - eventId
+        - entityType
+        - entityId
+        - operation
+        - payloadJson
+        - clientTimestamp
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Idempotency için benzersiz tekil ID
+        entityType:
+          type: string
+          enum: [PRODUCT, CUSTOMER, SALE, LEDGER_ENTRY]
+        entityId:
+          type: string
+        operation:
+          type: string
+          enum: [UPSERT, DELETE]
+        payloadJson:
+          type: string
+          description: İlgili DTO'nun JSON serileştirilmiş hali
+        clientTimestamp:
+          type: integer
+          description: İstemci işlem zaman damgası (Epoch ms)
+
+    SyncPushRequest:
+      type: object
+      required:
+        - deviceId
+        - events
+      properties:
+        deviceId:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncEventDto'
+
+    SyncPushResponse:
+      type: object
+      required:
+        - acknowledgedEventIds
+        - serverRevision
+      properties:
+        acknowledgedEventIds:
+          type: array
+          items:
+            type: string
+        serverRevision:
+          type: integer
+
+    SyncPullResponse:
+      type: object
+      required:
+        - currentRevision
+        - events
+      properties:
+        currentRevision:
+          type: integer
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncEventDto'
+
+paths:
+  /api/v5/sync/push:
+    post:
+      summary: İstemciden bekleyen olayları sunucuya toplu aktarır
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+      responses:
+        '200':
+          description: Olaylar başarıyla deftere işlendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPushResponse'
+
+  /api/v5/sync/pull:
+    get:
+      summary: Belirli bir watermark revizyonundan sonraki değişiklikleri getirir
+      parameters:
+        - name: since_revision
+          in: query
+          required: true
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Delta olay listesi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'

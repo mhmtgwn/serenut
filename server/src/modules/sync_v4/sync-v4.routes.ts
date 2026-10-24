@@ -34,6 +34,31 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const syncProtocolVersion = 6;
 
+function payloadDeepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  if (typeof a !== "object" || typeof b !== "object") {
+    if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) < 1e-9;
+    return a === b;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!payloadDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (!payloadDeepEqual(a[key], b[key])) return false;
+  }
+  return true;
+}
+
 router.use(authenticateUser as any);
 router.use(requireActiveEntitlement as any);
 router.use((req, res, next) => {
@@ -134,8 +159,9 @@ router.post("/push", async (req, res) => {
         [user.company_id, mutation.mutation_id],
       );
       if (prior.rowCount) {
-        const prevPayload = prior.rows[0].payload as Record<string, unknown> | null;
-        if (prevPayload && JSON.stringify(prevPayload) !== JSON.stringify(mutation.payload)) {
+        const rawPayload = prior.rows[0].payload;
+        const prevPayload = typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
+        if (prevPayload && !payloadDeepEqual(prevPayload, mutation.payload)) {
           throw new Error("mutation_payload_conflict");
         }
         results.push({
@@ -186,10 +212,11 @@ router.post("/push", async (req, res) => {
         currentRevision > 0 &&
         !entity.rows[0].is_deleted
       ) {
-        const existingPayload = entity.rows[0].payload as Record<string, unknown> | null;
+        const rawExisting = entity.rows[0].payload;
+        const existingPayload = typeof rawExisting === "string" ? JSON.parse(rawExisting) : rawExisting;
         const isIdentical =
           existingPayload != null &&
-          (JSON.stringify(existingPayload) === JSON.stringify(mutation.payload) ||
+          (payloadDeepEqual(existingPayload, mutation.payload) ||
             (mutation.entity_type === "financial_transaction" &&
               Number(existingPayload.amount) === Number(mutation.payload.amount) &&
               Number(existingPayload.paid_amount) === Number(mutation.payload.paid_amount) &&
