@@ -1,49 +1,50 @@
 @echo off
-chcp 65001 >nul
+setlocal
+cd /d "%~dp0"
+
 echo ===================================================
-echo 🚀 Serenut OS - Guvenli Deploy ^& Push Pipeline
+echo Serenut OS - Deploy and Push Pipeline
 echo ===================================================
 
 echo.
-echo [1/4] Mimari Borc Kontrolu (Architecture Guard)...
-node tool\architecture_guard.mjs
-if %ERRORLEVEL% neq 0 (
-    echo ❌ Architecture Guard basarisiz oldu!
+echo [1/4] Running Architecture Guard...
+call node tool\architecture_guard.mjs
+if errorlevel 1 (
+    echo [ERROR] Architecture Guard failed!
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
 echo.
-echo [2/4] OTA Release Anahtar Surekliligi Kontrolu...
-node scripts\verify_release_key_continuity.js origin/main
-if %ERRORLEVEL% neq 0 (
-    echo ❌ Release key continuity dogrulamasi basarisiz!
+echo [2/4] Verifying Release Key Continuity...
+call node scripts\verify_release_key_continuity.js origin/main
+if errorlevel 1 (
+    echo [ERROR] Release key continuity verification failed!
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
 echo.
-echo [3/4] Release Manager Kritik Testi...
+echo [3/4] Running Release Manager Test...
 call flutter test test\services\release_manager_test.dart
-if %ERRORLEVEL% neq 0 (
-    echo ❌ Release Manager testi basarisiz!
+if errorlevel 1 (
+    echo [ERROR] Release Manager test failed!
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
 echo.
-echo [4/4] Git Push origin main (CI/CD Tetikleme)...
+echo [4/4] Pushing to Git (origin main)...
 git push origin main
-if %ERRORLEVEL% neq 0 (
-    echo ❌ Git push basarisiz oldu veya iptal edildi!
+if errorlevel 1 (
+    echo [ERROR] Git push failed or was cancelled!
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
 echo.
 echo ===================================================
-echo 🎉 Basariyla push edildi!
-echo GitHub Actions uzerinde yayinlama basladi:
-echo https://github.com/mhmtgwn/serenut/actions
+echo SUCCESS! Release triggered via GitHub Actions.
+echo Check progress at: https://github.com/mhmtgwn/serenut/actions
 echo ===================================================
 pause
