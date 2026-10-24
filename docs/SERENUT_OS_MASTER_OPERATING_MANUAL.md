@@ -1,8 +1,8 @@
 # Serenut OS — Sistem Mimarisi, Operasyonel Kullanım & Sorun Giderme Ana El Kitabı (Master Operating Manual)
 
-> **Belge Sürümü:** 1.0.0 (Master Reference)  
+> **Belge Sürümü:** 2.0.0 (Definitive Master Reference)  
 > **Hedef Sistem:** Serenut OS İstemcisi (Desktop Windows / Android) & Serenut Cloud (Node.js/TypeScript VPS & PostgreSQL)  
-> **Amaç:** Kayıttan girişe, ürün yönetiminden cariye, donanımdan senkronizasyona ve güncelleme imzalamaya kadar sistemin her bir parçasının ne şekilde çalıştığını açıklayan, sorun anında doğrudan referans alınabilecek nihai operasyonel ve teknik kılavuz.
+> **Amaç:** Kayıttan girişe, e-Dönüşümden (GİB e-Arşiv) donanıma, ürün yönetiminden cariye, senkronizasyondan P2P görsel aktarımına, yedeklemeden güncelleme imzalamaya kadar sistemin istisnasız tüm parçalarının ne şekilde çalıştığını açıklayan, sorun anında doğrudan referans alınabilecek nihai teknik ve operasyonel el kitabı.
 
 ---
 
@@ -12,12 +12,16 @@
 2. [Kullanıcı, Organizasyon (Tenant) & Cihaz Yönetimi (Kayıttan Girişe)](#2-kullanıcı-organizasyon-tenant--cihaz-yönetimi-kayıttan-girişe)
 3. [Ürün Kataloğu, Fiyatlandırma, Barkodlar & Stok Motoru](#3-ürün-kataloğu-fiyatlandırma-barkodlar--stok-motoru)
 4. [Müşteri, Cari Hesap, Veresiye, Senet & Defter Motoru (Ledger Engine)](#4-müşteri-cari-hesap-veresiye-senet--defter-motoru-ledger-engine)
-5. [Kasa Satış, Sepet & Ödeme Motoru (POS Sales Engine)](#5-kasa-satış-sepet--ödeme-motoru-pos-sales-engine)
+5. [Kasa Satış, Sepet, Ödeme Motoru & Sepet Kurtarma](#5-kasa-satış-sepet-ödeme-motoru--sepet-kurtarma)
 6. [Senkronizasyon Motoru (Sync V4 — Offline-First Replication)](#6-senkronizasyon-motoru-sync-v4--offline-first-replication)
-7. [Donanım Entegrasyonları (Peripherals & Hardware Workers)](#7-donanım-entegrasyonları-peripherals--hardware-workers)
-8. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#8-dağıtım-güncelleme--kriptografik-imzalama-standartları)
-9. [Gözlemlenebilirlik, Telemetri & Loglama](#9-gözlemlenebilirlik-telemetri--loglama)
-10. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#10-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
+7. [Donanım Entegrasyonları & Ağ Paylaşımlı Donanım (Hardware Layer)](#7-donanım-entegrasyonları--ağ-paylaşımlı-donanım-hardware-layer)
+8. [Yerel Ağda Eşler Arası (P2P) Ürün Görseli Dağıtımı (LAN Peer Service)](#8-yerel-ağda-eşler-arası-p2p-ürün-görseli-dağıtımı-lan-peer-service)
+9. [e-Dönüşüm, GİB e-Arşiv / e-Fatura & Bildirim Ağ Geçitleri](#9-e-dönüşüm-gib-e-arşiv--e-fatura--bildirim-ağ-geçitleri)
+10. [Yedekleme, Geri Yükleme, Lisanslama & Veri Aktarımı (Migration)](#10-yedekleme-geri-yükleme-lisanslama--veri-aktarımı-migration)
+11. [Dağıtım, Güncelleme & Kriptografik İmzalama Standartları](#11-dağıtım-güncelleme--kriptografik-imzalama-standartları)
+12. [Gözlemlenebilirlik, Telemetri & Loglama](#12-gözlemlenebilirlik-telemetri--loglama)
+13. [Sorun Giderme Runbook'u & Acil Müdahale Prosedürleri](#13-sorun-giderme-runbooku--acil-müdahale-prosedürleri)
+14. [Genişletilmiş Hızlı Erişim Kontrol Listesi (Master Cheat Sheet)](#14-genişletilmiş-hızlı-erişim-kontrol-listesi-master-cheat-sheet)
 
 ---
 
@@ -32,7 +36,10 @@ graph TD
         Domain[Domain Modelleri & Use Case'ler]
         SalesEngine[Kasa Satış & Checkout FSM]
         Ledger[Çift Taraflı Defter Motoru]
-        HW[Donanım Servisleri: Yazıcı, Terazi, Barkod]
+        HW[Donanım: Yazıcı, Terazi, Barkod, Paylaşımlı Cihazlar]
+        P2P[P2P Görsel Dağıtımı: UDP 48732 / HTTP 48731]
+        GIB[GİB e-Arşiv Portalı İstemcisi]
+        SMS[SIM Kartlı SMS Gateway]
         SQLite[(Yerel Standart SQLite)]
         Outbox[(Outbox Tablosu)]
     end
@@ -40,6 +47,7 @@ graph TD
     subgraph "İLETİŞİM KANALLARI"
         HTTPS[HTTPS REST API / v1 / v4]
         WSS[WebSocket / Realtime Events]
+        LAN[Yerel Ağ / LAN Broadcast]
     end
 
     subgraph "BULUT / VPS KATMANI"
@@ -54,6 +62,10 @@ graph TD
     Domain --> SalesEngine
     Domain --> Ledger
     Domain --> HW
+    Domain --> GIB
+    Domain --> SMS
+    HW --> LAN
+    P2P --> LAN
     SalesEngine --> SQLite
     Ledger --> SQLite
     SQLite --> Outbox
@@ -273,7 +285,7 @@ Senetli satışlarda senetler ayrı bir portföy tablosunda (`promissory_notes`)
 
 ---
 
-## 5. KASA SATIŞ, SEPET & ÖDEME MOTORU (POS SALES ENGINE)
+## 5. KASA SATIŞ, SEPET, ÖDEME MOTORU & SEPET KURTARMA
 
 ### 5.1. Checkout Sonlu Durum Makinesi (Finite State Machine)
 
@@ -301,7 +313,15 @@ Eşzamanlı işlemleri engellemek için satış başlatıldığı anda sepet bel
 - Barkod okuyucu veya kasiyer ikinci bir tuşa bassa dahi işlem devam ederken sepet manipüle edilemez.
 - İşlem SQLite transaction seviyesinde `runInTransaction` ile yürütülür. Herhangi bir adımda (ör. stok yetersizliği, donanım çökmesi) hata oluşursa tüm transaction `ROLLBACK` edilir; hayalet satış veya açıkta kalan ödeme engellenir.
 
-### 5.3. Ödeme Yöntemleri & Karma (Split) Ödeme
+### 5.3. Elektrik Kesintisi & Kapanma Koruması (`CartPersistenceService`)
+
+Kasiyer 15 kalem ürün okuttuğu anda elektrik kesilirse veya bilgisayar aniden kapanırsa ne olur?
+- [CartPersistenceService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/cart_persistence_service.dart), sepet durumunu bellekte tutarken aynı zamanda her değişiklikte yerel diske atomik JSON snapshot olarak yazar (`active_cart_recovery.json`).
+- Bilgisayar tekrar açıldığında Serenut OS bu dosyayı okur:
+  - "Bekleyen açık bir sepet bulundu. Kurtarılsın mı?" uyarısı verir.
+  - Kasiyer tek tuşla 15 kalem ürünü ve seçili müşteriyi aynen ekrana geri getirir; müşteriyi kasada bekletmeden kaldığı yerden devam eder.
+
+### 5.4. Ödeme Yöntemleri & Karma (Split) Ödeme
 
 Sistem esnek ödeme kombinasyonlarını destekler:
 1. **Nakit:** Kasiyer alınan tutarı girer, para üstü ekranda büyük puntolarla gösterilir, nakit çekmecesi otomatik açılır (`\x1b\x70...`).
@@ -311,7 +331,7 @@ Sistem esnek ödeme kombinasyonlarını destekler:
    - Örnek: Toplam 2.000 TL -> 500 TL Nakit + 1.000 TL Kredi Kartı + 500 TL Veresiye.
    - Her ödeme parçası `sale_payments` tablosuna ayrı ayrı kaydedilir; ödemelerin toplamı sepet toplamına eşit olmadan satış kapatılamaz.
 
-### 5.4. İade ve Değişim Akışı
+### 5.5. İade ve Değişim Akışı
 
 - **Satış Fişinden İade:** Müşteri fiş barkodunu getirdiğinde geçmiş satış çağrılır. İade edilmek istenen satırlar seçilir.
 - **Belgesiz / Serbest İade:** Ürün ve miktar seçilerek iade fişi kesilir.
@@ -320,7 +340,7 @@ Sistem esnek ödeme kombinasyonlarını destekler:
   - İade bedeli nakit ödendiyse kasadan nakit çıkışı (`cash_transactions.type = 'refund'`) yapılır.
   - Veresiye satışın iadesiyse müşterinin cari hesabına alacak (`sale_return_credit`) yazılır.
 
-### 5.5. Gün Sonu ve Z-Raporu (Kasa Kapanışı)
+### 5.6. Gün Sonu ve Z-Raporu (Kasa Kapanışı)
 
 1. **Gün Açılışı:** Kasaya sabah bırakılan devir nakit girilir.
 2. **Gün İçi:** Kasa girişleri (tahsilat, nakit ekleme) ve çıkışları (masraf ödemesi, mal alımı) kaydedilir.
@@ -381,7 +401,7 @@ Ağ kopması durumunda istemci aynı mutasyonu tekrar gönderebilir.
 
 ---
 
-## 7. DONANIM ENTEGRASYONLARI (PERIPHERALS & HARDWARE WORKERS)
+## 7. DONANIM ENTEGRASYONLARI & AĞ PAYLAŞIMLI DONANIM (HARDWARE LAYER)
 
 ### 7.1. Termal Fiş Yazıcısı (ESC/POS)
 
@@ -422,9 +442,111 @@ Kasaya bağlı terazi ürün tartımında hızı ve doğruluğu sağlar.
   - Terazi veri akışında `ST` (Stable / Kararlı) ve `US` (Unstable / Hareketli) bayrakları gönderir.
   - Tartım titrerken kasiyerin hatalı gramajla satış yapmasını önlemek için sistem ekrandaki tartım butonunu `US` durumunda kilitler; terazi `ST` verdiğinde gramaj yeşile döner ve sepete eklenebilir.
 
+### 7.4. Ağ Paylaşımlı Donanım Köprüsü (`SharedHardwareService`)
+
+İşletmelerde her kasaya ayrı yazıcı veya terazi almak yüksek maliyetlidir.
+- [SharedHardwareService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/shared_hardware_service.dart) ve [SharedHardwareWorker](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/shared_hardware_worker.dart), USB üzerinden Ana Kasa'ya bağlı bir yazıcıyı ağda "Paylaşımlı Cihaz" olarak yayınlar.
+- İkinci Kasa (ör. Android el terminali veya Kasa 2) satış yaptığında doğrudan ana kasaya veya bulut kuyruğuna bir `ClaimedHardwareJob` gönderir.
+- Ana Kasa kuyruktaki işi alır, yerel termal yazıcısından fişi basar veya teraziden okuduğu ağırlığı Kasa 2'ye aktarır.
+
 ---
 
-## 8. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
+## 8. YEREL AĞDA EŞLER ARASI (P2P) ÜRÜN GÖRSELİ DAĞITIMI (LAN PEER SERVICE)
+
+Binlerce ürünün yüksek çözünürlüklü fotoğraflarını bulut sunucusuna yüklemek sunucu maliyetlerini artırır ve mağazanın internet kotasını tüketir.
+
+Serenut OS bu sorunu **P2P Local-Area Mesh** ile çözer:
+
+```mermaid
+graph LR
+    subgraph "MAĞAZA YEREL AĞI (LAN)"
+        Kasa1[Kasa 1: Fotoğraf Çekildi / Eklendi]
+        Kasa2[Kasa 2: İkinci Bilgisayar]
+        Tablet[Mobil Terminal: Android El Tableti]
+    end
+
+    Kasa1 -- "UDP 48732 Broadcast: 'Yeni Fotoğraf Var (SHA-256)'" --> Kasa2
+    Kasa1 -- "UDP 48732 Broadcast: 'Yeni Fotoğraf Var (SHA-256)'" --> Tablet
+    Kasa2 -- "HTTP 48731 GET /images/:hash" --> Kasa1
+    Tablet -- "HTTP 48731 GET /images/:hash" --> Kasa1
+    Kasa1 -. "Yalnızca Content-Addressed URI: device-image://hash" .-> Cloud[(Bulut / VPS)]
+```
+
+- **Sıfır Bulut Kota Tüketimi:** Bulut sunucusuna görsel dosyası yüklenmez! Yalnızca `device-image://<sha256>.jpg` referansı yazılır.
+- **Otomatik Cihaz Keşfi ([ProductImagePeerService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/product_image_peer_service.dart)):**
+  - İstemciler yerel ağda **UDP Port 48732** üzerinden şirket anahtarını içeren broadcast anonsları yapar.
+  - Bir kasada ürün resmi eklendiğinde, ağdaki diğer cihazlar saniyeler içinde bunu fark eder.
+  - Diğer kasalar **HTTP Port 48731** üzerinden resmi doğrudan resmi çeken kasadan indirir ve `%APPDATA%\...\product_images` dizinine kaydeder.
+  - Cihaz kapalı olsa bile bir sonraki açılışta eksik görseller yerel ağdan otomatik tamamlanır.
+
+---
+
+## 9. E-DÖNÜŞÜM, GİB E-ARŞİV / E-FATURA & BİLDİRİM AĞ GEÇİTLERİ
+
+### 9.1. GİB e-Arşiv Portalı Doğrudan İstemcisi (`GibEArsivClient` — 0 TL Maliyetli)
+
+Serenut OS, özel entegratörlere her fatura başına kontör parası ödeme zorunluluğunu ortadan kaldıran resmi bir doğrudan entegrasyona sahiptir ([GibEArsivClient](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/gib_earsiv_client.dart)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Kasa as Serenut OS
+    participant GIB as GİB e-Arşiv Resmi Portalı (earsivportal.efatura.gov.tr)
+    actor GibUser as Maliye / GİB SMS Hattı
+
+    Kasa->>GIB: POST dispatch (kullanıcı kodu, şifre, Assos-Session)
+    GIB-->>Kasa: Giriş Tokeni (token = abc123xyz)
+    Note over Kasa: 2. Kasa Satışından Fatura JSON'u Üretilir
+    Kasa->>GIB: POST dispatch (EARSIV_PORTAL_FATURA_OLUSTUR, payload)
+    GIB-->>Kasa: Fatura Taslağı Oluşturuldu (fatura_uuid)
+    Kasa->>GIB: POST dispatch (EARSIV_PORTAL_SMS_GONDER)
+    GIB-->>GibUser: Cep Telefonuna SMS Onay Kodu Gider
+    GibUser->>Kasa: Kasiyer Ekrana Gelen SMS Kodunu Girer
+    Kasa->>GIB: POST dispatch (EARSIV_PORTAL_SMS_ONAY, sms_code)
+    GIB-->>Kasa: 200 OK — Fatura Resmen İmzalandı & Mühürlendi!
+    Kasa->>GIB: GET dispatch (EARSIV_PORTAL_FATURA_GOSTER / HTML-PDF)
+    Kasa->>Kasa: Fatura PDF'ini Kaydet & Termalden Bilgi Fişi Bas
+```
+
+- **KDV & Matrah Dağılımı:** Kasa fişindeki her KDV oranı (%1, %10, %20) GİB kurallarına uygun olarak matrah ve KDV ayrımına tabi tutulur.
+- **İptal & Gider Pusulası:** İade durumlarında faturanın GİB portalı üzerinden resmi iptal isteği (`EARSIV_PORTAL_FATURA_IPTAL`) gönderilebilir.
+
+### 9.2. Android SIM Kartlı SMS Ağ Geçidi Modu (`SmsGatewayService`)
+
+İşletmelerin toplu SMS firmalarına para ödemesini engelleyen yerli mimari:
+- Kasada kullanılan Android cihaz (veya çekmecedeki eski bir Android telefon) sistemde **"Birincil SIM Ağ Geçidi"** olarak seçilir ([SmsGatewayService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart)).
+- Diğer tüm kasalar veya bulut sunucusu bir SMS göndermek istediğinde (ör. veresiye fiş bildirimi, bakiye ekstresi) mesajı sunucudaki SMS kuyruğuna yazar.
+- SIM kartlı Android cihaz her 20 saniyede bir `/api/v1/notifications/sms-gateway/poll` sorgusu yapar; bekleyen mesajları kendi SIM kartındaki ücretsiz SMS paketini kullanarak gerçek GSM şebekesinden müşteriye gönderir.
+
+### 9.3. WhatsApp Business Cloud API & Webhook Entegrasyonu
+
+- Satış tamamlandığında müşterinin cep telefonuna WhatsApp üzerinden dijital fiş bağlantısı ve bakiye özeti gönderilir.
+- Meta Cloud API (`graph.facebook.com/v18.0/`) üzerinden şablon mesajları iletilir; mesajın iletildi ve mavi tik (okundu) durumları WebSocket ile kasaya anında yansıtılır.
+
+---
+
+## 10. YEDEKLEME, GERİ YÜKLEME, LİSANSLAMA & VERİ AKTARIMI (MIGRATION)
+
+### 10.1. Güvenli Veritabanı Yedekleme & Geri Yükleme (`BackupService`)
+
+- [BackupService](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/backup_service.dart), her akşam gün sonu Z-raporu alındığında veya her yazılım güncellemesi öncesinde otomatik devreye girer.
+- **WAL Dondurma:** Yedek alınmadan önce veritabanında `PRAGMA wal_checkpoint(TRUNCATE)` çalıştırılarak `-wal` dosyasındaki tüm veri ana `.db` dosyasına dökülür.
+- **Doğrulama:** Yedek dosyasının SHA-256 hash'i hesaplanır ve `PRAGMA integrity_check` yapılarak dosyanın sağlam olduğu tescillenmeden işlem bitirilmez.
+- **Harici / Bulut Yedek:** İsteğe bağlı olarak Google Drive API entegrasyonu veya takılı bir USB belleğe `.serenut_backup` uzantılı arşiv dosyası olarak kopyalanır.
+
+### 10.2. Lisanslama ve Çevrimdışı İntibak Süresi (Offline Grace Period)
+
+- Lisans doğrulaması sunucunun RSA-4096 özel anahtarı ile imzalanmış bir dijital sertifika ile yapılır.
+- **İnternet Kesintisi Güvencesi:** Sürekli interneti olmayan mağazalarda kasanın kapanmasını önlemek için **15 Günlük Çevrimdışı İntibak Süresi (Grace Period)** tanımlıdır. İnternet 15 gün boyunca hiç gelmese bile kasa satış yapmaya devam eder.
+
+### 10.3. Dış Sistemlerden Veri Aktarımı (Excel / JSON Migration)
+
+- [DataTransferPage](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/presentation/pages/data_transfer_page.dart) üzerinden işletmelerin eski yazılımlarından (Akınsoft, Mikro, Logo, NarBarkod vb.) dışa aktardığı Excel (`.xlsx`), CSV veya JSON dosyaları içe aktarılır.
+- Ürün adları, barkodlar, birimler, alış/satış fiyatları ve mevcut stoklar kuruş modeline dönüştürülerek içe alınır.
+
+---
+
+## 11. DAĞITIM, GÜNCELLEME & KRİPTOGRAFİK İMZALAMA STANDARTLARI
 
 Bu bölüm, `AGENTS.md` ve `docs/release-update-runbook.md` belgelerinde tanımlanan **zorunlu güvenlik ve yayın kurallarını** içerir.
 
@@ -468,7 +590,7 @@ graph TD
     VerifyRsa -- Başarısız --> Abort[Dosyayı Hemen Sil & Hata Günlüğü Üret]
 ```
 
-### 8.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
+### 11.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
 
 - **`+` İletimi Yasaktır (Dosya Adları & Public UI - AGENTS.md Kural 2):**
   - Kullanıcıya sunulan veya web sitesinden indirilen dosyalarda `+` içeren dahili Flutter derleme numarası **ASLA KULLANILAMAZ** (Örnek: `SerenutOS-v1.3.144+299.exe` YASAKTIR).
@@ -476,7 +598,7 @@ graph TD
     - Görünen ve İndirilen Dosya Adı: `SerenutOS-v1.3.144.exe` ve `SerenutOS-v1.3.144.apk`.
   - `pubspec.yaml` içerisindeki `+299` yapısı sadece dahili `versionCode` ve CI takibi içindir; yayın araçları ve indirme servisleri bunu otomatik semantik formata (`v1.3.144`) çevirir.
 
-### 8.2. Değişmez İmza Sözleşmesi & OTA Standardı
+### 11.2. Değişmez İmza Sözleşmesi & OTA Standardı
 
 1. **Android Paket İmzası (Keystore):**
    - Sertifika Parmak İzi (SHA-256): `server/release-signing-policy.json` dosyasındaki `androidPackageCertificateSha256` değeri ile birebir eşleşmelidir. Eşleşmeyen APK yayınlanamaz.
@@ -492,16 +614,16 @@ graph TD
 
 ---
 
-## 9. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
+## 12. GÖZLEMLENEBİLİRLİK, TELEMETRİ & LOGLAMA
 
-### 9.1. Yerel Loglama (Structured JSONL)
+### 12.1. Yerel Loglama (Structured JSONL)
 
 İstemci tüm çalışma loglarını işletim sistemine özel yerel dizinde saklar:
 - **Windows:** `%APPDATA%\Serenut OS Software Technologies A.Ş\Serenut OS\logs\app.log`
 - **Android:** `/data/user/0/com.serenutos.pos/files/logs/app.log`
 - **Log Formatı:** JSON Lines (her satırda timestamp, level, subsystem, correlation_id, message, payload).
 
-### 9.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
+### 12.2. Sentry Entegrasyonu & Hata Fırtınası Filtreleri
 
 Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 - **Filtreleme Kuralları (`beforeSend`):**
@@ -510,9 +632,9 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 
 ---
 
-## 10. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
+## 13. SORUN GİDERME RUNBOOK'U & ACİL MÜDAHALE PROSEDÜRLERİ
 
-### 10.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
+### 13.1. Senaryo 1: Kasa Çevrimdışı Kaldı / Outbox Kuyruğu Birikti
 
 **Belirti:** Satışlar yapılıyor ancak web panelinde veya diğer kasalarda görünmüyor. Sağ üst köşedeki bulut simgesi kırmızı/sarı.
 1. **İnternet ve Sunucu Erişimi Kontrolü:**
@@ -531,7 +653,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ağ düzeldiğinde sistem otomatik push yapar.
    - Acil durumlarda Ayarlar -> Senkronizasyon -> "Şimdi Eşitle" butonuna basılır.
 
-### 10.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
+### 13.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
 
 **Belirti:** Müşteri kartında bakiye 500 TL yazıyor ancak hareket listesi toplandığında 400 TL çıkıyor.
 1. **İnceleme:** `customers.balance_cents` önbellek kolonu harici bir işlem veya kesinti yüzünden güncelliğini yitirmiş olabilir.
@@ -548,7 +670,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. Bakiye anında matematiksel olarak defterin gerçek toplamına eşitlenir.
 
-### 10.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
+### 13.3. Senaryo 3: SQLite Veritabanı Kilitlendi veya WAL Büyüdü
 
 **Belirti:** `database is locked` veya `disk I/O error`.
 1. **Bütünlük Kontrolü:**
@@ -563,7 +685,7 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    ```
 3. **Kurtarma:** Uygulama tamamen kapatılır, `%APPDATA%\...\databases\core_next` dizinindeki veritabanının yedeği alınır ve uygulama yeniden başlatılır.
 
-### 10.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
+### 13.4. Senaryo 4: Termal Yazıcı Fiş Basmıyor veya Türkçe Harfler Bozuk
 
 1. **Bağlantı Kontrolü:**
    - USB yazıcı ise Windows Aygıt Yöneticisi'nde doğru yazıcı kuyruğu seçili mi?
@@ -572,13 +694,13 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Ayarlar -> Yazıcı Ayarları -> "Karakter Kod Sayfası" seçeneğini `CP857` yapın.
    - Sorun çözülmezse "Grafik/Resim Olarak Yazdır" seçeneğini açın (tüm karakterleri piksel olarak dökeceğinden %100 kusursuz Türkçe basacaktır).
 
-### 10.5. Senaryo 5: Terazi Ağırlığı Okumuyor
+### 13.5. Senaryo 5: Terazi Ağırlığı Okumuyor
 
 1. Windows Aygıt Yöneticisi -> Bağlantı Noktaları (COM & LPT) altında terazi USB-Serial çeviricinin COM portunu (ör. `COM3`) kontrol edin.
 2. Başka bir uygulamanın COM portunu işgal etmediğinden emin olun (COM portları tekil erişimlidir).
 3. Ayarlar -> Donanım -> Terazi ekranından Baud Rate'in `9600` ve modelin doğru seçildiğini doğrulayın.
 
-### 10.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
+### 13.6. Senaryo 6: Güncelleme İndirildi Ama İmza Hatası Veriyor
 
 **Belirti:** Güncelleme iniyor ancak "İmza doğrulanamadı" uyarısıyla iptal ediliyor.
 1. İndirilen dosyanın SHA-256 hash'i sunucudaki hash ile uyuşmuyor olabilir (eksik indirme / proxy araya girmesi).
@@ -586,7 +708,13 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
    - Windows: `%TEMP%\serenut_updates` veya `%APPDATA%\...\updates` dizinini silin.
 3. Cihazın sürümünün köprü sürüm gerektirip gerektirmediğini (`1.3.10+91` altı mı?) kontrol edin.
 
-### 10.7. Senaryo 7: VPS Production Sunucusu Acil Müdahale Komutları
+### 13.7. Senaryo 7: GİB e-Arşiv Portalı Fatura İmzalamıyor / Hata Veriyor
+
+1. **GİB Portal Bakımı:** GİB portalı yoğunluk veya bakım saatlerinde (genelde gece 00:00 - 02:00) yanıt vermeyebilir. İstemcideki faturayı "Taslaklara Kaydet" ile yerelde tutun; portal açıldığında tek tıkla toplu imzalayın.
+2. **SMS Doğrulama Zaman Aşımı:** SMS onay kodu 180 saniye içinde girilmelidir. Zaman aşımına uğradıysa yeni SMS isteği tetikleyin.
+3. **Mükellef TCKN/VKN Kontrolü:** Alıcı TCKN veya VKN'si 10 ya da 11 hane olmalı, e-Fatura mükellefi olan kurumlara e-Arşiv değil doğrudan e-Fatura kesilmelidir.
+
+### 13.8. Senaryo 8: VPS Production Sunucusu Acil Müdahale Komutları
 
 ```bash
 # Sunucu durumunu kontrol et
@@ -607,18 +735,24 @@ node scripts/verify_published_release.js 1.3.144+299
 
 ---
 
-## 11. HIZLI ERİŞİM KONTROL LİSTESİ (CHEAT SHEET)
+## 14. GENİŞLETİLMİŞ HIZLI ERİŞİM KONTROL LİSTESİ (MASTER CHEAT SHEET)
 
 | Alan | Kanonik Kural | İlgili Dosya / Kod |
 |---|---|---|
-| **Veritabanı** | Standart SQLite (SQLCipher Yasak) | `lib/infrastructure/database/` |
-| **Para Birimi** | Kuruş / Integer (`MoneyCents`) | `core_next/client_core/lib/domain/money_cents.dart` |
-| **Bakiye Formülü** | Pozitif = Borçlu, Negatif = Alacaklı | `lib/infrastructure/database/schema/db_triggers.dart` |
+| **Veritabanı** | Standart SQLite (SQLCipher Yasak) | [db_schema.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_schema.dart) |
+| **Para Birimi** | Kuruş / Integer (`MoneyCents`) | [money_cents.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/core_next/client_core/lib/domain/money_cents.dart) |
+| **Bakiye Formülü** | Pozitif = Borçlu, Negatif = Alacaklı | [db_triggers.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_triggers.dart) |
 | **Dosya İsimleri** | `+` Yasak (`SerenutOS-vX.Y.Z.exe`) | `AGENTS.md` Kural 2 |
-| **OTA İmzalama** | Dosya SHA-256 Metninin RSA İmzası | `server/src/scripts/publish-release.ts` |
-| **Yayın Doğrulama** | Zorunlu Kontrol Scripti | `scripts/verify_published_release.js` |
-| **Senkronizasyon** | Deep Equal JSONB (`payloadDeepEqual`) | `server/src/modules/sync_v4/sync-v4.routes.ts` |
-| **Yerel Loglar** | `%APPDATA%\...\logs\app.log` | `lib/infrastructure/services/log_collection_service.dart` |
+| **OTA İmzalama** | Dosya SHA-256 Metninin RSA İmzası | [publish-release.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/scripts/publish-release.ts) |
+| **Yayın Doğrulama** | Zorunlu Kontrol Scripti | [verify_published_release.js](file:///c:/Users/ecz/proje/shaman/shaman_new/scripts/verify_published_release.js) |
+| **Senkronizasyon** | Deep Equal JSONB (`payloadDeepEqual`) | [sync-v4.routes.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/sync_v4/sync-v4.routes.ts) |
+| **GİB e-Arşiv** | 0 TL Maliyetli Resmi Portal İstemcisi | [gib_earsiv_client.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/gib_earsiv_client.dart) |
+| **SIM SMS Gateway** | Android Telefonu Şebeke Modemi Yapma | [sms_gateway_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/sms_gateway_service.dart) |
+| **P2P Görsel Ağı** | UDP 48732 / HTTP 48731 LAN Senkronu | [product_image_peer_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/product_image_peer_service.dart) |
+| **Ortak Donanım** | Kasalar Arası Ortak Yazıcı/Terazi | [shared_hardware_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/shared_hardware_service.dart) |
+| **Sepet Kurtarma** | Elektrik Kesilse Bile Sepeti Geri Getirme | [cart_persistence_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/cart_persistence_service.dart) |
+| **Yedekleme** | WAL Checkpoint & Integrity Check | [backup_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/backup_service.dart) |
+| **Yerel Loglar** | `%APPDATA%\...\logs\app.log` | [log_collection_service.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/services/log_collection_service.dart) |
 
 ---
 *Bu el kitabı Serenut OS geliştirici ve operasyon ekipleri için birincil ve bağlayıcı referanstır. Her yeni mimari kararda ve sürüm geçişinde güncellenmelidir.*
