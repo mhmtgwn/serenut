@@ -413,6 +413,19 @@ Cari hesaplardan nakit veya kartla para tahsilatı yapıldığında, kasiyerin h
   - Sistem vadesi geçmiş müşterilere toplu WhatsApp/SMS borç hatırlatması gönderirken esnafı mahcup etmeyecek akıllı bir filtre uygular:
   - `skippedRecentCount`: Son X gün içinde zaten hatırlatma mesajı gitmiş müşteriler otomatik atlanır; aynı müşteriye her gün mükerrer mesaj gidip taciz veya spam algısı oluşması engellenir.
 
+### 4.8. Çoklu Kasa Bakiye Yakınsaması & Yerel Delta Güvencesi (`_calculateUnreflectedCustomerDelta`)
+
+İşletmede birden fazla kasa (ör. Kasa 1 ve Kasa 2) bağımsız çalışırken veya çevrimdışı satışlar yapıldığında, merkezi sunucudan gelen müşteri bakiye snapshot'ının yerel veritabanındaki bekleyen hareketleri ezmesini önleyen mimari mekanizma ([SyncV4PullIngestionService:620](file:///c:/Users/ecz/proje/shaman/shaman_new/core_next/client_core/lib/infrastructure/sync/sync_v4_pull_ingestion_service.dart#L620)):
+
+- **Problemin Tanımı:** Bir kasa yerelde müşteriye 100 TL veresiye satmış ancak henüz sunucuya göndermemişken (`PENDING`), sunucudan o müşterinin eski bakiyesi `balance_cents = 500` olarak çekilirse düz `UPDATE customers` işlemi yereldeki 100 TL'lik borcu arayüzde geçici olarak gizleyebilir.
+- **Çözüm Algoritması (`_calculateUnreflectedCustomerDelta`):**
+  1. Sunucudan gelen müşteri verisi okunur (`remoteBalanceCents`).
+  2. Yerel `sync_events` tablosunda durumu `PENDING` veya `TRANSIENT_ERROR` olan ya da revizyonu gelen snapshot'tan daha yeni olan finansal olaylar sorgulanır.
+  3. Henüz sunucuya yansımamış vadeli satışlar (`-debtCents`) ve tahsilatlar (`+paidCents`) toplanarak `unreflectedDeltaCents` hesaplanır.
+  4. Yerel müşteri bakiyesi atomik olarak şu formülle güncellenir:
+     $$\text{effectiveBalanceCents} = \text{remoteBalanceCents} + \text{unreflectedDeltaCents}$$
+- **Sonuç:** Hiçbir kasa birbirinin hareketini ezemez; çevrimdışı hareketler ile merkezi veriler matematiksel kesinlikle birleşir.
+
 ---
 
 ## 5. KASA SATIŞ, SEPET, ÖDEME MOTORU & SEPET KURTARMA
@@ -624,6 +637,14 @@ stateDiagram-v2
   - Kilit hazırlığı (`draining`): Ekranda turuncu uyarı belirir ("Veritabanı Bakım Moduna Alınıyor — Devam eden X işlem tamamlanıyor, lütfen bekleyin...").
   - Kilitli (`locked`): "Sistem Bakım Modunda (Yazma Koruması Aktif)" uyarısı ekranda kalır.
 - **Fail-Closed Koruması:** Kilit aktifken satış yapma, sipariş onaylama veya ödeme alma butonları arayüz seviyesinde devre dışı bırakılır (`_ensureSalesActionPermitted`); SQLite seviyesinde `assertWritePermitted` istisnası fırlatarak veritabanına yarım veya çakışan kayıt girmesini kesin olarak engeller.
+- **Offline-First vs. Merkezi Kilit Ayrımı (Çevrimdışı Kasa Güvencesi & Split-Brain Koruması):**
+  - **Açık Ağdaki Kasalar:** WebSocket veya HTTP üzerinden bakım emrini anında alır, drenaj fazına geçer (`activeWriteCount == 0`) ve kasayı güvenli kilit moduna alır.
+  - **Çevrimdışı (Offline) Kasalar:** İnternet erişimi olmayan kasalar bakım sinyalini alamaz ve ticari akışın aksamaması (Zero-Downtime) için satış yapmaya devam eder. Satışlar yerel SQLite `sales`, `ledger_entries` ve `sync_outbox` tablolarına atomik olarak kaydedilir.
+  - **Bakım Sonrası Ağ Yeniden Bağlandığında (Catch-Up & Reconciliation):**
+    - Sunucu bakım/migrasyon sonrası şema uyumluluğunu doğrular.
+    - Eğer çevrimdışı kasadaki şema sürümü sunucunun yeni şemasından eskiyse, sunucu mutasyonları doğrudan reddetmek yerine `SCHEMA_MIGRATION_REQUIRED` bayrağı döner.
+    - İstemci `LiveSafeCatchUpReconciliationCoordinator` ve `BootstrapCoordinator` mekanizmasını tetikleyerek yerel veritabanını atomik olarak yeni şemaya taşır.
+    - Bekleyen outbox mutasyonları `payloadDeepEqual` ve `_calculateUnreflectedCustomerDelta` algoritması ile sunucuya idempotent olarak sırayla basılır; böylece ne merkezi kesim esnasında kasa durur ne de bakım bittiğinde tek bir işlem kaybolur veya çift yazılır.
 
 ---
 
@@ -732,6 +753,9 @@ graph LR
   - Bir kasada ürün resmi eklendiğinde, ağdaki diğer cihazlar saniyeler içinde bunu fark eder.
   - Diğer kasalar **HTTP Port 48731** üzerinden resmi doğrudan resmi çeken kasadan indirir ve `%APPDATA%\...\product_images` dizinine kaydeder.
   - Cihaz kapalı olsa bile bir sonraki açılışta eksik görseller yerel ağdan otomatik tamamlanır.
+- **Ağ Gereksinimleri & Kurumsal Wi-Fi Kısıtı (AP Isolation):**
+  - P2P görsel dağıtımının cihazlar arasında kesintisiz çalışması için cihazların aynı yerel ağda (LAN/Subnet) olması ve modem/router üzerinde **"AP Isolation / Client Isolation" (Erişim Noktası İzolasyonu)** seçeneğinin **kapalı** olması gerekir.
+  - AVM veya kurumsal kısıtlı ağlarda bu filtre açıksa veya cihazlar birbirine erişemiyorsa, sistem asla çökmez veya hata vermez (`missing source is harmless: the next sync pass retries it`); resmi ilk kaydeden kasa görselini yerel diskinde eksiksiz kullanmaya devam eder.
 
 ---
 
@@ -799,6 +823,11 @@ Satış anında veya satış detayından çağrılan fatura düzenleme sihirbaz�
 - **e-Arşiv PDF İndirme:** İmzalanan fatura GİB sunucusundan anında orijinal HTML/PDF formatında çekilir.
 - **Termal Bilgi Fişi:** 80mm veya 58mm termal yazıcıdan faturanın resmi karekodunu, ETTN (Evrensel Tekil Tanımlama Numarası) kodunu ve mali özetini içeren termal bilgi fişi basılır.
 - **WhatsApp / SMS Fatura İletimi:** Tek tıkla müşterinin cep telefonuna faturanın doğrudan PDF indirme bağlantısı WhatsApp veya SMS üzerinden gönderilir (Kağıt ve kargo maliyeti 0 TL).
+
+### 9.5. Hibrit e-Dönüşüm Mimarisi & Kurumsal Entegratör Köprüsü (`IEArsivProvider`)
+
+- **Katman 1 (0 TL Maliyetli Doğrudan GİB Portal İstemcisi):** Küçük ve orta ölçekli işletmeler için fatura başına kontör ücretini sıfırlayan doğrudan GİB Portalı otomasyonudur. GİB web sunucusunda planlı bakım olduğunda veya SMS gecikmelerinde faturalar yerel veritabanında `gib_drafts` tablosuna atomik olarak alınır; portal erişilebilir olduğunda tek tıkla toplu olarak onaylanır.
+- **Katman 2 (Kurumsal Özel Entegratör Genişlemesi):** Günlük yüzlerce fatura kesen kurumsal işletmeler için sistem, resmi lisanslı özel entegratörlerle (Uyumsoft, Sovos vb.) çalışabilecek `IEArsivProvider` sağlayıcı arayüzüne göre soyutlanmıştır. İstenildiğinde kasa satış arayüzü ve kasiyer deneyimi zerre değişmeden resmi SOAP/REST web servisi moduna geçiş yapılabilir.
 
 ---
 
@@ -1371,23 +1400,24 @@ Bu bölüm, `AGENTS.md` ve `docs/release-update-runbook.md` belgelerinde tanıml
 
 ```mermaid
 graph TD
-    subgraph "GELİŞTİRİCİ / CI"
+    subgraph "GELİŞTİRİCİ / CI ORTAMI"
         Pubspec[pubspec.yaml version: X.Y.Z+B]
-        BuildWin[Windows Exe & Installer Derle]
-        BuildApk[Android Release APK Derle]
+        BuildWin[Windows Kurulum Paketini Derle: SerenutOS-Setup-vX.Y.Z.exe]
+        BuildApk[Android Release APK Derle: SerenutOS-vX.Y.Z.apk]
+        Artifacts[İkili Dosyaları Güvenli Yayın Akışına Aktar]
+    end
+
+    subgraph "YAYIN MOTORU (publish-release.ts / Güvenli VPS Sunucusu)"
         Sha[Küçük Harfli 64 Karakter SHA-256 Metnini Hesapla]
-        RsaSign[RSA-4096 Özel Anahtarla Metni İmzala]
+        RsaSign[Master RSA-4096 Özel Anahtarla Hash Metnini İmzala]
+        VerifyPre[Gömülü Public Key ile İmzayı Kendi Kendine Doğrula]
+        DeployVPS[VPS /releases/ Dizinine Değişmez Olarak Dağıt]
+        UpdateDB[PostgreSQL app_versions Tablosuna Kaydet]
     end
 
-    subgraph "YAYIN ARACI (publish-release.ts)"
-        VerifyPre[Public Key ile İmzayı Doğrula]
-        DeployVPS[VPS releases Dizinine Dosyaları Kopyala]
-        UpdateDB[PostgreSQL releases Tablosunu Güncelle]
-    end
-
-    subgraph "İSTEMCİ (ReleaseManager)"
+    subgraph "İSTEMCİ / TARAYICI (ReleaseManager & UpdateController)"
         CheckUpdate[GET /api/v1/updates/check]
-        Download[Dosyayı İndir]
+        Download[Dosyayı İndir — Content-Disposition: Temiz Semantik İsim]
         VerifySha[İndirilen Dosyanın SHA-256'sını Hesapla]
         VerifyRsa[Yerel Public Key ile İmzayı Doğrula]
         Install[Kurulumu Sessizce / Onaylı Başlat]
@@ -1395,8 +1425,9 @@ graph TD
 
     Pubspec --> BuildWin
     Pubspec --> BuildApk
-    BuildWin --> Sha
-    BuildApk --> Sha
+    BuildWin --> Artifacts
+    BuildApk --> Artifacts
+    Artifacts --> Sha
     Sha --> RsaSign
     RsaSign --> VerifyPre
     VerifyPre --> DeployVPS
@@ -1406,16 +1437,20 @@ graph TD
     Download --> VerifySha
     VerifySha --> VerifyRsa
     VerifyRsa -- Başarılı --> Install
-    VerifyRsa -- Başarısız --> Abort[Dosyayı Hemen Sil & Hata Günlüğü Üret]
+    VerifyRsa -- Başarısız --> Abort[Dosyayı Hemen Sil & Güvenlik Alarmı Üret]
 ```
 
 ### 16.1. Sürüm ve Dosya Adlandırma Kuralları (Professional Versioning)
 
-- **`+` İletimi Yasaktır (Dosya Adları & Public UI - AGENTS.md Kural 2):**
-  - Kullanıcıya sunulan veya web sitesinden indirilen dosyalarda `+` içeren dahili Flutter derleme numarası **ASLA KULLANILAMAZ** (Örnek: `SerenutOS-v1.3.144+299.exe` YASAKTIR).
-  - **Doğru Format:**
-    - Görünen ve İndirilen Dosya Adı: `SerenutOS-v1.3.144.exe` ve `SerenutOS-v1.3.144.apk`.
-  - `pubspec.yaml` içerisindeki `+299` yapısı sadece dahili `versionCode` ve CI takibi içindir; yayın araçları ve indirme servisleri bunu otomatik semantik formata (`v1.3.144`) çevirir.
+- **`+` İletimi Yasaktır (Dosya Adları & Public UI — [AGENTS.md Kural 2](file:///c:/Users/ecz/proje/shaman/shaman_new/.agents/AGENTS.md)):**
+  - Kullanıcıya sunulan veya web sitesinden indirilen dosyalarda `+` içeren dahili Flutter derleme numarası **ASLA KULLANILAMAZ** (Örnek: `SerenutOS-v1.3.144+300.exe` KESİNLİKLE YASAKTIR).
+  - **Doğru Dağıtım & İndirme İsimleri:**
+    - **Windows Kurulum Sihirbazı:** `SerenutOS-Setup-v1.3.144.exe` (Tarayıcı indirmesinde `Content-Disposition` ile otomatik temiz isim basılır).
+    - **Android Yüklenebilir APK:** `SerenutOS-v1.3.144.apk`.
+  - **Sunucu Disk Saklama Mimarisi (Immutable Server Storage):**
+    - VPS diskinde dosya tekilliği ve geriye dönük imza bozulmazlığı için ikili dosyalar `/var/www/serenut-api/releases/${platform}/stable/SerenutOS-${versionCode}${ext}` (Örnek: `SerenutOS-1.3.144+300.exe`) olarak saklanır.
+    - `update.controller.ts`, indirme isteklerinde bu dosyayı bulur ancak kullanıcıya `Content-Disposition: attachment; filename="SerenutOS-Setup-v${cleanVersion}.exe"` başlığıyla sunar. Böylece hem disk seviyesinde build değişmezliği hem de kullanıcı tarafında %100 profesyonel semantik isim standardı korunur.
+  - `pubspec.yaml` içerisindeki `+300` yapısı yalnızca dahili `versionCode` ve CI takibi içindir; yayın araçları bunu kamuya açık arayüzlerde semantik formata (`v1.3.144`) dönüştürür.
 
 ### 16.2. Değişmez İmza Sözleşmesi & OTA Standardı
 
@@ -1425,9 +1460,11 @@ graph TD
    - Tüm binary'ler (`.exe` ve `.dll`) Digicert zaman damgası ile SHA-256 PFX sertifikası kullanılarak imzalanır (`signtool.exe`).
 3. **OTA RSA-SHA256 İmza Girdisi:**
    - **Kritik Kural:** İmzalanan şey dosyanın baytları değildir! Dosyanın küçük harfli 64 karakterlik SHA-256 özet metnidir (`utf-8`).
-4. **Tek Yetkili Yayınlayıcı:**
+4. **Tek Yetkili Yayınlayıcı & Anahtar İzolasyonu:**
    - Desteklenen tek yayınlayıcı: `server/src/scripts/publish-release.ts` (`dist/scripts/publish-release.js`).
+   - Master RSA-4096 özel anahtarı (`RELEASE_SIGNING_PRIVATE_KEY`) yalnızca güvenli yayın ortamında barındırılır; CI veya geliştirici ortamlarında tutulamaz.
    - `scripts/publish_v*.py` veya elle SQL yazarak sürüm yayınlamak **YASAKTIR**.
+   - Yayınlayıcı veritabanında `app_versions` tablosunu atomik işlemle günceller.
 5. **Yayın Doğrulama:**
    - Her yayın sonrasında `node scripts/verify_published_release.js X.Y.Z+B` çalıştırılarak imza ve hash VPS üzerinde tam test edilmeden yayın tamamlanmış sayılmaz.
 
@@ -1483,9 +1520,9 @@ Sentry crash reporting sistemi istemcideki gerçek kritik hataları yakalar.
 ### 18.2. Senaryo 2: Müşteri Bakiyesi ile Defter Hareketleri Uyuşmuyor
 
 **Belirti:** Müşteri kartında bakiye 500 TL yazıyor ancak hareket listesi toplandığında 400 TL çıkıyor.
-1. **İnceleme:** `customers.balance_cents` önbellek kolonu harici bir işlem veya kesinti yüzünden güncelliğini yitirmiş olabilir.
+1. **Mimari Arka Plan:** Sistem normal şartlarda `SyncV4PullIngestionService` içerisindeki `_calculateUnreflectedCustomerDelta` mekanizması ile uzaktan gelen bakiye snapshot'ını yerel kuyruktaki işlemlerle otomatik yakınsar. Ancak beklenmeyen bir elektrik kesintisi veya işletim sistemi zorla kapanması esnasında yerel SQLite trigger'ı yarım kaldıysa `customers.balance_cents` önbellek kolonu sapabilir.
 2. **Kanonik Yeniden Hesaplama:**
-   İstemcideki `LedgerService.recalculateCustomerBalance(customerId)` çalıştırılır veya SQLite üzerinde:
+   İstemcideki `CoreNextCustomerRepository` üzerinden mutabakat tetiklenir veya yerel SQLite üzerinde:
    ```sql
    UPDATE customers 
    SET balance_cents = (
@@ -1603,7 +1640,7 @@ node scripts/verify_published_release.js 1.3.144+300
 | **Veritabanı** | Standart SQLite (SQLCipher Yasak) | [db_schema.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_schema.dart) |
 | **Para Birimi** | Kuruş / Integer (`MoneyCents`) | [money_cents.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/core_next/client_core/lib/domain/money_cents.dart) |
 | **Bakiye Formülü** | Pozitif = Borçlu, Negatif = Alacaklı | [db_triggers.dart](file:///c:/Users/ecz/proje/shaman/shaman_new/lib/infrastructure/database/schema/db_triggers.dart) |
-| **Dosya İsimleri** | `+` Yasak (`SerenutOS-vX.Y.Z.exe`) | [AGENTS.md Kural 2](file:///c:/Users/ecz/proje/shaman/shaman_new/.agents/AGENTS.md) |
+| **Dosya İsimleri** | `+` Yasak (`SerenutOS-Setup-vX.Y.Z.exe` / `.apk`) | [AGENTS.md Kural 2](file:///c:/Users/ecz/proje/shaman/shaman_new/.agents/AGENTS.md) |
 | **OTA İmzalama** | Dosya SHA-256 Metninin RSA İmzası | [publish-release.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/scripts/publish-release.ts) |
 | **Yayın Doğrulama** | Zorunlu Kontrol Scripti | [verify_published_release.js](file:///c:/Users/ecz/proje/shaman/shaman_new/scripts/verify_published_release.js) |
 | **Senkronizasyon** | Deep Equal JSONB (`payloadDeepEqual`) | [sync-v4.routes.ts](file:///c:/Users/ecz/proje/shaman/shaman_new/server/src/modules/sync_v4/sync-v4.routes.ts) |
