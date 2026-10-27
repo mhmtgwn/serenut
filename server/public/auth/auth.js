@@ -144,7 +144,7 @@ function setupPagePrefills() {
           banner.id = 'selected-plan-banner';
           banner.className = 'auth-status text-sm text-green';
           banner.style.marginTop = '8px';
-          banner.textContent = `Seçilen paket: ${matched.label} — Hesabınız 30 gün ücretsiz deneme ile açılır, panelden paketinize geçebilirsiniz.`;
+          banner.textContent = `Seçilen paket: ${matched.label} — Hesabınız 7 gün ücretsiz deneme ile açılır, panelden paketinize geçebilirsiniz.`;
           heading.appendChild(banner);
         }
       }

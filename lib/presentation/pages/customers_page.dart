@@ -152,7 +152,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       ],
       body: Column(
         children: [
-          _buildSummaryBar(balanceSummary),
+          if (!_isSearching) _buildSummaryBar(balanceSummary),
           if (overdue > 0)
             InkWell(
               onTap: _showDueInstallmentsSheet,

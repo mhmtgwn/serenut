@@ -47,12 +47,15 @@ class _LiveScaleDialogState extends ConsumerState<LiveScaleDialog> {
         const SizedBox(width: 8),
         Expanded(child: Text(widget.product.name)),
       ]),
-      content: SizedBox(
-        width: 420,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
             '${(grams / 1000).toStringAsFixed(3)} kg',
             style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w800),
+          ),
           ),
           const SizedBox(height: 8),
           Text(

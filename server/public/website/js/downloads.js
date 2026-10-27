@@ -29,10 +29,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         <a class="btn btn-primary" href="/download/android" download>Android için indir</a>
       </article>
       <article class="feature-card">
-        <div class="eyebrow">Aktivasyon</div>
-        <h3>Aktivasyon Akışı</h3>
-        <p>Kurulum sonrası lisans, cihaz ve tenant bağlantısı uygulama içindeki cihaz/lisans modülünden yapılır.</p>
-        <a class="btn btn-secondary" href="/login">Uygulamaya Gir</a>
+        <div class="eyebrow">3 Adımda Başlangıç</div>
+        <h3>Nasıl Kurulur?</h3>
+        <p>1) Ücretsiz hesabınızı açın, 2) Uygulamayı indirip kurun, 3) E-posta ve şifrenizle giriş yapın. Lisansınız otomatik tanımlanır.</p>
+        <a class="btn btn-secondary" href="/register?flow=account">Ücretsiz Hesap Aç</a>
       </article>
     `;
   }

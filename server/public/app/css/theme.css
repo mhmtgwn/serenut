@@ -331,3 +331,70 @@ body{background:var(--ui-canvas);color:var(--ui-ink)}
   background:none!important;
   box-shadow:none!important
 }
+
+/* UI/UX Polish: table scrolling, responsive metrics, badge alignment, details chevron */
+.table-wrap {
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+.table-wrap table td,
+.table-wrap table th {
+  vertical-align: middle;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+@media (max-width: 600px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .metric-card {
+    min-height: 90px !important;
+    padding: 12px 14px !important;
+  }
+  .metric-card strong {
+    font-size: 1.3rem !important;
+  }
+}
+@media (max-width: 340px) {
+  .metrics-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+details.simple-wide {
+  border: 1px solid var(--ui-line);
+  border-radius: 9px;
+  background: #fff;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+details.simple-wide summary {
+  padding: 14px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+details.simple-wide summary::-webkit-details-marker {
+  display: none;
+}
+details.simple-wide summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ui-muted);
+  border-bottom: 2px solid var(--ui-muted);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin-left: 12px;
+}
+details.simple-wide[open] summary::after {
+  transform: rotate(-135deg);
+}

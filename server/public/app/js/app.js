@@ -54,10 +54,10 @@ function handlePaymentQueryFeedback() {
     try {
       window.top.location.replace(window.location.href);
       return;
-    } catch (_) {}
+    } catch (_) { }
   }
   if (paymentState === 'success') {
-    refreshAccessToken().catch(() => {});
+    refreshAccessToken().catch(() => { });
     showToast('Ödemeniz başarıyla alındı ve aboneliğiniz aktifleştirildi.', 'success', 6000);
   } else if (paymentState === 'pending') {
     showToast('Ödemeniz alındı, doğrulama tamamlandığında aboneliğiniz aktifleşecektir.', 'info', 6000);
@@ -288,9 +288,13 @@ function resolveInitialModule(bootstrap) {
       const billingMod = navigationItems.find((item) => item.id === 'billing-center');
       if (billingMod) return billingMod.id;
     }
-  } catch (_) {}
+  } catch (_) { }
 
-  const landing = navigationItems.find((item) =>
+  const companyDashboard = navigationItems.find((item) => item.id === 'company-dashboard');
+  if (companyDashboard) {
+    return companyDashboard.id;
+  }
+
     item.id === bootstrap.landing_module_id || item.href === bootstrap.landing_route
   );
   return landing?.id || navigationItems.find((item) => item.module === 'home')?.id || navigationItems[0].id;
@@ -361,9 +365,9 @@ window.addEventListener('hashchange', () => {
 
 async function startRealtime() {
   if (realtimeConnecting ||
-      realtimeSocket?.readyState === WebSocket.OPEN ||
-      realtimeSocket?.readyState === WebSocket.CONNECTING ||
-      !isAuthenticated()) return;
+    realtimeSocket?.readyState === WebSocket.OPEN ||
+    realtimeSocket?.readyState === WebSocket.CONNECTING ||
+    !isAuthenticated()) return;
   clearTimeout(realtimeReconnectTimer);
   realtimeConnecting = true;
 
@@ -417,13 +421,13 @@ function isUserEditingEmbedForm() {
 
 function scheduleModuleRefresh(eventType) {
   if (eventType === 'LicenseUpdated') {
-    refreshAccessToken().catch(() => {});
+    refreshAccessToken().catch(() => { });
   }
   clearTimeout(realtimeRefreshTimer);
   realtimeRefreshTimer = setTimeout(() => {
     document.dispatchEvent(new CustomEvent('serenut:realtime', { detail: { eventType } }));
     if (selectedModuleId === 'home' || selectedModuleId === 'workspace-home') {
-      apiFetch('/app/bootstrap').then(renderShell).catch(() => {});
+      apiFetch('/app/bootstrap').then(renderShell).catch(() => { });
     } else if (selectedModuleId) {
       if (isUserEditingEmbedForm()) {
         const container = document.getElementById('embed-content');

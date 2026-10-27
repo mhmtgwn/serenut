@@ -96,7 +96,7 @@ class _KarmaToggleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 64,
-      width: 44,
+      width: 50,
       child: Material(
         color: disabled
             ? _kSurface
@@ -150,7 +150,7 @@ class _CancelKarmaButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 64,
-      width: 44,
+      width: 50,
       child: Material(
         color: _kRedLight,
         borderRadius: BorderRadius.circular(10),
