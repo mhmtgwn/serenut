@@ -500,11 +500,11 @@ class EndOfDayRepository {
           s.paid_amount,
           LOWER(COALESCE(s.payment_method, 'cash')) AS method,
           s.created_at,
-          ft.metadata AS ft_metadata
+          (SELECT ft.metadata FROM financial_transactions ft WHERE ft.reference_id = s.id AND ft.type = 'sale' LIMIT 1) AS ft_metadata
         FROM sales s
         LEFT JOIN customers c ON s.customer_id = c.id
-        LEFT JOIN financial_transactions ft ON ft.reference_id = s.id AND ft.type = 'sale'
-        WHERE s.status NOT IN ('cancelled', 'iptal')
+        WHERE LOWER(COALESCE(s.status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+          AND (s.receipt_no NOT LIKE 'REF-%' OR s.receipt_no IS NULL)
           AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
           AND ${_sqlDate('s.created_at')} = ?
         ORDER BY s.created_at DESC
@@ -523,7 +523,8 @@ class EndOfDayRepository {
             NULL AS ft_metadata
           FROM sales s
           LEFT JOIN customers c ON s.customer_id = c.id
-          WHERE (s.status NOT IN ('cancelled', 'iptal') OR s.status IS NULL)
+          WHERE LOWER(COALESCE(s.status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+            AND (s.receipt_no NOT LIKE 'REF-%' OR s.receipt_no IS NULL)
             AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
             AND ${_sqlDate('s.created_at')} = ?
           ORDER BY s.created_at DESC
@@ -944,7 +945,7 @@ class EndOfDayRepository {
           LOWER(COALESCE(refund_method, 'cash')) AS method,
           COALESCE(SUM(amount), 0) AS total
         FROM refunds
-        WHERE (status != 'cancelled' OR status IS NULL)
+        WHERE (LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'iptal'))
           AND ${_sqlDate('created_at')} = ?
         GROUP BY LOWER(COALESCE(refund_method, 'cash'))
       ''', [dayStr]);
@@ -965,6 +966,35 @@ class EndOfDayRepository {
       // Ignored: fallback or safe default applied
     }
 
+    // Core Next İadeleri: sales tablosunda status = 'REFUND' veya receipt_no LIKE 'REF-%'
+    try {
+      final coreNextRefunds = await _gateway.rawQuery('''
+        SELECT
+          LOWER(COALESCE(payment_method, 'cash')) AS method,
+          COALESCE(SUM(ABS(COALESCE(total_amount, CAST(total_amount_minor AS REAL) / 100.0, 0.0))), 0) AS total
+        FROM sales
+        WHERE (LOWER(COALESCE(status, '')) = 'refund' OR receipt_no LIKE 'REF-%')
+          AND (is_deleted = 0 OR is_deleted IS NULL)
+          AND id NOT IN (SELECT id FROM refunds)
+          AND ${_sqlDate('created_at')} = ?
+        GROUP BY LOWER(COALESCE(payment_method, 'cash'))
+      ''', [dayStr]);
+
+      for (final r in coreNextRefunds) {
+        final m = (r['method'] as String? ?? 'cash').toLowerCase();
+        final tot = (r['total'] as num?)?.toDouble() ?? 0.0;
+        if (_isCard(m)) {
+          refundCard += tot;
+        } else if (_isCash(m)) {
+          refundCash += tot;
+        } else {
+          refundBalance += tot;
+        }
+      }
+    } catch (_) {
+      // Non-fatal if core-next fields are not present
+    }
+
     return _RefundDataResult(
       refundCash: refundCash,
       refundCard: refundCard,
@@ -977,9 +1007,9 @@ class EndOfDayRepository {
     try {
       final rows = await _gateway.rawQuery('''
         SELECT
-          COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN total_amount ELSE 0 END), 0) AS revenue,
-          COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN discount_amount ELSE 0 END), 0) AS discount,
-          COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
+          COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled','iptal','refund') AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL) THEN total_amount ELSE 0 END), 0) AS revenue,
+          COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled','iptal','refund') AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL) THEN discount_amount ELSE 0 END), 0) AS discount,
+          COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
         FROM sales
         WHERE (is_deleted = 0 OR is_deleted IS NULL)
           AND ${_sqlDate('created_at')} = ?
@@ -995,9 +1025,9 @@ class EndOfDayRepository {
       try {
         final rows = await _gateway.rawQuery('''
           SELECT
-            COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN total_amount_cents ELSE 0 END), 0) AS revenue_cents,
-            COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN discount_cents ELSE 0 END), 0) AS discount_cents,
-            COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
+            COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled','iptal','refund') AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL) THEN total_amount_cents ELSE 0 END), 0) AS revenue_cents,
+            COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled','iptal','refund') AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL) THEN discount_cents ELSE 0 END), 0) AS discount_cents,
+            COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
           FROM sales
           WHERE (is_deleted = 0 OR is_deleted IS NULL)
             AND ${_sqlDate('created_at')} = ?

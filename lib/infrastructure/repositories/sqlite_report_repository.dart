@@ -50,7 +50,9 @@ class SqliteReportRepository implements IReportRepository {
         SUM(paid_amount) AS cash,
         SUM(total_amount - paid_amount) AS debt
       FROM sales
-      WHERE status != 'cancelled'
+      WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+        AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL)
+        AND (is_deleted = 0 OR is_deleted IS NULL)
         AND ${_sqlDate('created_at')} >= ?
         AND ${_sqlDate('created_at')} <= ?
       GROUP BY ${_sqlDate('created_at')}
@@ -124,7 +126,9 @@ class SqliteReportRepository implements IReportRepository {
           si.subtotal AS subtotal
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
-        WHERE s.status != 'cancelled'
+        WHERE LOWER(COALESCE(s.status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+          AND (s.receipt_no NOT LIKE 'REF-%' OR s.receipt_no IS NULL)
+          AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
           AND ${_sqlDate('s.created_at')} >= ?
           AND ${_sqlDate('s.created_at')} <= ?
         UNION ALL
@@ -135,7 +139,7 @@ class SqliteReportRepository implements IReportRepository {
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.id
         WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
-          AND o.status != 'cancelled'
+          AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'iptal')
           AND ${_sqlDate('o.created_at')} >= ?
           AND ${_sqlDate('o.created_at')} <= ?
       )
@@ -190,7 +194,9 @@ class SqliteReportRepository implements IReportRepository {
           si.unit_price AS unit_price
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
-        WHERE s.status != 'cancelled'
+        WHERE LOWER(COALESCE(s.status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+          AND (s.receipt_no NOT LIKE 'REF-%' OR s.receipt_no IS NULL)
+          AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
           AND ${_sqlDate('s.created_at')} >= ?
           AND ${_sqlDate('s.created_at')} <= ?
         UNION ALL
@@ -202,7 +208,7 @@ class SqliteReportRepository implements IReportRepository {
         FROM order_items oi
         JOIN orders o ON oi.order_id = o.id
         WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
-          AND o.status != 'cancelled'
+          AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'iptal')
           AND ${_sqlDate('o.created_at')} >= ?
           AND ${_sqlDate('o.created_at')} <= ?
       )
@@ -354,7 +360,9 @@ class SqliteReportRepository implements IReportRepository {
         COALESCE(SUM(total_amount - paid_amount), 0) AS total_debt,
         COUNT(*) AS total_sales
       FROM sales
-      WHERE status != 'cancelled'
+      WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+        AND (receipt_no NOT LIKE 'REF-%' OR receipt_no IS NULL)
+        AND (is_deleted = 0 OR is_deleted IS NULL)
         AND ${_sqlDate('created_at')} >= ?
         AND ${_sqlDate('created_at')} <= ?
     ''', [dayFrom, dayTo]);
@@ -417,7 +425,9 @@ class SqliteReportRepository implements IReportRepository {
       FROM sale_items si
       JOIN products p ON si.product_id = p.id
       JOIN sales s ON si.sale_id = s.id
-      WHERE s.status != 'cancelled'
+      WHERE LOWER(COALESCE(s.status, '')) NOT IN ('cancelled', 'iptal', 'refund')
+        AND (s.receipt_no NOT LIKE 'REF-%' OR s.receipt_no IS NULL)
+        AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
         AND ${_sqlDate('s.created_at')} >= ?
         AND ${_sqlDate('s.created_at')} <= ?
       GROUP BY COALESCE(p.vat, 0)

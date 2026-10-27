@@ -93,6 +93,7 @@ class DatabaseSchema {
       CREATE TABLE IF NOT EXISTS sales (
         id TEXT PRIMARY KEY,
         customer_id TEXT NOT NULL,
+        receipt_no TEXT,
         total_amount REAL NOT NULL,
         total_amount_minor INTEGER NOT NULL DEFAULT 0,
         paid_amount REAL NOT NULL DEFAULT 0,
@@ -382,6 +383,7 @@ class DatabaseSchema {
           ELSE 0
         END AS credit
       FROM financial_transactions
+      WHERE (COALESCE(is_deleted, 0) = 0) AND deleted_at IS NULL
     ''');
 
     // Canonical customer ledger effect view (Single source of truth for balance calculation)
@@ -398,7 +400,7 @@ class DatabaseSchema {
         created_at,
         is_deleted,
         CASE 
-          WHEN COALESCE(is_deleted, 0) != 0 THEN 0.0
+          WHEN COALESCE(is_deleted, 0) != 0 OR deleted_at IS NOT NULL THEN 0.0
           WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
           WHEN type IN ('payment', 'collection') THEN paid_amount
           WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)

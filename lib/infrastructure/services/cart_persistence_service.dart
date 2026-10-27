@@ -108,13 +108,14 @@ class CartPersistenceService {
         final decoded = jsonDecode(quantitiesRaw);
         if (decoded is Map) {
           decoded.forEach((key, value) {
+            int? qty;
             if (value is num) {
-              cartQuantities[key.toString()] = value.toInt();
+              qty = value.toInt();
             } else if (value != null) {
-              final parsed = int.tryParse(value.toString());
-              if (parsed != null) {
-                cartQuantities[key.toString()] = parsed;
-              }
+              qty = int.tryParse(value.toString());
+            }
+            if (qty != null && qty > 0) {
+              cartQuantities[key.toString()] = qty;
             }
           });
         }

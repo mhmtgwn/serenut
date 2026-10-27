@@ -404,8 +404,11 @@ class SqliteFinancialTransactionRepository
 
   @override
   Future<List<FinancialTransactionEntity>> findAll() async {
-    final rows = await _executor.query('financial_transactions',
-        orderBy: 'logical_clock DESC, device_id DESC');
+    final rows = await _executor.query(
+      'financial_transactions',
+      where: '(is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL',
+      orderBy: 'logical_clock DESC, device_id DESC',
+    );
     return rows.map((row) => FinancialTransactionEntity.fromMap(row)).toList();
   }
 
@@ -454,6 +457,10 @@ class SqliteFinancialTransactionRepository
     final txDeviceId = entity.deviceId ?? deviceId ?? 'unknown-device';
 
     return _gateway.transaction(() async {
+      final amountMinor = (entity.amount * 100).round();
+      final paidAmountMinor = (entity.paidAmount * 100).round();
+      final debtAmountMinor = (entity.debtAmount * 100).round();
+
       final payload = {
         'id': entity.id,
         'type': entity.type,
@@ -461,6 +468,9 @@ class SqliteFinancialTransactionRepository
         'amount': entity.amount,
         'paid_amount': entity.paidAmount,
         'debt_amount': entity.debtAmount,
+        'amount_minor': amountMinor,
+        'paid_amount_minor': paidAmountMinor,
+        'debt_amount_minor': debtAmountMinor,
         'reference_id': entity.referenceId,
         'payment_method': entity.paymentMethod ?? 'cash',
         'metadata':
@@ -525,6 +535,10 @@ class SqliteFinancialTransactionRepository
       // Create the revised transaction entity as a new append-only entry.
       // trg_ft_insert trigger automatically applies its balance effect on the new customer.
       final newTxId = 'trans-rev-$orderId-${now.millisecondsSinceEpoch}';
+      final amountMinor = (amount * 100).round();
+      final paidAmountMinor = (paidAmount * 100).round();
+      final debtAmountMinor = (debtAmount * 100).round();
+
       final payload = {
         'id': newTxId,
         'type': 'sale',
@@ -532,6 +546,9 @@ class SqliteFinancialTransactionRepository
         'amount': amount,
         'paid_amount': paidAmount,
         'debt_amount': debtAmount,
+        'amount_minor': amountMinor,
+        'paid_amount_minor': paidAmountMinor,
+        'debt_amount_minor': debtAmountMinor,
         'created_at': nowIso,
         'reference_id': orderId,
         'payment_method': prev['payment_method'] ?? 'debt',
@@ -579,8 +596,8 @@ class SqliteFinancialTransactionRepository
 
   @override
   Future<int> count() async {
-    final result = await _executor
-        .rawQuery('SELECT COUNT(*) as count FROM financial_transactions');
+    final result = await _executor.rawQuery(
+        'SELECT COUNT(*) as count FROM financial_transactions WHERE (is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -600,7 +617,8 @@ class SqliteFinancialTransactionRepository
       String customerId) async {
     final rows = await _executor.query(
       'financial_transactions',
-      where: 'customer_id = ?',
+      where:
+          'customer_id = ? AND (is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL',
       whereArgs: [customerId],
       orderBy: 'logical_clock DESC, device_id DESC',
     );
@@ -613,7 +631,8 @@ class SqliteFinancialTransactionRepository
     if (referenceId.isEmpty) return [];
     final rows = await _executor.query(
       'financial_transactions',
-      where: 'reference_id = ? AND is_deleted = 0',
+      where:
+          'reference_id = ? AND (is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL',
       whereArgs: [referenceId],
       orderBy: 'logical_clock DESC, device_id DESC',
     );
@@ -624,7 +643,8 @@ class SqliteFinancialTransactionRepository
   Future<List<FinancialTransactionEntity>> getByType(String type) async {
     final rows = await _executor.query(
       'financial_transactions',
-      where: 'type = ?',
+      where:
+          'type = ? AND (is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL',
       whereArgs: [type],
       orderBy: 'logical_clock DESC, device_id DESC',
     );
@@ -636,7 +656,8 @@ class SqliteFinancialTransactionRepository
       DateTime from, DateTime to) async {
     final rows = await _executor.query(
       'financial_transactions',
-      where: 'created_at BETWEEN ? AND ?',
+      where:
+          'created_at BETWEEN ? AND ? AND (is_deleted = 0 OR is_deleted IS NULL) AND deleted_at IS NULL',
       whereArgs: [from.toIso8601String(), to.toIso8601String()],
       orderBy: 'logical_clock DESC, device_id DESC',
     );

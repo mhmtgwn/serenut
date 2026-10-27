@@ -989,6 +989,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       await inventory.increaseStock(restoredItems);
     }
 
+    // İade tutarı siparişin net toplamını aşamaz (iskonto koruması)
+    if (order.totalAmount > 0 && totalRefundAmount > order.totalAmount) {
+      totalRefundAmount = order.totalAmount;
+    }
+
     // 3. Deftere iade kaydı işle (müşteri bakiyesini güncelle veya nakit çıkışı yap)
     await paymentService.processRefund(
       saleId: order.id,

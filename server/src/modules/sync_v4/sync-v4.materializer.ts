@@ -20,6 +20,37 @@ export const numberValue = (payload: Record<string, unknown>, key: string, fallb
 
 export const nullableId = (value: string): string | null => (value.length ? value : null);
 
+export const isoDateValue = (payload: Record<string, unknown>, ...keys: string[]): string | null => {
+  for (const key of keys) {
+    const val = payload[key];
+    if (val === null || val === undefined || val === "") continue;
+    if (typeof val === "number" && Number.isFinite(val)) {
+      const ms = val < 1e11 ? val * 1000 : val;
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (!trimmed) continue;
+      if (/^\d+$/.test(trimmed)) {
+        const num = Number(trimmed);
+        if (Number.isFinite(num)) {
+          const ms = num < 1e11 ? num * 1000 : num;
+          const d = new Date(ms);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+      }
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) return d.toISOString();
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed;
+    }
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      return val.toISOString();
+    }
+  }
+  return null;
+};
+
 /**
  * Applies a replicated aggregate to the tenant's actual business tables.
  * The replication log is written only after this function succeeds, in the
@@ -124,7 +155,7 @@ export async function applyDomainMutation(
           stringValue(payload, "category", "Genel"),
           stringValue(payload, "sku", id), Number.isFinite(Number(payload.vat)) ? Number(payload.vat) : null,
           stringValue(payload, "image_url") || null, deleted ? "inactive" : stringValue(payload, "status", "active"),
-          deleted, stringValue(payload, "created_at") || null],
+          deleted, isoDateValue(payload, "created_at")],
       );
       return;
     }
@@ -143,7 +174,7 @@ export async function applyDomainMutation(
           stringValue(payload, "address") || null,
           numberValue(payload, "credit_limit"),
           deleted ? "inactive" : stringValue(payload, "status", "active"), deleted,
-          stringValue(payload, "created_at") || null],
+          isoDateValue(payload, "created_at")],
       );
       return;
     }
@@ -286,7 +317,7 @@ export async function upsertSale(
       quantity,
       unitPrice,
       subtotal,
-      createdAt: stringValue(row, "created_at") || null,
+      createdAt: isoDateValue(row, "created_at"),
     });
   }
   const clientTotal = numberValue(payload, "total_amount", Number.NaN);
@@ -315,7 +346,7 @@ export async function upsertSale(
     `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, discount_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,'completed','completed',$8,COALESCE($9::timestamptz,NOW()),NOW(),false,$10)`,
     [id, companyId, customerId, clientTotal, effectivePaidAmount, discountAmount, paymentMethod,
-      stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
+      stringValue(payload, "idempotency_key") || null, isoDateValue(payload, "created_at"),
       stringValue(payload, "created_by") || null],
   );
   for (const row of normalizedItems) {
@@ -375,9 +406,9 @@ export async function upsertOrder(
        updated_at=NOW() WHERE customer_orders.company_id=EXCLUDED.company_id`,
     [id, companyId, orderNumber, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
       discountAmount,
-      stringValue(payload, "order_date") || stringValue(payload, "created_at") || null,
-      stringValue(payload, "expected_delivery_date") || null, stringValue(payload, "actual_delivery_date") || null,
-      stringValue(payload, "notes") || null, stringValue(payload, "created_at") || null,
+      isoDateValue(payload, "order_date", "created_at"),
+      isoDateValue(payload, "expected_delivery_date"), isoDateValue(payload, "actual_delivery_date"),
+      stringValue(payload, "notes") || null, isoDateValue(payload, "created_at"),
       stringValue(payload, "created_by") || null],
   );
 
@@ -413,7 +444,7 @@ export async function upsertOrder(
        VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
       [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
         stringValue(row, "product_name") || null, numberValue(row, "quantity"),
-        numberValue(row, "unit_price"), companyId, stringValue(row, "created_at") || null],
+        numberValue(row, "unit_price"), companyId, isoDateValue(row, "created_at")],
     );
   }
 }
@@ -555,7 +586,7 @@ export async function upsertFinancialTransaction(
        updated_at = NOW()`,
     [id, companyId, type, customerId, amount,
       paidAmount, effectiveDebtAmount,
-      stringValue(payload, "date") || stringValue(payload, "created_at") || null,
+      isoDateValue(payload, "date", "created_at"),
       referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod, isDeleted],
   );
@@ -598,7 +629,7 @@ export async function upsertCashCount(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const countDate = stringValue(payload, "date") || stringValue(payload, "count_date") || new Date().toISOString().slice(0, 10);
+  const countDate = isoDateValue(payload, "date", "count_date")?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const openingBalance = numberValue(payload, "opening_balance", 0);
   const countedCash = numberValue(payload, "counted_cash", 0);
   const expectedCash = numberValue(payload, "expected_cash", 0);
@@ -621,7 +652,7 @@ export async function upsertCashCount(
        updated_at = NOW()
      WHERE cash_counts.company_id = EXCLUDED.company_id`,
     [id, companyId, countDate, openingBalance, countedCash, expectedCash, difference, notes, isDeleted,
-     stringValue(payload, "created_at") || null],
+     isoDateValue(payload, "created_at")],
   );
 }
 
@@ -672,7 +703,7 @@ export async function upsertInstallmentPlan(
        updated_at = NOW()
      WHERE customer_installment_plans.company_id = EXCLUDED.company_id`,
     [id, companyId, customerId, totalAmount, downPayment, installmentCount, description, status, isDeleted,
-     stringValue(payload, "created_at") || null],
+     isoDateValue(payload, "created_at")],
   );
 }
 
@@ -697,9 +728,9 @@ export async function upsertInstallment(
   const installmentNo = Math.round(numberValue(payload, "installment_no", 0));
   const amount = numberValue(payload, "amount", 0);
   const paidAmount = numberValue(payload, "paid_amount", 0);
-  const dueDate = stringValue(payload, "due_date") || null;
+  const dueDate = isoDateValue(payload, "due_date");
   const status = stringValue(payload, "status", "");
-  const paidAt = stringValue(payload, "paid_at") || null;
+  const paidAt = isoDateValue(payload, "paid_at");
   const transactionId = stringValue(payload, "financial_transaction_id") || null;
   const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
 
@@ -721,6 +752,6 @@ export async function upsertInstallment(
        updated_at = NOW()
      WHERE customer_installments.company_id = EXCLUDED.company_id`,
     [id, companyId, planId || null, customerId || null, installmentNo, amount, paidAmount, dueDate, status, paidAt, transactionId, isDeleted,
-     stringValue(payload, "created_at") || null],
+     isoDateValue(payload, "created_at")],
   );
 }

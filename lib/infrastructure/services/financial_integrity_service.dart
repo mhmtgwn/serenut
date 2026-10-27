@@ -261,7 +261,11 @@ class PaymentReconciliationService {
     required String localStatus,
     required String gatewayStatus,
   }) async {
-    if (localStatus == gatewayStatus && localAmount == gatewayAmount) {
+    final bool statusMatch =
+        localStatus.trim().toLowerCase() == gatewayStatus.trim().toLowerCase();
+    final bool amountMatch = (localAmount - gatewayAmount).abs() < 0.005;
+
+    if (statusMatch && amountMatch) {
       await _logger.logAction(
         action: 'reconcile_match',
         beforeState: 'unreconciled',

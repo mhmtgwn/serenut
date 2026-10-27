@@ -223,6 +223,23 @@ class DatabaseManager {
 
   /// Verify that crucial tables and columns exist using sqlite_master and PRAGMA table_info
   Future<void> _verifyDatabaseSchemaInvariants(Database db) async {
+    // Ensure sales.receipt_no exists for Core Next dual-core compatibility
+    try {
+      final salesTableCheck = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sales'");
+      if (salesTableCheck.isNotEmpty) {
+        final salesCols = await db.rawQuery('PRAGMA table_info(sales)');
+        final hasReceiptNo = salesCols.any((c) => c['name'] == 'receipt_no');
+        if (!hasReceiptNo) {
+          await db.execute('ALTER TABLE sales ADD COLUMN receipt_no TEXT');
+          await db.execute(
+              'CREATE INDEX IF NOT EXISTS idx_sales_receipt ON sales (receipt_no)');
+        }
+      }
+    } catch (e) {
+      debugPrint('[DatabaseManager] sales.receipt_no self-healing error: $e');
+    }
+
     final Map<String, List<String>> expectedColumns = {
       'users': [
         'id',
@@ -665,6 +682,7 @@ class DatabaseManager {
               ELSE 0
             END AS credit
           FROM financial_transactions
+          WHERE (COALESCE(is_deleted, 0) = 0) AND deleted_at IS NULL
         ''');
 
         await db.execute('DROP VIEW IF EXISTS v_customer_ledger_effect');
@@ -681,7 +699,7 @@ class DatabaseManager {
             created_at,
             is_deleted,
             CASE 
-              WHEN COALESCE(is_deleted, 0) != 0 THEN 0.0
+              WHEN COALESCE(is_deleted, 0) != 0 OR deleted_at IS NOT NULL THEN 0.0
               WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
               WHEN type IN ('payment', 'collection') THEN paid_amount
               WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
