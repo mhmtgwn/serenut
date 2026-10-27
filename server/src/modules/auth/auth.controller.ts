@@ -17,7 +17,7 @@ const router = Router();
 // Mail delivery is currently optional. Verification is enabled only when the
 // deployment explicitly opts in; a missing environment variable must not lock
 // newly-created accounts out.
-const emailDeliveryEnabled = process.env.EMAIL_DELIVERY_ENABLED === 'true';
+const emailDeliveryEnabled = process.env.EMAIL_DELIVERY_ENABLED === 'true' || Boolean(process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.startsWith('SET_') && process.env.RESEND_API_KEY !== 'mock');
 const emailVerificationRequired =
   emailDeliveryEnabled && process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
 
@@ -426,22 +426,22 @@ router.post('/recovery/codes/regenerate', authenticateUser, passwordResetLimiter
 // Creates a new company tenant + owner/admin user in a single atomic transaction.
 router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   const { company_name, name, email, username, password, phone, tax_number, tax_office, city, district, address,
-    accept_terms, accept_privacy, accept_kvkk, accept_marketing } = req.body;
+    accept_terms, accept_marketing } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const normalizedUsername = username ? String(username).trim().toLowerCase() : null;
   const normalizedTaxNumber = String(tax_number || '').replace(/\D/g, '');
 
-  if (!company_name || !name || !normalizedEmail || !password || !normalizedTaxNumber) {
+  if (!company_name || !name || !normalizedEmail || !password) {
     return res.status(400).json({
       error: 'missing_fields',
-      message: 'Firma adı, ad soyad, e-posta, şifre ve TC/VKN zorunludur.'
+      message: 'Firma adı, ad soyad, e-posta ve şifre zorunludur.'
     });
   }
 
-  if (![10, 11].includes(normalizedTaxNumber.length)) {
+  if (normalizedTaxNumber.length > 0 && ![10, 11].includes(normalizedTaxNumber.length)) {
     return res.status(400).json({ error: 'invalid_tax_number', message: 'TC 11, VKN 10 haneli olmalıdır.' });
   }
-  if (!accept_terms || !accept_privacy || !accept_kvkk) {
+  if (!accept_terms) {
     return res.status(400).json({ error: 'legal_consent_required', message: 'Üyelik, gizlilik ve KVKK onayları zorunludur.' });
   }
 
@@ -477,7 +477,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     }
 
     const taxCheck = await client.query(
-      `SELECT id FROM companies WHERE REGEXP_REPLACE(tax_number, '\\D', '', 'g') = $1 LIMIT 1`,
+      `SELECT id FROM companies WHERE $1 <> '' AND REGEXP_REPLACE(COALESCE(tax_number, ''), '\\D', '', 'g') = $1 LIMIT 1`,
       [normalizedTaxNumber]
     );
     if (taxCheck.rows.length > 0) {
@@ -493,7 +493,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     await client.query(
       `INSERT INTO companies (id, name, owner_name, tax_number, tax_office, phone, email, city, district, address, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')`,
-      [companyId, company_name, name, normalizedTaxNumber, tax_office || null, phone || null, normalizedEmail,
+      [companyId, company_name, name, normalizedTaxNumber || `PENDING-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`, tax_office || null, phone || null, normalizedEmail,
         city || null, district || null, address || null]
     );
 

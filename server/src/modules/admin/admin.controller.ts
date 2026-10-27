@@ -466,7 +466,7 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
        JOIN plans p ON p.id = o.base_plan_id WHERE o.company_id = $1`, [req.params.id]);
 
     return res.json({
-      company: company.rows[0],
+      company: company.rows[0], cloud_stats: (await runBypassingRLS(`SELECT (SELECT COUNT(*)::int FROM products WHERE company_id = $1 AND deleted_at IS NULL) AS products_count, (SELECT COUNT(*)::int FROM sales WHERE company_id = $1) AS sales_count, (SELECT COUNT(*)::int FROM customers WHERE company_id = $1 AND deleted_at IS NULL) AS customers_count, (SELECT COUNT(*)::int FROM sync_changes_log WHERE company_id = $1) AS sync_changes_count, (SELECT MAX(server_updated_at) FROM sync_changes_log WHERE company_id = $1) AS last_sync_at`, [req.params.id]).catch(() => ({ rows: [{}] }))).rows[0] || {},
       stores: stores.rows,
       devices: devices.rows,
       licenses: licenses.rows,
@@ -2875,6 +2875,53 @@ router.post('/payment-methods/:id/test', async (req: AuthenticatedRequest, res: 
       await runBypassingRLS('UPDATE payment_providers SET last_test_at = NOW(), last_error = null WHERE id = $1', [req.params.id]);
       return res.json({ success: true, message: 'Test applied manually.' });
     }
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.get('/traffic-funnel', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    await runBypassingRLS(`CREATE TABLE IF NOT EXISTS web_page_visits (id BIGSERIAL PRIMARY KEY, page_path VARCHAR(120) NOT NULL, visitor_hash VARCHAR(64) NOT NULL, traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş', device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+    const summaryRes = await runBypassingRLS(`
+      SELECT
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= CURRENT_DATE)::int AS visitors_today,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)::int AS pageviews_today,
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS visitors_30d,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS pageviews_30d,
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path IN ('/plans', '/downloads') AND created_at >= NOW() - INTERVAL '30 days')::int AS interested_30d,
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path = '/register' AND created_at >= NOW() - INTERVAL '30 days')::int AS register_views_30d,
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path IN ('/download/windows', '/download/android') AND created_at >= NOW() - INTERVAL '30 days')::int AS downloads_30d,
+        COUNT(*) FILTER (WHERE page_path = '/download/windows' AND created_at >= NOW() - INTERVAL '30 days')::int AS windows_downloads_30d,
+        COUNT(*) FILTER (WHERE page_path = '/download/android' AND created_at >= NOW() - INTERVAL '30 days')::int AS android_downloads_30d
+      FROM web_page_visits
+    `);
+    const conversionDbRes = await runBypassingRLS(`
+      SELECT
+        (SELECT COUNT(*)::int FROM companies WHERE created_at >= NOW() - INTERVAL '30 days') AS signups_30d,
+        (SELECT COUNT(DISTINCT company_id)::int FROM device_activations WHERE activated_at >= NOW() - INTERVAL '30 days') AS activated_companies_30d
+    `);
+    const sourcesRes = await runBypassingRLS(`
+      SELECT traffic_source AS source, COUNT(DISTINCT visitor_hash)::int AS visitors, COUNT(*)::int AS views
+      FROM web_page_visits WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY traffic_source ORDER BY visitors DESC
+    `);
+    const pagesRes = await runBypassingRLS(`
+      SELECT page_path, COUNT(DISTINCT visitor_hash)::int AS visitors, COUNT(*)::int AS views
+      FROM web_page_visits WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY page_path ORDER BY views DESC LIMIT 8
+    `);
+    const devicesRes = await runBypassingRLS(`
+      SELECT device_type, COUNT(DISTINCT visitor_hash)::int AS visitors
+      FROM web_page_visits WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY device_type ORDER BY visitors DESC
+    `);
+    return res.json({
+      summary: { ...(summaryRes.rows[0] || {}), ...(conversionDbRes.rows[0] || {}) },
+      sources: sourcesRes.rows,
+      top_pages: pagesRes.rows,
+      devices: devicesRes.rows,
+    });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
   }

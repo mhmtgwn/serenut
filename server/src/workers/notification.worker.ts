@@ -135,6 +135,28 @@ async function dispatchSms(to: string, body: string): Promise<boolean> {
 }
 
 async function dispatchEmail(to: string, subject: string, body: string): Promise<boolean> {
+  const resendApiKey = process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.startsWith('SET_') && process.env.RESEND_API_KEY !== 'mock' ? process.env.RESEND_API_KEY : '';
+  if (resendApiKey) {
+    logger.info(`[EMAIL] Sending to ${to} via Resend API...`);
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Serenut Destek <destek@serenut.com>',
+        to: [to],
+        subject,
+        html: body,
+        reply_to: 'destek@serenut.com',
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      logger.error(`[EMAIL] Resend returned status ${response.status}: ${errText}`);
+      throw new Error(`Resend error: ${response.status}`);
+    }
+    logger.info(`[EMAIL] Email sent successfully via Resend to ${to}`);
+    return true;
+  }
   const hasSmtp = Boolean(process.env.SMTP_HOST);
   const hasPostmark = Boolean(process.env.SMTP_API_KEY && !process.env.SMTP_API_KEY.startsWith('YOUR_') && process.env.SMTP_API_KEY !== 'mock');
   const isMock = !hasSmtp && !hasPostmark;

@@ -307,6 +307,32 @@ function enforceSchemaHandshake(req: Request, res: Response, next: NextFunction)
 
 app.use(enforceSchemaHandshake);
 
+let webVisitsTableReady = false;
+const trackedPublicPaths = new Set(['/', '/index.html', '/plans', '/plans.html', '/downloads', '/downloads.html', '/platform', '/platform.html', '/contact', '/contact.html', '/register', '/login', '/download/windows', '/download/android']);
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (req.method === 'GET' && trackedPublicPaths.has(req.path)) {
+    const ua = String(req.headers['user-agent'] || '');
+    if (ua && !/bot|crawl|spider|slurp|curl|wget|headless|lighthouse|monitor|uptime|python|axios/i.test(ua)) {
+      const normPath = req.path === '/index.html' ? '/' : req.path.replace(/\.html$/, '');
+      const dayKey = new Date().toISOString().slice(0, 10);
+      const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+      const ref = String(req.headers['referer'] || req.query.utm_source || '').toLowerCase();
+      const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
+      const device = /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
+      setImmediate(async () => {
+        try {
+          if (!webVisitsTableReady) {
+            await pgPool.query(`CREATE TABLE IF NOT EXISTS web_page_visits (id BIGSERIAL PRIMARY KEY, page_path VARCHAR(120) NOT NULL, visitor_hash VARCHAR(64) NOT NULL, traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş', device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_web_page_visits_created_at ON web_page_visits(created_at DESC);`);
+            webVisitsTableReady = true;
+          }
+          await pgPool.query(`INSERT INTO web_page_visits (page_path, visitor_hash, traffic_source, device_type) VALUES ($1, $2, $3, $4)`, [normPath, visitorHash, source, device]);
+        } catch (_err) { /* ignore telemetry errors */ }
+      });
+    }
+  }
+  next();
+});
+
 // ── REDIRECTS (301 KALICI YÖNLENDİRME) ─────────────────────────────────────────
 app.get(['/pricing', '/pricing.html'], (req, res) => {
   res.redirect(301, '/plans.html');

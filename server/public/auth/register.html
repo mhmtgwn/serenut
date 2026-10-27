@@ -11,26 +11,26 @@
   <main class="simple-auth-page">
     <section class="simple-auth-card simple-auth-card-wide" aria-labelledby="auth-title">
       <a href="/" class="simple-auth-brand" aria-label="Serenut ana sayfa"><img src="/shared/assets/serenut-os-color.svg" alt="Serenut OS"></a>
-      <div class="simple-auth-heading"><h1 id="auth-title">Hesap oluştur</h1><p>İşletme ve yönetici bilgilerinizi girin.</p></div>
+      <div class="simple-auth-heading"><h1 id="auth-title">Ücretsiz Deneme Hesabı Oluştur</h1><p>30 saniyede hesabınızı açın, uygulamayı indirip 7 gün ücretsiz deneyin. Kredi kartı gerekmez.</p></div>
       <form id="register-form" class="simple-register-grid">
-        <label class="simple-field simple-wide" for="company"><span>Firma ünvanı</span><input id="company" required autofocus></label>
+        <label class="simple-field simple-wide" for="company"><span>İşletme / Mağaza Adı</span><input id="company" required autofocus placeholder="Örn: Güneş Market veya Merkez Eczanesi"></label>
         <label class="simple-field" for="name"><span>Yetkili ad soyad</span><input id="name" required autocomplete="name"></label>
         <label class="simple-field" for="email"><span>E-posta</span><input type="email" id="email" required autocomplete="email"></label>
         <label class="simple-field" for="phone"><span>Telefon</span><input type="tel" id="phone" autocomplete="tel"></label>
-        <label class="simple-field" for="tax-number"><span>TC veya VKN</span><input id="tax-number" inputmode="numeric" maxlength="11" required></label>
-        <label class="simple-field" for="tax-office"><span>Vergi dairesi</span><input id="tax-office"></label>
-        <label class="simple-field" for="city"><span>İl</span><input id="city"></label>
-        <label class="simple-field" for="district"><span>İlçe</span><input id="district"></label>
-        <label class="simple-field" for="password"><span>Şifre</span><input type="password" id="password" minlength="10" required autocomplete="new-password" placeholder="En az 10 karakter; harf ve rakam"></label>
-        <label class="simple-field simple-wide" for="address"><span>Firma adresi</span><textarea id="address" rows="2"></textarea></label>
+        <details class="simple-wide" style="grid-column:1/-1;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px 12px;background:var(--surface-muted,#f8fafc)"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted,#475569)">İsteğe bağlı: Fatura ve adres bilgilerini şimdi ekle (paket satın alırken de girebilirsiniz)</summary><div class="simple-register-grid" style="margin-top:10px"><label class="simple-field" for="tax-number"><span>TC veya VKN (İsteğe bağlı)</span><input id="tax-number" inputmode="numeric" maxlength="11" placeholder="10 veya 11 hane"></label><label class="simple-field" for="tax-office"><span>Vergi dairesi</span><input id="tax-office"></label><label class="simple-field" for="city"><span>İl</span><input id="city"></label><label class="simple-field" for="district"><span>İlçe</span><input id="district"></label><label class="simple-field simple-wide" for="address"><span>Firma adresi</span><textarea id="address" rows="2"></textarea></label></div></details>
+        <label class="simple-field simple-wide" for="password"><span>Şifre</span><input type="password" id="password" minlength="10" required autocomplete="new-password" placeholder="En az 10 karakter; harf ve rakam"></label>
+
+
+
+
         <div class="legal-consents">
-          <label><input type="checkbox" id="accept-terms" required> <a href="/terms" target="_blank">Üyelik koşullarını</a> kabul ediyorum.</label>
-          <label><input type="checkbox" id="accept-privacy" required> <a href="/privacy" target="_blank">Gizlilik politikasını</a> kabul ediyorum.</label>
-          <label><input type="checkbox" id="accept-kvkk" required> <a href="/kvkk" target="_blank">KVKK metnini</a> okudum.</label>
+          <label><input type="checkbox" id="accept-terms" required> <a href="/terms" target="_blank">Üyelik koşullarını</a>, <a href="/privacy" target="_blank">Gizlilik politikasını</a> ve <a href="/kvkk" target="_blank">KVKK aydınlatma metnini</a> okudum, kabul ediyorum.</label><input type="checkbox" id="accept-privacy" checked hidden><input type="checkbox" id="accept-kvkk" checked hidden>
+
+
           <label><input type="checkbox" id="accept-marketing"> Kampanya duyurularını almak istiyorum.</label>
         </div>
         <div class="auth-status text-sm text-red" id="status" role="status"></div>
-        <button class="btn btn-primary w-full" type="submit">Hesap Oluştur</button>
+        <button class="btn btn-primary w-full" type="submit">Ücretsiz Hesabımı Oluştur ve Başla</button>
       </form>
       <p class="simple-auth-switch">Zaten hesabınız var mı? <a href="/login">Giriş yapın</a></p>
     </section>

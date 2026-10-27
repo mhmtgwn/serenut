@@ -274,7 +274,7 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
   event.preventDefault();
   const button = event.submitter;
   const taxNumber = document.getElementById('tax-number').value.replace(/\D/g, '');
-  if (![10, 11].includes(taxNumber.length)) {
+  if (taxNumber.length > 0 && ![10, 11].includes(taxNumber.length)) {
     message('TC Kimlik No 11, Vergi Kimlik No 10 haneli olmalıdır.');
     return;
   }
@@ -304,13 +304,13 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
     });
 
     const selectedPlan = sessionStorage.getItem('selected_plan_id');
-    const panelDest = selectedPlan ? '/app/#billing-center' : '/app/?flow=panel';
+    const panelDest = selectedPlan ? '/app/#billing-center' : '/app/#company-dashboard';
 
     if (data.access_token) {
       setAuthToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (data.user) setUserProfile(data.user);
-      if (Array.isArray(data.recovery_codes) && data.recovery_codes.length) {
+      if (Array.isArray(data.recovery_codes) && data.recovery_codes.length) { sessionStorage.setItem('serenut_initial_recovery_codes', JSON.stringify(data.recovery_codes)); } window.location.replace(panelDest); return; if (false) {
         showRecoveryCodes(data.recovery_codes, panelDest);
         return;
       }
