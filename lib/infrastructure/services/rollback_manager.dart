@@ -147,12 +147,25 @@ class RollbackManager {
         }
       }
 
-      // 2. Backup sqlite database
+      // 2. Backup sqlite database with WAL checkpoint
+      try {
+        final db = await DatabaseManager.instance.getDatabase();
+        await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+      } catch (_) {}
+
       final String dbPath = join(await getDatabasesPath(), 'serenut_pos.db');
       final dbFile = File(dbPath);
       if (await dbFile.exists()) {
         final targetDbBackup = File(join(backupDir.path, 'serenut_pos.db.bak'));
         await dbFile.copy(targetDbBackup.path);
+        if (isCancelled?.call() ?? false) return false;
+      }
+
+      final coreNextPath = await DatabaseManager.instance.getCoreNextDatabasePath();
+      final coreNextFile = File(coreNextPath);
+      if (await coreNextFile.exists()) {
+        final targetCoreBackup = File(join(backupDir.path, 'serenut_core_v2.db.bak'));
+        await coreNextFile.copy(targetCoreBackup.path);
         if (isCancelled?.call() ?? false) return false;
       }
 
@@ -172,24 +185,54 @@ class RollbackManager {
       final backupDir = Directory(join(appDir.path, 'update_backups'));
       if (!await backupDir.exists()) return false;
 
-      // 1. Rollback Windows executable
-      if (Platform.isWindows) {
-        final backupExe = File(join(backupDir.path, 'serenut_running.exe.bak'));
-        if (await backupExe.exists()) {
-          final targetExe = File(Platform.resolvedExecutable);
-          await backupExe.copy(targetExe.path);
-        }
-      }
+      try {
+        final db = await DatabaseManager.instance.getDatabase();
+        await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+      } catch (_) {}
+      await DatabaseManager.instance.close();
 
-      // 2. Rollback sqlite database
+      // 1. Rollback sqlite databases
       final backupDb = File(join(backupDir.path, 'serenut_pos.db.bak'));
       if (await backupDb.exists()) {
         final String dbPath = join(await getDatabasesPath(), 'serenut_pos.db');
         final targetDb = File(dbPath);
-        if (await targetDb.exists()) {
-          await targetDb.delete();
-        }
+        final walFile = File('$dbPath-wal');
+        final shmFile = File('$dbPath-shm');
+        if (await walFile.exists()) await walFile.delete();
+        if (await shmFile.exists()) await shmFile.delete();
+        if (await targetDb.exists()) await targetDb.delete();
         await backupDb.copy(targetDb.path);
+      }
+
+      final backupCoreDb = File(join(backupDir.path, 'serenut_core_v2.db.bak'));
+      if (await backupCoreDb.exists()) {
+        final String corePath = await DatabaseManager.instance.getCoreNextDatabasePath();
+        final targetCoreDb = File(corePath);
+        final walCore = File('$corePath-wal');
+        final shmCore = File('$corePath-shm');
+        if (await walCore.exists()) await walCore.delete();
+        if (await shmCore.exists()) await shmCore.delete();
+        if (await targetCoreDb.exists()) await targetCoreDb.delete();
+        await backupCoreDb.copy(targetCoreDb.path);
+      }
+
+      // 2. Rollback Windows executable via detached bootstrap helper
+      if (Platform.isWindows) {
+        final backupExe = File(join(backupDir.path, 'serenut_running.exe.bak'));
+        final targetExe = File(Platform.resolvedExecutable);
+        if (await backupExe.exists() && await targetExe.exists()) {
+          final scriptFile = File(join(backupDir.path, 'apply_rollback.bat'));
+          await scriptFile.writeAsString('''
+@echo off
+timeout /t 2 /nobreak > nul
+copy /y "${backupExe.path}" "${targetExe.path}"
+start "" "${targetExe.path}"
+del "%~f0"
+''');
+          await Process.start('cmd.exe', ['/c', scriptFile.path],
+              mode: ProcessStartMode.detached);
+          exit(0);
+        }
       }
 
       debugPrint(

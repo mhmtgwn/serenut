@@ -93,10 +93,14 @@ export async function idempotencyMiddleware(req: Request, res: Response, next: N
     return next();
   }
 
-  const key = req.header('Idempotency-Key');
-  if (!key) {
+  const rawKey = req.header('Idempotency-Key');
+  if (!rawKey) {
     return next();
   }
+
+  // Multi-Tenant isolation: Scope idempotency cache key by company ID
+  const companyId = (req as any).user?.company_id || req.header('x-company-id') || 'global';
+  const key = `${companyId}:${rawKey}`;
 
   // Sync v4 push operations possess aggregate-level mutation idempotency in PostgreSQL.
   // Bypass Redis request-level idempotency to prevent batch key collision locks.

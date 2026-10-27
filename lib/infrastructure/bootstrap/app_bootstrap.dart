@@ -273,7 +273,7 @@ class AppBootstrap {
       required bool enableSalesEngine,
       DatabaseFactory? dbFactory,
     }) async {
-      final coordinator = const DualDatabaseRoutingCoordinator();
+      const coordinator = DualDatabaseRoutingCoordinator();
       final routing = await coordinator.resolveAndOpen(
         requestedTenantId: requestedTenantId,
         legacyDbPath: legacyDbPath,

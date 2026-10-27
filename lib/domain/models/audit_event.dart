@@ -40,7 +40,9 @@ class AuditEvent {
       userName: map['user_name'] as String?,
       oldValue: map['old_value'] as String?,
       newValue: map['new_value'] as String?,
-      timestamp: DateTime.parse(map['timestamp'] as String),
+      timestamp: map['timestamp'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int)
+          : (DateTime.tryParse(map['timestamp']?.toString() ?? '') ?? DateTime.now()),
       deviceId: map['device_id'] as String?,
       notes: map['notes'] as String?,
       previousHash: map['previous_hash'] as String?,

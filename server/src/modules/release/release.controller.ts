@@ -116,11 +116,12 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
 }
 
 // Helper: determine rollout eligibility for a device
-function isDeviceInRollout(deviceId: string, rolloutPercentage: number): boolean {
+function isDeviceInRollout(deviceId: string, rolloutPercentage: number, releaseId = ''): boolean {
   if (rolloutPercentage >= 100) return true;
   if (rolloutPercentage <= 0) return false;
-  // Deterministic hash-based bucketing — same device always gets same answer
-  const hash = crypto.createHash('md5').update(deviceId).digest('hex');
+  // Deterministic hash-based bucketing — same device + release always gets same answer
+  const seed = releaseId ? `${releaseId}:${deviceId}` : deviceId;
+  const hash = crypto.createHash('md5').update(seed).digest('hex');
   const bucket = parseInt(hash.substring(0, 4), 16) % 100;
   return bucket < rolloutPercentage;
 }
@@ -248,7 +249,7 @@ router.get('/check', async (req: Request, res: Response) => {
       // 2. Partial rollout (<100%) requires device_id for deterministic placement
       if (rollout < 100) {
         if (!device_id) continue;
-        if (!isDeviceInRollout(device_id, rollout)) continue;
+        if (!isDeviceInRollout(device_id, rollout, release.id)) continue;
       }
 
       // 3. Fail-closed on non-stable channels: Pilot/staged releases MUST have explicit targets.
@@ -436,7 +437,9 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
     ).catch(() => {});
 
     const ext = path.extname(release.file_path);
-    const filename = `serenut-${release.version_code}-${release.platform}${ext}`;
+    const cleanVersion = release.version_code.replace(/\+/g, '.');
+    const versionTag = cleanVersion.startsWith('v') ? cleanVersion : `v${cleanVersion}`;
+    const filename = `SerenutOS-${versionTag}${ext}`;
 
     const range = req.headers.range;
     let stream: fs.ReadStream;

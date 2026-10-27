@@ -281,6 +281,13 @@ class SyncV4PullWorker {
           );
         }
 
+        // Cursor ilerlemediyse veya gerilediyse, aynı kayıtların sonsuz döngüde tekrar çekilmesini engelle
+        if (batch.changesFetched > 0 && batch.cursorAfter <= lastCursor) {
+          totalBatches++;
+          totalChanges += batch.changesFetched;
+          break;
+        }
+
         totalBatches++;
         totalChanges += batch.changesFetched;
         lastCursor = batch.cursorAfter;

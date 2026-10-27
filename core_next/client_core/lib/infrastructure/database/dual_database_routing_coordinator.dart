@@ -6,6 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/providers/sync_provider.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import '../sync/sync_v4_http_client.dart';
+import '../sync/sync_v4_outbox_processor.dart';
+import '../sync/sync_v4_pull_ingestion_service.dart';
+import '../sync/sync_v4_pull_worker.dart';
 import 'app_database.dart';
 import 'database_routing_resolver.dart';
 import '../repositories/core_next_customer_repository.dart';
@@ -164,7 +170,37 @@ class DualDatabaseRoutingCoordinator {
             refundUseCase: refundUseCase,
           );
         }),
+        coreNextSyncExecutorProvider.overrideWith((ref) {
+          return () async {
+            final licenseService = ref.read(licenseServiceProvider);
+            final lic = licenseService.getLicenseInfo();
+            final deviceActivationId = lic?.activationId;
+            final deviceId = ref.read(deviceManagerProvider).getDeviceId();
+            final apiClient = ref.read(apiClientProvider);
+            final baseUrl = apiClient.baseUrl;
+
+            if (deviceActivationId == null || deviceActivationId.isEmpty) {
+              return;
+            }
+
+            final httpClient = SyncV4HttpClient(
+              baseUrl: baseUrl,
+              deviceActivationId: deviceActivationId,
+              deviceId: deviceId,
+            );
+            final outboxProcessor = SyncV4OutboxProcessor(db: coreDb, httpClient: httpClient);
+            final ingestionService = SyncV4PullIngestionService(coreDb, localDeviceId: deviceId);
+            final pullWorker = SyncV4PullWorker(
+              httpClient: httpClient,
+              ingestionService: ingestionService,
+            );
+
+            await outboxProcessor.processOutbox();
+            await pullWorker.pullAll();
+          };
+        }),
       ],
     ];
   }
 }
+

@@ -332,17 +332,34 @@ class LicenseService {
   Future<DateTime?> getMaxOperationalTimestamp() async {
     try {
       final db = await _getDb();
-      final results = await db.rawQuery('''
-        SELECT MAX(max_date) as max_date FROM (
-          SELECT MAX(created_at) as max_date FROM sales UNION ALL
-          SELECT MAX(created_at) as max_date FROM orders UNION ALL
-          SELECT MAX(created_at) as max_date FROM financial_transactions
-        )
-      ''');
-      if (results.isNotEmpty && results.first['max_date'] != null) {
-        final dateStr = results.first['max_date'] as String;
-        return DateTime.tryParse(dateStr);
+      DateTime? maxFound;
+
+      Future<void> checkTable(String table, String col) async {
+        try {
+          final r = await db.rawQuery('SELECT MAX($col) as m FROM $table');
+          if (r.isNotEmpty && r.first['m'] != null) {
+            final val = r.first['m'];
+            DateTime? dt;
+            if (val is int) {
+              dt = DateTime.fromMillisecondsSinceEpoch(val);
+            } else if (val is String) {
+              dt = DateTime.tryParse(val);
+            }
+            if (dt != null && (maxFound == null || dt.isAfter(maxFound!))) {
+              maxFound = dt;
+            }
+          }
+        } catch (_) {}
       }
+
+      await checkTable('sales', 'created_at');
+      await checkTable('orders', 'created_at');
+      await checkTable('financial_transactions', 'created_at');
+      await checkTable('ledger_entries', 'created_at');
+      await checkTable('cash_transactions', 'created_at');
+      await checkTable('sync_events', 'client_timestamp');
+
+      return maxFound;
     } catch (e) {
       debugPrint('Failed to query max operational timestamp: $e');
     }

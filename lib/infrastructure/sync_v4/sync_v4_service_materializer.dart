@@ -33,20 +33,40 @@ extension SyncV4Materializer on SyncV4Service {
       'order' => 'orders',
       'sale' => 'sales',
       'financial_transaction' => 'financial_transactions',
+      'cash_count' => 'cash_counts',
+      'customer_installment_plan' => 'customer_installment_plans',
+      'customer_installment' => 'customer_installments',
       _ => null,
     };
     if (table == null) return;
     if (change['operation'] == 'DELETE') {
-      final tombstone = <String, Object?>{
-        'is_deleted': 1,
-        'deleted_at': DateTime.now().toUtc().toIso8601String(),
-        'is_synced': 1,
-      };
-      if (table == 'products' || table == 'customers') {
-        tombstone['is_active'] = 0;
+      final schema = await db.rawQuery('PRAGMA table_info($table)');
+      final columns = schema
+          .map((column) => column['name']?.toString())
+          .whereType<String>()
+          .toSet();
+      if (columns.contains('is_deleted')) {
+        final tombstone = <String, Object?>{
+          'is_deleted': 1,
+          if (columns.contains('deleted_at'))
+            'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          if (columns.contains('is_synced')) 'is_synced': 1,
+        };
+        if (columns.contains('is_active')) {
+          tombstone['is_active'] = 0;
+        }
+        await db.update(table, tombstone, where: 'id = ?', whereArgs: [id]);
+      } else {
+        await db.delete(table, where: 'id = ?', whereArgs: [id]);
       }
-      await db.update(table, tombstone, where: 'id = ?', whereArgs: [id]);
       return;
+    }
+    if (type == 'cash_count') {
+      if (payload.containsKey('count_date') && !payload.containsKey('date')) {
+        payload['date'] = payload['count_date'];
+      } else if (payload.containsKey('date') && !payload.containsKey('count_date')) {
+        payload['count_date'] = payload['date'];
+      }
     }
     if (type == 'product') {
       final repairedId = BarcodeStandard.normalizeReadyCatalog(id);
@@ -91,7 +111,11 @@ extension SyncV4Materializer on SyncV4Service {
     if (type == 'order') {
       await _disambiguateOrderNumber(db, row, id);
     }
-    if ((type == 'order' || type == 'sale') && row['customer_id'] != null) {
+    if ((type == 'order' ||
+            type == 'sale' ||
+            type == 'customer_installment_plan' ||
+            type == 'customer_installment') &&
+        row['customer_id'] != null) {
       final customerId = row['customer_id'].toString().trim();
       if (customerId.isNotEmpty) {
         final existingCust = await db.query(
@@ -150,7 +174,16 @@ extension SyncV4Materializer on SyncV4Service {
     final updated =
         await db.update(table, row, where: 'id = ?', whereArgs: [id]);
     if (updated == 0) {
-      await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
+      if (type == 'cash_count' && row['date'] != null) {
+        final byDate = await db.update(table, row,
+            where: 'date = ?', whereArgs: [row['date']]);
+        if (byDate == 0) {
+          await db.insert(table, row,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      } else {
+        await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
+      }
     }
     if (items is List && (type == 'sale' || type == 'order')) {
       final itemTable = type == 'sale' ? 'sale_items' : 'order_items';
@@ -255,19 +288,19 @@ extension SyncV4Materializer on SyncV4Service {
     for (final value in rawItems) {
       final item = Map<String, dynamic>.from(value as Map);
       final saleItemId = item['sale_item_id']?.toString() ?? '';
-      final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
+      final quantity = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       final rows = await db.rawQuery(
           '''SELECT si.*,COALESCE((SELECT SUM(ri.quantity)
         FROM refund_items ri WHERE ri.sale_item_id=si.id),0) refunded_quantity
         FROM sale_items si WHERE si.id=? AND si.sale_id=?''',
           [saleItemId, saleId]);
-      if (rows.isEmpty || quantity <= 0) {
+      if (rows.isEmpty || quantity <= 0.0001) {
         throw StateError('invalid_refund_item');
       }
       final row = rows.first;
       final sold = (row['quantity'] as num).toDouble();
       final refunded = (row['refunded_quantity'] as num).toDouble();
-      if (quantity > sold - refunded) {
+      if (quantity > (sold - refunded) + 0.0001) {
         throw StateError('invalid_refund_quantity');
       }
       final unit = (row['subtotal'] as num).toDouble() / sold;

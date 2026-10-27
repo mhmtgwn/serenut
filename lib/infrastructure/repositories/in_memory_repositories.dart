@@ -138,6 +138,20 @@ class InMemoryProductRepository implements IProductRepository {
   }
 
   @override
+  Future<ProductEntity?> getByBarcode(String barcode) async {
+    final clean = barcode.trim();
+    if (clean.isEmpty) return null;
+    final candidates = BarcodeStandard.lookupCandidates(clean);
+    try {
+      return InMemoryDb.products.firstWhere(
+        (p) => candidates.contains(p.id),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<int> create(ProductEntity entity) async {
     final candidates = BarcodeStandard.lookupCandidates(entity.id);
     if (InMemoryDb.products.any((p) => candidates.contains(p.id))) {

@@ -85,22 +85,41 @@ class SalesFlowState {
     this.idempotencyKey = '',
   });
 
-  double get subtotal {
-    double sum = 0;
+  /// Sepet ara toplamını kuruş tamsayısı (Integer) olarak hesaplar.
+  /// Tartılı ürünlerde bankacılık standardında Half-Up yuvarlama uygulanır: ((priceCents * grams) + 500) ~/ 1000
+  int get subtotalCents {
+    int sumCents = 0;
     cartQuantities.forEach((id, qty) {
       final prod = cartProducts[id];
       if (prod != null) {
-        final saleQuantity = prod.isWeighed ? qty / 1000.0 : qty.toDouble();
-        sum += prod.price * saleQuantity;
+        final priceCents = prod.priceCents;
+        if (prod.isWeighed) {
+          sumCents += ((priceCents * qty) + 500) ~/ 1000;
+        } else {
+          sumCents += priceCents * qty;
+        }
       }
     });
-    return sum;
+    return sumCents;
   }
 
-  double get total {
-    final net = subtotal - discountAmount;
-    return net > 0 ? net : 0.0;
+  /// İskonto miktarını kuruş tamsayısı (Integer) olarak döndürür.
+  int get discountAmountCents => (discountAmount * 100).round();
+
+  /// Ödenen tutarı kuruş tamsayısı (Integer) olarak döndürür.
+  int get paidAmountCents => (paidAmount * 100).round();
+
+  /// Sepet net toplamını kuruş tamsayısı (Integer) olarak hesaplar.
+  int get totalCents {
+    final netCents = subtotalCents - discountAmountCents;
+    return netCents > 0 ? netCents : 0;
   }
+
+  /// Geriye dönük UI uyumluluğu için IEEE-754 artıklarından arındırılmış kesin Lira ara toplamını döndürür.
+  double get subtotal => subtotalCents / 100.0;
+
+  /// Geriye dönük UI uyumluluğu için IEEE-754 artıklarından arındırılmış kesin Lira net toplamını döndürür.
+  double get total => totalCents / 100.0;
 
   SalesFlowState copyWith({
     SalesFlowStatus? status,
@@ -265,6 +284,13 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       paymentMethod: state.paymentMethod,
       paidAmount: state.paidAmount,
       discountAmount: state.discountAmount,
+      paidAmountCents: state.paidAmountCents,
+      discountAmountCents: state.discountAmountCents,
+      karmaCashTendered: state.karmaCashTendered,
+      karmaCashApplied: state.karmaCashApplied,
+      karmaCard: state.karmaCard,
+      karmaDebt: state.karmaDebt,
+      karmaChange: state.karmaChange,
       fsmStatus: state.status.name,
       idempotencyKey: state.idempotencyKey,
     );
@@ -291,6 +317,11 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         paymentMethod: cached['paymentMethod'] as String,
         paidAmount: (cached['paidAmount'] as num?)?.toDouble() ?? 0.0,
         discountAmount: (cached['discountAmount'] as num?)?.toDouble() ?? 0.0,
+        karmaCashTendered: (cached['karmaCashTendered'] as num?)?.toDouble() ?? 0.0,
+        karmaCashApplied: (cached['karmaCashApplied'] as num?)?.toDouble() ?? 0.0,
+        karmaCard: (cached['karmaCard'] as num?)?.toDouble() ?? 0.0,
+        karmaDebt: (cached['karmaDebt'] as num?)?.toDouble() ?? 0.0,
+        karmaChange: (cached['karmaChange'] as num?)?.toDouble() ?? 0.0,
         isSubmitting: false,
         idempotencyKey: cached['idempotencyKey'] as String? ?? '',
       );
@@ -459,14 +490,20 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     newQuantities[product.id] = newQty;
     newProducts[product.id] = product;
 
+    final newSubtotal = _calculateSubtotal(newQuantities, newProducts);
+    final sanitizedDiscount = state.discountAmount.clamp(0.0, newSubtotal);
     double nextPaid = state.paidAmount;
+    final newNetTotal = (newSubtotal - sanitizedDiscount).clamp(0.0, double.infinity);
     if (state.paymentMethod == 'cash' || state.paymentMethod == 'card') {
-      nextPaid = _calculateTotal(newQuantities, newProducts);
+      nextPaid = newNetTotal;
+    } else if (nextPaid > newNetTotal) {
+      nextPaid = newNetTotal;
     }
 
     state = state.copyWith(
       cartQuantities: newQuantities,
       cartProducts: newProducts,
+      discountAmount: sanitizedDiscount,
       paidAmount: nextPaid,
     );
     _persistState();
@@ -593,22 +630,29 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
 
   double _calculateSubtotal(
       Map<String, int> quantities, Map<String, ProductEntity> products) {
-    double sum = 0;
+    int sumCents = 0;
     quantities.forEach((id, qty) {
       final prod = products[id];
       if (prod != null) {
-        sum += prod.price * (prod.isWeighed ? qty / 1000.0 : qty.toDouble());
+        final priceCents = (prod.price * 100).round();
+        if (prod.isWeighed) {
+          sumCents += ((priceCents * qty) / 1000.0).round();
+        } else {
+          sumCents += priceCents * qty;
+        }
       }
     });
-    return sum;
+    return sumCents / 100.0;
   }
 
   double _calculateTotal(
       Map<String, int> quantities, Map<String, ProductEntity> products) {
-    final sum = _calculateSubtotal(quantities, products);
-    final effectiveDiscount = state.discountAmount.clamp(0.0, sum);
-    final net = sum - effectiveDiscount;
-    return net > 0 ? net : 0.0;
+    final subtotal = _calculateSubtotal(quantities, products);
+    final subtotalCents = (subtotal * 100).round();
+    final discountCents =
+        (state.discountAmount * 100).round().clamp(0, subtotalCents);
+    final netCents = subtotalCents - discountCents;
+    return (netCents > 0 ? netCents : 0) / 100.0;
   }
 }
 

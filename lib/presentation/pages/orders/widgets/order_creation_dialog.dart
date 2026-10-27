@@ -29,6 +29,7 @@ import 'package:serenutos/presentation/widgets/discount_dialog.dart';
 import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.dart';
 import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
+import 'package:serenutos/domain/services/scale_barcode_parser.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'steps/step_customer.dart';
@@ -458,16 +459,51 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
 
   Future<void> _handleBarcodeSubmit(
       String barcode, List<ProductEntity> productsList) async {
-    if (barcode.trim().isEmpty) return;
+    final raw = barcode.trim();
+    if (raw.isEmpty) return;
 
     final repository = await ref.read(productRepositoryProvider.future);
 
-    // 1. Direct ID / SKU match
-    var matched = await repository.findById(barcode.trim());
+    // 1. TARTILI TERAZİ BARKODU ÇÖZÜMLEME (27 / 28 / 29 Serisi EAN-13)
+    final scaleResult = ScaleBarcodeParser.tryParse(raw);
+    if (scaleResult != null && scaleResult.isValid) {
+      ProductEntity? matchedScaleProduct;
+      for (final candidate in scaleResult.pluCandidates) {
+        matchedScaleProduct = await repository.findById(candidate) ??
+            await repository.getByBarcode(candidate);
+        if (matchedScaleProduct != null) break;
+      }
 
-    // 2. Search by name/exact matches
+      if (matchedScaleProduct != null) {
+        if (!mounted) return;
+        _barcodeController.clear();
+        _barcodeFocusNode.requestFocus();
+
+        final effectiveWeight = scaleResult.barcodeType == ScaleBarcodeType.priceEmbedded
+            ? scaleResult.calculateEffectiveWeightGrams((matchedScaleProduct.price * 100).round())
+            : scaleResult.weightGrams;
+        final qty = effectiveWeight / 1000.0;
+
+        setState(() {
+          final existingKey = _cart.keys.firstWhere(
+            (p) => p.id == matchedScaleProduct!.id,
+            orElse: () => matchedScaleProduct!,
+          );
+          _cart[existingKey] = (_cart[existingKey] ?? 0.0) + qty;
+        });
+
+        _showNotification('${matchedScaleProduct.name} ($effectiveWeight gr) siparişe eklendi.');
+        return;
+      }
+    }
+
+    // 2. Direct ID or Barcode match
+    var matched = await repository.findById(raw) ??
+        await repository.getByBarcode(raw);
+
+    // 3. Search by name/exact matches
     if (matched == null) {
-      final results = await repository.searchByName(barcode.trim());
+      final results = await repository.searchByName(raw);
       if (results.isNotEmpty) {
         matched = results.first;
       }

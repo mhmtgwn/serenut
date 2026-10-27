@@ -1,6 +1,5 @@
 // core_next/client_core/lib/infrastructure/sync/sync_v4_outbox_processor.dart
 
-import 'package:sqflite/sqflite.dart';
 import '../../domain/models/sync_dtos.dart';
 import '../../domain/models/sync_mutation.dart';
 import '../database/app_database.dart';
@@ -47,6 +46,10 @@ const Set<String> nonRetryableServerErrors = {
 
 /// Çevrimdışı `sync_events` kuyruğunu tüketip HTTP istemcisine ileten işlemci.
 class SyncV4OutboxProcessor {
+  /// Bir mutasyonun geçici hata alarak en fazla kaç kez denenebileceği üst sınırı.
+  /// Bu sınırı aşan mutasyonlar REJECTED (Dead Letter) yapılarak kuyruğun kilitlenmesi engellenir.
+  static const int maxTransientAttempts = 25;
+
   final CoreAppDatabase db;
   final SyncV4HttpClient httpClient;
 
@@ -116,10 +119,12 @@ class SyncV4OutboxProcessor {
           } else if (conflictMap.containsKey(m.eventId)) {
             // Çatışma: LWW / Conflict tablosuna kaydedildi
             final conf = conflictMap[m.eventId]!;
+            final targetRev = conf.serverRevision > 0 ? conf.serverRevision : m.baseRevision;
             await txn.update(
               'sync_events',
               {
                 'sync_state': 'CONFLICT',
+                'base_revision': targetRev,
                 'last_error': 'Sunucu revizyonu ile çakışma (rev: ${conf.serverRevision})',
               },
               where: 'event_id = ?',
@@ -130,19 +135,23 @@ class SyncV4OutboxProcessor {
             // Ret: Kalıcı 4xx veya sunucu doğrulama hatası ayrımı
             final error = rejectedMap[m.eventId]!;
             final isNonRetryable = nonRetryableServerErrors.contains(error);
+            final newAttempts = m.attempts + 1;
+            final isMaxAttemptsExceeded = newAttempts >= maxTransientAttempts;
+            final state = (isNonRetryable || isMaxAttemptsExceeded) ? 'REJECTED' : 'TRANSIENT_ERROR';
+            final lastErr = isMaxAttemptsExceeded ? 'max_attempts_exceeded: $error' : error;
 
             await txn.update(
               'sync_events',
               {
-                'sync_state': isNonRetryable ? 'REJECTED' : 'TRANSIENT_ERROR',
-                'attempts': m.attempts + 1,
-                'last_error': error,
+                'sync_state': state,
+                'attempts': newAttempts,
+                'last_error': lastErr,
               },
               where: 'event_id = ?',
               whereArgs: [m.eventId],
             );
 
-            if (isNonRetryable) {
+            if (isNonRetryable || isMaxAttemptsExceeded) {
               rejected++;
             } else {
               transient++;
@@ -150,17 +159,25 @@ class SyncV4OutboxProcessor {
           } else {
             // Sunucu yanıtı bir mutasyonun işlendiğini kesin olarak doğrulamıyorsa onu başarılı kabul etme!
             // Yanıtta ne ack, ne conflict, ne de rejected olarak dönmeyen mutasyon geçici hata sayılır.
+            final newAttempts = m.attempts + 1;
+            final isMaxAttemptsExceeded = newAttempts >= maxTransientAttempts;
             await txn.update(
               'sync_events',
               {
-                'sync_state': 'TRANSIENT_ERROR',
-                'attempts': m.attempts + 1,
-                'last_error': 'unacknowledged_by_server',
+                'sync_state': isMaxAttemptsExceeded ? 'REJECTED' : 'TRANSIENT_ERROR',
+                'attempts': newAttempts,
+                'last_error': isMaxAttemptsExceeded
+                    ? 'max_attempts_exceeded: unacknowledged_by_server'
+                    : 'unacknowledged_by_server',
               },
               where: 'event_id = ?',
               whereArgs: [m.eventId],
             );
-            transient++;
+            if (isMaxAttemptsExceeded) {
+              rejected++;
+            } else {
+              transient++;
+            }
           }
         }
 
@@ -230,12 +247,14 @@ class SyncV4OutboxProcessor {
   Future<void> _recordBatchTransientError(List<SyncMutation> list, String message) async {
     await db.transaction((txn) async {
       for (final m in list) {
+        final newAttempts = m.attempts + 1;
+        final isDeadLetter = newAttempts >= maxTransientAttempts;
         await txn.update(
           'sync_events',
           {
-            'sync_state': 'TRANSIENT_ERROR',
-            'attempts': m.attempts + 1,
-            'last_error': message,
+            'sync_state': isDeadLetter ? 'REJECTED' : 'TRANSIENT_ERROR',
+            'attempts': newAttempts,
+            'last_error': isDeadLetter ? 'max_attempts_exceeded: $message' : message,
           },
           where: 'event_id = ?',
           whereArgs: [m.eventId],
@@ -289,6 +308,7 @@ class SyncV4OutboxProcessor {
         'sync_events',
         {
           'sync_state': 'PENDING',
+          'attempts': 0,
           'last_error': null,
         },
         where: 'event_id = ?',
@@ -296,4 +316,42 @@ class SyncV4OutboxProcessor {
       );
     });
   }
+
+  /// Çakışmaya düşmüş bir mutasyonun base_revision değerini güncelleyerek yeniden kuyruğa (PENDING) alır.
+  Future<void> rebaseConflictMutation(String eventId, {int? newRevision}) async {
+    await db.transaction((txn) async {
+      final updateData = <String, dynamic>{
+        'sync_state': 'PENDING',
+        'attempts': 0,
+        'last_error': null,
+      };
+      if (newRevision != null && newRevision > 0) {
+        updateData['base_revision'] = newRevision;
+      }
+      await txn.update(
+        'sync_events',
+        updateData,
+        where: 'event_id = ?',
+        whereArgs: [eventId],
+      );
+    });
+  }
+
+  /// Belirli bir varlık tip ve ID'si için çakışmadaki tüm mutasyonları güncel revizyonla rebase eder.
+  Future<int> rebaseAllConflictsForEntity(String entityType, String entityId, int newRevision) async {
+    return await db.transaction<int>((txn) async {
+      return await txn.update(
+        'sync_events',
+        {
+          'sync_state': 'PENDING',
+          'base_revision': newRevision,
+          'attempts': 0,
+          'last_error': null,
+        },
+        where: "entity_type = ? AND entity_id = ? AND sync_state = 'CONFLICT'",
+        whereArgs: [entityType, entityId],
+      );
+    });
+  }
 }
+

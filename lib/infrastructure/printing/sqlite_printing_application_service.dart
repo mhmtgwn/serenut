@@ -82,7 +82,8 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'total': sale.totalAmount,
           'paid': sale.paidAmount,
           'remaining': sale.remainingAmount,
-          'openDrawer': sale.paymentMethod == 'cash',
+          'openDrawer': sale.paymentMethod == 'cash' ||
+              (paymentBreakdown != null && (paymentBreakdown['cash'] as num? ?? 0) > 0),
           'qrData': 'sale|${sale.id}|${sale.totalAmount}',
         },
         items);
@@ -129,6 +130,9 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       order.customerId,
     );
 
+    final hasCash = paymentMethod == 'cash' ||
+        (paymentBreakdown != null && (paymentBreakdown['cash'] as num? ?? 0) > 0);
+
     return _receipt(
         settings,
         {
@@ -146,6 +150,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'total': order.totalAmount,
           'paid': paidAmount,
           'notes': notes ?? order.notes,
+          'openDrawer': hasCash,
           'qrData': 'order|${order.id}|${order.totalAmount}',
           'barcode': order.displayNumber,
         },
@@ -156,6 +161,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
   @override
   Future<PrintJobRecord> queueCollectionReceipt(CustomerEntity customer,
       double amount, String paymentMethod, String? notes, Settings settings) {
+    final hasCash = paymentMethod.toLowerCase() == 'cash' || paymentMethod.toLowerCase() == 'nakit';
     return _receipt(settings, {
       'kind': 'collection',
       'number': 'TAH-${DateTime.now().millisecondsSinceEpoch}',
@@ -167,6 +173,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       'total': amount,
       'paid': amount,
       'notes': notes,
+      'openDrawer': hasCash,
     }, const []);
   }
 
@@ -192,6 +199,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       'downPayment': plan.downPayment,
       'financedAmount': plan.financedAmount,
       'installmentCount': plan.installmentCount,
+      'openDrawer': plan.downPayment > 0,
       'installments': installments.map((i) => {
         'no': i.installmentNo,
         'date': i.dueDate,
@@ -211,6 +219,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     double? remainingDebt,
     String? nextDueDate,
   }) {
+    final hasCash = paymentMethod.toLowerCase() == 'cash' || paymentMethod.toLowerCase() == 'nakit';
     return _receipt(settings, {
       'kind': 'installment_collection',
       'number':
@@ -226,7 +235,44 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       'remainingCount': remainingCount,
       'remainingDebt': remainingDebt,
       'nextDueDate': nextDueDate,
+      'openDrawer': hasCash,
     }, const []);
+  }
+
+  @override
+  Future<PrintJobRecord> queueRefundReceipt({
+    required String receiptNo,
+    required DateTime date,
+    required double totalAmount,
+    required List<Map<String, dynamic>> items,
+    CustomerEntity? customer,
+    required String paymentMethod,
+    required Settings settings,
+    String? reason,
+    Map<String, dynamic>? paymentBreakdown,
+  }) {
+    final hasCash = paymentMethod.toLowerCase() == 'cash' ||
+        paymentMethod.toLowerCase() == 'nakit' ||
+        (paymentBreakdown != null && (paymentBreakdown['cash'] as num? ?? 0) > 0);
+    return _receipt(
+      settings,
+      {
+        'kind': 'refund',
+        'number': receiptNo,
+        'date': _date(date),
+        'payment': _payment(paymentMethod),
+        'paymentBreakdown': paymentBreakdown,
+        'customerName': customer?.name,
+        'customerPhone': customer?.phone,
+        'customerBalance': customer?.balance,
+        'subtotal': totalAmount,
+        'total': totalAmount,
+        'paid': totalAmount,
+        'notes': reason != null && reason.isNotEmpty ? 'İade Nedeni: $reason' : 'Müşteri İadesi',
+        'openDrawer': hasCash,
+      },
+      items,
+    );
   }
 
   @override
@@ -247,10 +293,14 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         },
         categories
             .map((category) => {
+                  'name': category.categoryName,
                   'product_name': category.categoryName,
                   'quantity': category.saleCount,
+                  'unitPrice': category.saleCount == 0
+                      ? 0.0
+                      : category.totalAmount / category.saleCount,
                   'unit_price': category.saleCount == 0
-                      ? 0
+                      ? 0.0
                       : category.totalAmount / category.saleCount,
                   'total': category.totalAmount,
                 })

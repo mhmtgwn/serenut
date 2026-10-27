@@ -3,18 +3,18 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
-/// Keeps product images exclusively on Serenut devices.
-///
-/// The cloud only sees a content-addressed `device-image://...` reference.
-/// Image bytes are advertised and copied directly between devices on the same
-/// LAN. A missing source is harmless: the next sync pass retries it.
+/// Keeps product images synchronized via a hybrid architecture:
+/// 1. LAN P2P cache (fast, offline-first, zero cloud bandwidth)
+/// 2. Cloud Origin fallback (guaranteed cross-LAN and web availability)
 class ProductImagePeerService {
   ProductImagePeerService._();
 
@@ -30,6 +30,34 @@ class ProductImagePeerService {
   String? _peerToken;
   Directory? _imageDirectory;
   final Set<InternetAddress> _peers = <InternetAddress>{};
+
+  http.Client? _httpClient;
+  String? _cloudOriginUrl;
+
+  http.Client get client => _httpClient ??= http.Client();
+
+  @visibleForTesting
+  void setHttpClient(http.Client? client) => _httpClient = client;
+
+  @visibleForTesting
+  void setCloudOriginUrl(String? url) => _cloudOriginUrl = url;
+
+  @visibleForTesting
+  void setImageDirectory(Directory? directory) => _imageDirectory = directory;
+
+  @visibleForTesting
+  void setPeerToken(String? token) => _peerToken = token;
+
+  String get resolvedCloudOriginUrl {
+    if (_cloudOriginUrl != null && _cloudOriginUrl!.isNotEmpty) {
+      return _cloudOriginUrl!.replaceAll(RegExp(r'/+$'), '');
+    }
+    final rawBase = EnvironmentConfig.current.apiBaseUrl.trim();
+    if (rawBase.isEmpty) return '';
+    final uri = Uri.tryParse(rawBase);
+    if (uri == null) return '';
+    return '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+  }
 
   static bool isDeviceImageUri(String? value) =>
       value?.trim().toLowerCase().startsWith('device-image://') == true;
@@ -127,6 +155,7 @@ class ProductImagePeerService {
         operation: 'UPSERT',
         payload: {...row, 'image_url': portableUri, 'is_synced': 0},
       );
+      unawaited(uploadToCloudOrigin(target, imageId));
     }
   }
 
@@ -156,13 +185,28 @@ class ProductImagePeerService {
       if (manifest != null) availability[peer] = manifest;
     }
     var downloaded = 0;
+    final remaining = <String>[];
     for (final imageId in missing) {
+      var foundOnPeer = false;
       for (final peer in availability.keys) {
         if (!availability[peer]!.contains(imageId)) continue;
         if (await _download(peer, imageId, directory)) {
           downloaded++;
+          foundOnPeer = true;
           break;
         }
+      }
+      if (!foundOnPeer) {
+        remaining.add(imageId);
+      }
+    }
+
+    // Hybrid Cloud Origin Fallback:
+    // When LAN peers are absent or do not hold the required image,
+    // fetch directly from Cloud Origin.
+    for (final imageId in remaining) {
+      if (await downloadFromCloudOrigin(imageId, directory)) {
+        downloaded++;
       }
     }
     return downloaded;
@@ -241,7 +285,7 @@ class ProductImagePeerService {
 
   Future<Set<String>?> _fetchManifest(InternetAddress peer) async {
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('http://${peer.address}:$_httpPort/product-images/manifest'),
         headers: {'x-serenut-peer-token': _peerToken!},
       ).timeout(const Duration(seconds: 5));
@@ -265,12 +309,74 @@ class ProductImagePeerService {
     Directory directory,
   ) async {
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('http://${peer.address}:$_httpPort/product-images/$imageId'),
         headers: {'x-serenut-peer-token': _peerToken!},
       ).timeout(const Duration(seconds: 8));
       if (response.statusCode != HttpStatus.ok ||
           response.bodyBytes.length > 8 * 1024 * 1024) {
+        return false;
+      }
+      final expectedHash = imageId.substring(0, 64);
+      if (sha256.convert(response.bodyBytes).toString() != expectedHash) {
+        return false;
+      }
+      final target = File(p.join(directory.path, imageId));
+      final temporary = File('${target.path}.part');
+      await temporary.writeAsBytes(response.bodyBytes, flush: true);
+      await temporary.rename(target.path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Uploads a locally stored product image to the Cloud Origin as a backup.
+  Future<bool> uploadToCloudOrigin(File file, String imageId) async {
+    try {
+      if (!await file.exists()) return false;
+      final origin = resolvedCloudOriginUrl;
+      if (origin.isEmpty) return false;
+      final bytes = await file.readAsBytes();
+      final expectedHash = imageId.substring(0, 64);
+      if (sha256.convert(bytes).toString() != expectedHash) return false;
+
+      final uri = Uri.parse('$origin/api/v1/products/image');
+      final response = await client.post(
+        uri,
+        headers: {
+          'Content-Type': 'image/${_mimeSubtype(imageId)}',
+          'x-image-id': imageId,
+          if (_peerToken != null) 'x-serenut-peer-token': _peerToken!,
+        },
+        body: bytes,
+      ).timeout(const Duration(seconds: 15));
+
+      return response.statusCode == HttpStatus.ok ||
+          response.statusCode == HttpStatus.created;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Downloads a missing product image from the Cloud Origin fallback.
+  Future<bool> downloadFromCloudOrigin(
+    String imageId,
+    Directory directory,
+  ) async {
+    try {
+      final origin = resolvedCloudOriginUrl;
+      if (origin.isEmpty) return false;
+      final uri = Uri.parse('$origin/uploads/product-images/$imageId');
+      final response = await client.get(
+        uri,
+        headers: {
+          if (_peerToken != null) 'x-serenut-peer-token': _peerToken!,
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode != HttpStatus.ok ||
+          response.bodyBytes.length > 10 * 1024 * 1024) {
         return false;
       }
       final expectedHash = imageId.substring(0, 64);

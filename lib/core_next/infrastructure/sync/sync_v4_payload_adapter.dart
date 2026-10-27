@@ -60,11 +60,22 @@ class SyncV4PayloadAdapter {
       final subtotalLira = toLira(item.total);
       computedItemsTotal += subtotalLira;
 
+      // Tartılı ürünlerde miktar gram cinsinden tutulduğu için kilogram standardına normalize et
+      final isWeighed = item.isWeighed ||
+          (item.quantity > 0 &&
+              item.unitPrice.value > 0 &&
+              ((item.unitPrice.value * item.quantity) - item.total.value).abs() > 5 &&
+              (((item.unitPrice.value * item.quantity) / 1000.0) - item.total.value).abs() <= 5);
+      final effectiveQuantity = isWeighed
+          ? double.parse((item.quantity / 1000.0).toStringAsFixed(3))
+          : item.quantity.toDouble();
+
       normalizedItems.add({
         'id': item.id,
         'product_id': item.productId,
         'product_name': item.productName,
-        'quantity': item.quantity,
+        'quantity': effectiveQuantity,
+        'is_weighed': isWeighed,
         'unit_price': unitPriceLira,
         'subtotal': subtotalLira,
         'created_at': createdAt.toUtc().toIso8601String(),
@@ -311,10 +322,12 @@ class SyncV4PayloadAdapter {
     required String name,
     required int priceCents,
     int? costPriceCents,
-    required int stockQuantity,
-    int minStock = 5,
+    required num stockQuantity,
+    num minStock = 5,
     String? category,
     String? unit,
+    String saleType = 'piece',
+    int minimumWeightGrams = 20,
     int? vatRate,
     String? imageUrl,
     bool isDeleted = false,
@@ -349,12 +362,14 @@ class SyncV4PayloadAdapter {
       'barcode': cleanId,
       'name': cleanName,
       'description': cleanName,
-      // Sunucu Protocol 6 alanları (Ondalık TL ve birim adet)
+      // Sunucu Protocol 6 alanları (Ondalık TL ve birim adet/kg)
       'price': priceLira,
       'purchase_price': costPriceLira,
       'quantity': stockQuantity,
       'min_stock': minStock,
       'unit': effectiveUnit,
+      'sale_type': saleType,
+      'minimum_weight_grams': minimumWeightGrams,
       'category': effectiveCategory,
       'vat': effectiveVat,
       'sku': cleanId,

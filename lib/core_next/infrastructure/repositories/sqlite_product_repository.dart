@@ -8,7 +8,7 @@ abstract interface class ICoreProductRepository {
   Future<List<ProductEntity>> searchProducts(String query, {int limit = 50});
   Future<List<ProductEntity>> getByCategory(String categoryId);
   Future<void> upsertProduct(ProductEntity product);
-  Future<void> updateStock(String productId, int newQuantity);
+  Future<void> updateStock(String productId, num newQuantity);
   Future<void> softDeleteProduct(String productId);
 }
 
@@ -86,12 +86,12 @@ class SqliteProductRepository implements ICoreProductRepository {
   }
 
   @override
-  Future<void> updateStock(String productId, int newQuantity) async {
+  Future<void> updateStock(String productId, num newQuantity) async {
     await _db.update(
       'products',
       {
-        'stock_quantity': newQuantity,
-        'updated_at': DateTime.now().toIso8601String(),
+        'stock_quantity': newQuantity.toDouble(),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'id = ?',
       whereArgs: [productId],
@@ -104,7 +104,7 @@ class SqliteProductRepository implements ICoreProductRepository {
       'products',
       {
         'is_deleted': 1,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'id = ?',
       whereArgs: [productId],

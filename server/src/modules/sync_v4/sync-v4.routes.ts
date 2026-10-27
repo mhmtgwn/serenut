@@ -29,6 +29,9 @@ const entityTypes = new Set([
   "sale",
   "financial_transaction",
   "refund",
+  "cash_count",
+  "customer_installment_plan",
+  "customer_installment",
 ]);
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -290,7 +293,11 @@ router.post("/push", async (req, res) => {
               : mutation.entity_type === "customer" ||
                   mutation.entity_type === "financial_transaction"
                 ? "CustomerUpdated"
-                : "OrderUpdated",
+                : mutation.entity_type === "sale"
+                  ? "SaleCompleted"
+                  : mutation.entity_type === "refund"
+                    ? "RefundCreated"
+                    : "OrderUpdated",
           entityId: mutation.entity_id,
           revision,
         });

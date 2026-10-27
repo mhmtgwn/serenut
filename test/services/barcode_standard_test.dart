@@ -24,5 +24,11 @@ void main() {
       expect(BarcodeStandard.normalizeReadyCatalog('8690000000001'),
           '8690000000001');
     });
+
+    test('strips trailing .0 from numeric barcodes (Excel artifact)', () {
+      expect(BarcodeStandard.normalize('8690504090106.0'), '8690504090106');
+      expect(BarcodeStandard.normalize('123456789012.0'), '123456789012');
+      expect(BarcodeStandard.normalize('0123456789012.0'), '123456789012');
+    });
   });
 }

@@ -132,3 +132,8 @@ scratch/
 .tmp*
 test/services/*_runner_test.dart
 test/services/font_render_check_test.dart
+backups/
+build_error.txt
+*.tmp
+*.db
+stage10_12_40_rehearsal_results.json

@@ -73,6 +73,24 @@ class PaymentService {
     }
 
     final debt = totalAmount - paidAmount;
+    if (debt > 0 && customerId.isNotEmpty) {
+      final customer = await _customerRepository.findById(customerId);
+      if (customer != null &&
+          customer.creditLimit != null &&
+          customer.creditLimit! > 0) {
+        final projectedDebt = (customer.balance < -0.009 ? -customer.balance : 0.0) +
+            (customer.balance > 0.009
+                ? (debt - customer.balance).clamp(0.0, double.infinity)
+                : debt);
+        if (projectedDebt > customer.creditLimit! + 0.009) {
+          throw CreditLimitExceededException(
+            customerName: customer.name,
+            creditLimit: customer.creditLimit!,
+            projectedDebt: projectedDebt,
+          );
+        }
+      }
+    }
 
     final transactionId = _generateTxId('trans');
     await _transactionRepository.create(

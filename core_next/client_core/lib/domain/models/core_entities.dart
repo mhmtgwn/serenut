@@ -26,8 +26,10 @@ class ProductEntity {
   final MoneyCents? costPrice;
   final int vatRate;
   final ProductUnit unit;
-  final int stockQuantity;
-  final int criticalStockThreshold;
+  final String saleType;
+  final int minimumWeightGrams;
+  final num stockQuantity;
+  final num criticalStockThreshold;
   final String? imageUrl;
   final bool isActive;
   final bool isDeleted;
@@ -43,6 +45,8 @@ class ProductEntity {
     this.costPrice,
     this.vatRate = 20,
     this.unit = ProductUnit.piece,
+    this.saleType = 'piece',
+    this.minimumWeightGrams = 20,
     this.stockQuantity = 0,
     this.criticalStockThreshold = 5,
     this.imageUrl,
@@ -50,6 +54,8 @@ class ProductEntity {
     this.isDeleted = false,
     required this.updatedAt,
   });
+
+  bool get isWeighed => saleType == 'weighed' || unit == ProductUnit.kg || unit == ProductUnit.gram;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -60,12 +66,14 @@ class ProductEntity {
         'cost_price_cents': costPrice?.value,
         'vat_rate': vatRate,
         'unit': unit.name,
+        'sale_type': saleType,
+        'minimum_weight_grams': minimumWeightGrams,
         'stock_quantity': stockQuantity,
         'critical_threshold': criticalStockThreshold,
         'image_url': imageUrl,
         'is_active': isActive ? 1 : 0,
         'is_deleted': isDeleted ? 1 : 0,
-        'updated_at': updatedAt.toIso8601String(),
+        'updated_at': updatedAt.millisecondsSinceEpoch,
       };
 
   factory ProductEntity.fromMap(Map<String, dynamic> map) => ProductEntity(
@@ -80,8 +88,10 @@ class ProductEntity {
             : null,
         vatRate: (map['vat_rate'] as num?)?.toInt() ?? 20,
         unit: ProductUnit.values.byName(map['unit'] as String? ?? 'piece'),
-        stockQuantity: (map['stock_quantity'] as num?)?.toInt() ?? 0,
-        criticalStockThreshold: (map['critical_threshold'] as num?)?.toInt() ?? 5,
+        saleType: map['sale_type'] as String? ?? 'piece',
+        minimumWeightGrams: (map['minimum_weight_grams'] as num?)?.toInt() ?? 20,
+        stockQuantity: (map['stock_quantity'] as num?)?.toDouble() ?? 0.0,
+        criticalStockThreshold: (map['critical_threshold'] as num?)?.toDouble() ?? 5.0,
         imageUrl: map['image_url'] as String?,
         isActive: (map['is_active'] as int? ?? 1) == 1,
         isDeleted: (map['is_deleted'] as int? ?? 0) == 1,
@@ -130,7 +140,7 @@ class CustomerEntity {
         'notes': notes,
         'is_active': isActive ? 1 : 0,
         'is_deleted': isDeleted ? 1 : 0,
-        'updated_at': updatedAt.toIso8601String(),
+        'updated_at': updatedAt.millisecondsSinceEpoch,
       };
 
   factory CustomerEntity.fromMap(Map<String, dynamic> map) => CustomerEntity(
@@ -186,7 +196,7 @@ class LedgerEntryEntity {
         'amount_cents': amount.value,
         'balance_after_cents': balanceAfter.value,
         'description': description,
-        'created_at': createdAt.toIso8601String(),
+        'created_at': createdAt.millisecondsSinceEpoch,
       };
 
   factory LedgerEntryEntity.fromMap(Map<String, dynamic> map) =>
@@ -240,6 +250,7 @@ class SaleOrderItemEntity {
   final MoneyCents discount;
   final int vatRate;
   final MoneyCents total;
+  final bool isWeighed;
 
   const SaleOrderItemEntity({
     required this.id,
@@ -252,6 +263,7 @@ class SaleOrderItemEntity {
     this.discount = MoneyCents.zero,
     required this.vatRate,
     required this.total,
+    this.isWeighed = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -279,6 +291,7 @@ class SaleOrderItemEntity {
         discount: MoneyCents((map['discount_cents'] as num?)?.toInt() ?? 0),
         vatRate: (map['vat_rate'] as num?)?.toInt() ?? 20,
         total: MoneyCents((map['total_cents'] as num).toInt()),
+        isWeighed: (map['is_weighed'] as int? ?? 0) == 1,
       );
 }
 

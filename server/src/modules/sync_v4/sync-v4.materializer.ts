@@ -81,6 +81,24 @@ export async function applyDomainMutation(
         return;
       case "refund":
         throw new Error("immutable_refund");
+      case "cash_count":
+        await client.query(
+          "UPDATE cash_counts SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
+      case "customer_installment_plan":
+        await client.query(
+          "UPDATE customer_installment_plans SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
+      case "customer_installment":
+        await client.query(
+          "UPDATE customer_installments SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
     }
   }
 
@@ -157,6 +175,15 @@ export async function applyDomainMutation(
       });
       return;
     }
+    case "cash_count":
+      await upsertCashCount(client, companyId, id, payload);
+      return;
+    case "customer_installment_plan":
+      await upsertInstallmentPlan(client, companyId, id, payload);
+      return;
+    case "customer_installment":
+      await upsertInstallment(client, companyId, id, payload);
+      return;
   }
 }
 
@@ -219,19 +246,39 @@ export async function upsertSale(
     );
     if (!customer.rowCount) throw new Error("invalid_customer");
   }
-  let computedTotal = 0;
+  let computedTotalCents = 0;
   const normalizedItems: Array<{ id: string; productId: string; productName: string | null; quantity: number; unitPrice: number; subtotal: number; createdAt: string | null }> = [];
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     if (!item || typeof item !== "object") throw new Error("invalid_mutation");
     const row = item as Record<string, unknown>;
     const productId = stringValue(row, "product_id");
-    const quantity = numberValue(row, "quantity", Number.NaN);
+    let quantity = numberValue(row, "quantity", Number.NaN);
     const unitPrice = numberValue(row, "unit_price", numberValue(row, "price", Number.NaN));
     if (!productId || !Number.isFinite(quantity) || quantity <= 0 ||
         !Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("invalid_sale_item");
-    const subtotal = quantity * unitPrice;
-    computedTotal += subtotal;
+
+    const rowSubtotal = numberValue(row, "subtotal", numberValue(row, "total_amount", numberValue(row, "total", Number.NaN)));
+
+    // Savunmacı gram normalizasyonu: İstemci tartılı ürünü gram cinsinden göndermişse
+    // (ör. quantity=450 gr, unitPrice=100 TL/kg, subtotal=45 TL), miktar*fiyat subtotal'in ~1000 katı olur.
+    if (Number.isFinite(rowSubtotal) && rowSubtotal > 0 && quantity > 10) {
+      const subtotalCents = Math.round(rowSubtotal * 100);
+      const rawCents = Math.round(quantity * unitPrice * 100);
+      if (Math.abs(rawCents / 1000 - subtotalCents) <= 5) {
+        quantity = quantity / 1000;
+      }
+    }
+
+    // Standart kuruş yuvarlama (Half-up Banker's rounding to integer cents)
+    const calculatedSubtotalCents = Math.round(quantity * unitPrice * 100);
+    // İstemcinin kuruş bazlı hesapladığı subtotal değeri 0.05 TL tolerans dahilindeyse istemcinin net kuruş değerini onayla
+    const itemSubtotalCents = (Number.isFinite(rowSubtotal) && Math.abs(Math.round(rowSubtotal * 100) - calculatedSubtotalCents) <= 5)
+      ? Math.round(rowSubtotal * 100)
+      : calculatedSubtotalCents;
+
+    const subtotal = itemSubtotalCents / 100;
+    computedTotalCents += itemSubtotalCents;
     normalizedItems.push({
       id: stringValue(row, "id", `sync-${id}-${index}`),
       productId,
@@ -245,7 +292,9 @@ export async function upsertSale(
   const clientTotal = numberValue(payload, "total_amount", Number.NaN);
   const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
   const discountAmount = numberValue(payload, "discount_amount", 0);
-  const expectedTotal = Math.max(0, Number((computedTotal - discountAmount).toFixed(2)));
+  const discountCents = Math.round(discountAmount * 100);
+  const expectedTotalCents = Math.max(0, computedTotalCents - discountCents);
+  const expectedTotal = expectedTotalCents / 100;
 
   if (!Number.isFinite(clientTotal) || Math.abs(clientTotal - expectedTotal) > 0.05 ||
       !Number.isFinite(paidAmount) || paidAmount < 0) {
@@ -254,10 +303,10 @@ export async function upsertSale(
   if ((paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") && paidAmount !== 0) {
     throw new Error("invalid_credit_payment");
   }
-  if (paymentMethod === "card" && Math.abs(paidAmount - expectedTotal) > 0.05) {
+  if (paymentMethod === "card" && Math.abs(paidAmount - clientTotal) > 0.05 && Math.abs(paidAmount - expectedTotal) > 0.05) {
     throw new Error("invalid_full_payment");
   }
-  if (paymentMethod === "cash" && paidAmount < expectedTotal - 0.05) {
+  if (paymentMethod === "cash" && paidAmount < Math.min(clientTotal, expectedTotal) - 0.05) {
     throw new Error("invalid_full_payment");
   }
 
@@ -375,6 +424,22 @@ export async function upsertFinancialTransaction(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
+  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
+  if (isDeleted) {
+    const priorCheck = await client.query(
+      `SELECT id, is_deleted FROM financial_transactions WHERE id=$1 AND company_id=$2`,
+      [id, companyId],
+    );
+    if (priorCheck.rowCount) {
+      if (!priorCheck.rows[0].is_deleted) {
+        await client.query(
+          "UPDATE financial_transactions SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+      }
+      return;
+    }
+  }
   const customerId = nullableId(stringValue(payload, "customer_id"));
   const type = stringValue(payload, "type");
   const amount = numberValue(payload, "amount", Number.NaN);
@@ -392,7 +457,6 @@ export async function upsertFinancialTransaction(
   const rawMetadata = typeof payload.metadata === "object" && payload.metadata !== null ? payload.metadata : null;
   const isRevision = (rawMetadata && (rawMetadata as any).reason === "order_revision") ||
                      (typeof payload.metadata === "string" && payload.metadata.includes('"order_revision"'));
-  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
   let effectiveDebtAmount = debtAmount;
   if (!Number.isFinite(effectiveDebtAmount) || effectiveDebtAmount < 0 || Math.abs(amount - paidAmount - effectiveDebtAmount) > 0.05) {
     effectiveDebtAmount = Math.max(0, Number((amount - paidAmount).toFixed(2)));
@@ -494,5 +558,169 @@ export async function upsertFinancialTransaction(
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
       referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod, isDeleted],
+  );
+
+  if (type === "refund" && Array.isArray(payload.items) && payload.items.length > 0) {
+    for (let index = 0; index < payload.items.length; index++) {
+      const it = payload.items[index];
+      if (it && typeof it === "object") {
+        const prodId = stringValue(it, "product_id");
+        const rawQty = numberValue(it, "quantity", 0);
+        if (prodId && rawQty > 0) {
+          const pRes = await client.query(
+            `SELECT unit FROM products WHERE id = $1 AND company_id = $2`,
+            [prodId, companyId],
+          );
+          const isWeighed = (pRes.rowCount ?? 0) > 0 && (pRes.rows[0].unit === "kg" || pRes.rows[0].unit === "gram");
+          const qtyDelta = isWeighed && rawQty >= 20 ? (rawQty / 1000.0) : rawQty;
+
+          await client.query(
+            `UPDATE products SET quantity = quantity + $1, updated_at = NOW()
+             WHERE id = $2 AND company_id = $3 AND is_deleted = false`,
+            [qtyDelta, prodId, companyId],
+          );
+          await client.query(
+            `INSERT INTO inventory_movements(id, company_id, product_id, movement_type, quantity_delta, reference_type, reference_id, created_by)
+             VALUES($1, $2, $3, 'refund', $4, 'refund', $5, $6)
+             ON CONFLICT (id) DO NOTHING`,
+            [`mov-ref-${id}-${prodId}-${index}`, companyId, prodId, qtyDelta, id,
+              stringValue(payload, "created_by") || null],
+          );
+        }
+      }
+    }
+  }
+}
+
+export async function upsertCashCount(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const countDate = stringValue(payload, "date") || stringValue(payload, "count_date") || new Date().toISOString().slice(0, 10);
+  const openingBalance = numberValue(payload, "opening_balance", 0);
+  const countedCash = numberValue(payload, "counted_cash", 0);
+  const expectedCash = numberValue(payload, "expected_cash", 0);
+  const difference = numberValue(payload, "difference", countedCash - expectedCash);
+  const notes = stringValue(payload, "notes") || null;
+  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
+
+  await client.query(
+    `INSERT INTO cash_counts (id, company_id, count_date, opening_balance, counted_cash, expected_cash, difference, notes, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, COALESCE($10::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       count_date = EXCLUDED.count_date,
+       opening_balance = EXCLUDED.opening_balance,
+       counted_cash = EXCLUDED.counted_cash,
+       expected_cash = EXCLUDED.expected_cash,
+       difference = EXCLUDED.difference,
+       notes = EXCLUDED.notes,
+       is_deleted = EXCLUDED.is_deleted,
+       deleted_at = CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
+       updated_at = NOW()
+     WHERE cash_counts.company_id = EXCLUDED.company_id`,
+    [id, companyId, countDate, openingBalance, countedCash, expectedCash, difference, notes, isDeleted,
+     stringValue(payload, "created_at") || null],
+  );
+}
+
+export async function upsertInstallmentPlan(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  let customerId = stringValue(payload, "customer_id");
+  if (!customerId) {
+    const existing = await client.query(
+      `SELECT customer_id FROM customer_installment_plans WHERE id = $1 AND company_id = $2`,
+      [id, companyId],
+    );
+    if (existing.rowCount && existing.rows[0].customer_id) {
+      customerId = existing.rows[0].customer_id;
+    } else {
+      throw new Error("invalid_installment_plan_customer");
+    }
+  }
+  const totalAmount = numberValue(payload, "total_amount", 0);
+  const downPayment = numberValue(payload, "down_payment", 0);
+  const installmentCount = Math.max(1, Math.round(numberValue(payload, "installment_count", 1)));
+  const description = stringValue(payload, "description") || null;
+  const status = stringValue(payload, "status", "active");
+  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
+
+  await client.query(
+    `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
+     ON CONFLICT (id) DO NOTHING`,
+    [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
+  );
+
+  await client.query(
+    `INSERT INTO customer_installment_plans (id, company_id, customer_id, total_amount, down_payment, installment_count, description, status, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       customer_id = COALESCE(EXCLUDED.customer_id, customer_installment_plans.customer_id),
+       total_amount = CASE WHEN EXCLUDED.total_amount > 0 THEN EXCLUDED.total_amount ELSE customer_installment_plans.total_amount END,
+       down_payment = CASE WHEN EXCLUDED.down_payment >= 0 THEN EXCLUDED.down_payment ELSE customer_installment_plans.down_payment END,
+       installment_count = CASE WHEN EXCLUDED.installment_count > 0 THEN EXCLUDED.installment_count ELSE customer_installment_plans.installment_count END,
+       description = COALESCE(EXCLUDED.description, customer_installment_plans.description),
+       status = COALESCE(NULLIF(EXCLUDED.status, ''), customer_installment_plans.status),
+       is_deleted = EXCLUDED.is_deleted,
+       deleted_at = CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
+       updated_at = NOW()
+     WHERE customer_installment_plans.company_id = EXCLUDED.company_id`,
+    [id, companyId, customerId, totalAmount, downPayment, installmentCount, description, status, isDeleted,
+     stringValue(payload, "created_at") || null],
+  );
+}
+
+export async function upsertInstallment(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  let planId = stringValue(payload, "plan_id");
+  let customerId = stringValue(payload, "customer_id");
+  if (!planId || !customerId) {
+    const existing = await client.query(
+      `SELECT plan_id, customer_id FROM customer_installments WHERE id = $1 AND company_id = $2`,
+      [id, companyId],
+    );
+    if (existing.rowCount) {
+      if (!planId) planId = existing.rows[0].plan_id;
+      if (!customerId) customerId = existing.rows[0].customer_id;
+    }
+  }
+  const installmentNo = Math.round(numberValue(payload, "installment_no", 0));
+  const amount = numberValue(payload, "amount", 0);
+  const paidAmount = numberValue(payload, "paid_amount", 0);
+  const dueDate = stringValue(payload, "due_date") || null;
+  const status = stringValue(payload, "status", "");
+  const paidAt = stringValue(payload, "paid_at") || null;
+  const transactionId = stringValue(payload, "financial_transaction_id") || null;
+  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
+
+  await client.query(
+    `INSERT INTO customer_installments (id, company_id, plan_id, customer_id, installment_no, amount, paid_amount, due_date, status, paid_at, financial_transaction_id, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, CASE WHEN $5 > 0 THEN $5 ELSE 1 END, $6, $7, COALESCE($8::date, CURRENT_DATE), CASE WHEN $9 != '' THEN $9 ELSE 'pending' END, $10::timestamptz, $11, $12, COALESCE($13::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       plan_id = COALESCE(EXCLUDED.plan_id, customer_installments.plan_id),
+       customer_id = COALESCE(EXCLUDED.customer_id, customer_installments.customer_id),
+       installment_no = CASE WHEN EXCLUDED.installment_no > 0 THEN EXCLUDED.installment_no ELSE customer_installments.installment_no END,
+       amount = CASE WHEN EXCLUDED.amount > 0 THEN EXCLUDED.amount ELSE customer_installments.amount END,
+       paid_amount = EXCLUDED.paid_amount,
+       due_date = COALESCE(EXCLUDED.due_date, customer_installments.due_date),
+       status = CASE WHEN EXCLUDED.status != '' THEN EXCLUDED.status ELSE customer_installments.status END,
+       paid_at = COALESCE(EXCLUDED.paid_at, customer_installments.paid_at),
+       financial_transaction_id = COALESCE(EXCLUDED.financial_transaction_id, customer_installments.financial_transaction_id),
+       is_deleted = EXCLUDED.is_deleted,
+       deleted_at = CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
+       updated_at = NOW()
+     WHERE customer_installments.company_id = EXCLUDED.company_id`,
+    [id, companyId, planId || null, customerId || null, installmentNo, amount, paidAmount, dueDate, status, paidAt, transactionId, isDeleted,
+     stringValue(payload, "created_at") || null],
   );
 }

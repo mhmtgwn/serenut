@@ -157,9 +157,12 @@ class SmsLogRepository {
   Future<DateTime?> getLastReminderDate(String phone) async {
     final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleanPhone.isEmpty) return null;
+    final searchSuffix = cleanPhone.length >= 10
+        ? cleanPhone.substring(cleanPhone.length - 10)
+        : cleanPhone;
     if (kIsWeb) {
       final matches = _inMemoryLogs.where((e) =>
-          e.phone.replaceAll(RegExp(r'[^0-9]'), '').contains(cleanPhone) &&
+          e.phone.replaceAll(RegExp(r'[^0-9]'), '').contains(searchSuffix) &&
           (e.eventType == 'balance_reminder' || e.eventType == 'bulk_debt_reminder') &&
           e.status == SmsLogStatus.sent);
       if (matches.isEmpty) return null;
@@ -172,7 +175,7 @@ class SmsLogRepository {
            WHERE phone LIKE ? AND event_type IN ('balance_reminder', 'bulk_debt_reminder')
            AND status = 'sent'
            ORDER BY created_at DESC LIMIT 1''',
-        ['%$cleanPhone%'],
+        ['%$searchSuffix%'],
       );
       if (rows.isEmpty) return null;
       final sentStr = rows.first['sent_at'] as String? ?? rows.first['created_at'] as String?;

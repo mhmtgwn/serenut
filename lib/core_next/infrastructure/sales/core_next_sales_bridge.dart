@@ -13,6 +13,7 @@ import '../../domain/usecases/checkout_use_case.dart';
 import '../../domain/usecases/refund_use_case.dart';
 import '../repositories/sqlite_product_repository.dart';
 import '../../presentation/sales/sales_engine_adapter.dart';
+import '../../presentation/sales/core_sales_flow_state.dart';
 import '../database/app_database.dart';
 
 class CoreNextSalesBridge {
@@ -60,9 +61,8 @@ class CoreNextSalesBridge {
         }
       }
 
-      // 2. Ürünleri yükle ve sepeti doldur
-      final products = <core.ProductEntity>[];
-      final quantities = <String, int>{};
+      // 2. Ürünleri yükle ve sepeti doldur (Ayrı poşetler ve kalemler korunur)
+      final cartItems = <CoreCartItem>[];
 
       for (final item in items) {
         var prod = await productRepo.getById(item.productId);
@@ -73,14 +73,21 @@ class CoreNextSalesBridge {
           price: MoneyCents((item.unitPrice * 100).round()),
           updatedAt: DateTime.now(),
         );
-        products.add(prod);
-        quantities[prod.id] = (quantities[prod.id] ?? 0) + item.quantity.toInt();
+        final itemQty = prod.isWeighed
+            ? (item.quantity * 1000).round()
+            : item.quantity.toInt();
+        cartItems.add(CoreCartItem(
+          product: prod,
+          quantity: itemQty,
+          unitPrice: prod.price,
+          isWeighed: prod.isWeighed,
+        ));
       }
 
       // 3. Tutar ve İskonto Hesapları
-      final subtotalCents = products.fold<int>(
+      final subtotalCents = cartItems.fold<int>(
         0,
-        (sum, p) => sum + (p.price.value * (quantities[p.id] ?? 1)),
+        (sum, it) => sum + it.lineTotal.value,
       );
       final discountCents = MoneyCents(((discountAmount ?? 0.0) * 100).round());
       final rawTotal = subtotalCents - discountCents.value;
@@ -158,9 +165,8 @@ class CoreNextSalesBridge {
       }
 
       // 5. Sepeti müşteri, iskonto ve ödeme parçalarıyla deterministik doldur
-      adapter.syncFromCart(
-        products: products,
-        quantities: quantities,
+      adapter.syncFromCartItems(
+        items: cartItems,
         customer: selectedCustomer,
         discount: discountCents,
         paymentSplits: splits,

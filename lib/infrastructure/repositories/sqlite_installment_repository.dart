@@ -136,10 +136,24 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
     await _gateway.transaction(() async {
       // 1. Taksit Planını Ekle
       await _executor.insert('customer_installment_plans', plan.toMap());
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'customer_installment_plan',
+        entityId: planId,
+        operation: 'UPSERT',
+        payload: plan.toMap(),
+      );
 
       // 2. Taksit Satırlarını Ekle
       for (final inst in installments) {
         await _executor.insert('customer_installments', inst.toMap());
+        await SyncOutboxV4.enqueue(
+          _executor,
+          entityType: 'customer_installment',
+          entityId: inst.id,
+          operation: 'UPSERT',
+          payload: inst.toMap(),
+        );
       }
 
       // 3. Müşteriye Borç Hareketi Yaz (financial_transactions)
@@ -153,8 +167,11 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         'type': 'manual_debt',
         'customer_id': customerId,
         'amount': totalAmount,
+        'amount_minor': (totalAmount * 100).round(),
         'paid_amount': 0.0,
+        'paid_amount_minor': 0,
         'debt_amount': totalAmount,
+        'debt_amount_minor': (totalAmount * 100).round(),
         'reference_id': planId,
         'description': debtDesc,
         'payment_method': 'veresiye',
@@ -173,8 +190,11 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'type': 'manual_debt',
           'customer_id': customerId,
           'amount': totalAmount,
+          'amount_minor': (totalAmount * 100).round(),
           'paid_amount': 0.0,
+          'paid_amount_minor': 0,
           'debt_amount': totalAmount,
+          'debt_amount_minor': (totalAmount * 100).round(),
           'reference_id': planId,
           'description': debtDesc,
           'payment_method': 'veresiye',
@@ -194,8 +214,11 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'type': 'collection',
           'customer_id': customerId,
           'amount': downPayment,
+          'amount_minor': (downPayment * 100).round(),
           'paid_amount': downPayment,
+          'paid_amount_minor': (downPayment * 100).round(),
           'debt_amount': 0.0,
+          'debt_amount_minor': 0,
           'reference_id': planId,
           'description': colDesc,
           'payment_method': downPaymentMethod,
@@ -203,6 +226,21 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'is_synced': 0,
           'created_at': now.toIso8601String(),
         });
+
+        if (downPaymentMethod.toLowerCase() == 'cash' || downPaymentMethod.toLowerCase() == 'nakit') {
+          try {
+            await _executor.insert('cash_transactions', {
+              'id': 'cash-down-${_uuid.v4()}',
+              'type': 'INFLOW',
+              'amount_cents': (downPayment * 100).round(),
+              'category': 'INSTALLMENT_DOWNPAYMENT',
+              'description': colDesc,
+              'created_at': now.millisecondsSinceEpoch,
+            });
+          } catch (_) {
+            // Non-fatal if legacy cash_transactions table does not exist
+          }
+        }
 
         await SyncOutboxV4.enqueue(
           _executor,
@@ -214,8 +252,11 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
             'type': 'collection',
             'customer_id': customerId,
             'amount': downPayment,
+            'amount_minor': (downPayment * 100).round(),
             'paid_amount': downPayment,
+            'paid_amount_minor': (downPayment * 100).round(),
             'debt_amount': 0.0,
+            'debt_amount_minor': 0,
             'reference_id': planId,
             'description': colDesc,
             'payment_method': downPaymentMethod,
@@ -355,8 +396,11 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         'type': 'collection',
         'customer_id': inst.customerId,
         'amount': amount,
+        'amount_minor': (amount * 100).round(),
         'paid_amount': amount,
+        'paid_amount_minor': (amount * 100).round(),
         'debt_amount': 0.0,
+        'debt_amount_minor': 0,
         'reference_id': installmentId,
         'description': colDesc,
         'payment_method': paymentMethod,
@@ -364,6 +408,21 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         'is_synced': 0,
         'created_at': now.toIso8601String(),
       });
+
+      if (paymentMethod.toLowerCase() == 'cash' || paymentMethod.toLowerCase() == 'nakit') {
+        try {
+          await _executor.insert('cash_transactions', {
+            'id': 'cash-inst-${_uuid.v4()}',
+            'type': 'INFLOW',
+            'amount_cents': (amount * 100).round(),
+            'category': 'INSTALLMENT',
+            'description': colDesc,
+            'created_at': now.millisecondsSinceEpoch,
+          });
+        } catch (_) {
+          // Non-fatal if legacy cash_transactions table does not exist
+        }
+      }
 
       await SyncOutboxV4.enqueue(
         _executor,
@@ -375,12 +434,35 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           'type': 'collection',
           'customer_id': inst.customerId,
           'amount': amount,
+          'amount_minor': (amount * 100).round(),
           'paid_amount': amount,
+          'paid_amount_minor': (amount * 100).round(),
           'debt_amount': 0.0,
+          'debt_amount_minor': 0,
           'reference_id': installmentId,
           'description': colDesc,
           'payment_method': paymentMethod,
           'created_at': now.toIso8601String(),
+        },
+      );
+
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'customer_installment',
+        entityId: installmentId,
+        operation: 'UPSERT',
+        payload: {
+          'id': installmentId,
+          'plan_id': inst.planId,
+          'customer_id': inst.customerId,
+          'installment_no': inst.installmentNo,
+          'amount': inst.amount,
+          'due_date': inst.dueDate.length >= 10 ? inst.dueDate.substring(0, 10) : inst.dueDate,
+          'paid_amount': newPaid,
+          'status': newStatus,
+          'paid_at': isFullyPaid ? now.toIso8601String() : inst.paidAt?.toIso8601String(),
+          'financial_transaction_id': colTxId,
+          'updated_at': now.toIso8601String(),
         },
       );
 
@@ -401,6 +483,18 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
           where: 'id = ?',
           whereArgs: [inst.planId],
         );
+        await SyncOutboxV4.enqueue(
+          _executor,
+          entityType: 'customer_installment_plan',
+          entityId: inst.planId,
+          operation: 'UPSERT',
+          payload: {
+            'id': inst.planId,
+            'customer_id': inst.customerId,
+            'status': 'completed',
+            'updated_at': now.toIso8601String(),
+          },
+        );
       }
     });
   }
@@ -409,6 +503,16 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
   Future<void> cancelPlan(String planId) async {
     final now = DateTime.now();
     await _gateway.transaction(() async {
+      final planRows = await _executor.query(
+        'customer_installment_plans',
+        where: 'id = ?',
+        whereArgs: [planId],
+        limit: 1,
+      );
+      final customerId = planRows.isNotEmpty
+          ? planRows.first['customer_id']?.toString()
+          : null;
+
       await _executor.update(
         'customer_installment_plans',
         {
@@ -420,6 +524,37 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         where: 'id = ?',
         whereArgs: [planId],
       );
+
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'customer_installment_plan',
+        entityId: planId,
+        operation: 'DELETE',
+        payload: {
+          'id': planId,
+          if (customerId != null) 'customer_id': customerId,
+          'status': 'cancelled',
+          'is_deleted': 1,
+          'updated_at': now.toIso8601String(),
+        },
+      );
+
+      // 2. Plandaki tüm taksitleri çek ve iptal et
+      final planInstRows = await _executor.query(
+        'customer_installments',
+        where: 'plan_id = ?',
+        whereArgs: [planId],
+      );
+      final instIds = planInstRows.map((r) => r['id'] as String).toList();
+      final relatedTxIds = <String>{};
+
+      for (final r in planInstRows) {
+        final txId = r['financial_transaction_id'] as String?;
+        if (txId != null && txId.isNotEmpty) {
+          relatedTxIds.add(txId);
+        }
+      }
+
       await _executor.update(
         'customer_installments',
         {
@@ -431,6 +566,75 @@ class SqliteInstallmentRepository implements IInstallmentRepository {
         where: 'plan_id = ?',
         whereArgs: [planId],
       );
+
+      for (final r in planInstRows) {
+        final instId = r['id'] as String;
+        final instCustId = r['customer_id'] as String? ?? customerId;
+        await SyncOutboxV4.enqueue(
+          _executor,
+          entityType: 'customer_installment',
+          entityId: instId,
+          operation: 'DELETE',
+          payload: {
+            'id': instId,
+            'plan_id': planId,
+            if (instCustId != null) 'customer_id': instCustId,
+            'status': 'cancelled',
+            'is_deleted': 1,
+            'updated_at': now.toIso8601String(),
+          },
+        );
+      }
+
+      // 3. İptal edilen planın tüm finansal kayıtlarını (manual_debt, downPayment collection ve taksit collection) iptal et
+      // Plan id reference'lı kayıtlar (manual_debt ve peşinat collection)
+      final planTxs = await _executor.query(
+        'financial_transactions',
+        where: 'reference_id = ? AND is_deleted = 0',
+        whereArgs: [planId],
+      );
+      for (final tx in planTxs) {
+        relatedTxIds.add(tx['id'] as String);
+      }
+
+      // Taksit ID referanslı kayıtlar
+      if (instIds.isNotEmpty) {
+        final placeholders = List.filled(instIds.length, '?').join(',');
+        final instTxs = await _executor.query(
+          'financial_transactions',
+          where: 'reference_id IN ($placeholders) AND is_deleted = 0',
+          whereArgs: instIds,
+        );
+        for (final tx in instTxs) {
+          relatedTxIds.add(tx['id'] as String);
+        }
+      }
+
+      // Tüm ilişkili finansal hareketleri iptal et ve outbox'a yaz
+      for (final txId in relatedTxIds) {
+        await _executor.update(
+          'financial_transactions',
+          {
+            'is_deleted': 1,
+            'is_synced': 0,
+            'deleted_at': now.toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [txId],
+        );
+        await SyncOutboxV4.enqueue(
+          _executor,
+          entityType: 'financial_transaction',
+          entityId: txId,
+          operation: 'DELETE',
+          payload: {
+            'id': txId,
+            'is_deleted': 1,
+            'deleted_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+          },
+        );
+      }
     });
   }
 

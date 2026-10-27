@@ -34,7 +34,7 @@ class UnsafeRollbackException implements Exception {
 }
 
 class DatabaseRoutingResolver {
-  static const int expectedCoreNextSchemaVersion = 4;
+  static const int expectedCoreNextSchemaVersion = 7;
 
   const DatabaseRoutingResolver();
 

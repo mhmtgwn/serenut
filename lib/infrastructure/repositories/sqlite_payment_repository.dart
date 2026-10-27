@@ -645,12 +645,24 @@ class SqliteFinancialTransactionRepository
 
   @override
   Future<double> getBalance(String customerId) async {
+    final customerRows = await _executor.query(
+      'customers',
+      columns: ['balance'],
+      where: 'id = ? AND is_active = 1',
+      whereArgs: [customerId],
+      limit: 1,
+    );
+    if (customerRows.isNotEmpty) {
+      return (customerRows.first['balance'] as num?)?.toDouble() ?? 0.0;
+    }
+
     final result = await _executor.rawQuery(
-      'SELECT SUM(debt_amount - paid_amount) as balance FROM financial_transactions '
-      'WHERE customer_id = ?',
+      'SELECT COALESCE(SUM(paid_amount - debt_amount), 0.0) as balance '
+      'FROM financial_transactions '
+      'WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',
       [customerId],
     );
-    if (result.isEmpty) return 0;
-    return result.first['balance'] as double? ?? 0;
+    if (result.isEmpty) return 0.0;
+    return (result.first['balance'] as num?)?.toDouble() ?? 0.0;
   }
 }

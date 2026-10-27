@@ -24,6 +24,8 @@ class CheckoutRequest {
   final bool openCashDrawer;
   final String? idempotencyKey;
   final ActorContext? actor;
+  final String? branchId;
+  final bool allowNegativeStock;
 
   const CheckoutRequest({
     required this.flowState,
@@ -35,6 +37,8 @@ class CheckoutRequest {
     this.openCashDrawer = false,
     this.idempotencyKey,
     this.actor,
+    this.branchId,
+    this.allowNegativeStock = true,
   });
 }
 
@@ -179,15 +183,19 @@ class CoreCheckoutUseCase {
           final itemId = _uuid.v4();
           final p = cartItem.product;
 
-          if (!cartItem.isWeighed) {
+          if (!request.allowNegativeStock) {
             final prodRows = await txn.query('products',
                 columns: ['stock_quantity'], where: 'id = ?', whereArgs: [p.id]);
             if (prodRows.isNotEmpty) {
               final currentStock =
-                  (prodRows.first['stock_quantity'] as num?)?.toInt() ?? 0;
-              if (currentStock < cartItem.quantity) {
+                  (prodRows.first['stock_quantity'] as num?)?.toDouble() ?? 0.0;
+              final requiredStock = cartItem.isWeighed
+                  ? (cartItem.quantity / 1000.0)
+                  : cartItem.quantity.toDouble();
+              if (currentStock < requiredStock) {
+                final displayUnit = cartItem.isWeighed ? 'kg' : 'adet';
                 throw StateError(
-                    'Yetersiz stok: "${p.name}" ürününden stokta $currentStock adet var, ${cartItem.quantity} adet satılamaz.');
+                    'Yetersiz stok: "${p.name}" ürününden stokta $currentStock $displayUnit var, $requiredStock $displayUnit satılamaz.');
               }
             }
           }
@@ -207,6 +215,7 @@ class CoreCheckoutUseCase {
             discount: cartItem.discount,
             vatRate: p.vatRate,
             total: lineTotal,
+            isWeighed: cartItem.isWeighed,
           );
           orderItems.add(itemEntity);
 
@@ -223,6 +232,7 @@ class CoreCheckoutUseCase {
           'id': saleId,
           'receipt_no': request.receiptNo,
           'customer_id': customer?.id,
+          'branch_id': request.branchId,
           'subtotal_cents': state.subtotal.value,
           'discount_cents': state.generalDiscount.value,
           'vat_total_cents': vatTotalSum,
@@ -237,12 +247,46 @@ class CoreCheckoutUseCase {
         if (_faultHook != null) await _faultHook!('after_sales_insert');
 
         // 3. Kalemleri ve Stok Düşümlerini Kaydet (Children)
-        for (final itemEntity in orderItems) {
+        for (int i = 0; i < orderItems.length; i++) {
+          final itemEntity = orderItems[i];
+          final cartItem = state.items[i];
           await txn.insert('sale_items', itemEntity.toMap());
+
+          // Önceki stoku sorgula
+          final prodRows = await txn.query(
+            'products',
+            columns: ['stock_quantity'],
+            where: 'id = ?',
+            whereArgs: [itemEntity.productId],
+            limit: 1,
+          );
+          final prevStock = prodRows.isNotEmpty
+              ? ((prodRows.first['stock_quantity'] as num?)?.toDouble() ?? 0.0)
+              : 0.0;
+          final stockDelta = cartItem.isWeighed
+              ? (cartItem.quantity / 1000.0)
+              : cartItem.quantity.toDouble();
+          final newStock = prevStock - stockDelta;
+
           await txn.rawUpdate(
             'UPDATE products SET stock_quantity = stock_quantity - ?, updated_at = ? WHERE id = ?',
-            [itemEntity.quantity, now.millisecondsSinceEpoch, itemEntity.productId],
+            [stockDelta, now.millisecondsSinceEpoch, itemEntity.productId],
           );
+
+          // Append-Only Değişmez Stok Defteri Kaydı (stock_movements)
+          await txn.insert('stock_movements', {
+            'id': _uuid.v4(),
+            'product_id': itemEntity.productId,
+            'branch_id': request.branchId,
+            'reference_id': saleId,
+            'reference_type': 'SALE',
+            'quantity_delta': -stockDelta,
+            'previous_stock': prevStock,
+            'new_stock': newStock,
+            'reason': 'Perakende Satış: ${request.receiptNo}',
+            'created_by': request.actor?.username ?? _defaultActor?.username ?? 'cashier',
+            'created_at': now.millisecondsSinceEpoch,
+          });
         }
 
         if (_faultHook != null) await _faultHook!('after_items_insert');
@@ -372,6 +416,9 @@ class CoreCheckoutUseCase {
       final paymentTypeDesc = effectiveSplits.isNotEmpty
           ? effectiveSplits.map((s) => s.type.name.toUpperCase()).join('+')
           : 'NAKİT';
+      final hasCash = effectiveSplits.isEmpty ||
+          effectiveSplits.any((s) => s.type == PaymentType.cash && s.amount.value > 0);
+      final shouldOpenDrawer = request.openCashDrawer || hasCash;
 
       _hardwareWorker.printReceipt(
         PrintReceiptCommand(
@@ -389,7 +436,7 @@ class CoreCheckoutUseCase {
           paymentType: paymentTypeDesc,
           customerName: customer?.name,
           timestamp: now,
-          openCashDrawer: request.openCashDrawer,
+          openCashDrawer: shouldOpenDrawer,
           cutPaper: true,
         ),
       );
@@ -425,7 +472,7 @@ class CoreCheckoutUseCase {
     } else {
       // Çakışma: Aynı idempotency key veya fiş no ile farklı tutarlı bir sepet!
       throw StateError(
-        'İdempotency çakışması: "$idempotencyKey" anahtarı daha önce farklı tutar (${existingTotal} kuruş) ile kaydedilmiştir. İkinci işlem reddedildi.',
+        'İdempotency çakışması: "$idempotencyKey" anahtarı daha önce farklı tutar ($existingTotal kuruş) ile kaydedilmiştir. İkinci işlem reddedildi.',
       );
     }
   }

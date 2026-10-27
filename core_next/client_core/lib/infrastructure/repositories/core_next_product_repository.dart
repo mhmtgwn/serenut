@@ -3,7 +3,6 @@
 // Authoritative Core Next Product & Stock Repository Bridge
 // Provides complete IProductRepository contract over serenut_core_v2.db
 
-import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/config/utils.dart';
@@ -42,8 +41,8 @@ class CoreNextProductRepository implements IProductRepository {
       category: categoryName,
       vat: (row['vat_rate'] as num?)?.toInt() ?? 20,
       imageUrl: row['image_url']?.toString(),
-      saleType: 'piece',
-      minimumWeightGrams: 20,
+      saleType: row['sale_type']?.toString() ?? 'piece',
+      minimumWeightGrams: (row['minimum_weight_grams'] as num?)?.toInt() ?? 20,
       origin: 'TÜRKİYE',
     );
   }
@@ -94,6 +93,11 @@ class CoreNextProductRepository implements IProductRepository {
   }
 
   @override
+  Future<ProductEntity?> getByBarcode(String barcode) async {
+    return findById(barcode);
+  }
+
+  @override
   Future<int> create(ProductEntity entity) async {
     await _ensureCategoryExists(entity.category);
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -112,8 +116,10 @@ class CoreNextProductRepository implements IProductRepository {
         'cost_price_cents': costCents,
         'vat_rate': entity.vat ?? 20,
         'unit': entity.unit,
-        'stock_quantity': entity.quantity.toInt(),
-        'critical_threshold': entity.minStock.toInt(),
+        'sale_type': entity.saleType,
+        'minimum_weight_grams': entity.minimumWeightGrams,
+        'stock_quantity': entity.quantity.toDouble(),
+        'critical_threshold': entity.minStock.toDouble(),
         'image_url': entity.imageUrl,
         'is_active': 1,
         'is_deleted': 0,
@@ -129,10 +135,12 @@ class CoreNextProductRepository implements IProductRepository {
         name: entity.name,
         priceCents: priceCents,
         costPriceCents: costCents,
-        stockQuantity: entity.quantity.toInt(),
-        minStock: entity.minStock.toInt(),
+        stockQuantity: entity.quantity,
+        minStock: entity.minStock,
         category: entity.category,
         unit: entity.unit,
+        saleType: entity.saleType,
+        minimumWeightGrams: entity.minimumWeightGrams,
         vatRate: entity.vat,
         imageUrl: entity.imageUrl,
         isDeleted: false,
@@ -171,8 +179,10 @@ class CoreNextProductRepository implements IProductRepository {
         'cost_price_cents': costCents,
         'vat_rate': entity.vat ?? 20,
         'unit': entity.unit,
-        'stock_quantity': entity.quantity.toInt(),
-        'critical_threshold': entity.minStock.toInt(),
+        'sale_type': entity.saleType,
+        'minimum_weight_grams': entity.minimumWeightGrams,
+        'stock_quantity': entity.quantity.toDouble(),
+        'critical_threshold': entity.minStock.toDouble(),
         'image_url': entity.imageUrl,
         'is_active': 1,
         'is_deleted': 0,
@@ -189,10 +199,12 @@ class CoreNextProductRepository implements IProductRepository {
         name: entity.name,
         priceCents: priceCents,
         costPriceCents: costCents,
-        stockQuantity: entity.quantity.toInt(),
-        minStock: entity.minStock.toInt(),
+        stockQuantity: entity.quantity,
+        minStock: entity.minStock,
         category: entity.category,
         unit: entity.unit,
+        saleType: entity.saleType,
+        minimumWeightGrams: entity.minimumWeightGrams,
         vatRate: entity.vat,
         imageUrl: entity.imageUrl,
         isDeleted: false,
@@ -326,7 +338,7 @@ class CoreNextProductRepository implements IProductRepository {
       SET stock_quantity = stock_quantity - ?, updated_at = ?
       WHERE id = ?
       ''',
-      [quantity.toInt(), now, cleanId],
+      [quantity.toDouble(), now, cleanId],
     );
   }
 
@@ -340,7 +352,7 @@ class CoreNextProductRepository implements IProductRepository {
       SET stock_quantity = stock_quantity + ?, updated_at = ?
       WHERE id = ?
       ''',
-      [quantity.toInt(), now, cleanId],
+      [quantity.toDouble(), now, cleanId],
     );
   }
 

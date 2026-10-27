@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/domain/interfaces/earsiv_provider.dart';
 import 'package:serenutos/domain/models/gib_invoice_models.dart';
 
 class GibAuthException implements Exception {
@@ -23,9 +24,16 @@ class GibInvoiceException implements Exception {
   String toString() => 'GİB Fatura Hatası: $message';
 }
 
-class GibEArsivClient {
+class GibEArsivClient implements IEArsivProvider {
   final http.Client _httpClient;
   bool isTestMode;
+
+  @override
+  String get providerId => 'gib_portal';
+
+  @override
+  String get displayName =>
+      isTestMode ? 'GİB e-Arşiv Portalı (Test)' : 'GİB e-Arşiv Portalı';
 
   String? _token;
   DateTime? _tokenExpiresAt;
@@ -34,6 +42,15 @@ class GibEArsivClient {
     http.Client? httpClient,
     this.isTestMode = false,
   }) : _httpClient = httpClient ?? http.Client();
+
+  @override
+  Future<bool> testConnection({
+    required String username,
+    required String password,
+  }) async {
+    final token = await login(username: username, password: password);
+    return token.isNotEmpty;
+  }
 
   String get _baseUrl => isTestMode
       ? 'https://earsivportaltest.efatura.gov.tr/earsiv-services/dispatch'
@@ -55,6 +72,7 @@ class GibEArsivClient {
       };
 
   /// 1. GİB e-Arşiv Portalına Giriş Yap ve Token Al
+  @override
   Future<String> login({
     required String username,
     required String password,
@@ -121,6 +139,7 @@ class GibEArsivClient {
   }
 
   /// 2. GİB Taslak Fatura Oluştur
+  @override
   Future<String> createDraftInvoice({
     required String token,
     required GibInvoiceRecipient recipient,
@@ -155,20 +174,45 @@ class GibEArsivClient {
         ? recipient.titleOrName
         : '';
 
+    double calculatedGrossTotal = 0.0;
+    double calculatedTotalDiscount = 0.0;
+
     final malHizmetTable = items.map((item) {
+      final grossLine = item.quantity * item.unitPrice;
+      final discount = item.discountAmount;
+      final netLine = item.lineTotalWithoutVat;
+      calculatedGrossTotal += grossLine;
+      calculatedTotalDiscount += discount;
+
+      final iskontoOrani = grossLine > 0 && discount > 0
+          ? ((discount / grossLine) * 100).round()
+          : 0;
+
+      final gibUnit = switch (item.unit.toUpperCase()) {
+        'KG' || 'KGM' || 'KILOGRAM' => 'KGM',
+        'GR' || 'GRM' || 'GRAM' => 'GRM',
+        'LT' || 'LTR' || 'LITRE' => 'LTR',
+        'PK' || 'PAKET' => 'PK',
+        _ => 'C62', // Adet
+      };
+
       return {
         'malHizmet': item.name,
         'miktar': item.quantity,
-        'birim': item.unit,
+        'birim': gibUnit,
         'birimFiyat': item.unitPrice.toStringAsFixed(2),
-        'fiyat': (item.quantity * item.unitPrice).toStringAsFixed(2),
-        'iskontoOrani': 0,
-        'iskontoTutari': item.discountAmount.toStringAsFixed(2),
-        'iskontoNedeni': '',
-        'malHizmetTutari': item.lineTotalWithoutVat.toStringAsFixed(2),
+        'fiyat': grossLine.toStringAsFixed(2),
+        'iskontoOrani': iskontoOrani,
+        'iskontoTutari': discount.toStringAsFixed(2),
+        'iskontoNedeni': discount > 0 ? 'İskonto' : '',
+        'malHizmetTutari': netLine.toStringAsFixed(2),
         'kdvOrani': item.vatRate.toInt(),
         'kdvTutari': item.vatAmount.toStringAsFixed(2),
         'vergiOrani': 0,
+        if (item.vatRate.toInt() == 0) ...{
+          'vergiMuafiyetKodu': '351',
+          'vergiMuafiyetSebebi': 'KDV Kanunu 17/4-g İstisna',
+        },
       };
     }).toList();
 
@@ -207,8 +251,8 @@ class GibEArsivClient {
       'malHizmetTable': malHizmetTable,
       'tip': 'İskonto',
       'matrah': totalWithoutVat.toStringAsFixed(2),
-      'malhizmetToplamTutari': totalWithoutVat.toStringAsFixed(2),
-      'toplamIskonto': '0.00',
+      'malhizmetToplamTutari': (calculatedGrossTotal > 0 ? calculatedGrossTotal : totalWithoutVat).toStringAsFixed(2),
+      'toplamIskonto': calculatedTotalDiscount.toStringAsFixed(2),
       'hesaplanankdv': totalVat.toStringAsFixed(2),
       'vergilerDahilToplamTutar': totalAmount.toStringAsFixed(2),
       'odenecekTutar': totalAmount.toStringAsFixed(2),
@@ -253,7 +297,14 @@ class GibEArsivClient {
     }
 
     final data = resJson['data']?.toString() ?? '';
-    if (data.contains('başarıyla') || resJson['metadata'] != null) {
+    final lowerData = data.toLowerCase();
+    final isDraftSuccess = lowerData.contains('başarıyla') ||
+        lowerData.contains('basariyla') ||
+        lowerData.contains('oluşturul') ||
+        lowerData.contains('olusturul') ||
+        lowerData.contains('success') ||
+        resJson['metadata'] != null;
+    if (isDraftSuccess) {
       debugPrint('[GibEArsivClient] Fatura Taslağı Oluşturuldu: $uuid');
       return uuid;
     }
@@ -262,6 +313,7 @@ class GibEArsivClient {
   }
 
   /// 3. GİB'den Yetkili Cep Telefonuna SMS Doğrulama Kodu İste
+  @override
   Future<String> requestSmsCode({required String token}) async {
     final callid = const Uuid().v4().replaceAll('-', '');
     final jpMap = {
@@ -301,17 +353,43 @@ class GibEArsivClient {
   }
 
   /// 4. SMS Şifresini Doğrula ve Faturayı İmzala (Resmileştir)
+  @override
+  Future<bool> verifySmsCodeAndSign({
+    required String token,
+    required String smsCode,
+    required String invoiceUuid,
+  }) =>
+      verifySmsCodeAndSignBatch(
+        token: token,
+        smsCode: smsCode,
+        invoiceUuids: [invoiceUuid],
+      );
+
+  // Backward-compatible alias
   Future<bool> verifySmsAndSign({
     required String token,
     required String smsCode,
     required String invoiceUuid,
+  }) =>
+      verifySmsCodeAndSign(
+        token: token,
+        smsCode: smsCode,
+        invoiceUuid: invoiceUuid,
+      );
+
+  /// 4b. SMS Şifresi ile Birden Fazla Faturayı Toplu Olarak İmzala (Resmileştir)
+  @override
+  Future<bool> verifySmsCodeAndSignBatch({
+    required String token,
+    required String smsCode,
+    required List<String> invoiceUuids,
   }) async {
+    if (invoiceUuids.isEmpty) return true;
     final callid = const Uuid().v4().replaceAll('-', '');
     final jpMap = {
       'smsSifre': smsCode.trim(),
-      'imzalanacaklar': [
-        {'faturaUuid': invoiceUuid},
-      ],
+      'imzalanacaklar':
+          invoiceUuids.map((id) => {'faturaUuid': id}).toList(),
     };
 
     final body = {
@@ -341,8 +419,17 @@ class GibEArsivClient {
     }
 
     final data = resJson['data']?.toString() ?? '';
-    if (data.contains('başarıyla') || data.contains('imzalandı')) {
-      debugPrint('[GibEArsivClient] Fatura Resmi Olarak İmzalandı: $invoiceUuid');
+    final lowerData = data.toLowerCase();
+    final isSignSuccess = lowerData.contains('başarıyla') ||
+        lowerData.contains('basariyla') ||
+        lowerData.contains('imzalandı') ||
+        lowerData.contains('imzalandi') ||
+        lowerData.contains('tamamlandı') ||
+        lowerData.contains('tamamlandi') ||
+        lowerData.contains('success');
+    if (isSignSuccess) {
+      debugPrint(
+          '[GibEArsivClient] Fatura(lar) Resmi Olarak İmzalandı: ${invoiceUuids.length} adet');
       return true;
     }
 
@@ -354,14 +441,16 @@ class GibEArsivClient {
   }
 
   /// 5. İmzalanmış Resmi Faturanın HTML Çıktısını Al (Görüntüleme & Fiş Yazdırma İçin)
+  @override
   Future<String> getInvoiceHtml({
     required String token,
     required String invoiceUuid,
+    bool isApproved = true,
   }) async {
     final callid = const Uuid().v4().replaceAll('-', '');
     final jpMap = {
       'ettn': invoiceUuid,
-      'onayDurumu': 'Onaylandı',
+      'onayDurumu': isApproved ? 'Onaylandı' : 'Onaylanmadı',
     };
 
     final body = {
@@ -395,6 +484,7 @@ class GibEArsivClient {
   }
 
   /// 6. Faturayı İptal Et
+  @override
   Future<bool> cancelInvoice({
     required String token,
     required String invoiceUuid,

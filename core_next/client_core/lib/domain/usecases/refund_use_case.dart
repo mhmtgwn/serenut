@@ -2,14 +2,12 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../infrastructure/database/app_database.dart';
 import '../models/core_entities.dart';
 import '../models/money_cents.dart';
 import '../models/rbac_models.dart';
-import '../models/sync_mutation.dart';
 import '../services/ledger_service.dart';
 import '../../infrastructure/repositories/sqlite_ledger_repository.dart';
 
@@ -45,6 +43,7 @@ class RefundRequest {
   final ActorContext actor;
   final String? idempotencyKey;
   final List<RefundPaymentSplit>? paymentDistributions; // Karma ödemelerde zorunlu
+  final bool allowManualRefundToCashOrBalance; // Yetkili onayıyla kartlı satışın elden nakit/cari iadesine izin verir
 
   const RefundRequest({
     required this.originalSaleId,
@@ -53,6 +52,7 @@ class RefundRequest {
     required this.actor,
     this.idempotencyKey,
     this.paymentDistributions,
+    this.allowManualRefundToCashOrBalance = false,
   });
 }
 
@@ -94,6 +94,8 @@ class CoreRefundUseCase {
     LedgerService? ledgerService,
   })  : _db = db,
         _ledgerService = ledgerService;
+
+  LedgerService? get ledgerService => _ledgerService;
 
   Future<RefundResultEntity> execute(RefundRequest request) async {
     // 1. RBAC Yetkilendirme Kontrolü
@@ -319,6 +321,7 @@ class CoreRefundUseCase {
               quantity: availableQty,
               total: MoneyCents(lineRefundCents),
               vatRate: sample.vatRate,
+              isWeighed: sample.isWeighed,
             ),
           );
           computedRefundCents += lineRefundCents;
@@ -357,6 +360,7 @@ class CoreRefundUseCase {
               quantity: reqItem.quantity,
               total: MoneyCents(lineRefundCents),
               vatRate: lineItem.vatRate,
+              isWeighed: lineItem.isWeighed,
             ),
           );
           computedRefundCents += lineRefundCents;
@@ -437,22 +441,50 @@ class CoreRefundUseCase {
       final availableCashRefundCents = max(0, origCashCents - priorCashRefunded);
       final availableDebtRefundCents = max(0, origDebtCents - priorDebtRefunded);
 
-      // Kart ödemesi kontrolü
+      // Kart ödemesi kontrolü ve esnek iade kanalları
       final hasCardOnly = (origCardCents > 0 && origCashCents == 0 && origDebtCents == 0);
-      if (hasCardOnly) {
-        throw UnsupportedError(
-          'Kredi kartı ile tahsil edilmiş satışlar için harici POS/kart terminali iade entegrasyonu bulunmamaktadır. Otomatik kart iadesi yapılamaz.',
-        );
-      }
-
       int cashRefundCents = 0;
       int debtRefundCents = 0;
+      int cardRefundCents = 0;
 
       final isMixedSale = (origCashCents > 0 && origDebtCents > 0) ||
           (origCardCents > 0 && (origCashCents > 0 || origDebtCents > 0));
 
-      if (isMixedSale) {
-        // Karma ödemeli satışlarda dağılım belirtilmemişse belirsiz işlem reddedilir
+      if (hasCardOnly) {
+        final hasExplicitDistribution = request.paymentDistributions != null && request.paymentDistributions!.isNotEmpty;
+        if (!request.allowManualRefundToCashOrBalance && !hasExplicitDistribution) {
+          throw UnsupportedError(
+            'Kredi kartı ile tahsil edilmiş satışlar için harici POS/kart terminali iade entegrasyonu bulunmamaktadır. Otomatik kart iadesi yapılamaz.',
+          );
+        }
+
+        if (hasExplicitDistribution) {
+          int splitSum = 0;
+          for (final split in request.paymentDistributions!) {
+            if (split.amount.value < 0) {
+              throw ArgumentError('İade dağılım tutarı negatif olamaz.');
+            }
+            if (split.amount.value == 0) continue;
+            if (split.type == PaymentType.cash) {
+              cashRefundCents += split.amount.value;
+            } else if (split.type == PaymentType.onAccount) {
+              debtRefundCents += split.amount.value;
+            } else if (split.type == PaymentType.creditCard) {
+              cardRefundCents += split.amount.value;
+            } else {
+              throw UnsupportedError('Desteklenmeyen iade ödeme türü: ${split.type}');
+            }
+            splitSum += split.amount.value;
+          }
+          if (splitSum != refundTotal.value) {
+            throw StateError('İade ödeme dağılımı toplamı ($splitSum kuruş) iade tutarına (${refundTotal.value} kuruş) eşit olmalıdır.');
+          }
+        } else {
+          // allowManualRefundToCashOrBalance aktif ise varsayılan olarak nakit iade yapılır
+          cashRefundCents = refundTotal.value;
+        }
+      } else if (isMixedSale) {
+        // Karma ödemeli satışlarda dağılım kontrolü
         if (request.paymentDistributions == null || request.paymentDistributions!.isEmpty) {
           throw StateError(
             'Karma ödemeli satışlarda iade tutarının hangi ödeme kanalından yapılacağı (paymentDistributions) açıkça belirtilmelidir. Otomatik tahmin yapılamaz.',
@@ -466,13 +498,9 @@ class CoreRefundUseCase {
           }
           if (split.amount.value == 0) continue;
           if (split.type == PaymentType.creditCard) {
-            throw UnsupportedError(
-              'Kredi kartı ile yapılan tahsilatların otomatik terminal iadesi desteklenmemektedir.',
-            );
+            cardRefundCents += split.amount.value;
           } else if (split.type == PaymentType.bankTransfer) {
-            throw UnsupportedError(
-              'Banka havalesi ile yapılan tahsilatların otomatik iadesi desteklenmemektedir.',
-            );
+            cardRefundCents += split.amount.value;
           } else if (split.type == PaymentType.cash) {
             cashRefundCents += split.amount.value;
           } else if (split.type == PaymentType.onAccount) {
@@ -489,12 +517,6 @@ class CoreRefundUseCase {
           );
         }
 
-        // ÖZGÜN ÖDEMEYLE VE KALAN İADE LİMİTİYLE MUTABAKAT KONTROLÜ
-        if (cashRefundCents > availableCashRefundCents) {
-          throw StateError(
-            'İade edilecek nakit tutarı ($cashRefundCents kuruş), orijinal satışta kalan iade edilebilir nakit tutarını ($availableCashRefundCents kuruş) aşamaz.',
-          );
-        }
         if (debtRefundCents > availableDebtRefundCents) {
           throw StateError(
             'İade edilecek vadeli borç tutarı ($debtRefundCents kuruş), orijinal satışta kalan iade edilebilir vadeli tutarı ($availableDebtRefundCents kuruş) aşamaz.',
@@ -556,11 +578,12 @@ class CoreRefundUseCase {
         'id': refundId,
         'receipt_no': refundReceiptNo,
         'customer_id': originalSale['customer_id'],
+        'branch_id': originalSale['branch_id'],
         'subtotal_cents': -refundTotal.value,
         'discount_cents': 0,
         'vat_total_cents': 0,
         'total_cents': -refundTotal.value,
-        'paid_cents': -cashRefundCents,
+        'paid_cents': -(cashRefundCents + cardRefundCents),
         'debt_cents': -debtRefundCents,
         'status': 'REFUND',
         'idempotency_key': idempotencyKey,
@@ -584,11 +607,43 @@ class CoreRefundUseCase {
           'total_cents': it.total.value,
         });
 
+        // Önceki stoku ve tartılı ürün bilgisini sorgula
+        final prodRows = await txn.query(
+          'products',
+          columns: ['stock_quantity', 'sale_type', 'unit'],
+          where: 'id = ?',
+          whereArgs: [it.productId],
+          limit: 1,
+        );
+        final isWeighed = prodRows.isNotEmpty &&
+            ((prodRows.first['sale_type'] == 'weighed') ||
+                (prodRows.first['unit'] == 'kg' || prodRows.first['unit'] == 'gram'));
+        final prevStock = prodRows.isNotEmpty
+            ? ((prodRows.first['stock_quantity'] as num?)?.toDouble() ?? 0.0)
+            : 0.0;
+        final stockDelta = isWeighed ? (it.quantity / 1000.0) : it.quantity.toDouble();
+        final newStock = prevStock + stockDelta;
+
         // Stoğu geri artır
         await txn.rawUpdate(
           'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?',
-          [it.quantity, now.millisecondsSinceEpoch, it.productId],
+          [stockDelta, now.millisecondsSinceEpoch, it.productId],
         );
+
+        // Append-Only Değişmez Stok Defteri Kaydı (stock_movements)
+        await txn.insert('stock_movements', {
+          'id': _uuid.v4(),
+          'product_id': it.productId,
+          'branch_id': originalSale['branch_id'],
+          'reference_id': refundId,
+          'reference_type': 'REFUND',
+          'quantity_delta': stockDelta,
+          'previous_stock': prevStock,
+          'new_stock': newStock,
+          'reason': 'İade: ${request.reason}',
+          'created_by': request.actor.username,
+          'created_at': now.millisecondsSinceEpoch,
+        });
 
         finalizedItems.add(
           SaleOrderItemEntity(
@@ -601,6 +656,7 @@ class CoreRefundUseCase {
             quantity: it.quantity,
             total: it.total,
             vatRate: it.vatRate,
+            isWeighed: isWeighed,
           ),
         );
       }
@@ -648,6 +704,15 @@ class CoreRefundUseCase {
           'sale_id': refundId,
           'payment_type': 'on_account',
           'amount_cents': -debtRefundCents,
+          'created_at': now.millisecondsSinceEpoch,
+        });
+      }
+      if (cardRefundCents > 0) {
+        await txn.insert('sale_payments', {
+          'id': _uuid.v4(),
+          'sale_id': refundId,
+          'payment_type': 'credit_card',
+          'amount_cents': -cardRefundCents,
           'created_at': now.millisecondsSinceEpoch,
         });
       }

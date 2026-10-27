@@ -339,7 +339,7 @@ if (-not \$success) {
         if (!success) {
           debugPrint(
               'WinSpool FFI returned false. Trying PowerShell fallback...');
-          return _printUsbPowerShellFallback(printerName, bytes);
+          return await _printUsbPowerShellFallback(printerName, bytes);
         }
         return success;
       } catch (e) {

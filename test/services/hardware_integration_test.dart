@@ -35,6 +35,71 @@ void main() {
       expect(kg?.netGrams, 1250);
       expect(grams?.netGrams, 1250);
     });
+
+    test('prioritizes weight with explicit unit over preceding ID or sequence numbers', () {
+      final idPrefixed = ScaleFrameParser.parse('ID: 01   1.250kg',
+          deviceId: 'test', sequence: 6);
+      expect(idPrefixed?.netGrams, 1250);
+
+      final casFormat = ScaleFrameParser.parse('02, 0.450 kg, ST',
+          deviceId: 'test', sequence: 7);
+      expect(casFormat?.netGrams, 450);
+      expect(casFormat?.stable, isTrue);
+    });
+  });
+
+  group('ScaleSession Error Auto-Recovery', () {
+    test('auto-recovers from transient overload and negative weight error', () {
+      final session = ScaleSession(
+        minimumWeightGrams: 50,
+        zeroToleranceGrams: 5,
+        requiredStableSamples: 2,
+      )..start(productId: 'prod-1');
+
+      expect(session.state, ScaleSessionState.waitingForWeight);
+
+      // Overload occurs
+      session.addReading(ScaleReading(
+        deviceId: 'scale-1',
+        sequence: 1,
+        grossGrams: 50000,
+        stable: false,
+        overload: true,
+        measuredAt: DateTime.now(),
+      ));
+      expect(session.state, ScaleSessionState.error);
+
+      // Subsequent reading normalizes to zero
+      session.addReading(ScaleReading(
+        deviceId: 'scale-1',
+        sequence: 2,
+        grossGrams: 0,
+        stable: true,
+        overload: false,
+        measuredAt: DateTime.now(),
+      ));
+      expect(session.state, ScaleSessionState.waitingForWeight);
+
+      // Weight placed on scale and stabilizes
+      session.addReading(ScaleReading(
+        deviceId: 'scale-1',
+        sequence: 3,
+        grossGrams: 250,
+        stable: true,
+        measuredAt: DateTime.now(),
+      ));
+      expect(session.state, ScaleSessionState.measuring);
+
+      session.addReading(ScaleReading(
+        deviceId: 'scale-1',
+        sequence: 4,
+        grossGrams: 250,
+        stable: true,
+        measuredAt: DateTime.now(),
+      ));
+      expect(session.state, ScaleSessionState.stable);
+      expect(session.accept().netGrams, 250);
+    });
   });
 
   test('TCP POS requires explicit approval and authorization code', () async {

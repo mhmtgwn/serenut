@@ -3,7 +3,6 @@
 // Authoritative Core Next Customer Repository Bridge
 // Implements ICustomerRepository over serenut_core_v2.db
 
-import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/config/utils.dart';
@@ -18,6 +17,17 @@ class CoreNextCustomerRepository implements ICustomerRepository {
   factory CoreNextCustomerRepository.fromCoreAppDatabase(CoreAppDatabase coreDb) {
     return CoreNextCustomerRepository(coreDb.db);
   }
+
+  static const String _debtTypesCondition =
+      "(UPPER(REPLACE(le.entry_type, '_', '')) IN ('DEBITSALE', 'DEBT', 'MANUALDEBT', 'SALE', 'DEBITADJUSTMENT') "
+      "OR UPPER(le.entry_type) IN ('DEBIT_SALE', 'DEBT', 'MANUAL_DEBT', 'SALE', 'DEBIT_ADJUSTMENT') "
+      "OR le.entry_type IN ('debitSale', 'debitAdjustment'))";
+
+  static const String _paymentTypesCondition =
+      "(UPPER(REPLACE(entry_type, '_', '')) IN ('COLLECTION', 'PAYMENT', 'CREDITCOLLECTION', 'CREDITADJUSTMENT') "
+      "OR UPPER(entry_type) IN ('COLLECTION', 'PAYMENT', 'CREDIT_COLLECTION', 'CREDIT_ADJUSTMENT') "
+      "OR entry_type IN ('creditCollection', 'creditAdjustment'))";
+
 
   static int? _parseTimestamp(dynamic val) {
     if (val == null) return null;
@@ -69,10 +79,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final rows = await _db.rawQuery('''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE c.is_deleted = 0 AND c.is_active = 1
@@ -89,10 +99,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final rows = await _db.rawQuery('''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE c.id = ? AND c.is_deleted = 0
@@ -113,10 +123,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final rows = await _db.rawQuery('''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE (c.name LIKE ? OR c.phone LIKE ? OR (? != '' AND c.phone LIKE ?))
@@ -193,10 +203,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final sql = '''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE ${whereClauses.join(' AND ')}
@@ -266,10 +276,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final rows = await _db.rawQuery('''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE c.balance_cents < 0 AND c.is_deleted = 0 AND c.is_active = 1
@@ -283,10 +293,10 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final rows = await _db.rawQuery('''
       SELECT c.*,
         (SELECT MIN(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS oldest_debt_date,
         (SELECT MAX(le.created_at) FROM ledger_entries le
-         WHERE le.customer_id = c.id AND le.entry_type IN ('DEBIT_SALE', 'DEBT')
+         WHERE le.customer_id = c.id AND $_debtTypesCondition
         ) AS latest_debt_date
       FROM customers c
       WHERE c.balance_cents > 0 AND c.is_deleted = 0 AND c.is_active = 1
@@ -351,7 +361,7 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final res = await _db.rawQuery('''
       SELECT COALESCE(SUM(amount_cents), 0) as paid_cents
       FROM ledger_entries
-      WHERE customer_id = ? AND entry_type IN ('COLLECTION', 'PAYMENT')
+      WHERE customer_id = ? AND $_paymentTypesCondition
     ''', [cleanId]);
     final cents = (res.first['paid_cents'] as num?)?.toDouble() ?? 0.0;
     return cents / 100.0;

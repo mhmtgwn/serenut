@@ -56,13 +56,21 @@ class _LiveScaleDialogState extends ConsumerState<LiveScaleDialog> {
           ),
           const SizedBox(height: 8),
           Text(
-            canAccept
-                ? 'AĞIRLIK STABİL'
-                : hardware.connected
-                    ? 'Stabil ağırlık bekleniyor…'
-                    : 'Terazi bağlı değil',
+            _session.state == ScaleSessionState.error
+                ? (hardware.reading?.overload == true
+                    ? 'AŞIRI YÜK! (Ağırlığı azaltın)'
+                    : 'SIFIRLAMA GEREKLİ (Kefeyi boşaltın / dara alın)')
+                : canAccept
+                    ? 'AĞIRLIK STABİL'
+                    : hardware.connected
+                        ? 'Stabil ağırlık bekleniyor…'
+                        : 'Terazi bağlı değil',
             style: TextStyle(
-              color: canAccept ? Colors.green : Colors.orange,
+              color: _session.state == ScaleSessionState.error
+                  ? Colors.red
+                  : canAccept
+                      ? Colors.green
+                      : Colors.orange,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -237,8 +237,8 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const deviceCheck = storeId
       ? await client.query(
           `SELECT COUNT(*) as count FROM device_activations
-           WHERE company_id = $1 AND status = 'active'`,
-          [user.company_id]
+           WHERE company_id = $1 AND store_id = $2 AND status = 'active'`,
+          [user.company_id, storeId]
         )
       : { rows: [{ count: '0' }] };
     const licCheck = { rows: [{ count: '0' }] };

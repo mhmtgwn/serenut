@@ -51,5 +51,16 @@ abstract interface class PrintingApplicationService {
     double? remainingDebt,
     String? nextDueDate,
   });
+  Future<PrintJobRecord> queueRefundReceipt({
+    required String receiptNo,
+    required DateTime date,
+    required double totalAmount,
+    required List<Map<String, dynamic>> items,
+    CustomerEntity? customer,
+    required String paymentMethod,
+    required Settings settings,
+    String? reason,
+    Map<String, dynamic>? paymentBreakdown,
+  });
 }
 

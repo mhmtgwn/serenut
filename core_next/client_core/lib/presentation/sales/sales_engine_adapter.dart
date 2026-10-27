@@ -1,5 +1,5 @@
-// core_next/client_core/lib/presentation/sales/sales_engine_adapter.dart
 import 'core_sales_flow_notifier.dart';
+import 'core_sales_flow_state.dart';
 import '../../domain/models/core_entities.dart';
 import '../../domain/models/money_cents.dart';
 import '../../domain/models/rbac_models.dart';
@@ -155,11 +155,32 @@ class SalesEngineAdapter {
     for (final prod in products) {
       final qty = quantities[prod.id];
       if (qty != null && qty > 0) {
-        if (prod.unit == ProductUnit.gram || prod.unit == ProductUnit.kg) {
+        if (prod.isWeighed || prod.unit == ProductUnit.gram || prod.unit == ProductUnit.kg) {
           _coreNotifier!.addWeighedProduct(prod, qty);
         } else {
           _coreNotifier!.addProduct(prod, quantity: qty);
         }
+      }
+    }
+    _coreNotifier!.selectCustomer(customer);
+    _coreNotifier!.setGeneralDiscount(discount);
+    _coreNotifier!.setPaymentSplits(paymentSplits);
+  }
+
+  /// Mevcut sepet ve ödeme durumunu satır bazlı (ayrı poşetler korunarak) aktarır
+  void syncFromCartItems({
+    required List<CoreCartItem> items,
+    CustomerEntity? customer,
+    MoneyCents discount = MoneyCents.zero,
+    required List<PaymentSplitEntity> paymentSplits,
+  }) {
+    if (_coreNotifier == null) return;
+    _coreNotifier!.clearCart();
+    for (final item in items) {
+      if (item.isWeighed) {
+        _coreNotifier!.addWeighedProduct(item.product, item.quantity);
+      } else {
+        _coreNotifier!.addProduct(item.product, quantity: item.quantity);
       }
     }
     _coreNotifier!.selectCustomer(customer);

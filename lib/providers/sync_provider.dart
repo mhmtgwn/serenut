@@ -24,6 +24,11 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
+import 'package:serenutos/core_next/infrastructure/database/app_database.dart';
+import 'package:serenutos/core_next/infrastructure/sync/sync_v4_http_client.dart';
+import 'package:serenutos/core_next/infrastructure/sync/sync_v4_outbox_processor.dart';
+import 'package:serenutos/core_next/infrastructure/sync/sync_v4_pull_ingestion_service.dart';
+import 'package:serenutos/core_next/infrastructure/sync/sync_v4_pull_worker.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
@@ -75,8 +80,37 @@ class SyncState {
 /// Core Next Senkronizasyon Yürütücü Fonksiyon Arayüzü
 typedef CoreNextSyncExecutor = Future<void> Function();
 
-/// Core Next Senkronizasyon Yürütücü Sağlayıcısı (Varsayılan: null)
-final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) => null);
+/// Core Next Senkronizasyon Yürütücü Sağlayıcısı
+final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) {
+  return () async {
+    final licenseService = ref.read(licenseServiceProvider);
+    final lic = licenseService.getLicenseInfo();
+    final deviceActivationId = lic?.activationId;
+    final deviceId = ref.read(deviceManagerProvider).getDeviceId();
+    final apiClient = ref.read(apiClientProvider);
+    final baseUrl = apiClient.baseUrl;
+
+    if (deviceActivationId == null || deviceActivationId.isEmpty) {
+      return;
+    }
+
+    final coreDb = await CoreAppDatabase.open();
+    final httpClient = SyncV4HttpClient(
+      baseUrl: baseUrl,
+      deviceActivationId: deviceActivationId,
+      deviceId: deviceId,
+    );
+    final outboxProcessor = SyncV4OutboxProcessor(db: coreDb, httpClient: httpClient);
+    final ingestionService = SyncV4PullIngestionService(coreDb, localDeviceId: deviceId);
+    final pullWorker = SyncV4PullWorker(
+      httpClient: httpClient,
+      ingestionService: ingestionService,
+    );
+
+    await outboxProcessor.processOutbox();
+    await pullWorker.pullAll();
+  };
+});
 
 class SyncNotifier extends StateNotifier<SyncState>
     with WidgetsBindingObserver {

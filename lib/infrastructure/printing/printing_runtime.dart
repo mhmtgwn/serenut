@@ -86,20 +86,34 @@ class PrintingRuntime {
 
   Future<void> _validateActiveRoutes() async {
     for (final kind in PrintDocumentKind.values) {
-      final route = await repository.getRoute(kind);
-      if (route == null) continue;
-      final profiles = await repository.getDesignProfiles(kind);
-      final matching = profiles.where(
-        (profile) => profile.id == route.designProfileId,
-      );
-      if (matching.isEmpty) {
-        throw StateError('${kind.name} rotasının tasarım profili bulunamadı.');
-      }
-      final profile = matching.single;
-      if (!coordinator.supportsRenderer(kind, profile.rendererVersion)) {
-        throw StateError(
-          '${kind.name} rotası için ${profile.rendererVersion} renderer kayıtlı değil.',
+      try {
+        final route = await repository.getRoute(kind);
+        if (route == null) continue;
+        final profiles = await repository.getDesignProfiles(kind);
+        final matching = profiles.where(
+          (profile) => profile.id == route.designProfileId,
         );
+        if (matching.isEmpty) {
+          if (profiles.isNotEmpty) {
+            await repository.saveRoute(
+              route.copyWith(designProfileId: profiles.first.id),
+            );
+          }
+          continue;
+        }
+        final profile = matching.single;
+        if (!coordinator.supportsRenderer(kind, profile.rendererVersion)) {
+          final supported = profiles.where(
+            (p) => coordinator.supportsRenderer(kind, p.rendererVersion),
+          );
+          if (supported.isNotEmpty) {
+            await repository.saveRoute(
+              route.copyWith(designProfileId: supported.first.id),
+            );
+          }
+        }
+      } catch (_) {
+        // Safe degrade: do not prevent other print routes from running
       }
     }
   }

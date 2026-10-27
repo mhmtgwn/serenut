@@ -7,7 +7,11 @@ abstract final class BarcodeStandard {
   static final RegExp _digitsOnly = RegExp(r'^\d+$');
 
   static String normalize(String rawBarcode) {
-    final barcode = rawBarcode.trim();
+    var barcode = rawBarcode.trim();
+    if (barcode.endsWith('.0') &&
+        _digitsOnly.hasMatch(barcode.substring(0, barcode.length - 2))) {
+      barcode = barcode.substring(0, barcode.length - 2);
+    }
     if (barcode.length == 13 &&
         barcode.startsWith('0') &&
         _digitsOnly.hasMatch(barcode)) {

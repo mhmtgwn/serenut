@@ -105,6 +105,7 @@ import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
 import realtimeRouter from './modules/realtime/realtime.controller';
 import catalogRouter from './modules/catalog/catalog.controller';
+import productImageRouter from './modules/catalog/product-image.controller';
 import whatsappRouter from './modules/whatsapp/whatsapp.controller';
 
 // BullMQ Workers
@@ -376,6 +377,10 @@ app.use('/uploads/company-logos', express.static(
   process.env.COMPANY_LOGOS_DIR || path.join(process.cwd(), 'public/uploads/company-logos'),
   { immutable: true, maxAge: '365d', fallthrough: false },
 ));
+app.use('/uploads/product-images', express.static(
+  process.env.PRODUCT_IMAGES_DIR || path.join(process.cwd(), 'uploads/product-images'),
+  { immutable: true, maxAge: '365d', fallthrough: false },
+));
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
@@ -413,6 +418,9 @@ app.use('/api/licenses', licenseLimiter, licenseRouter);
 app.use('/api/v1/updates', updateRouter);
 app.use('/api/v1/releases', releaseRouter);
 app.use('/api/v1/catalogs', catalogRouter);
+app.use('/api/v1/products', productImageRouter);
+app.use('/api/v1/product-images', productImageRouter);
+app.use('/api/v4/products', productImageRouter);
 app.use('/api/v2/releases', releaseV2Router);
 app.use('/api/v4/sync', syncV4Router);
 app.use('/api/v1/telemetry', telemetryRouter);

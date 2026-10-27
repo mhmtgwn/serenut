@@ -82,7 +82,7 @@ class PilotCutoverGate {
   static const String prefKeyPilotEnabled = 'core_next_pilot_enabled';
   static const String prefKeyKillSwitch = 'core_next_kill_switch';
   static const String prefKeySalesEngineEnabled = 'core_next_sales_engine_enabled';
-  static const int expectedSchemaVersion = 3;
+  static const int expectedSchemaVersion = 7;
 
   final PilotRepositoryOverrideGenerator? _overrideGenerator;
 
@@ -399,13 +399,13 @@ class PilotCutoverGate {
 
       final versionRes = await testDb.rawQuery('PRAGMA user_version;');
       final userVersion = (versionRes.first.values.first as num?)?.toInt() ?? 0;
-      if (userVersion != expectedSchemaVersion) {
+      if (userVersion < 3 || userVersion > expectedSchemaVersion) {
         stopwatch.stop();
         return PilotGateResult(
           isPilotActive: false,
           status: PilotGateStatus.blockedTargetSchemaMismatch,
           reason:
-              'Hedef veritabanı şema sürümü uyumsuz ($userVersion != $expectedSchemaVersion).',
+              'Hedef veritabanı şema sürümü uyumsuz ($userVersion not in 3..$expectedSchemaVersion).',
           evaluatedDurationMs: stopwatch.elapsedMilliseconds,
         );
       }

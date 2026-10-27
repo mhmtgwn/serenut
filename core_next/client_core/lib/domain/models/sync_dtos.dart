@@ -239,8 +239,7 @@ class SyncConflictException extends SyncException {
 }
 
 class SyncServerException extends SyncException {
-  const SyncServerException(String message, [int statusCode = 500])
-      : super(message, statusCode);
+  const SyncServerException(super.message, [super.statusCode = 500]);
 }
 
 class SyncTimeoutException extends SyncException {

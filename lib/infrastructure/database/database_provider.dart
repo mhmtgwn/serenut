@@ -328,7 +328,7 @@ class DatabaseManager {
     }
     try {
       final userVersion = await _readDatabaseUserVersion(path);
-      if (userVersion == 3) {
+      if (userVersion >= 3 && userVersion <= 10) {
         Database? inspectDb;
         try {
           inspectDb = await openDatabase(

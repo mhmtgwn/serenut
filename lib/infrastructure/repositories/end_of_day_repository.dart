@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 // ════════════════════════════════════════════════════════════
 // DTOs
@@ -422,8 +423,10 @@ class EndOfDayRepository {
     );
 
     // ── CİRO & HASILAT HESABI ──────────────────────────────
-    // Ciro = Bugün yapılan tezgah satışları + Bugün teslim edilen siparişler
-    final directSalesRevenue = totals.revenue;
+    // Ciro = Bugün yapılan tezgah satışları (brüt) + Bugün teslim edilen siparişler
+    // totals.revenue sales tablosundaki total_amount (indirim düşülmüş net tutarlar) toplamıdır.
+    // Brüt tezgah cirosu = net satışlar + indirimler
+    final directSalesRevenue = totals.revenue + totals.discount;
     final deliveredOrdersRevenue = orders.deliveredTotal;
     final totalRevenue = directSalesRevenue + deliveredOrdersRevenue;
 
@@ -486,24 +489,49 @@ class EndOfDayRepository {
 
   // ── 1. Tezgah Satışları (sales tablosu) ──────────────────────
   Future<_SalesDataResult> _fetchDirectSales(String dayStr) async {
-    final rows = await _gateway.rawQuery('''
-      SELECT
-        s.id,
-        s.customer_id,
-        COALESCE(c.name, 'Genel Müşteri') AS customer_name,
-        s.total_amount,
-        s.paid_amount,
-        LOWER(COALESCE(s.payment_method, 'cash')) AS method,
-        s.created_at,
-        ft.metadata AS ft_metadata
-      FROM sales s
-      LEFT JOIN customers c ON s.customer_id = c.id
-      LEFT JOIN financial_transactions ft ON ft.reference_id = s.id AND ft.type = 'sale'
-      WHERE s.status NOT IN ('cancelled', 'iptal')
-        AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
-        AND ${_sqlDate('s.created_at')} = ?
-      ORDER BY s.created_at DESC
-    ''', [dayStr]);
+    List<Map<String, dynamic>> rows = const [];
+    try {
+      rows = await _gateway.rawQuery('''
+        SELECT
+          s.id,
+          s.customer_id,
+          COALESCE(c.name, 'Genel Müşteri') AS customer_name,
+          s.total_amount,
+          s.paid_amount,
+          LOWER(COALESCE(s.payment_method, 'cash')) AS method,
+          s.created_at,
+          ft.metadata AS ft_metadata
+        FROM sales s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN financial_transactions ft ON ft.reference_id = s.id AND ft.type = 'sale'
+        WHERE s.status NOT IN ('cancelled', 'iptal')
+          AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
+          AND ${_sqlDate('s.created_at')} = ?
+        ORDER BY s.created_at DESC
+      ''', [dayStr]);
+    } catch (_) {
+      try {
+        rows = await _gateway.rawQuery('''
+          SELECT
+            s.id,
+            s.customer_id,
+            COALESCE(c.name, 'Genel Müşteri') AS customer_name,
+            COALESCE(s.total_amount, CAST(s.total_amount_cents AS REAL) / 100.0, 0.0) AS total_amount,
+            COALESCE(s.paid_amount, CAST(s.total_amount_cents AS REAL) / 100.0, 0.0) AS paid_amount,
+            LOWER(COALESCE(s.payment_method, 'cash')) AS method,
+            s.created_at,
+            NULL AS ft_metadata
+          FROM sales s
+          LEFT JOIN customers c ON s.customer_id = c.id
+          WHERE (s.status NOT IN ('cancelled', 'iptal') OR s.status IS NULL)
+            AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
+            AND ${_sqlDate('s.created_at')} = ?
+          ORDER BY s.created_at DESC
+        ''', [dayStr]);
+      } catch (_) {
+        rows = const [];
+      }
+    }
 
     int cashCount = 0, cardCount = 0, debtCount = 0, karmaCount = 0;
     double pureCash = 0, pureCard = 0, pureDebt = 0;
@@ -809,29 +837,40 @@ class EndOfDayRepository {
 
         if (amount <= 0) continue;
 
+        double splitCash = amount;
+        double splitCard = 0.0;
+
+        if (method == 'karma' || method == 'mixed') {
+          final metaStr = r['metadata'] as String?;
+          if (metaStr != null && metaStr.isNotEmpty) {
+            try {
+              final meta = jsonDecode(metaStr) as Map<String, dynamic>?;
+              final breakdown = meta?['payment_breakdown'] as Map<String, dynamic>?;
+              if (breakdown != null) {
+                splitCash = (breakdown['cash_applied'] ?? breakdown['cash_tendered'] as num?)?.toDouble() ?? 0.0;
+                splitCard = (breakdown['card'] as num?)?.toDouble() ?? 0.0;
+              }
+            } catch (_) {}
+          }
+        } else if (_isCard(method)) {
+          splitCash = 0.0;
+          splitCard = amount;
+        }
+
         // 1. Sipariş Kaporası (Bugün alınan yeni siparişten giren peşinat/kapora)
         if (isOrder && type == 'sale') {
-          if (_isCard(method)) {
-            orderDepositCard += amount;
-          } else {
-            orderDepositCash += amount;
-          }
+          orderDepositCard += splitCard;
+          orderDepositCash += splitCash;
         }
         // 2. Sipariş Teslimat / Ara Ödemesi (Bugün siparişe yapılan ödeme)
         else if (isOrder && (type == 'payment' || type == 'collection')) {
-          if (_isCard(method)) {
-            orderDeliveryCard += amount;
-          } else {
-            orderDeliveryCash += amount;
-          }
+          orderDeliveryCard += splitCard;
+          orderDeliveryCash += splitCash;
         }
         // 3. Cari Borç Tahsilatı (Doğrudan müşteriden borç kapama)
         else if (!isSale && !isOrder && (type == 'collection' || type == 'payment')) {
-          if (_isCard(method)) {
-            collectionCard += amount;
-          } else {
-            collectionCash += amount;
-          }
+          collectionCard += splitCard;
+          collectionCash += splitCash;
 
           collectionDetails.add(CollectionDetailLine(
             id: id,
@@ -845,7 +884,41 @@ class EndOfDayRepository {
         }
       }
     } catch (_) {
-      // Ignored: fallback or safe default applied
+      try {
+        final cashRows = await _gateway.rawQuery('''
+          SELECT
+            id, type, category, amount_cents, reference_id, description, created_at
+          FROM cash_transactions
+          WHERE ${_sqlDate('created_at')} = ?
+          ORDER BY created_at DESC
+        ''', [dayStr]);
+
+        for (final cr in cashRows) {
+          final rawCa = cr['created_at'];
+          DateTime dt;
+          if (rawCa is int) {
+            dt = DateTime.fromMillisecondsSinceEpoch(rawCa);
+          } else {
+            dt = DateTime.tryParse(rawCa?.toString() ?? '') ?? DateTime.now();
+          }
+          final category = (cr['category'] ?? '').toString().toUpperCase();
+          final amount = ((cr['amount_cents'] as num?)?.toInt() ?? 0) / 100.0;
+          if (amount <= 0) continue;
+
+          if (category == 'COLLECTION') {
+            collectionCash += amount;
+            collectionDetails.add(CollectionDetailLine(
+              id: cr['id'].toString(),
+              customerName: 'Cari Müşteri',
+              amount: amount,
+              method: 'cash',
+              type: 'collection',
+              description: cr['description']?.toString(),
+              createdAt: dt,
+            ));
+          }
+        }
+      } catch (_) {}
     }
 
     return _TransactionsDataResult(
@@ -901,22 +974,45 @@ class EndOfDayRepository {
 
   // ── 5. Ciro Toplamları (sales tablosu) ───────────────────────
   Future<_TotalsRaw> _fetchTotals(String dayStr) async {
-    final rows = await _gateway.rawQuery('''
-      SELECT
-        COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN total_amount ELSE 0 END), 0) AS revenue,
-        COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN discount_amount ELSE 0 END), 0) AS discount,
-        COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
-      FROM sales
-      WHERE (is_deleted = 0 OR is_deleted IS NULL)
-        AND ${_sqlDate('created_at')} = ?
-    ''', [dayStr]);
+    try {
+      final rows = await _gateway.rawQuery('''
+        SELECT
+          COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN total_amount ELSE 0 END), 0) AS revenue,
+          COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN discount_amount ELSE 0 END), 0) AS discount,
+          COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
+        FROM sales
+        WHERE (is_deleted = 0 OR is_deleted IS NULL)
+          AND ${_sqlDate('created_at')} = ?
+      ''', [dayStr]);
 
-    final row = rows.first;
-    return _TotalsRaw(
-      revenue: (row['revenue'] as num?)?.toDouble() ?? 0.0,
-      discount: (row['discount'] as num?)?.toDouble() ?? 0.0,
-      cancelledCount: (row['cancelled_cnt'] as num?)?.toInt() ?? 0,
-    );
+      final row = rows.first;
+      return _TotalsRaw(
+        revenue: (row['revenue'] as num?)?.toDouble() ?? 0.0,
+        discount: (row['discount'] as num?)?.toDouble() ?? 0.0,
+        cancelledCount: (row['cancelled_cnt'] as num?)?.toInt() ?? 0,
+      );
+    } catch (_) {
+      try {
+        final rows = await _gateway.rawQuery('''
+          SELECT
+            COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN total_amount_cents ELSE 0 END), 0) AS revenue_cents,
+            COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','iptal') THEN discount_cents ELSE 0 END), 0) AS discount_cents,
+            COALESCE(SUM(CASE WHEN status IN ('cancelled','iptal') THEN 1 ELSE 0 END), 0) AS cancelled_cnt
+          FROM sales
+          WHERE (is_deleted = 0 OR is_deleted IS NULL)
+            AND ${_sqlDate('created_at')} = ?
+        ''', [dayStr]);
+
+        final row = rows.first;
+        return _TotalsRaw(
+          revenue: ((row['revenue_cents'] as num?)?.toDouble() ?? 0.0) / 100.0,
+          discount: ((row['discount_cents'] as num?)?.toDouble() ?? 0.0) / 100.0,
+          cancelledCount: (row['cancelled_cnt'] as num?)?.toInt() ?? 0,
+        );
+      } catch (_) {
+        return const _TotalsRaw(revenue: 0, discount: 0, cancelledCount: 0);
+      }
+    }
   }
 
   // ── 6. Toplam Piyasa Alacağı ────────────────────────────────
@@ -929,13 +1025,22 @@ class EndOfDayRepository {
       ''');
       return (rows.first['total'] as num?)?.toDouble() ?? 0.0;
     } catch (_) {
-      return 0.0;
+      try {
+        final rows = await _gateway.rawQuery('''
+          SELECT COALESCE(SUM(-balance_cents), 0) AS total_cents
+          FROM customers
+          WHERE balance_cents < 0
+        ''');
+        return ((rows.first['total_cents'] as num?)?.toDouble() ?? 0.0) / 100.0;
+      } catch (_) {
+        return 0.0;
+      }
     }
   }
 
   // ── Yardımcı Filtreler ──────────────────────────────────────
   static String _sqlDate(String col) =>
-      "CASE WHEN $col LIKE '%Z' THEN substr(datetime($col, 'localtime'), 1, 10) ELSE substr($col, 1, 10) END";
+      "CASE WHEN typeof($col) = 'integer' THEN substr(datetime($col / 1000, 'unixepoch', 'localtime'), 1, 10) WHEN $col LIKE '%Z' THEN substr(datetime($col, 'localtime'), 1, 10) ELSE substr($col, 1, 10) END";
 
   bool _isCash(String m) =>
       m == 'cash' || m == 'nakit' || m == 'peşin' || m == 'pesin';
@@ -1131,6 +1236,27 @@ class EndOfDayRepository {
       now,
       now,
     ]);
+
+    try {
+      await SyncOutboxV4.enqueue(
+        _gateway,
+        entityType: 'cash_count',
+        entityId: 'count_$date',
+        operation: 'UPSERT',
+        payload: {
+          'id': 'count_$date',
+          'date': date,
+          'opening_balance': openingBalance,
+          'counted_cash': countedCash,
+          'expected_cash': expectedCash,
+          'difference': diff,
+          'notes': notes,
+          'updated_at': now,
+        },
+      );
+    } catch (_) {
+      // Non-fatal if outbox is currently unavailable
+    }
   }
 }
 

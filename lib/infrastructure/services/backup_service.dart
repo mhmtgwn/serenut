@@ -412,7 +412,7 @@ class BackupService implements IBackupService {
       final userVersion =
           (versionResult.first.values.first as num?)?.toInt() ?? 0;
 
-      if (userVersion == 3 ||
+      if ((userVersion >= 3 && userVersion <= 10) ||
           (tableNames.contains('app_settings') &&
               tableNames.contains('ledger_entries'))) {
         isCoreNextBackup = true;
@@ -437,9 +437,13 @@ class BackupService implements IBackupService {
         ? await dbManager.getCoreNextDatabasePath()
         : await dbManager.getLegacyDatabasePath();
 
-    if (!isCoreNextBackup) {
-      await dbManager.close();
+    try {
+      final db = await dbManager.getDatabase();
+      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (_) {
+      // Ignored if DB was not yet initialized
     }
+    await dbManager.close();
 
     // 3. Atomik dosya takası ve .bak kurtarma
     final walPath = '$targetDbPath-wal';

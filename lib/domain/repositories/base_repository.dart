@@ -8,6 +8,40 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/config/utils.dart';
 
+DateTime parseFlexibleDateTime(dynamic val, [DateTime? fallback]) {
+  if (val == null) return fallback ?? DateTime.now();
+  if (val is DateTime) return val;
+  if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+  if (val is num) return DateTime.fromMillisecondsSinceEpoch(val.toInt());
+  if (val is String) {
+    final trimmed = val.trim();
+    if (trimmed.isEmpty) return fallback ?? DateTime.now();
+    final asInt = int.tryParse(trimmed);
+    if (asInt != null && asInt > 1000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(asInt);
+    }
+    return DateTime.tryParse(trimmed) ?? (fallback ?? DateTime.now());
+  }
+  return fallback ?? DateTime.now();
+}
+
+DateTime? parseFlexibleNullableDateTime(dynamic val) {
+  if (val == null) return null;
+  if (val is DateTime) return val;
+  if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+  if (val is num) return DateTime.fromMillisecondsSinceEpoch(val.toInt());
+  if (val is String) {
+    final trimmed = val.trim();
+    if (trimmed.isEmpty) return null;
+    final asInt = int.tryParse(trimmed);
+    if (asInt != null && asInt > 1000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(asInt);
+    }
+    return DateTime.tryParse(trimmed);
+  }
+  return null;
+}
+
 /// Generic repository interface for CRUD operations
 ///
 /// Implemented by:
@@ -60,6 +94,9 @@ class ProductInventorySummary {
 abstract class IProductRepository implements BaseRepository<ProductEntity> {
   /// Typed lookup by product ID/barcode
   Future<ProductEntity?> findProductById(String id);
+
+  /// Lookup product by its barcode or SKU
+  Future<ProductEntity?> getByBarcode(String barcode);
 
   /// Typed soft delete by product ID
   Future<int> deleteProduct(String id);
@@ -388,6 +425,12 @@ class ProductEntity {
 
   bool get isWeighed => saleType == 'weighed';
 
+  /// Satış fiyatını kuruş tamsayısı (Integer) olarak döndürür (MoneyCents standartı).
+  int get priceCents => (price * 100).round();
+
+  /// Alış maliyet fiyatını kuruş tamsayısı (Integer) olarak döndürür.
+  int get purchasePriceCents => (purchasePrice * 100).round();
+
   /// Miktar bilgisini IEEE-754 kayan nokta artıklarından (.00000004 veya .99999998)
   /// arındırılmış Türkçe sayı formatında döndürür (ör. 13.276,65 veya 10).
   String get formattedQuantity => quantity.toTurkishQuantity();
@@ -497,6 +540,22 @@ class ProductEntity {
   int get hashCode => id.hashCode;
 }
 
+class CreditLimitExceededException implements Exception {
+  final String customerName;
+  final double creditLimit;
+  final double projectedDebt;
+
+  const CreditLimitExceededException({
+    required this.customerName,
+    required this.creditLimit,
+    required this.projectedDebt,
+  });
+
+  @override
+  String toString() =>
+      'Kredi limiti aşıldı: $customerName için tanımlı limit ${creditLimit.toStringAsFixed(2)} ₺, işlem sonrası borç ${projectedDebt.toStringAsFixed(2)} ₺ olacaktır.';
+}
+
 /// Customer entity
 class CustomerEntity {
   final String id;
@@ -505,6 +564,7 @@ class CustomerEntity {
   final String? address;
   final String phone;
   final double balance; // Positive = credit, Negative = debt
+  final double? creditLimit; // Credit limit in currency units (null or <= 0 = unlimited)
   final DateTime createdAt;
   final DateTime? oldestDebtDate;
   final DateTime? latestDebtDate;
@@ -516,6 +576,7 @@ class CustomerEntity {
     this.address,
     required this.phone,
     required this.balance,
+    this.creditLimit,
     required this.createdAt,
     this.oldestDebtDate,
     this.latestDebtDate,
@@ -528,6 +589,7 @@ class CustomerEntity {
     String? address,
     String? phone,
     double? balance,
+    double? creditLimit,
     DateTime? createdAt,
     DateTime? oldestDebtDate,
     DateTime? latestDebtDate,
@@ -539,6 +601,7 @@ class CustomerEntity {
         address: address ?? this.address,
         phone: phone ?? this.phone,
         balance: balance ?? this.balance,
+        creditLimit: creditLimit ?? this.creditLimit,
         createdAt: createdAt ?? this.createdAt,
         oldestDebtDate: oldestDebtDate ?? this.oldestDebtDate,
         latestDebtDate: latestDebtDate ?? this.latestDebtDate,
@@ -552,6 +615,8 @@ class CustomerEntity {
         'phone': phone,
         'balance': balance,
         'balance_minor': (balance * 100).round(),
+        'credit_limit': creditLimit,
+        'credit_limit_minor': creditLimit != null ? (creditLimit! * 100).round() : null,
         'created_at': createdAt.toIso8601String(),
       };
 
@@ -567,15 +632,16 @@ class CustomerEntity {
         balance: (map['balance'] is num)
             ? (map['balance'] as num).toDouble()
             : (double.tryParse((map['balance'] ?? '0').toString()) ?? 0.0),
-        createdAt: map['created_at'] != null
-            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
-        oldestDebtDate: map['oldest_debt_date'] != null
-            ? DateTime.tryParse(map['oldest_debt_date'].toString())
-            : null,
-        latestDebtDate: map['latest_debt_date'] != null
-            ? DateTime.tryParse(map['latest_debt_date'].toString())
-            : null,
+        creditLimit: map['credit_limit'] != null
+            ? ((map['credit_limit'] is num)
+                ? (map['credit_limit'] as num).toDouble()
+                : double.tryParse(map['credit_limit'].toString()))
+            : (map['credit_limit_minor'] != null
+                ? (map['credit_limit_minor'] as num).toDouble() / 100.0
+                : null),
+        createdAt: parseFlexibleDateTime(map['created_at']),
+        oldestDebtDate: parseFlexibleNullableDateTime(map['oldest_debt_date']),
+        latestDebtDate: parseFlexibleNullableDateTime(map['latest_debt_date']),
       );
 }
 
@@ -647,9 +713,7 @@ class SaleEntity {
                 0.0),
         paymentMethod: (map['payment_method'] ?? 'cash').toString(),
         status: (map['status'] ?? 'completed').toString(),
-        createdAt: map['created_at'] != null
-            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
+        createdAt: parseFlexibleDateTime(map['created_at']),
         idempotencyKey: map['idempotency_key']?.toString(),
         isSynced: (map['is_synced'] is num)
             ? (map['is_synced'] as num).toInt()
@@ -753,10 +817,8 @@ class FinancialTransactionEntity {
         debtAmount: (map['debt_amount'] is num)
             ? (map['debt_amount'] as num).toDouble()
             : (double.tryParse((map['debt_amount'] ?? '0').toString()) ?? 0.0),
-        date: DateTime.tryParse(
-                (map['created_at'] ?? map['date'] ?? map['occurred_at'] ?? '')
-                    .toString()) ??
-            DateTime.now(),
+        date: parseFlexibleDateTime(
+            map['created_at'] ?? map['date'] ?? map['occurred_at']),
         referenceId: map['reference_id']?.toString(),
         metadata: () {
           final m = map['metadata'];
@@ -898,15 +960,11 @@ class OrderEntity {
         customerPhone: map['customer_phone']?.toString() ??
             map['customerPhone']?.toString(),
         status: (map['status'] ?? 'created').toString(),
-        createdAt: map['created_at'] != null
-            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-            : DateTime.now(),
-        expectedDeliveryDate: map['expected_delivery_date'] != null
-            ? DateTime.tryParse(map['expected_delivery_date'].toString())
-            : null,
-        actualDeliveryDate: map['actual_delivery_date'] != null
-            ? DateTime.tryParse(map['actual_delivery_date'].toString())
-            : null,
+        createdAt: parseFlexibleDateTime(map['created_at']),
+        expectedDeliveryDate:
+            parseFlexibleNullableDateTime(map['expected_delivery_date']),
+        actualDeliveryDate:
+            parseFlexibleNullableDateTime(map['actual_delivery_date']),
         notes: map['notes']?.toString(),
         createdBy: map['created_by']?.toString(),
         discountAmount: (map['discount_amount'] is num)

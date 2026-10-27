@@ -500,8 +500,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     bytes.addAll(EscPosCommands.init);
 
-    // Trigger physical cash drawer open for cash transactions
-    if (sale.paymentMethod == 'cash' && settings.openCashDrawer) {
+    // Trigger physical cash drawer open for cash transactions and mixed karma payments
+    final bool hasCash = sale.paymentMethod == 'cash' || sale.paymentMethod == 'karma';
+    if (hasCash && settings.openCashDrawer) {
       bytes.addAll(EscPosCommands.openDrawer);
     }
 
@@ -791,6 +792,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
+
+    // Trigger physical cash drawer open for cash collections
+    if (paymentMethod == 'cash' && settings.openCashDrawer) {
+      bytes.addAll(EscPosCommands.openDrawer);
+    }
+
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
     bytes.addAll(
         [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson

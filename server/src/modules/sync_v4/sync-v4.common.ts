@@ -17,7 +17,7 @@ export async function assertActiveSyncActivation(
   activationId: unknown,
   installationId: unknown,
   executor: Pick<PoolClient, "query"> = pgPool,
-): Promise<void> {
+): Promise<string> {
   if (typeof installationId !== "string" || !installationId) {
     throw new Error("invalid_device_activation");
   }
@@ -29,6 +29,7 @@ export async function assertActiveSyncActivation(
       [activationId, companyId, installationId],
     );
     if (activation.rowCount === 0) throw new Error("invalid_device_activation");
+    return String(activation.rows[0].id);
   } else {
     const activation = await executor.query(
       `SELECT id FROM device_activations
@@ -37,5 +38,6 @@ export async function assertActiveSyncActivation(
       [companyId, installationId],
     );
     if (activation.rowCount === 0) throw new Error("invalid_device_activation");
+    return String(activation.rows[0].id);
   }
 }

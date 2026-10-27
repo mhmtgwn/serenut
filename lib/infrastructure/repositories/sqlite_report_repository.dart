@@ -11,42 +11,51 @@ class SqliteReportRepository implements IReportRepository {
 
   SqliteReportRepository(this._gateway);
 
+  static String _sqlDate(String col) =>
+      "CASE WHEN typeof($col) = 'integer' THEN substr(datetime($col / 1000, 'unixepoch', 'localtime'), 1, 10) WHEN $col LIKE '%Z' THEN substr(datetime($col, 'localtime'), 1, 10) ELSE substr($col, 1, 10) END";
+
+  static String _sqlDt(String col) =>
+      "CASE WHEN typeof($col) = 'integer' THEN datetime($col / 1000, 'unixepoch', 'localtime') WHEN $col LIKE '%Z' THEN datetime($col, 'localtime') ELSE $col END";
+
   // ──────────────────────────────────────────────────────────
   // 1. Günlük Gelir (bar chart verisi)
   // ──────────────────────────────────────────────────────────
   @override
   Future<List<DailyRevenue>> getDailyRevenue(DateRange range) async {
+    final dayFrom = range.from.toIso8601String().substring(0, 10);
+    final dayTo = range.to.toIso8601String().substring(0, 10);
+
     // Try v_financial_ledger first (Phase 2 records), fallback to sales table
     final ftRows = await _gateway.rawQuery('''
       SELECT 
-        DATE(created_at) AS day,
+        ${_sqlDate('created_at')} AS day,
         SUM(debit) AS total,
         SUM(CASE WHEN type = 'sale' THEN 1 ELSE -1 END) AS cnt,
         SUM(credit) AS cash,
         SUM(debit - credit) AS debt
       FROM v_financial_ledger
       WHERE type IN ('sale', 'cancellation')
-        AND created_at >= ?
-        AND created_at <= ?
-      GROUP BY DATE(created_at)
+        AND ${_sqlDate('created_at')} >= ?
+        AND ${_sqlDate('created_at')} <= ?
+      GROUP BY ${_sqlDate('created_at')}
       ORDER BY day ASC
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+    ''', [dayFrom, dayTo]);
 
     // Also query legacy sales table for completeness
     final salesRows = await _gateway.rawQuery('''
       SELECT 
-        DATE(created_at) AS day,
+        ${_sqlDate('created_at')} AS day,
         SUM(total_amount) AS total,
         COUNT(*) AS cnt,
         SUM(paid_amount) AS cash,
         SUM(total_amount - paid_amount) AS debt
       FROM sales
       WHERE status != 'cancelled'
-        AND created_at >= ?
-        AND created_at <= ?
-      GROUP BY DATE(created_at)
+        AND ${_sqlDate('created_at')} >= ?
+        AND ${_sqlDate('created_at')} <= ?
+      GROUP BY ${_sqlDate('created_at')}
       ORDER BY day ASC
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+    ''', [dayFrom, dayTo]);
 
     // Merge both sources by date key
     final Map<String, Map<String, dynamic>> merged = {};
@@ -104,6 +113,9 @@ class SqliteReportRepository implements IReportRepository {
   // ──────────────────────────────────────────────────────────
   @override
   Future<List<CategoryRevenue>> getCategoryRevenue(DateRange range) async {
+    final dayFrom = range.from.toIso8601String().substring(0, 10);
+    final dayTo = range.to.toIso8601String().substring(0, 10);
+
     final rows = await _gateway.rawQuery('''
       WITH combined_items AS (
         SELECT 
@@ -113,8 +125,8 @@ class SqliteReportRepository implements IReportRepository {
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         WHERE s.status != 'cancelled'
-          AND s.created_at >= ?
-          AND s.created_at <= ?
+          AND ${_sqlDate('s.created_at')} >= ?
+          AND ${_sqlDate('s.created_at')} <= ?
         UNION ALL
         SELECT 
           oi.product_id AS product_id,
@@ -124,8 +136,8 @@ class SqliteReportRepository implements IReportRepository {
         JOIN orders o ON oi.order_id = o.id
         WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
           AND o.status != 'cancelled'
-          AND o.created_at >= ?
-          AND o.created_at <= ?
+          AND ${_sqlDate('o.created_at')} >= ?
+          AND ${_sqlDate('o.created_at')} <= ?
       )
       SELECT 
         COALESCE(NULLIF(TRIM(p.category), ''), 'unknown') AS cat_id,
@@ -136,7 +148,7 @@ class SqliteReportRepository implements IReportRepository {
       LEFT JOIN products p ON ci.product_id = p.id
       GROUP BY COALESCE(NULLIF(TRIM(p.category), ''), 'Genel')
       ORDER BY total DESC
-    ''', [range.toIsoFrom(), range.toIsoTo(), range.toIsoFrom(), range.toIsoTo()]);
+    ''', [dayFrom, dayTo, dayFrom, dayTo]);
 
     if (rows.isEmpty) return [];
 
@@ -166,6 +178,9 @@ class SqliteReportRepository implements IReportRepository {
   @override
   Future<List<ProductPerformance>> getTopProducts(DateRange range,
       {int limit = 10}) async {
+    final dayFrom = range.from.toIso8601String().substring(0, 10);
+    final dayTo = range.to.toIso8601String().substring(0, 10);
+
     final rows = await _gateway.rawQuery('''
       WITH combined_items AS (
         SELECT 
@@ -176,8 +191,8 @@ class SqliteReportRepository implements IReportRepository {
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         WHERE s.status != 'cancelled'
-          AND s.created_at >= ?
-          AND s.created_at <= ?
+          AND ${_sqlDate('s.created_at')} >= ?
+          AND ${_sqlDate('s.created_at')} <= ?
         UNION ALL
         SELECT 
           oi.product_id AS product_id,
@@ -188,8 +203,8 @@ class SqliteReportRepository implements IReportRepository {
         JOIN orders o ON oi.order_id = o.id
         WHERE (o.is_deleted = 0 OR o.is_deleted IS NULL)
           AND o.status != 'cancelled'
-          AND o.created_at >= ?
-          AND o.created_at <= ?
+          AND ${_sqlDate('o.created_at')} >= ?
+          AND ${_sqlDate('o.created_at')} <= ?
       )
       SELECT 
         CAST(ci.product_id AS TEXT) AS pid,
@@ -204,10 +219,10 @@ class SqliteReportRepository implements IReportRepository {
       ORDER BY revenue DESC
       LIMIT ?
     ''', [
-      range.toIsoFrom(),
-      range.toIsoTo(),
-      range.toIsoFrom(),
-      range.toIsoTo(),
+      dayFrom,
+      dayTo,
+      dayFrom,
+      dayTo,
       limit,
     ]);
 
@@ -250,16 +265,16 @@ class SqliteReportRepository implements IReportRepository {
         c.id AS cid,
         c.name AS cname,
         SUM(CASE 
-          WHEN CAST((julianday('now') - julianday(ft.created_at)) AS INTEGER) <= 30 
+          WHEN CAST((julianday('now') - julianday(${_sqlDt('ft.created_at')})) AS INTEGER) <= 30 
           THEN (ft.debit - ft.credit) ELSE 0 END) AS d0_30,
         SUM(CASE 
-          WHEN CAST((julianday('now') - julianday(ft.created_at)) AS INTEGER) BETWEEN 31 AND 60 
+          WHEN CAST((julianday('now') - julianday(${_sqlDt('ft.created_at')})) AS INTEGER) BETWEEN 31 AND 60 
           THEN (ft.debit - ft.credit) ELSE 0 END) AS d31_60,
         SUM(CASE 
-          WHEN CAST((julianday('now') - julianday(ft.created_at)) AS INTEGER) BETWEEN 61 AND 90 
+          WHEN CAST((julianday('now') - julianday(${_sqlDt('ft.created_at')})) AS INTEGER) BETWEEN 61 AND 90 
           THEN (ft.debit - ft.credit) ELSE 0 END) AS d61_90,
         SUM(CASE 
-          WHEN CAST((julianday('now') - julianday(ft.created_at)) AS INTEGER) > 90 
+          WHEN CAST((julianday('now') - julianday(${_sqlDt('ft.created_at')})) AS INTEGER) > 90 
           THEN (ft.debit - ft.credit) ELSE 0 END) AS d_over90
       FROM v_financial_ledger ft
       JOIN customers c ON CAST(ft.customer_id AS TEXT) = CAST(c.id AS TEXT)
@@ -315,6 +330,9 @@ class SqliteReportRepository implements IReportRepository {
   // ──────────────────────────────────────────────────────────
   @override
   Future<ReportSummary> getSummary(DateRange range) async {
+    final dayFrom = range.from.toIso8601String().substring(0, 10);
+    final dayTo = range.to.toIso8601String().substring(0, 10);
+
     // Revenue & sales from v_financial_ledger view
     final ftSummary = await _gateway.rawQuery('''
       SELECT 
@@ -324,9 +342,9 @@ class SqliteReportRepository implements IReportRepository {
         COALESCE(SUM(CASE WHEN type = 'sale' THEN 1 ELSE -1 END), 0) AS total_sales
       FROM v_financial_ledger
       WHERE type IN ('sale', 'cancellation')
-        AND created_at >= ?
-        AND created_at <= ?
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+        AND ${_sqlDate('created_at')} >= ?
+        AND ${_sqlDate('created_at')} <= ?
+    ''', [dayFrom, dayTo]);
 
     // Fallback: also check sales table
     final salesSummary = await _gateway.rawQuery('''
@@ -337,15 +355,15 @@ class SqliteReportRepository implements IReportRepository {
         COUNT(*) AS total_sales
       FROM sales
       WHERE status != 'cancelled'
-        AND created_at >= ?
-        AND created_at <= ?
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+        AND ${_sqlDate('created_at')} >= ?
+        AND ${_sqlDate('created_at')} <= ?
+    ''', [dayFrom, dayTo]);
 
     // New customers in period
     final newCustomers = await _gateway.rawQuery('''
       SELECT COUNT(*) AS cnt FROM customers
-      WHERE created_at >= ? AND created_at <= ? AND is_active = 1
-    ''', [range.toIsoFrom(), range.toIsoTo()]);
+      WHERE ${_sqlDate('created_at')} >= ? AND ${_sqlDate('created_at')} <= ? AND is_active = 1
+    ''', [dayFrom, dayTo]);
 
     // Use financial_transactions if it has data, else sales table
     final ftData = ftSummary.first;
@@ -389,6 +407,8 @@ class SqliteReportRepository implements IReportRepository {
   @override
   Future<List<Map<String, dynamic>>> getVatBreakdown(
       DateTime start, DateTime end) async {
+    final dayFrom = start.toIso8601String().substring(0, 10);
+    final dayTo = end.toIso8601String().substring(0, 10);
     return await _gateway.rawQuery('''
       SELECT 
         COALESCE(p.vat, 0) as vat_rate,
@@ -398,9 +418,9 @@ class SqliteReportRepository implements IReportRepository {
       JOIN products p ON si.product_id = p.id
       JOIN sales s ON si.sale_id = s.id
       WHERE s.status != 'cancelled'
-        AND s.created_at >= ?
-        AND s.created_at <= ?
+        AND ${_sqlDate('s.created_at')} >= ?
+        AND ${_sqlDate('s.created_at')} <= ?
       GROUP BY COALESCE(p.vat, 0)
-    ''', [start.toIso8601String(), end.toIso8601String()]);
+    ''', [dayFrom, dayTo]);
   }
 }

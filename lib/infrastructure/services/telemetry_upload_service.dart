@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../infrastructure/database/database_provider.dart';
 import '../../infrastructure/database/db_gateway.dart';
 import '../../infrastructure/network/api_client.dart';
@@ -13,15 +14,28 @@ import '../../infrastructure/network/api_client.dart';
 class TelemetryUploadService {
   final ApiClient _apiClient;
   final DbGateway? _gateway;
-  bool _isRecording = false;
+  static Future<void> _writeQueue = Future.value();
+  static const int maxTelemetryQueueSize = 5000;
 
   TelemetryUploadService(this._apiClient, [this._gateway]);
 
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value,
+      {Object? metadata}) {
+    final completer = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await _recordMetricInternal(name, value, metadata: metadata);
+        completer.complete();
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _recordMetricInternal(String name, double value,
       {Object? metadata}) async {
-    if (_isRecording) return;
-    _isRecording = true;
     try {
       final cutoff = DatabaseManager.cutoffMaintenanceLock;
       if (cutoff != null && !cutoff.state.isWritePermitted) {
@@ -41,12 +55,21 @@ class TelemetryUploadService {
       await runZoned(() async {
         final db = await DatabaseManager.instance.getDatabase();
         await db.insert('client_telemetry_logs', payload);
+
+        // FIFO eviction: maintain local queue under 5,000 records
+        final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM client_telemetry_logs')) ?? 0;
+        if (count > maxTelemetryQueueSize) {
+          final excess = count - maxTelemetryQueueSize;
+          await db.rawDelete('''
+            DELETE FROM client_telemetry_logs WHERE id IN (
+              SELECT id FROM client_telemetry_logs ORDER BY id ASC LIMIT ?
+            )
+          ''', [excess]);
+        }
       }, zoneValues: {#sqlite_txn: null});
       debugPrint('[TelemetryUpload] Recorded local metric: $name = $value');
     } catch (e) {
       debugPrint('[TelemetryUpload] Failed to record local metric: $e');
-    } finally {
-      _isRecording = false;
     }
   }
 

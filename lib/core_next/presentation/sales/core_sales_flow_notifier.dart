@@ -102,6 +102,7 @@ class CoreSalesFlowNotifier extends StateNotifier<CoreSalesFlowState> {
     bool openCashDrawer = false,
     String? idempotencyKey,
     ActorContext? actor,
+    String? branchId,
   }) async {
     state = state.copyWith(isSubmitting: true, errorMessage: () => null);
 
@@ -117,6 +118,7 @@ class CoreSalesFlowNotifier extends StateNotifier<CoreSalesFlowState> {
           openCashDrawer: openCashDrawer,
           idempotencyKey: idempotencyKey,
           actor: actor ?? _defaultActor,
+          branchId: branchId,
         ),
       );
 

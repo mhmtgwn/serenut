@@ -268,26 +268,8 @@ class AuthService {
           if (e.statusCode == 400 ||
               e.statusCode == 401 ||
               e.statusCode == 403) {
-            // Check if user exists locally in SQLite (e.g. local cashier) before failing
-            if (!kIsWeb) {
-              try {
-                final localUser =
-                    await _userRepository.findByUsername(username.trim());
-                if (localUser != null) {
-                  final hash =
-                      await _userRepository.getPasswordHash(localUser.id);
-                  if (hash != null &&
-                      _hashService.verifyPassword(password, hash)) {
-                    await _onLoginSuccess(localUser);
-                    await _userRepository.updateLastLogin(localUser.id);
-                    return localUser;
-                  }
-                }
-              } catch (_) {
-                // Ignored: fallback or safe default applied
-              }
-            }
-
+            // Sunucu isteği açıkça reddettiğinde (400, 401 Unauthorized, 403 Forbidden),
+            // yerel SQLite'a ASLA düşülmez; yetkisiz erişim derhal engellenir (B28).
             final body = e.responseBody;
             String message = 'Giriş başarısız.';
             if (body != null) {

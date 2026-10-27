@@ -61,8 +61,9 @@ async function prepareRelease(
     platform,
     'stable',
   );
-  fs.mkdirSync(releaseDir, { recursive: true });
-  const finalPath = path.join(releaseDir, `SerenutOS-${versionCode}${ext}`);
+  const cleanVersion = versionCode.replace(/\+/g, '.');
+  const normalizedTag = cleanVersion.startsWith('v') ? cleanVersion : `v${cleanVersion}`;
+  const finalPath = path.join(releaseDir, `SerenutOS-${normalizedTag}${ext}`);
   const temporaryPath = path.join(
     releaseDir,
     `.${path.basename(finalPath)}.${process.pid}.${Date.now()}.tmp`,

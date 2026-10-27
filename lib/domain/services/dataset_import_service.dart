@@ -7,7 +7,7 @@ import 'dart:typed_data';
 import 'dart:isolate';
 import 'dart:convert';
 import 'dart:math' show max, min;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:archive/archive_io.dart';
@@ -137,7 +137,59 @@ class DatasetImportService {
     if (cell == null) return '';
     final val = cell.value;
     if (val == null) return '';
-    return val.toString().trim();
+    dynamic innerVal = val;
+    try {
+      // ignore: avoid_dynamic_calls
+      innerVal = val.value ?? val;
+    } catch (_) {
+      innerVal = val;
+    }
+    return innerVal.toString().trim();
+  }
+
+  /// Helper to convert barcode cell value to String safely, stripping
+  /// trailing `.0` or scientific notation produced by numeric Excel columns.
+  static String _staticParseBarcode(dynamic cell) {
+    if (cell == null) return '';
+    final val = cell.value;
+    if (val == null) return '';
+
+    dynamic innerVal = val;
+    try {
+      // CellValue objects in excel package have a .value property
+      // ignore: avoid_dynamic_calls
+      innerVal = val.value ?? val;
+    } catch (_) {
+      innerVal = val;
+    }
+
+    if (innerVal is int) {
+      return innerVal.toString();
+    }
+    if (innerVal is double) {
+      if (!innerVal.isNaN &&
+          !innerVal.isInfinite &&
+          innerVal == innerVal.roundToDouble()) {
+        return innerVal.toStringAsFixed(0);
+      }
+    }
+
+    var str = innerVal.toString().trim();
+    // Excel numeric export artifacts: "8690504090106.0" -> "8690504090106"
+    if (str.endsWith('.0')) {
+      str = str.substring(0, str.length - 2);
+    }
+    // Scientific notation: "8.690504090106e+12" or "8.690504090106E12"
+    if (str.contains(RegExp(r'[eE][+-]?\d+'))) {
+      final parsed = double.tryParse(str);
+      if (parsed != null &&
+          !parsed.isNaN &&
+          !parsed.isInfinite &&
+          parsed == parsed.roundToDouble()) {
+        str = parsed.toStringAsFixed(0);
+      }
+    }
+    return str;
   }
 
   /// UPC-A is represented by 12 digits. Its EAN-13 representation is the
@@ -157,13 +209,60 @@ class DatasetImportService {
     return equivalent != null && keys.contains(equivalent) ? equivalent : null;
   }
 
-  /// Helper to convert cell value to double safely
+  /// Helper to convert cell value to double safely, handling Turkish/international
+  /// currency strings (e.g. "125,50", "₺ 1.250,50", "125,50 TL").
   static double _staticParseDouble(dynamic cell) {
     if (cell == null) return 0.0;
     final val = cell.value;
     if (val == null) return 0.0;
-    if (val is num) return val.toDouble();
-    return double.tryParse(val.toString()) ?? 0.0;
+
+    dynamic innerVal = val;
+    try {
+      // ignore: avoid_dynamic_calls
+      innerVal = val.value ?? val;
+    } catch (_) {
+      innerVal = val;
+    }
+
+    if (innerVal is num) return innerVal.toDouble();
+
+    var str = innerVal.toString().trim();
+    if (str.isEmpty) return 0.0;
+
+    // Clean currency symbols, abbreviations and common whitespace
+    str = str
+        .replaceAll('₺', '')
+        .replaceAll(
+            RegExp(r'\b(tl|try|usd|eur)\b', caseSensitive: false), '')
+        .replaceAll(r'$', '')
+        .replaceAll('€', '')
+        .trim();
+    if (str.isEmpty) return 0.0;
+
+    // Direct parse attempt
+    final direct = double.tryParse(str);
+    if (direct != null) return direct;
+
+    // Handle localized delimiters
+    final hasComma = str.contains(',');
+    final hasDot = str.contains('.');
+
+    if (hasComma && hasDot) {
+      final lastComma = str.lastIndexOf(',');
+      final lastDot = str.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        // Turkish/EU format: "1.250,50" -> dots are thousand separators, comma is decimal
+        str = str.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        // US format: "1,250.50" -> commas are thousand separators, dot is decimal
+        str = str.replaceAll(',', '');
+      }
+    } else if (hasComma) {
+      // Only comma: "125,50" -> "125.50"
+      str = str.replaceAll(',', '.');
+    }
+
+    return double.tryParse(str) ?? 0.0;
   }
 
   /// Helper to convert cell value to int safely
@@ -171,8 +270,55 @@ class DatasetImportService {
     if (cell == null) return 0;
     final val = cell.value;
     if (val == null) return 0;
-    if (val is num) return val.toInt();
-    return int.tryParse(val.toString()) ?? 0;
+
+    dynamic innerVal = val;
+    try {
+      // ignore: avoid_dynamic_calls
+      innerVal = val.value ?? val;
+    } catch (_) {
+      innerVal = val;
+    }
+
+    if (innerVal is num) return innerVal.toInt();
+    return int.tryParse(innerVal.toString()) ?? 0;
+  }
+
+  /// Helper to convert cell value to VAT rate int safely.
+  /// If empty or missing, defaults to 20% (standard Turkish VAT rate).
+  /// Genuine 0% VAT (tax-exempt/books/grain) is strictly preserved.
+  static int _staticParseVat(dynamic cell, {int defaultRate = 20}) {
+    if (cell == null) return defaultRate;
+    final val = cell.value;
+    if (val == null) return defaultRate;
+
+    dynamic innerVal = val;
+    try {
+      // ignore: avoid_dynamic_calls
+      innerVal = val.value ?? val;
+    } catch (_) {
+      innerVal = val;
+    }
+
+    if (innerVal is num) {
+      final v = innerVal.toInt();
+      if (v >= 0 && v <= 100) return v;
+      return defaultRate;
+    }
+
+    var str = innerVal.toString().trim();
+    if (str.isEmpty) return defaultRate;
+
+    str = str
+        .replaceAll('%', '')
+        .replaceAll(RegExp(r'kdv', caseSensitive: false), '')
+        .trim();
+    if (str.isEmpty) return defaultRate;
+
+    final parsed = int.tryParse(str) ?? (double.tryParse(str)?.toInt());
+    if (parsed != null && parsed >= 0 && parsed <= 100) {
+      return parsed;
+    }
+    return defaultRate;
   }
 
   /// Resolves familiar Turkish/English catalogue headers. Files without a
@@ -190,17 +336,38 @@ class DatasetImportService {
     };
     final columns = <String, int>{};
     final aliases = <String, List<String>>{
-      'barcode': ['barkod', 'barkod no', 'barcode', 'ean', 'sku'],
+      'barcode': [
+        'barkod',
+        'barkod no',
+        'barkod no.',
+        'barkodu',
+        'barcode',
+        'ean',
+        'sku'
+      ],
       'name': ['urun adi', 'ürün adı', 'urun', 'ürün', 'product name', 'name'],
       'category': ['kategori', 'category'],
       'brand': ['marka', 'brand'],
-      'price': ['fiyat', 'fiyat (tl)', 'satis fiyati', 'satış fiyatı', 'price'],
+      'price': [
+        'fiyat',
+        'fiyat (tl)',
+        'fiyat(tl)',
+        'satis fiyati',
+        'satış fiyatı',
+        'birim fiyati',
+        'birim fiyatı',
+        'tutar',
+        'price'
+      ],
       'vat': [
         'kdv',
         'kdv orani',
         'kdv oranı',
         'kdv orani (%)',
         'kdv oranı (%)',
+        'kdv (%)',
+        'kdv(%)',
+        'kdv%',
         'vat'
       ],
       'remoteUrl': [
@@ -218,6 +385,7 @@ class DatasetImportService {
         'stok',
         'stok adedi',
         'stok adet',
+        'stok adeti',
         'stok miktari',
         'stok miktarı',
         'miktar',
@@ -248,6 +416,21 @@ class DatasetImportService {
 
   static dynamic _cellAt(List<dynamic> row, int? index) =>
       index != null && index >= 0 && index < row.length ? row[index] : null;
+
+  @visibleForTesting
+  static String parseBarcodeForTesting(dynamic cell) =>
+      _staticParseBarcode(cell);
+
+  @visibleForTesting
+  static double parseDoubleForTesting(dynamic cell) => _staticParseDouble(cell);
+
+  @visibleForTesting
+  static int parseVatForTesting(dynamic cell, {int defaultRate = 20}) =>
+      _staticParseVat(cell, defaultRate: defaultRate);
+
+  @visibleForTesting
+  static Map<String, int> resolveColumnsForTesting(List<dynamic> headerRow) =>
+      _resolveColumns(headerRow);
 
   static bool _isSupportedImageEntry(String name) {
     final normalized = name.replaceAll('\\', '/').toLowerCase();
@@ -509,7 +692,7 @@ class DatasetImportService {
       if (row.isEmpty) continue;
 
       final barcode = BarcodeStandard.normalize(
-        _staticParseString(_cellAt(row, columns['barcode'])),
+        _staticParseBarcode(_cellAt(row, columns['barcode'])),
       );
       final name = _staticParseString(_cellAt(row, columns['name']));
 
@@ -525,9 +708,7 @@ class DatasetImportService {
           ? 'Bilinmiyor'
           : _staticParseString(_cellAt(row, columns['brand']));
       final price = _staticParseDouble(_cellAt(row, columns['price']));
-      final vat = _staticParseInt(_cellAt(row, columns['vat'])) == 0
-          ? 18
-          : _staticParseInt(_cellAt(row, columns['vat']));
+      final vat = _staticParseVat(_cellAt(row, columns['vat']));
       final remoteUrl = _staticParseString(_cellAt(row, columns['remoteUrl']));
       final quantity = _staticParseInt(_cellAt(row, columns['quantity']));
 
@@ -687,7 +868,7 @@ class DatasetImportService {
       if (row.isEmpty) continue;
 
       final barcode = BarcodeStandard.normalize(
-        _staticParseString(_cellAt(row, columns['barcode'])),
+        _staticParseBarcode(_cellAt(row, columns['barcode'])),
       );
       final name = _staticParseString(_cellAt(row, columns['name']));
 
@@ -703,9 +884,7 @@ class DatasetImportService {
           ? 'Bilinmiyor'
           : _staticParseString(_cellAt(row, columns['brand']));
       final price = _staticParseDouble(_cellAt(row, columns['price']));
-      final vat = _staticParseInt(_cellAt(row, columns['vat'])) == 0
-          ? 18
-          : _staticParseInt(_cellAt(row, columns['vat']));
+      final vat = _staticParseVat(_cellAt(row, columns['vat']));
       final remoteUrl = _staticParseString(_cellAt(row, columns['remoteUrl']));
       final quantity = _staticParseInt(_cellAt(row, columns['quantity']));
 
@@ -1283,7 +1462,11 @@ class DatasetImportService {
                     'id': barcode,
                     'name': name,
                     'description': brand,
+                    'brand': brand,
                     'price': price,
+                    'price_minor': (price * 100).round(),
+                    'purchase_price': 0.0,
+                    'purchase_price_minor': 0,
                     'quantity': quantity,
                     'category': category,
                     'vat': vat,
@@ -1325,9 +1508,11 @@ class DatasetImportService {
 
                   if (strategy.syncPrices) {
                     updateFields['price'] = price;
+                    updateFields['price_minor'] = (price * 100).round();
                   }
                   if (strategy.syncDescriptions) {
                     updateFields['description'] = brand;
+                    updateFields['brand'] = brand;
                   }
                   if (strategy.syncImages && finalImageUrl != null) {
                     updateFields['image_url'] = finalImageUrl;
@@ -1400,34 +1585,41 @@ class DatasetImportService {
 
           // Deactivate missing products if enabled and enqueue sync mutations
           if (strategy.deactivateMissing) {
-            final excelBarcodes = <String>{
+            final excelBarcodeSet = <String>{
               for (final product in products) product['barcode'] as String,
               for (final product in products)
                 if (_upcEanEquivalentBarcode(product['barcode'] as String)
                     case final equivalent?)
                   equivalent,
-            }.toList(growable: false);
-            if (excelBarcodes.isNotEmpty) {
-              const int sqliteParamLimit = 999;
-              for (int k = 0; k < excelBarcodes.length; k += sqliteParamLimit) {
-                final subList = excelBarcodes.sublist(
-                    k, min(k + sqliteParamLimit, excelBarcodes.length));
-                final placeholders = List.filled(subList.length, '?').join(',');
-                final affectedRows = await txn.query(
-                  'products',
-                  where: 'id NOT IN ($placeholders) AND is_active = 1',
-                  whereArgs: subList,
-                );
+            };
+            if (excelBarcodeSet.isNotEmpty) {
+              final activeRows = await txn.query(
+                'products',
+                where: 'is_active = 1',
+              );
+              final missingRows = activeRows.where((r) {
+                final id = r['id']?.toString() ?? '';
+                final sku = r['sku']?.toString();
+                return !excelBarcodeSet.contains(id) &&
+                    (sku == null || !excelBarcodeSet.contains(sku));
+              }).toList();
+
+              const int sqliteParamLimit = 900;
+              for (int k = 0; k < missingRows.length; k += sqliteParamLimit) {
+                final chunk = missingRows.sublist(
+                    k, min(k + sqliteParamLimit, missingRows.length));
+                final chunkIds = chunk.map((r) => r['id'].toString()).toList();
+                final placeholders = List.filled(chunkIds.length, '?').join(',');
                 await txn.update(
                   'products',
                   {
                     'is_active': 0,
                     'updated_at': DateTime.now().toIso8601String(),
                   },
-                  where: 'id NOT IN ($placeholders) AND is_active = 1',
-                  whereArgs: subList,
+                  where: 'id IN ($placeholders) AND is_active = 1',
+                  whereArgs: chunkIds,
                 );
-                for (final row in affectedRows) {
+                for (final row in chunk) {
                   final id = row['id']?.toString();
                   if (id != null && id.isNotEmpty) {
                     await SyncOutboxV4.enqueue(

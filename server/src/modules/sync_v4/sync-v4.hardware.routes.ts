@@ -55,11 +55,11 @@ router.post("/device-hardware-profile/restore", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const result = await client.query(
       `SELECT profile, updated_at FROM device_hardware_profiles
        WHERE device_activation_id = $1 AND company_id = $2`,
-      [activationId, user.company_id],
+      [resolvedActivationId, user.company_id],
     );
     await client.query("COMMIT");
     return res.json({
@@ -92,7 +92,7 @@ router.put("/device-hardware-profile", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     await client.query(
       `INSERT INTO device_hardware_profiles
          (device_activation_id, company_id, profile, updated_at)
@@ -100,7 +100,7 @@ router.put("/device-hardware-profile", async (req, res) => {
        ON CONFLICT (device_activation_id) DO UPDATE
        SET profile = EXCLUDED.profile, updated_at = NOW()
        WHERE device_hardware_profiles.company_id = EXCLUDED.company_id`,
-      [activationId, user.company_id, encoded],
+      [resolvedActivationId, user.company_id, encoded],
     );
     await client.query("COMMIT");
     return res.json({ success: true });
@@ -128,7 +128,7 @@ router.put("/shared-hardware/presence", requirePermission("settings:printer") as
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const retainedIds: string[] = [];
     for (const raw of hardware) {
       if (!raw || typeof raw !== "object") throw new Error("invalid_shared_hardware");
@@ -141,7 +141,7 @@ router.put("/shared-hardware/presence", requirePermission("settings:printer") as
           !sharedHardwareTypes.has(hardwareType) || !connectionType) {
         throw new Error("invalid_shared_hardware");
       }
-      const cloudId = `${activationId}:${localId}`;
+      const cloudId = `${resolvedActivationId}:${localId}`;
       retainedIds.push(cloudId);
       const configuration = safeHardwareObject(item.configuration);
       const capabilities = safeHardwareObject(item.capabilities);
@@ -157,7 +157,7 @@ router.put("/shared-hardware/presence", requirePermission("settings:printer") as
            online=true,last_seen_at=NOW(),updated_at=NOW()
          WHERE shared_hardware.company_id=EXCLUDED.company_id
            AND shared_hardware.owner_activation_id=EXCLUDED.owner_activation_id`,
-        [cloudId,user.company_id,activationId,deviceId,name,hardwareType,connectionType,
+        [cloudId,user.company_id,resolvedActivationId,deviceId,name,hardwareType,connectionType,
           stringValue(item,"language") || null,JSON.stringify(configuration),JSON.stringify(capabilities),
           ["owner","branch","company"].includes(stringValue(item,"sharing_scope"))
             ? stringValue(item,"sharing_scope") : "company",
@@ -168,7 +168,7 @@ router.put("/shared-hardware/presence", requirePermission("settings:printer") as
       `UPDATE shared_hardware SET online=false,updated_at=NOW()
        WHERE company_id=$1 AND owner_activation_id=$2
          AND NOT (id = ANY($3::text[]))`,
-      [user.company_id, activationId, retainedIds],
+      [user.company_id, resolvedActivationId, retainedIds],
     );
     await client.query("COMMIT");
     return res.json({ success: true, registered: retainedIds.length });
@@ -188,7 +188,7 @@ router.post("/shared-hardware/list", requirePermission("settings:printer") as an
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const result = await client.query(
       `SELECT h.id,h.name,h.hardware_type AS type,h.connection_type,h.language,h.capabilities,
               h.sharing_scope,h.enabled,
@@ -201,7 +201,7 @@ router.post("/shared-hardware/list", requirePermission("settings:printer") as an
        WHERE h.company_id=$1 AND h.enabled=true
          AND (h.sharing_scope='company' OR h.owner_activation_id=$2)
        ORDER BY online DESC,h.name ASC`,
-      [user.company_id, activationId],
+      [user.company_id, resolvedActivationId],
     );
     await client.query("COMMIT");
     return res.json({ hardware: result.rows });
@@ -230,7 +230,7 @@ router.post("/hardware-jobs", requirePermission("settings:printer") as any, asyn
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const target = await client.query(
       `SELECT owner_activation_id,hardware_type,enabled,sharing_scope FROM shared_hardware
        WHERE id=$1 AND company_id=$2 FOR SHARE`, [hardwareId,user.company_id]);
@@ -248,7 +248,7 @@ router.post("/hardware-jobs", requirePermission("settings:printer") as any, asyn
        VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7::jsonb,$8)
        ON CONFLICT(company_id,idempotency_key) DO UPDATE SET updated_at=hardware_jobs.updated_at
        RETURNING id,state,created_at`,
-      [user.company_id,hardwareId,target.rows[0].owner_activation_id,activationId,user.id,
+      [user.company_id,hardwareId,target.rows[0].owner_activation_id,resolvedActivationId,user.id,
         operation,encodedPayload,idempotencyKey.substring(0,180)],
     );
     await client.query("COMMIT");
@@ -283,7 +283,7 @@ router.post("/hardware-jobs/claim", requirePermission("settings:printer") as any
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     await client.query(
       `UPDATE hardware_jobs SET state='requires_confirmation',lease_owner=NULL,
          lease_expires_at=NULL,error_code='owner_interrupted_during_delivery',
@@ -291,7 +291,7 @@ router.post("/hardware-jobs/claim", requirePermission("settings:printer") as any
          updated_at=NOW(),completed_at=NOW()
        WHERE company_id=$1 AND owner_activation_id=$2 AND state='executing'
          AND lease_expires_at<NOW()`,
-      [user.company_id, activationId],
+      [user.company_id, resolvedActivationId],
     );
     const result = await client.query(
       `WITH candidate AS (
@@ -306,7 +306,7 @@ router.post("/hardware-jobs/claim", requirePermission("settings:printer") as any
          lease_owner=$3,lease_expires_at=NOW()+INTERVAL '45 seconds',updated_at=NOW()
        FROM candidate WHERE j.id=candidate.id
        RETURNING j.id,j.hardware_id,j.operation,j.payload,j.attempt_count,j.lease_expires_at`,
-      [user.company_id,activationId,deviceId],
+      [user.company_id,resolvedActivationId,deviceId],
     );
     await client.query("COMMIT");
     return res.json({ job: result.rows[0] ?? null });
@@ -325,14 +325,14 @@ router.post("/hardware-jobs/:id/start", requirePermission("settings:printer") as
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const result = await client.query(
       `UPDATE hardware_jobs SET state='executing',updated_at=NOW(),
          lease_expires_at=NOW()+INTERVAL '45 seconds'
        WHERE id=$1 AND company_id=$2 AND owner_activation_id=$3
          AND lease_owner=$4 AND state='claimed' AND lease_expires_at>NOW()
        RETURNING id,state`,
-      [req.params.id,user.company_id,activationId,deviceId],
+      [req.params.id,user.company_id,resolvedActivationId,deviceId],
     );
     if (!result.rowCount) throw new Error("hardware_job_lease_lost");
     await client.query("COMMIT");
@@ -353,7 +353,7 @@ router.post("/hardware-jobs/list", requirePermission("settings:printer") as any,
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const result = await client.query(
       `SELECT j.id,j.hardware_id,h.name AS hardware_name,j.operation,j.state,
               j.attempt_count,j.error_code,j.error_message,j.created_at,j.updated_at,
@@ -363,7 +363,7 @@ router.post("/hardware-jobs/list", requirePermission("settings:printer") as any,
        WHERE j.company_id=$1 AND
          (j.requested_by_activation_id=$2 OR j.owner_activation_id=$2)
        ORDER BY j.created_at DESC LIMIT 200`,
-      [user.company_id, activationId],
+      [user.company_id, resolvedActivationId],
     );
     await client.query("COMMIT");
     return res.json({ jobs: result.rows });
@@ -386,11 +386,11 @@ router.post("/hardware-jobs/:id/action", requirePermission("settings:printer") a
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const current = await client.query(
       `SELECT state FROM hardware_jobs WHERE id=$1 AND company_id=$2
          AND (requested_by_activation_id=$3 OR owner_activation_id=$3) FOR UPDATE`,
-      [req.params.id,user.company_id,activationId],
+      [req.params.id,user.company_id,resolvedActivationId],
     );
     if (!current.rowCount) throw new Error("hardware_job_not_found");
     const state = current.rows[0].state as string;
@@ -432,7 +432,7 @@ router.post("/hardware-jobs/:id/result", requirePermission("settings:printer") a
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const resolvedActivationId = await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
     const result = await client.query(
       `UPDATE hardware_jobs SET state=$1::varchar,result=$2::jsonb,error_code=$3,error_message=$4,
          next_attempt_at=CASE WHEN $1::varchar='retry_wait' THEN NOW()+INTERVAL '10 seconds' ELSE NULL END,
@@ -442,7 +442,7 @@ router.post("/hardware-jobs/:id/result", requirePermission("settings:printer") a
        RETURNING id,state`,
       [state,JSON.stringify(req.body?.result ?? {}),req.body?.error_code ?? null,
         String(req.body?.error_message ?? "").substring(0,500) || null,req.params.id,
-        user.company_id,activationId,deviceId],
+        user.company_id,resolvedActivationId,deviceId],
     );
     if (!result.rowCount) throw new Error("hardware_job_lease_lost");
     await client.query("COMMIT");

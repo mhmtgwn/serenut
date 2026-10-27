@@ -84,10 +84,16 @@ class ProductImage extends ConsumerWidget {
 
     // 1. Web execution
     if (kIsWeb) {
-      if (imageUrl != null &&
-          imageUrl!.isNotEmpty &&
-          _isNetworkUrl(imageUrl!)) {
-        return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
+      if (imageUrl != null && imageUrl!.isNotEmpty) {
+        if (ProductImagePeerService.isDeviceImageUri(imageUrl)) {
+          final imageId = ProductImagePeerService.imageIdFromUri(imageUrl);
+          if (imageId != null) {
+            return _buildNetworkImage(
+                context, _toAbsoluteUrl('/uploads/product-images/$imageId'));
+          }
+        } else if (_isNetworkUrl(imageUrl!)) {
+          return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
+        }
       }
       return _buildPlaceholder();
     }
@@ -104,6 +110,10 @@ class ProductImage extends ConsumerWidget {
               if (File(localPath).existsSync()) {
                 return _buildFileImage(context, localPath);
               }
+              // Cloud Origin fallback when local file is not yet cached on device
+              final cloudUrl =
+                  _toAbsoluteUrl('/uploads/product-images/$imageId');
+              return _buildNetworkImage(context, cloudUrl);
             }
           } else if (_isNetworkUrl(imageUrl!)) {
             return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));

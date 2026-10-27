@@ -367,7 +367,7 @@ class SqliteOrderRepository implements IOrderRepository {
       SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.expected_delivery_date < ? AND o.status != 'delivered' AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+      WHERE o.expected_delivery_date < ? AND o.status NOT IN ('delivered', 'cancelled') AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
       ORDER BY o.created_at DESC
     ''', [now]);
     return _enrichOrders(rows);

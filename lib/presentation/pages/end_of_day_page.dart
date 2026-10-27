@@ -88,6 +88,10 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
               const PaymentTypeLine(label: 'Vadeli', count: 0, total: 0));
 
       final range = DateRange.today();
+      final counted = report.cashFlow.savedCountedCash;
+      final expected = report.cashFlow.expectedCash;
+      final discrepancy = counted != null ? (counted - expected) : null;
+
       final summary = ReportSummary(
         totalRevenue: report.totalRevenue,
         totalSales: report.totalSaleCount,
@@ -114,9 +118,35 @@ class _EndOfDayPageState extends ConsumerState<EndOfDayPage> {
               ))
           .toList();
 
+      if (counted != null) {
+        categories.add(CategoryRevenue(
+          categoryId: 'counted_cash',
+          categoryName: 'Fiili Sayim',
+          totalAmount: counted,
+          saleCount: 1,
+          percentage: 0,
+        ));
+        categories.add(CategoryRevenue(
+          categoryId: 'expected_cash',
+          categoryName: 'Beklenen Kasa',
+          totalAmount: expected,
+          saleCount: 1,
+          percentage: 0,
+        ));
+        if (discrepancy != null) {
+          categories.add(CategoryRevenue(
+            categoryId: 'discrepancy',
+            categoryName: discrepancy >= 0 ? 'Kasa Fazlasi (+)' : 'Kasa Acigi (-)',
+            totalAmount: discrepancy.abs(),
+            saleCount: 1,
+            percentage: 0,
+          ));
+        }
+      }
+
       await ref
           .read(printingApplicationServiceProvider)
-          .queueReport('end_of_day', summary, categories, settings);
+          .queueReport('GÜN SONU', summary, categories, settings);
 
       if (mounted) _snack('Yazdırma kuyruğuna eklendi.');
     } catch (e) {

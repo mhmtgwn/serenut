@@ -89,7 +89,7 @@ class PrintAssetEncoder {
           source != null &&
           source.isNotEmpty &&
           File(source).existsSync()) {
-        return File(source).readAsBytes();
+        return await File(source).readAsBytes();
       }
       final data = await rootBundle.load('assets/logo.png');
       return data.buffer.asUint8List();

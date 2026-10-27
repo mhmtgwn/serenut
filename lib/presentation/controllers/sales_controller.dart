@@ -190,7 +190,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
             cashierName: cashierName,
             terminalMetadata: terminalMetadata,
             userId: currentUser?.id,
-            userRole: currentUser?.role?.name,
+            userRole: currentUser?.role.name,
           );
         } else {
           created = await _salesService.createSale(
@@ -270,7 +270,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           reason: reason,
           userId: currentUser?.id,
           cashierName: cashierName,
-          userRole: currentUser?.role?.name,
+          userRole: currentUser?.role.name,
         );
       } else {
         await _salesService.returnItems(

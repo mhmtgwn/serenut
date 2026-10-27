@@ -100,12 +100,19 @@ class WindowsSpoolerPrintTransport implements PrintTransport {
     required Map<String, Object?> configuration,
   }) {
     final completer = Completer<PrintTransportObservation>();
-    _spoolerChain = _spoolerChain.then((_) async {
+    _spoolerChain = _spoolerChain.catchError((_) {}).then((_) async {
       try {
         final res = await _sendInternal(
           bytes: bytes,
           copies: copies,
           configuration: configuration,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw const PrintTransportException(
+            code: 'windows_spooler_timeout',
+            message: 'Windows yazdırma kuyruğu zaman aşımına uğradı (15s). Yazıcıyı ve Print Spooler servisini kontrol edin.',
+            retryable: true,
+          ),
         );
         completer.complete(res);
       } catch (e, st) {
@@ -173,12 +180,19 @@ class BluetoothPrintTransport implements PrintTransport {
     required Map<String, Object?> configuration,
   }) {
     final completer = Completer<PrintTransportObservation>();
-    _bluetoothChain = _bluetoothChain.then((_) async {
+    _bluetoothChain = _bluetoothChain.catchError((_) {}).then((_) async {
       try {
         final res = await _sendInternal(
           bytes: bytes,
           copies: copies,
           configuration: configuration,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw const PrintTransportException(
+            code: 'bluetooth_print_timeout',
+            message: 'Bluetooth yazdırma işlemi zaman aşımına uğradı (15s). Cihaz bağlantısını kontrol edin.',
+            retryable: true,
+          ),
         );
         completer.complete(res);
       } catch (e, st) {

@@ -27,6 +27,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 
 import 'package:serenutos/core_next/domain/models/core_entities.dart' as core;
 import 'package:serenutos/core_next/infrastructure/database/app_database.dart';
+import 'package:serenutos/core_next/infrastructure/database/schema_definitions.dart';
 import 'package:serenutos/core_next/infrastructure/database/dual_database_routing_coordinator.dart';
 import 'package:serenutos/core_next/infrastructure/migration/migration_bridge_engine.dart';
 import 'package:serenutos/core_next/infrastructure/repositories/core_next_customer_repository.dart';
@@ -139,7 +140,7 @@ void main() {
 
         final versionRes = await workingCoreDb.db.rawQuery('PRAGMA user_version;');
         final userVersion = (versionRes.first.values.first as num).toInt();
-        expect(userVersion, equals(3));
+        expect(userVersion, equals(CoreSchemaDefinitions.schemaVersion));
 
         final totalProducts = Sqflite.firstIntValue(
           await workingCoreDb.db.rawQuery('SELECT COUNT(*) FROM products'),

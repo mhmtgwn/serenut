@@ -78,11 +78,15 @@ class SyncOperation {
       };
 
   factory SyncOperation.fromMap(Map<String, dynamic> map) => SyncOperation(
-        id: map['id'] as String,
-        type: map['type'] as String,
-        payload: map['payload'] as Map<String, dynamic>,
-        idempotencyKey: map['idempotencyKey'] as String,
-        retryCount: map['retryCount'] as int? ?? 0,
+        id: (map['id'] ?? '').toString(),
+        type: (map['type'] ?? '').toString(),
+        payload: map['payload'] is Map
+            ? Map<String, dynamic>.from(map['payload'] as Map)
+            : {},
+        idempotencyKey: (map['idempotencyKey'] ?? '').toString(),
+        retryCount: map['retryCount'] is num
+            ? (map['retryCount'] as num).toInt()
+            : (int.tryParse((map['retryCount'] ?? '0').toString()) ?? 0),
       );
 }
 
@@ -192,7 +196,20 @@ class OperationQueueService {
 
   List<SyncOperation> getQueue() {
     final queueRaw = _prefs.getStringList(_kQueueKey) ?? [];
-    return queueRaw.map((e) => SyncOperation.fromMap(jsonDecode(e))).toList();
+    final List<SyncOperation> operations = [];
+    for (final e in queueRaw) {
+      try {
+        final decoded = jsonDecode(e);
+        if (decoded is Map) {
+          operations.add(
+              SyncOperation.fromMap(Map<String, dynamic>.from(decoded)));
+        }
+      } catch (err) {
+        debugPrint(
+            '⚠️ [OperationQueueService] Failed to decode queued operation: $err');
+      }
+    }
+    return operations;
   }
 
   Future<void> removeOperation(String opId) {

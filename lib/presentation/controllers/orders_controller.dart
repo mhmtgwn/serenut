@@ -397,8 +397,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           terminalMetadata: paymentMetadata,
         );
       } catch (e) {
-        // Compensating rollback: Eğer finansal kayıt oluşturulamazsa, yarım kalmış sipariş kalmaması için sil
+        // Compensating rollback: Eğer finansal kayıt oluşturulamazsa, yarım kalmış sipariş kalmaması için sil ve stokları iade et
         try {
+          final inventory = await ref.read(inventoryServiceProvider.future);
+          await inventory.increaseStock(_inventoryItems(order.items));
           final orderRepo = await ref.read(orderRepositoryProvider.future);
           await orderRepo.delete(order.id);
         } catch (_) {}
@@ -529,15 +531,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     }
 
     // Sipariş henüz iptal edilmemişse önce finansal hareketlerini ve stoklarını usulünce iptal et
+    // Fail-Closed: İptal başarısız olursa sipariş asla silinmez, istisna dışarı fırlatılır!
     if (order.status.toLowerCase() != 'cancelled') {
-      try {
-        final cancellationService =
-            await ref.read(orderCancellationServiceProvider.future);
-        await cancellationService.cancel(id: order.id);
-      } catch (e, st) {
-        TelemetryService().logError(e, st,
-            context: 'orders_controller:deleteOrder:cancelOrder', level: LogLevel.warning);
-      }
+      final cancellationService =
+          await ref.read(orderCancellationServiceProvider.future);
+      await cancellationService.cancel(id: order.id);
     }
 
     await _repository.delete(id);

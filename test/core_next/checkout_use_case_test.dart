@@ -62,7 +62,8 @@ void main() {
       'price_cents': 20000, // 200 TL/kg
       'vat_rate': 10,
       'unit': 'kg',
-      'stock_quantity': 10000, // 10 kg
+      'sale_type': 'weighed',
+      'stock_quantity': 10.0, // 10 kg
       'is_active': 1,
       'is_deleted': 0,
       'updated_at': DateTime.now().millisecondsSinceEpoch,
@@ -132,8 +133,10 @@ void main() {
         id: 'p-peynir',
         barcode: '222',
         name: 'Köy Peyniri (Tartılı)',
-        price: MoneyCents(20000), // 200 TL/kg
-        stockQuantity: 10000,
+        price: const MoneyCents(20000), // 200 TL/kg
+        unit: ProductUnit.kg,
+        saleType: 'weighed',
+        stockQuantity: 10.0,
         updatedAt: DateTime.now(),
       );
 
@@ -152,9 +155,9 @@ void main() {
       );
 
       expect(saleOrder.total.value, 9000);
-      // Stoktan 450 gram düşmeli: 10000 - 450 = 9550
+      // Stoktan 450 gram (0.45 kg) düşmeli: 10.0 - 0.45 = 9.55 kg
       final productRows = await coreDb.db.query('products', where: 'id = ?', whereArgs: ['p-peynir']);
-      expect(productRows.first['stock_quantity'], 9550);
+      expect((productRows.first['stock_quantity'] as num).toDouble(), 9.55);
     });
 
     test('Senaryo 2B: Tartılı Terazi ticari yarım-yukarı yuvarlama sınır testleri (1g, 10g, 100g, 300g, 500g, 999g, 1000g)', () {

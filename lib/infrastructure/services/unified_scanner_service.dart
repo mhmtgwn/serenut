@@ -12,7 +12,8 @@ import 'package:serenutos/domain/services/i_scanner_service.dart';
 
 /// Production-grade scanner abstraction for all platforms.
 class UnifiedScannerService implements IScannerService {
-  static const Duration _debounceWindow = Duration(milliseconds: 1500);
+  static const Duration _cameraDebounceWindow = Duration(milliseconds: 1500);
+  static const Duration _hardwareDebounceWindow = Duration(milliseconds: 150);
   static const Duration _spamWindow = Duration(milliseconds: 200);
   static const int _spamThreshold = 3;
   static const int _maxBufferSize = 50;
@@ -29,6 +30,8 @@ class UnifiedScannerService implements IScannerService {
   // USB keyboard mode accumulator
   final StringBuffer _keyBuffer = StringBuffer();
   Timer? _keyTimer;
+  DateTime? _lastKeystrokeTime;
+  static const Duration _maxInterKeyDelay = Duration(milliseconds: 80);
 
   ScannerMode _activeMode = ScannerMode.none;
   bool _isInitialized = false;
@@ -108,14 +111,21 @@ class UnifiedScannerService implements IScannerService {
   /// Handle keyboard event for USB scanner mode (Windows).
   ///
   /// Usage: wrap top-level widget with KeyboardListener and call this.
-  /// USB scanners send characters then '\n' at the end.
+  /// USB scanners send characters with sub-80ms delta, then '\n' at the end.
   @override
   bool handleKeyEvent(KeyEvent event) {
     if (_activeMode != ScannerMode.usbKeyboard) return false;
     if (event is! KeyDownEvent) return false;
 
     final char = event.character;
-    if (char == null) return false;
+    final now = DateTime.now();
+
+    // Check inter-key delta: if last key was pressed more than 80ms ago, this cannot be part of a high-speed scanner stream
+    if (_lastKeystrokeTime != null &&
+        now.difference(_lastKeystrokeTime!) > _maxInterKeyDelay) {
+      _keyBuffer.clear();
+    }
+    _lastKeystrokeTime = now;
 
     // Enter key = end of barcode
     if (char == '\n' ||
@@ -124,27 +134,27 @@ class UnifiedScannerService implements IScannerService {
       final code = _keyBuffer.toString().trim();
       _keyBuffer.clear();
       _keyTimer?.cancel();
-      if (code.isNotEmpty) {
+      _lastKeystrokeTime = null;
+      if (code.length >= 4) {
         _processBarcode(code, ScannerMode.usbKeyboard);
+        return true;
       }
-      return true;
+      return false;
     }
+
+    if (char == null || char.isEmpty) return false;
 
     // Accumulate characters
     _keyBuffer.write(char);
 
-    // Safety timeout — if no enter after 200ms, flush anyway
+    // Safety timeout — if no enter after 100ms, flush buffer
     _keyTimer?.cancel();
-    _keyTimer = Timer(const Duration(milliseconds: 200), () {
-      final code = _keyBuffer.toString().trim();
+    _keyTimer = Timer(const Duration(milliseconds: 100), () {
       _keyBuffer.clear();
-      if (code.length >= 4) {
-        // Minimum barcode length guard
-        _processBarcode(code, ScannerMode.usbKeyboard);
-      }
+      _lastKeystrokeTime = null;
     });
 
-    return true;
+    return false;
   }
 
   /// Trigger a single scan from Sunmi hardware (for button-triggered mode).
@@ -211,9 +221,13 @@ class UnifiedScannerService implements IScannerService {
     }
 
     // ── Debounce (duplicate elimination) ─────────────────────────────────
+    final debounceWindow = (source == ScannerMode.camera)
+        ? _cameraDebounceWindow
+        : _hardwareDebounceWindow;
+
     if (_lastBarcode == code &&
         _lastScanTime != null &&
-        now.difference(_lastScanTime!) < _debounceWindow) {
+        now.difference(_lastScanTime!) < debounceWindow) {
       // Same barcode within debounce window — ignore
       return;
     }

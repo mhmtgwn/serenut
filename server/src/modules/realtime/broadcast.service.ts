@@ -60,8 +60,8 @@ export class RealtimeBroadcastService {
    */
   private static getTopicCategory(type: string): string {
     const lowerType = type.toLowerCase();
-    if (lowerType.includes('order') || lowerType.includes('sale')) return 'orders';
-    if (lowerType.includes('payment')) return 'payments';
+    if (lowerType.includes('order') || lowerType.includes('sale') || lowerType.includes('refund')) return 'orders';
+    if (lowerType.includes('payment') || lowerType.includes('collection')) return 'payments';
     if (lowerType.includes('inventory') || lowerType.includes('price')) return 'inventory';
     if (lowerType.includes('customer')) return 'customers';
     if (lowerType.includes('notification')) return 'notifications';

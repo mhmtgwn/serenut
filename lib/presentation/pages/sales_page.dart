@@ -28,6 +28,7 @@ import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 import 'package:serenutos/presentation/widgets/invoice/create_gib_invoice_dialog.dart';
+import 'package:serenutos/domain/services/scale_barcode_parser.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 part 'sales/animated_cart_tab.dart';
@@ -135,34 +136,92 @@ class _SalesPageState extends ConsumerState<SalesPage>
   }
 
   Future<void> _handleBarcodeSubmit(
-      String barcode, List<ProductEntity> productsList) async {
-    if (barcode.trim().isEmpty) return;
+      String rawBarcode, List<ProductEntity> productsList) async {
+    final barcode = rawBarcode.trim();
+    if (barcode.isEmpty) return;
 
-    final repository = await ref.read(productRepositoryProvider.future);
+    final productRepo = await ref.read(productRepositoryProvider.future);
 
-    // 1. Direct ID / SKU match
-    var matched = await repository.findById(barcode.trim());
+    // 1. TARTILI TERAZİ BARKODU ÇÖZÜMLEME (27 / 28 / 29 Serisi EAN-13)
+    final scaleResult = ScaleBarcodeParser.tryParse(barcode);
+    if (scaleResult != null && scaleResult.isValid) {
+      ProductEntity? matchedScaleProduct;
+      for (final candidate in scaleResult.pluCandidates) {
+        matchedScaleProduct = await productRepo.findById(candidate) ??
+            await productRepo.getByBarcode(candidate);
+        if (matchedScaleProduct != null) break;
+      }
 
-    // 2. Search by name/exact matches
-    if (matched == null) {
-      final results = await repository.searchByName(barcode.trim());
+      if (matchedScaleProduct != null) {
+        if (!mounted) return;
+        _barcodeController.clear();
+        _barcodeFocusNode.requestFocus();
+
+        if (matchedScaleProduct.isWeighed) {
+          final effectiveGrams = scaleResult.barcodeType == ScaleBarcodeType.priceEmbedded
+              ? scaleResult.calculateEffectiveWeightGrams((matchedScaleProduct.price * 100).round())
+              : scaleResult.weightGrams;
+          if (effectiveGrams < matchedScaleProduct.minimumWeightGrams) {
+            _showErrorSnackBar(
+                '${matchedScaleProduct.name} için okunan ağırlık ($effectiveGrams gr) minimum ağırlığın (${matchedScaleProduct.minimumWeightGrams} gr) altındadır.');
+            return;
+          }
+          ref
+              .read(salesFlowProvider.notifier)
+              .addMeasuredToCart(matchedScaleProduct, effectiveGrams);
+          if (mounted) {
+            AppNotificationHost.show(
+              SnackBar(
+                content: Text(
+                    '${matchedScaleProduct.name} ($effectiveGrams gr) sepete eklendi.'),
+                backgroundColor: _kGreen,
+                duration: const Duration(milliseconds: 1000),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        } else {
+          ref.read(salesFlowProvider.notifier).addToCart(matchedScaleProduct);
+          if (mounted) {
+            AppNotificationHost.show(
+              SnackBar(
+                content: Text('${matchedScaleProduct.name} sepete eklendi.'),
+                backgroundColor: _kGreen,
+                duration: const Duration(milliseconds: 800),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+
+    // 2. STANDART ÜRÜN ARAMA (Doğrudan Barkod / ID / SKU)
+    var matchedProduct = await productRepo.findById(barcode) ??
+        await productRepo.getByBarcode(barcode);
+
+    // 3. İsimle veya eşleşen ürünlerle arama
+    if (matchedProduct == null) {
+      final results = await productRepo.searchByName(barcode);
       if (results.isNotEmpty) {
-        matched = results.first;
+        matchedProduct = results.first;
       }
     }
     if (!mounted) return;
 
-    if (matched != null) {
+    if (matchedProduct != null) {
       _barcodeController.clear();
       _barcodeFocusNode.requestFocus();
-      if (matched.isWeighed) {
-        await _handleProductSelected(matched);
+      if (matchedProduct.isWeighed) {
+        await _handleProductSelected(matchedProduct);
       } else {
-        ref.read(salesFlowProvider.notifier).addToCart(matched);
+        ref.read(salesFlowProvider.notifier).addToCart(matchedProduct);
         if (mounted) {
           AppNotificationHost.show(
             SnackBar(
-              content: Text('${matched.name} sepete eklendi.'),
+              content: Text('${matchedProduct.name} sepete eklendi.'),
               backgroundColor: _kGreen,
               duration: const Duration(milliseconds: 800),
               behavior: SnackBarBehavior.floating,
@@ -170,10 +229,42 @@ class _SalesPageState extends ConsumerState<SalesPage>
           );
         }
       }
-    } else {
-      _showErrorSnackBar('Barkod ile eşleşen ürün bulunamadı: $barcode');
-      _barcodeFocusNode.requestFocus();
+      return;
     }
+
+    // 4. MÜŞTERİ / SADAKAT KARTI / TELEFON BARKODU ÇÖZÜMLEME
+    final customerRepo = await ref.read(customerRepositoryProvider.future);
+    CustomerEntity? matchedCustomer = await customerRepo.findById(barcode);
+    if (matchedCustomer == null) {
+      final custResults = await customerRepo.search(barcode);
+      if (custResults.isNotEmpty) {
+        matchedCustomer = custResults.first;
+      }
+    }
+    if (!mounted) return;
+
+    if (matchedCustomer != null) {
+      _barcodeController.clear();
+      _barcodeFocusNode.requestFocus();
+      ref.read(salesFlowProvider.notifier).selectCustomer(matchedCustomer);
+      if (mounted) {
+        AppNotificationHost.show(
+          SnackBar(
+            content:
+                Text('${matchedCustomer.name} cari müşteri olarak seçildi.'),
+            backgroundColor: _kGreen,
+            duration: const Duration(milliseconds: 1200),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 5. Hiçbir kayıtla eşleşmediyse hata bildirimi
+    _showErrorSnackBar(
+        'Barkod ile eşleşen ürün veya müşteri bulunamadı: $barcode');
+    _barcodeFocusNode.requestFocus();
   }
 
   Future<void> _submitSale() async {

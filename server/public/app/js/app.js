@@ -289,7 +289,7 @@ async function startRealtime() {
     realtimeSocket = new WebSocket(url);
     realtimeSocket.onopen = () => {
       if (!realtimeCompanyId) return;
-      ['orders', 'inventory', 'customers', 'payments', 'license', 'notifications', 'settings']
+      ['orders', 'inventory', 'customers', 'payments', 'license', 'notifications', 'settings', 'general']
         .forEach((topic) => realtimeSocket.send(JSON.stringify({ action: 'subscribe', topic: `tenant/${realtimeCompanyId}/${topic}` })));
     };
     realtimeSocket.onmessage = (event) => {
@@ -313,6 +313,10 @@ function scheduleModuleRefresh(eventType) {
   clearTimeout(realtimeRefreshTimer);
   realtimeRefreshTimer = setTimeout(() => {
     document.dispatchEvent(new CustomEvent('serenut:realtime', { detail: { eventType } }));
-    if (selectedModuleId !== 'home') selectModule(selectedModuleId);
+    if (selectedModuleId === 'home' || selectedModuleId === 'workspace-home') {
+      apiFetch('/app/bootstrap').then(renderShell).catch(() => {});
+    } else if (selectedModuleId) {
+      selectModule(selectedModuleId);
+    }
   }, 400);
 }

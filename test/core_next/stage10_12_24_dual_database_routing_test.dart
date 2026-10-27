@@ -149,7 +149,7 @@ void main() {
 
       final vRes = await coreDb.db.rawQuery('PRAGMA user_version;');
       expect((vRes.first.values.first as num).toInt(), equals(CoreSchemaDefinitions.schemaVersion));
-      expect(CoreSchemaDefinitions.schemaVersion, equals(3));
+      expect(CoreSchemaDefinitions.schemaVersion, equals(7));
 
       // Check required Core Next tables
       final tables = (await coreDb.db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'"))
@@ -189,10 +189,10 @@ void main() {
         reason: 'Legacy DatabaseManager Core Next veritabanını fail-closed IncompatibleDatabaseSchemaException ile reddetmelidir',
       );
 
-      // 3. Dosyanın şema sürümünün bozulmadığını ve 3 olarak kaldığını doğrula (upgrade uygulanmadı)
+      // 3. Dosyanın şema sürümünün bozulmadığını ve CoreSchemaDefinitions.schemaVersion olarak kaldığını doğrula (upgrade uygulanmadı)
       final inspectDb = await openDatabase(isolatedTargetPath, readOnly: true);
       final vRes = await inspectDb.rawQuery('PRAGMA user_version;');
-      expect((vRes.first.values.first as num).toInt(), equals(3));
+      expect((vRes.first.values.first as num).toInt(), equals(CoreSchemaDefinitions.schemaVersion));
 
       // financial_transactions tablosunun OLMADIĞINI doğrula (_onUpgrade adımları hiç çalışmadı)
       final ftTable = await inspectDb.rawQuery(

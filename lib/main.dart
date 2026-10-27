@@ -35,6 +35,7 @@ void main() async {
       // Optimize sampling in production: 10% trace sampling reduces overhead/quota usage,
       // while crash & exception reporting remains 100% active.
       options.tracesSampleRate = kReleaseMode ? 0.1 : 1.0;
+      // ignore: experimental_member_use
       options.profilesSampleRate = kReleaseMode ? 0.05 : 1.0;
       options.environment = kReleaseMode ? 'production' : 'development';
       options.attachStacktrace = true;

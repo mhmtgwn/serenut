@@ -86,13 +86,23 @@ class SqliteCustomerRepository implements ICustomerRepository {
         'normalized_email': entity.email.toLowerCase(),
         'updated_at': DateTime.now().toIso8601String(),
       };
+      // Append-only bakiye güvencesi: Müşteri profil/iletişim güncellemeleri
+      // defter bakiyesini asla ezemez!
+      payload.remove('balance');
+      payload.remove('balance_minor');
+      payload.remove('created_at');
+      payload.remove('id');
+
       final result = await _executor.update('customers', payload,
           where: 'id = ?', whereArgs: [entity.id]);
       await SyncOutboxV4.enqueue(_executor,
           entityType: 'customer',
           entityId: entity.id,
           operation: 'UPSERT',
-          payload: payload);
+          payload: {
+            'id': entity.id,
+            ...payload,
+          });
       return result;
     });
   }

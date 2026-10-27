@@ -50,8 +50,9 @@ class SyncV4PullIngestionService {
   const SyncV4PullIngestionService(this.db, {this.localDeviceId});
 
   /// Son kaydedilmiş pull cursor'ını okur
-  Future<int> getSavedCursor() async {
-    final rows = await db.query(
+  Future<int> getSavedCursor([DatabaseExecutor? executor]) async {
+    final exec = executor ?? db.db;
+    final rows = await exec.query(
       'app_settings',
       where: 'key = ?',
       whereArgs: ['sync_pull_cursor'],
@@ -84,13 +85,15 @@ class SyncV4PullIngestionService {
     required bool isBootstrap,
   }) async {
     if (changes.isEmpty) {
+      final currentCursor = await getSavedCursor();
+      final effectiveCursor = (!isBootstrap && nextCursor < currentCursor) ? currentCursor : nextCursor;
       // Değişiklik yoksa sadece cursor'ı kaydet
       await db.transaction((txn) async {
-        await _saveCursor(txn, nextCursor);
+        await _saveCursor(txn, effectiveCursor);
       });
       return PullIngestionResult(
         totalChanges: 0,
-        newCursor: nextCursor,
+        newCursor: effectiveCursor,
       );
     }
 
@@ -175,10 +178,27 @@ class SyncV4PullIngestionService {
         } else {
           otherCount++;
         }
+
+        // Çakışma Masası Rebase Garantisi (B5): Eğer bu varlık için bekleyen bir CONFLICT kaydı varsa,
+        // sunucunun güncel revizyonu ile rebase edilerek kuyruğa (PENDING) geri kazandırılır.
+        await txn.update(
+          'sync_events',
+          {
+            'sync_state': 'PENDING',
+            'base_revision': change.revision,
+            'attempts': 0,
+            'last_error': null,
+          },
+          where: "entity_type = ? AND entity_id = ? AND sync_state = 'CONFLICT'",
+          whereArgs: [change.entityType, change.entityId],
+        );
       }
 
+      final currentCursor = await getSavedCursor(txn);
+      final effectiveCursor = (!isBootstrap && nextCursor < currentCursor) ? currentCursor : nextCursor;
+
       // Kural: Cursor yalnızca tüm veriler kalıcılaştırıldıktan sonra aynı transaction'da kaydedilir!
-      await _saveCursor(txn, nextCursor);
+      await _saveCursor(txn, effectiveCursor);
 
       return PullIngestionResult(
         totalChanges: changes.length,
@@ -188,7 +208,7 @@ class SyncV4PullIngestionService {
         refundsApplied: refundsCount,
         otherApplied: otherCount,
         skippedDueToPendingLocal: skippedCount,
-        newCursor: nextCursor,
+        newCursor: effectiveCursor,
       );
     });
   }
@@ -246,7 +266,9 @@ class SyncV4PullIngestionService {
     final name = payload['name']?.toString() ?? 'Ürün ${change.entityId}';
     final vatRate = (payload['vat_rate'] as num?)?.toInt() ?? 20;
     final unit = payload['unit']?.toString() ?? 'piece';
-    final rawRemoteStock = (payload['stock_quantity'] as num?)?.toInt() ?? 0;
+    final saleType = payload['sale_type']?.toString() ?? ((unit == 'kg' || unit == 'gram') ? 'weighed' : 'piece');
+    final minimumWeightGrams = (payload['minimum_weight_grams'] as num?)?.toInt() ?? 20;
+    final rawRemoteStock = (payload['stock_quantity'] as num?)?.toDouble() ?? ((payload['quantity'] as num?)?.toDouble() ?? 0.0);
     final isActive = (payload['is_active'] == false || payload['is_active'] == 0) ? 0 : 1;
 
     // Çevrimdışı ve henüz bu snapshot'a yansımamış satışların miktarını hesapla
@@ -266,8 +288,10 @@ class SyncV4PullIngestionService {
       'cost_price_cents': costPriceCents,
       'vat_rate': vatRate,
       'unit': unit,
+      'sale_type': saleType,
+      'minimum_weight_grams': minimumWeightGrams,
       'stock_quantity': effectiveStock,
-      'critical_threshold': (payload['critical_threshold'] as num?)?.toInt() ?? 5,
+      'critical_threshold': (payload['critical_threshold'] as num?)?.toDouble() ?? 5.0,
       'image_url': payload['image_url']?.toString(),
       'is_active': isActive,
       'is_deleted': 0,
@@ -293,25 +317,28 @@ class SyncV4PullIngestionService {
     }
   }
 
-  Future<int> _calculateUnreflectedSoldQty(
+  Future<double> _calculateUnreflectedSoldQty(
     Transaction txn,
     String productId,
     int changeRevision,
     String changeCreatedAt,
   ) async {
     final saleItemRows = await txn.rawQuery('''
-      SELECT si.quantity, se.sync_state, se.base_revision, se.client_timestamp
+      SELECT si.quantity, p.sale_type, p.unit, se.sync_state, se.base_revision, se.client_timestamp
       FROM sale_items si
+      JOIN products p ON p.id = si.product_id
       JOIN sync_events se ON se.entity_id = si.sale_id AND se.entity_type = 'sale'
       WHERE si.product_id = ?
     ''', [productId]);
 
-    int unreflectedQty = 0;
+    double unreflectedQty = 0.0;
     final changeTs = DateTime.tryParse(changeCreatedAt)?.millisecondsSinceEpoch ?? 0;
 
     for (final row in saleItemRows) {
       final state = row['sync_state'] as String;
-      final qty = (row['quantity'] as num).toInt();
+      final rawQty = (row['quantity'] as num).toDouble();
+      final isWeighed = (row['sale_type'] == 'weighed') || (row['unit'] == 'kg' || row['unit'] == 'gram');
+      final qty = isWeighed ? (rawQty / 1000.0) : rawQty;
       final baseRev = (row['base_revision'] as num?)?.toInt() ?? 0;
       final clientTs = (row['client_timestamp'] as num?)?.toInt() ?? 0;
 
@@ -336,7 +363,7 @@ class SyncV4PullIngestionService {
       ''', [productId, changeRevision]);
 
       if (postSnapApplied.isNotEmpty) {
-        final postDelta = (postSnapApplied.first['post_delta'] as num?)?.toInt() ?? 0;
+        final postDelta = (postSnapApplied.first['post_delta'] as num?)?.toDouble() ?? 0.0;
         unreflectedQty -= postDelta;
       }
     }
@@ -401,17 +428,27 @@ class SyncV4PullIngestionService {
         final rawItem = items[i];
         if (rawItem is! Map) continue;
         final productId = rawItem['product_id']?.toString();
-        final qty = (rawItem['quantity'] as num?)?.toInt() ?? 0;
-        if (productId == null || qty <= 0) continue;
+        var qty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
+        if (productId == null || qty <= 0.0001) continue;
 
         final prod = await txn.query(
           'products',
-          columns: ['id'],
+          columns: ['id', 'unit', 'sale_type'],
           where: 'id = ?',
           whereArgs: [productId],
           limit: 1,
         );
         if (prod.isNotEmpty) {
+          final isWeighed = (prod.first['sale_type'] == 'weighed') ||
+              (prod.first['unit'] == 'kg' || prod.first['unit'] == 'gram');
+          if (isWeighed && qty >= 10 && rawItem['is_weighed'] != true) {
+            final unitPrice = (rawItem['unit_price'] as num?)?.toDouble() ?? 0.0;
+            final subtotal = (rawItem['subtotal'] as num?)?.toDouble() ?? 0.0;
+            if (subtotal > 0 && ((qty * unitPrice / 1000.0) - subtotal).abs() <= 0.05) {
+              qty = qty / 1000.0;
+            }
+          }
+
           await txn.rawUpdate(
             'UPDATE products SET stock_quantity = stock_quantity - ?, updated_at = ? WHERE id = ?',
             [qty, now, productId],
@@ -500,8 +537,8 @@ class SyncV4PullIngestionService {
         final rawItem = items[i];
         if (rawItem is! Map) continue;
         String? productId = rawItem['product_id']?.toString();
-        final qty = (rawItem['quantity'] as num?)?.toInt() ?? 0;
-        if (qty <= 0) continue;
+        var qty = (rawItem['quantity'] as num?)?.toDouble() ?? 0.0;
+        if (qty <= 0.0001) continue;
 
         if (productId == null || productId.isEmpty) {
           final saleItemId = rawItem['sale_item_id']?.toString();
@@ -522,12 +559,22 @@ class SyncV4PullIngestionService {
         if (productId != null && productId.isNotEmpty) {
           final prod = await txn.query(
             'products',
-            columns: ['id'],
+            columns: ['id', 'unit', 'sale_type'],
             where: 'id = ?',
             whereArgs: [productId],
             limit: 1,
           );
           if (prod.isNotEmpty) {
+            final isWeighed = (prod.first['sale_type'] == 'weighed') ||
+                (prod.first['unit'] == 'kg' || prod.first['unit'] == 'gram');
+            if (isWeighed && qty >= 10 && rawItem['is_weighed'] != true) {
+              final unitPrice = (rawItem['unit_price'] as num?)?.toDouble() ?? 0.0;
+              final subtotal = (rawItem['subtotal'] as num?)?.toDouble() ?? 0.0;
+              if (subtotal > 0 && ((qty * unitPrice / 1000.0) - subtotal).abs() <= 0.05) {
+                qty = qty / 1000.0;
+              }
+            }
+
             await txn.rawUpdate(
               'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?',
               [qty, now, productId],
@@ -597,7 +644,10 @@ class SyncV4PullIngestionService {
     if (payload['balance_cents'] != null) {
       remoteBalanceCents = (payload['balance_cents'] as num).toInt();
     } else if (payload['balance'] != null) {
-      remoteBalanceCents = ((payload['balance'] as num).toDouble() * 100).round();
+      // Sunucu (PostgreSQL schema_v72.sql) alacak perspektifiyle müşteri borcunu pozitif (+debt) tutar.
+      // İstemci (Core Next & Flutter UI) ise müşteri cari perspektifiyle borcu negatif (-debt) tutar.
+      // Bu nedenle sunucudan gelen pozitif Lira borç bakiyesi istemcide ters işaretle (-balance * 100) kuruşa dönüştürülür.
+      remoteBalanceCents = -((payload['balance'] as num).toDouble() * 100).round();
     } else {
       remoteBalanceCents = 0;
     }
@@ -662,9 +712,9 @@ class SyncV4PullIngestionService {
     String changeCreatedAt,
   ) async {
     final finEventRows = await txn.rawQuery('''
-      SELECT se.payload_json, se.sync_state, se.base_revision, se.client_timestamp
+      SELECT se.entity_type, se.payload_json, se.sync_state, se.base_revision, se.client_timestamp
       FROM sync_events se
-      WHERE se.entity_type = 'financial_transaction'
+      WHERE se.entity_type IN ('financial_transaction', 'sale')
     ''');
 
     int unreflectedDeltaCents = 0;
@@ -687,7 +737,17 @@ class SyncV4PullIngestionService {
 
       bool isUnreflected = false;
       if (state == 'PENDING' || state == 'TRANSIENT_ERROR') {
-        isUnreflected = true;
+        // Eğer sunucu snapshot'ının revizyonu bu mutasyonun temel aldığı revizyondan kesin olarak
+        // büyükse ve snapshot sunucu zaman damgası mutasyonun oluşturulma zamanından sonraysa;
+        // bu durum mutasyonun sunucuya ulaşıp işlendiğini ancak istemci ACK yanıtını henüz almadan
+        // pull snapshot'ının geldiğini (in-flight overlap) gösterir.
+        // Bu durumda mükerrer borç/tahsilat (double-counting) eklenmesini önleriz.
+        final isSnapshotStrictlyNewer =
+            (changeRevision > 0 && baseRev > 0 && changeRevision > baseRev) &&
+                (changeTs > 0 && clientTs > 0 && changeTs > clientTs);
+        if (!isSnapshotStrictlyNewer) {
+          isUnreflected = true;
+        }
       } else if (state == 'SYNCED' || state == 'COMPLETED') {
         final isRevOlder = changeRevision > 0 && baseRev > 0 && changeRevision < baseRev;
         final isTsOlder = (changeRevision == 0 || baseRev == 0) && changeTs > 0 && clientTs > 0 && changeTs < clientTs;
@@ -697,18 +757,46 @@ class SyncV4PullIngestionService {
       }
 
       if (isUnreflected) {
-        // vadeli satış borcu ise balance'ı negatif yönde artırır (-debtCents)
-        final debtLira = (map['debt_amount'] as num?)?.toDouble() ?? 0.0;
-        final debtCents = (debtLira * 100).round();
-        if (debtCents > 0) {
-          unreflectedDeltaCents -= debtCents;
-        }
-        // Eğer tahsilat ise (paid_amount), balance'ı pozitif yönde artırır (+paidCents)
-        if (map['type'] == 'collection' || map['type'] == 'payment') {
-          final paidLira = (map['paid_amount'] as num?)?.toDouble() ?? (map['amount'] as num?)?.toDouble() ?? 0.0;
-          final paidCents = (paidLira * 100).round();
-          if (paidCents > 0) {
-            unreflectedDeltaCents += paidCents;
+        final entityType = row['entity_type'] as String? ?? 'financial_transaction';
+        if (entityType == 'sale') {
+          // Vadeli / açık hesap satış müşterinin bakiyesini borç yönünde eksiltir (-debtCents)
+          final debtLira = (map['debt_amount'] as num?)?.toDouble() ??
+              (((map['total_amount'] as num?)?.toDouble() ?? 0.0) - ((map['paid_amount'] as num?)?.toDouble() ?? 0.0));
+          final debtCents = (debtLira * 100).round();
+          if (debtCents > 0) {
+            unreflectedDeltaCents -= debtCents;
+          }
+        } else {
+          // Vadeli işlem borcu ise balance'ı negatif yönde artırır (-debtCents)
+          final debtLira = (map['debt_amount'] as num?)?.toDouble() ?? 0.0;
+          final debtCents = (debtLira * 100).round();
+          if (debtCents > 0) {
+            unreflectedDeltaCents -= debtCents;
+          }
+          // Eğer tahsilat ise (paid_amount), balance'ı pozitif yönde artırır (+paidCents)
+          if (map['type'] == 'collection' || map['type'] == 'payment') {
+            final paidLira = (map['paid_amount'] as num?)?.toDouble() ?? (map['amount'] as num?)?.toDouble() ?? 0.0;
+            final paidCents = (paidLira * 100).round();
+            if (paidCents > 0) {
+              unreflectedDeltaCents += paidCents;
+            }
+          } else if (map['type'] == 'cancellation') {
+            // Vadeli satış iptali borcu düşürür (bakiyeyi pozitif yönde düzeltir)
+            final cancelLira = (map['debt_amount'] as num?)?.toDouble() ?? (map['amount'] as num?)?.toDouble() ?? 0.0;
+            final cancelCents = (cancelLira * 100).round();
+            if (cancelCents > 0) {
+              unreflectedDeltaCents += cancelCents;
+            }
+          } else if (map['type'] == 'refund') {
+            // Cari hesaba yapılan iade (nakit ödenmeyen) borcu düşürür
+            final paidLira = (map['paid_amount'] as num?)?.toDouble() ?? 0.0;
+            if (paidLira == 0) {
+              final refundLira = (map['amount'] as num?)?.toDouble() ?? 0.0;
+              final refundCents = (refundLira * 100).round();
+              if (refundCents > 0) {
+                unreflectedDeltaCents += refundCents;
+              }
+            }
           }
         }
       }

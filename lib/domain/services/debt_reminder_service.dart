@@ -130,7 +130,8 @@ class DebtReminderService {
             ],
             'fallback_body': waText,
           });
-          await _whatsappOutbox.flush();
+          final flushed = await _whatsappOutbox.flush();
+          final wasSent = flushed > 0;
 
           // Log kaydı ekle (tekrar hatırlatma takip mekanizması için)
           await _smsLogRepository.insertLog(
@@ -140,11 +141,12 @@ class DebtReminderService {
               eventType: kSmsEventBalanceReminder,
               message: waText,
               createdAt: DateTime.now(),
-              sentAt: DateTime.now(),
-              status: SmsLogStatus.sent,
+              sentAt: wasSent ? DateTime.now() : null,
+              status: wasSent ? SmsLogStatus.sent : SmsLogStatus.pending,
+              errorMessage: wasSent ? null : 'Kuyrukta bekliyor / İletim teyidi bekleniyor',
             ),
           );
-          waOk = true;
+          waOk = wasSent;
         }
       } catch (e) {
         debugPrint('⚠️ DebtReminderService WhatsApp gönderim hatası: $e');

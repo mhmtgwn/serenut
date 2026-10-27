@@ -188,6 +188,31 @@ class SqliteProductRepository implements IProductRepository {
     );
   }
 
+  @override
+  Future<ProductEntity?> getByBarcode(String barcode) async {
+    final cleanBarcode = barcode.trim();
+    if (cleanBarcode.isEmpty) return null;
+    final candidates = BarcodeStandard.lookupCandidates(cleanBarcode);
+    final placeholders = List.filled(candidates.length, '?').join(',');
+
+    try {
+      final list = await _queryProducts(
+        where: '(id IN ($placeholders) OR sku IN ($placeholders)) AND is_active = 1',
+        whereArgs: [...candidates, ...candidates],
+      );
+      if (list.isNotEmpty) {
+        final normalized = candidates.first;
+        return list.firstWhere(
+          (p) => p.id == normalized,
+          orElse: () => list.first,
+        );
+      }
+    } catch (_) {
+      // Fallback to findById
+    }
+    return findById(cleanBarcode);
+  }
+
   bool? _hasIsDeletedCol;
   Future<bool> _checkHasIsDeletedColumn() async {
     if (_hasIsDeletedCol != null) return _hasIsDeletedCol!;
@@ -501,13 +526,8 @@ class SqliteProductRepository implements IProductRepository {
         if (original != null) {
           final newQty = original.quantity - quantity;
           final payload = {
-            'id': original.id,
-            'name': original.name,
-            'barcode': original.id,
-            'price': original.price,
+            ...original.toMap(),
             'quantity': newQty,
-            'category': original.category,
-            'vat': original.vat ?? 18,
             'is_active': 1,
             'is_deleted': 0,
             'is_synced': 0,
@@ -551,13 +571,8 @@ class SqliteProductRepository implements IProductRepository {
         if (original != null) {
           final newQty = original.quantity + quantity;
           final payload = {
-            'id': original.id,
-            'name': original.name,
-            'barcode': original.id,
-            'price': original.price,
+            ...original.toMap(),
             'quantity': newQty,
-            'category': original.category,
-            'vat': original.vat ?? 18,
             'is_active': 1,
             'is_deleted': 0,
             'is_synced': 0,

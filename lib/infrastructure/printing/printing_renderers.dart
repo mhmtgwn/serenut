@@ -65,10 +65,18 @@ class EscPosReceiptRenderer implements PrintRenderer {
     final turkishMode = design['turkishMode']?.toString() ?? 'universal';
     final List<int> bytes;
     if (turkishMode == 'cp857') {
+      final isXprinter = (design['printerBrand']?.toString().toLowerCase().contains('xprinter') ?? false) ||
+          (design['model']?.toString().toLowerCase().contains('xprinter') ?? false) ||
+          (design['driver']?.toString().toLowerCase().contains('xprinter') ?? false);
       bytes = <int>[
         ..._init,
         0x1C, 0x2E,
-        0x1B, 0x74, 0x0D, // ESC t 13 (Epson CP857)
+        0x1B, 0x74, isXprinter ? 0x18 : 0x0D,
+      ];
+    } else if (turkishMode == 'cp857_xprinter') {
+      bytes = <int>[
+        ..._init,
+        0x1C, 0x2E,
         0x1B, 0x74, 0x18, // ESC t 24 (Xprinter CP857)
       ];
     } else if (turkishMode == 'cp1254') {
@@ -109,9 +117,12 @@ class EscPosReceiptRenderer implements PrintRenderer {
         docKind == 'rapor' ||
         docKind == 'installment_plan' ||
         docKind == 'installment_collection' ||
+        docKind == 'refund' ||
+        docKind == 'iade' ||
         design['showHeaderTitle'] == true) {
       final headerTitle = switch (docKind) {
         'sale' || 'satis' => '[ SATIS FISI ]',
+        'refund' || 'iade' => '[ IADE FISI ]',
         'collection' || 'tahsilat' => '[ TAHSILAT MAKBUZU ]',
         'installment_plan' => '[ TAKSITLI SATIS & ODEME PLANI ]',
         'installment_collection' => '[ TAKSIT TAHSILAT MAKBUZU ]',
@@ -317,9 +328,9 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
         for (final raw in items) {
           final item = Map<String, Object?>.from(raw as Map);
-          final name = item['name']?.toString().trim() ?? 'Urun';
+          final name = (item['name'] ?? item['product_name'] ?? item['title'])?.toString().trim() ?? 'Urun';
           final quantity = _decimal(item['quantity']);
-          final unitPrice = _decimal(item['unitPrice']);
+          final unitPrice = _decimal(item['unitPrice'] ?? item['unit_price'] ?? item['price']);
           final total = item['total'] == null
               ? quantity * unitPrice
               : _decimal(item['total']);
@@ -344,9 +355,9 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
         for (final raw in items) {
           final item = Map<String, Object?>.from(raw as Map);
-          final name = item['name']?.toString().trim() ?? 'Urun';
+          final name = (item['name'] ?? item['product_name'] ?? item['title'])?.toString().trim() ?? 'Urun';
           final quantity = _decimal(item['quantity']);
-          final unitPrice = _decimal(item['unitPrice']);
+          final unitPrice = _decimal(item['unitPrice'] ?? item['unit_price'] ?? item['price']);
           final total = item['total'] == null
               ? quantity * unitPrice
               : _decimal(item['total']);
@@ -354,11 +365,18 @@ class EscPosReceiptRenderer implements PrintRenderer {
           final priceStr = unitPrice.toStringAsFixed(2);
           final totStr = total.toStringAsFixed(2);
 
-          _line(
-            bytes,
-            _columns4(qtyStr, name, priceStr, totStr, 3, 13, 7, 9),
-            mode: turkishMode,
-          );
+          if (name.length > 13) {
+            _line(bytes, name, mode: turkishMode);
+            final detailLeft = '  $qtyStr x $priceStr';
+            final detailLine = _columns(detailLeft, totStr, width);
+            _line(bytes, detailLine, mode: turkishMode);
+          } else {
+            _line(
+              bytes,
+              _columns4(qtyStr, name, priceStr, totStr, 3, 13, 7, 9),
+              mode: turkishMode,
+            );
+          }
         }
       }
       _line(bytes, '-' * width, mode: turkishMode);

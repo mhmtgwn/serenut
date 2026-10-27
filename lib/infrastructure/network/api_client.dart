@@ -77,6 +77,9 @@ class ApiClient {
   /// Returns the current JWT token (read-only).
   String? get jwtToken => _jwtToken;
 
+  /// Returns the base URL of the active environment.
+  String get baseUrl => _config.apiBaseUrl;
+
   /// Helper to build request headers.
   Map<String, String> _buildHeaders({String? idempotencyKey}) {
     final Map<String, String> headers = {

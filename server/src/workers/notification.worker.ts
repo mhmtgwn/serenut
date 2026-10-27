@@ -567,8 +567,56 @@ export function startNotificationWorker(): void {
     });
   outboxDispatcher = setInterval(() => {
     void dispatchNotificationOutboxBatch();
-  }, 2_000);
+    void reapStuckNotifications();
+  }, 5_000);
   outboxDispatcher.unref();
+}
+
+async function reapStuckNotifications(): Promise<void> {
+  try {
+    // 1. Enqueued for > 5 minutes without completion (server crashed / Redis lost job)
+    const enqueuedStuck = await runBypassingRLS(
+      `UPDATE notification_queue
+       SET status = 'retrying',
+           retry_count = retry_count + 1,
+           next_retry_at = NOW() + INTERVAL '30 seconds',
+           updated_at = NOW()
+       WHERE status = 'enqueued'
+         AND updated_at < NOW() - INTERVAL '5 minutes'
+         AND retry_count < max_retries
+       RETURNING id, company_id, channel`,
+    );
+    if (enqueuedStuck.rowCount) {
+      logger.warn(`[NotificationWorker] Reaped ${enqueuedStuck.rowCount} stuck 'enqueued' notifications back to 'retrying'`);
+    }
+
+    // 2. Enqueued for > 5 minutes that exceeded max_retries -> mark failed and release credits
+    const enqueuedDead = await runBypassingRLS(
+      `SELECT id, company_id, channel FROM notification_queue
+       WHERE status = 'enqueued'
+         AND updated_at < NOW() - INTERVAL '5 minutes'
+         AND retry_count >= max_retries`,
+    );
+    for (const row of enqueuedDead.rows) {
+      await markFailed(row.id, row.company_id, row.channel, 'enqueued_timeout_exceeded');
+    }
+
+    // 3. reconciliation_required for > 15 minutes without webhook resolution
+    const reconDead = await runBypassingRLS(
+      `SELECT id, company_id, channel FROM notification_queue
+       WHERE status = 'reconciliation_required'
+         AND updated_at < NOW() - INTERVAL '15 minutes'`,
+    );
+    for (const row of reconDead.rows) {
+      await markFailed(row.id, row.company_id, row.channel, 'reconciliation_timeout_expired');
+      logger.warn(`[NotificationWorker] Reaped stuck 'reconciliation_required' notification to failed`, {
+        notificationId: row.id,
+        companyId: row.company_id,
+      });
+    }
+  } catch (error: any) {
+    logger.error('[NotificationWorker] Outbox reaper error', { error: error?.message });
+  }
 }
 
 async function recoverEvolutionWhatsAppNotifications(): Promise<void> {

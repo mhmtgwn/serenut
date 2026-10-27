@@ -91,15 +91,40 @@ class _CreateGibInvoiceDialogState
     if (widget.items != null && widget.items!.isNotEmpty) {
       _invoiceItems = List.from(widget.items!);
     } else if (widget.sale != null) {
-      _invoiceItems = widget.sale!.items.map((item) {
+      final sale = widget.sale!;
+      double rawSubtotal = 0.0;
+      for (final item in sale.items) {
         final grossPrice = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-        // KDV hariç fiyat hesapla (varsayılan KDV oranı ile)
-        final netPrice = grossPrice / (1.0 + (vatRate / 100.0));
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+        rawSubtotal += grossPrice * qty;
+      }
+
+      final discountFactor = (rawSubtotal > 0 && sale.discountAmount > 0)
+          ? ((rawSubtotal - sale.discountAmount) / rawSubtotal).clamp(0.0, 1.0)
+          : 1.0;
+
+      _invoiceItems = sale.items.map((item) {
+        final grossPrice = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+        final effectiveGrossPrice = grossPrice * discountFactor;
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+
+        final double itemVat = (item['vat'] as num?)?.toDouble() ??
+            (item['vat_rate'] as num?)?.toDouble() ??
+            (item['kdv'] as num?)?.toDouble() ??
+            vatRate;
+
+        final netPrice = effectiveGrossPrice / (1.0 + (itemVat / 100.0));
+        final unitStr = (item['unit'] as String?)?.toLowerCase();
+        final unitCode = unitStr == 'kg'
+            ? 'KGM'
+            : (unitStr == 'lt' || unitStr == 'litre' ? 'LTR' : 'C62');
+
         return GibInvoiceItem(
           name: (item['product_name'] as String?) ?? 'Ürün',
-          quantity: (item['quantity'] as num?)?.toDouble() ?? 1.0,
+          quantity: qty,
+          unit: unitCode,
           unitPrice: netPrice,
-          vatRate: vatRate,
+          vatRate: itemVat,
         );
       }).toList();
     } else {
@@ -226,6 +251,72 @@ class _CreateGibInvoiceDialogState
     }
   }
 
+  /// 1b. Hızlı Kasa Çıkışı: Faturayı GİB'e Taslak Olarak Gönder (SMS Beklemez)
+  Future<void> _submitDraftOnly() async {
+    final creds = ref.read(gibCredentialsProvider);
+    if (!creds.isConfigured) {
+      _showNotConfiguredDialog();
+      return;
+    }
+
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final service = ref.read(gibInvoiceServiceProvider);
+      final recipient = GibInvoiceRecipient(
+        identifier: _identifierCtrl.text.trim(),
+        titleOrName: _nameCtrl.text.trim(),
+        taxOffice: _taxOfficeCtrl.text.trim(),
+        address: _addressCtrl.text.trim(),
+        district: _districtCtrl.text.trim(),
+        city: _cityCtrl.text.trim().isNotEmpty
+            ? _cityCtrl.text.trim()
+            : 'Türkiye',
+        phone: _phoneCtrl.text.trim().isNotEmpty
+            ? _phoneCtrl.text.trim()
+            : null,
+        email: _emailCtrl.text.trim().isNotEmpty
+            ? _emailCtrl.text.trim()
+            : null,
+        type: _recipientType,
+      );
+
+      // Taslağı GİB'e gönder ve yerel depoya pendingSms olarak kaydet
+      final record = await service.createAndSubmitDraft(
+        username: creds.username,
+        password: creds.password,
+        recipient: recipient,
+        items: _invoiceItems,
+        totalWithoutVat: _totalWithoutVat,
+        totalVat: _totalVat,
+        totalAmount: _totalAmount,
+        saleId: widget.sale?.id,
+        customerId: widget.customer?.id,
+        note: _noteCtrl.text.trim().isNotEmpty ? _noteCtrl.text.trim() : null,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentRecord = record;
+          _step = 3; // Taslak başarı adımı (Kasa SMS beklemeden devam eder)
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceAll('Exception:', '');
+        });
+      }
+    }
+  }
+
   /// 2. Adım: SMS Şifresini Doğrula ve İmzala
   Future<void> _verifySmsAndSign() async {
     final code = _smsCodeCtrl.text.trim();
@@ -310,6 +401,24 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
     launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  void _shareDraftViaWhatsApp() {
+    final phone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+    final name = _nameCtrl.text;
+    final total = _totalAmount.toStringAsFixed(2);
+    final uuid = _currentRecord?.gibUuid ?? '';
+
+    final message = '''Sayın $name,
+$total ₺ tutarındaki alışverişinize ait e-Arşiv Fatura taslağınız Gelir İdaresi Başkanlığı (GİB) portalına iletilmiştir.
+Fatura Takip / ETTN No: $uuid
+Faturanız gün sonunda resmen mühürlenecek olup sistem kayıtlarımızda güvence altındadır.
+
+Bizi tercih ettiğiniz için teşekkür ederiz.''';
+
+    final uri = Uri.parse(
+        'https://wa.me/${phone.startsWith('90') ? phone : '90$phone'}?text=${Uri.encodeComponent(message)}');
+    launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -348,7 +457,11 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
                 child: SingleChildScrollView(
                   child: _step == 0
                       ? _buildFormStep()
-                      : (_step == 1 ? _buildSmsStep() : _buildSuccessStep()),
+                      : (_step == 1
+                          ? _buildSmsStep()
+                          : (_step == 2
+                              ? _buildSuccessStep()
+                              : _buildDraftSuccessStep())),
                 ),
               ),
             ],
@@ -378,7 +491,11 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
               Text(
                 _step == 0
                     ? 'Resmi GİB e-Arşiv Fatura Kes'
-                    : (_step == 1 ? 'SMS Doğrulama & İmza' : 'Fatura Başarıyla Kesildi'),
+                    : (_step == 1
+                        ? 'SMS Doğrulama & İmza'
+                        : (_step == 2
+                            ? 'Fatura Başarıyla Kesildi'
+                            : 'Fatura Taslağı GİB\'e İletildi')),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -390,7 +507,9 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
                     ? '0 TL Maliyetle Doğrudan GİB e-Arşiv Portalı'
                     : (_step == 1
                         ? 'GİB Güvenlik Onayı'
-                        : 'Fatura resmiyet kazandı'),
+                        : (_step == 2
+                            ? 'Fatura resmiyet kazandı'
+                            : 'Kasayı bekletmeden kaydedildi; gün sonu toplu imzalanabilir')),
                 style: const TextStyle(fontSize: 12, color: POSColors.textSecondary),
               ),
             ],
@@ -614,25 +733,47 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 46,
-            child: FilledButton.icon(
-              onPressed: _isLoading ? null : _submitDraft,
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.send_rounded, size: 18),
-              label: Text(_isLoading
-                  ? 'GİB Sistemine Gönderiliyor...'
-                  : 'GİB Taslak Fatura Oluştur & SMS İste'),
-              style: FilledButton.styleFrom(
-                backgroundColor: POSColors.green,
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: _isLoading ? null : _submitDraftOnly,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.flash_on_rounded, size: 18),
+                    label: Text(_isLoading
+                        ? 'GİB\'e İletiliyor...'
+                        : 'Taslak Kaydet (Hızlı Kasa - SMS Beklemez)'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: POSColors.greenDark,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _submitDraft,
+                    icon: const Icon(Icons.sms_rounded, size: 16),
+                    label: const Text('Şimdi SMS İle İmzala'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: POSColors.text,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -800,6 +941,86 @@ Bizi tercih ettiğiniz için teşekkür ederiz.
                 label: const Text('Tamamla'),
                 style: FilledButton.styleFrom(
                   backgroundColor: POSColors.green,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDraftSuccessStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFEFF6FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.inventory_2_rounded,
+                size: 52, color: Color(0xFF2563EB)),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Center(
+          child: Text(
+            'Fatura Taslağı GİB Sistemine İletildi!',
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: POSColors.text),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            'ETTN / UUID: ${_currentRecord?.gibUuid ?? ''}',
+            style: const TextStyle(fontSize: 11, color: POSColors.textSecondary),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  size: 20, color: Color(0xFF16A34A)),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Fatura taslağı GİB portalına başarıyla yüklendi. Kasa akışını aksatmadan satış kapatılabilir. Gün sonunda patron tüm taslakları tek bir SMS ile toplu olarak onaylayabilir.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _shareDraftViaWhatsApp,
+                icon: const Icon(Icons.share_rounded,
+                    size: 18, color: Color(0xFF16A34A)),
+                label: const Text('WhatsApp İle Paylaş'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.done_all_rounded, size: 18),
+                label: const Text('Tamamla & Kapat'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: POSColors.greenDark,
                 ),
               ),
             ),

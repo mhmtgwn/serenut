@@ -19,6 +19,7 @@ class SmsGatewayService {
 
   void start() {
     if (kIsWeb || !Platform.isAndroid || _timer != null) return;
+    unawaited(_smsService.acquireWakeLock('SmsGatewayService'));
     unawaited(poll());
     _timer =
         Timer.periodic(const Duration(seconds: 20), (_) => unawaited(poll()));
@@ -27,11 +28,22 @@ class SmsGatewayService {
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    unawaited(_smsService.releaseWakeLock());
   }
+
+  /// Verifies whether the OS will allow uninterrupted background execution.
+  Future<bool> isIgnoringBatteryOptimizations() =>
+      _smsService.isIgnoringBatteryOptimizations();
+
+  /// Prompts user to whitelist Serenut OS from battery optimizations.
+  Future<bool> requestIgnoreBatteryOptimizations() =>
+      _smsService.requestIgnoreBatteryOptimizations();
 
   Future<void> poll() async {
     if (_busy || _apiClient.jwtToken == null) return;
     _busy = true;
+    // Servis periyodik çalıştığı sürece WakeLock'ı canlı tut
+    unawaited(_smsService.acquireWakeLock('SmsGatewayService'));
     try {
       final deviceHash = _deviceManager.getDeviceId();
       final gatewayResponse =

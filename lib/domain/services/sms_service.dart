@@ -5,6 +5,8 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -112,6 +114,54 @@ class SmsService {
     final statusSms = await Permission.sms.status;
     final statusPhone = await Permission.phone.status;
     return statusSms.isGranted && statusPhone.isGranted;
+  }
+
+  /// Acquires a CPU WakeLock on Android to keep the SMS gateway polling during screen sleep.
+  Future<bool> acquireWakeLock([String tag = 'SmsGateway']) async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final res = await const MethodChannel('serenut/sms_sender')
+          .invokeMethod<bool>('acquireWakeLock', {'tag': tag});
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Releases the acquired CPU WakeLock.
+  Future<bool> releaseWakeLock() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final res = await const MethodChannel('serenut/sms_sender')
+          .invokeMethod<bool>('releaseWakeLock');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks if battery optimizations are disabled for continuous background execution.
+  Future<bool> isIgnoringBatteryOptimizations() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final res = await const MethodChannel('serenut/sms_sender')
+          .invokeMethod<bool>('isIgnoringBatteryOptimizations');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Requests ignoring battery optimizations via Android system dialog.
+  Future<bool> requestIgnoreBatteryOptimizations() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final res = await const MethodChannel('serenut/sms_sender')
+          .invokeMethod<bool>('requestIgnoreBatteryOptimizations');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Send an SMS immediately. Falls back to queue if offline or fails.

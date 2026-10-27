@@ -4,16 +4,16 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/domain/interfaces/earsiv_provider.dart';
 import 'package:serenutos/domain/models/gib_invoice_models.dart';
-import 'package:serenutos/infrastructure/services/gib_earsiv_client.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_invoice_repository.dart';
 
 class GibInvoiceService {
-  final GibEArsivClient _client;
+  final IEArsivProvider _client;
   final IGibInvoiceRepository _repository;
 
   GibInvoiceService({
-    required GibEArsivClient client,
+    required IEArsivProvider client,
     required IGibInvoiceRepository repository,
   })  : _client = client,
         _repository = repository;
@@ -105,8 +105,8 @@ class GibInvoiceService {
   }) async {
     final token = await _client.login(username: username, password: password);
 
-    // GİB üzerinde resmi imzayı bas
-    await _client.verifySmsAndSign(
+    // Sağlayıcı üzerinde resmi imzayı bas
+    await _client.verifySmsCodeAndSign(
       token: token,
       smsCode: smsCode,
       invoiceUuid: gibUuid,
@@ -130,6 +130,51 @@ class GibInvoiceService {
 
     final updated = await _repository.findById(invoiceId);
     return updated!;
+  }
+
+  /// 3b. Adım: SMS Kodunu Doğrula ve Birden Fazla Faturayı Tek Seferde Toplu Olarak İmzala
+  Future<List<GibInvoiceRecord>> verifySmsAndSignBatch({
+    required String username,
+    required String password,
+    required List<({String invoiceId, String gibUuid})> invoices,
+    required String smsCode,
+  }) async {
+    if (invoices.isEmpty) return [];
+    final token = await _client.login(username: username, password: password);
+
+    final uuids = invoices.map((i) => i.gibUuid).toList();
+    await _client.verifySmsCodeAndSignBatch(
+      token: token,
+      smsCode: smsCode,
+      invoiceUuids: uuids,
+    );
+
+    final signedAt = DateTime.now();
+    final updatedRecords = <GibInvoiceRecord>[];
+
+    for (final inv in invoices) {
+      String? html;
+      try {
+        html = await _client.getInvoiceHtml(
+            token: token, invoiceUuid: inv.gibUuid);
+      } catch (e) {
+        debugPrint('[GibInvoiceService] HTML çıktısı çekilirken uyarı: $e');
+      }
+
+      await _repository.updateStatus(
+        id: inv.invoiceId,
+        status: GibInvoiceStatus.signed,
+        htmlContent: html,
+        signedAt: signedAt,
+      );
+
+      final updated = await _repository.findById(inv.invoiceId);
+      if (updated != null) {
+        updatedRecords.add(updated);
+      }
+    }
+
+    return updatedRecords;
   }
 
   /// Fatura İptali

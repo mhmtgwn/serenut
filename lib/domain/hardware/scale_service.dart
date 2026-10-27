@@ -77,7 +77,7 @@ class TcpScaleAdapter implements IScaleAdapter {
       _state = HardwareConnectionState.connected;
       _subscription = socket
           .cast<List<int>>()
-          .transform(utf8.decoder)
+          .transform(const Utf8Decoder(allowMalformed: true))
           .map((chunk) => chunk.replaceAll('\r', '\n'))
           .transform(const LineSplitter())
           .listen(_handleFrame, onError: _handleError, onDone: _handleDone);
@@ -183,7 +183,7 @@ class SerialScaleAdapter implements IScaleAdapter {
       _state = HardwareConnectionState.connected;
       _subscription = _reader!.stream
           .cast<List<int>>()
-          .transform(utf8.decoder)
+          .transform(const Utf8Decoder(allowMalformed: true))
           .map((chunk) => chunk.replaceAll('\r', '\n'))
           .transform(const LineSplitter())
           .listen(_handleFrame, onError: _handleError);
@@ -211,12 +211,20 @@ class SerialScaleAdapter implements IScaleAdapter {
 
   @override
   Future<void> disconnect() async {
-    await _subscription?.cancel();
+    try {
+      await _subscription?.cancel();
+    } catch (_) {}
     _subscription = null;
-    _reader?.close();
+    try {
+      _reader?.close();
+    } catch (_) {}
     _reader = null;
-    _port?.close();
-    _port?.dispose();
+    try {
+      _port?.close();
+    } catch (_) {}
+    try {
+      _port?.dispose();
+    } catch (_) {}
     _port = null;
     _state = HardwareConnectionState.disconnected;
   }
@@ -248,11 +256,30 @@ class ScaleFrameParser {
     String defaultUnit = 'kg',
   }) {
     final normalized = frame.trim();
-    final match = _weight.firstMatch(normalized);
-    if (match == null) return null;
-    final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+    final matches = _weight.allMatches(normalized).toList();
+    if (matches.isEmpty) return null;
+
+    // Prioritize match that explicitly specifies unit (kg or g)
+    RegExpMatch? selectedMatch;
+    for (final m in matches) {
+      if (m.group(2) != null && m.group(2)!.isNotEmpty) {
+        selectedMatch = m;
+        break;
+      }
+    }
+    // If no match has an explicit unit, pick the rightmost match with a decimal point or sign, or the last match
+    selectedMatch ??= matches.lastWhere(
+      (m) =>
+          m.group(1)!.contains('.') ||
+          m.group(1)!.contains(',') ||
+          m.group(1)!.startsWith('+') ||
+          m.group(1)!.startsWith('-'),
+      orElse: () => matches.last,
+    );
+
+    final value = double.tryParse(selectedMatch.group(1)!.replaceAll(',', '.'));
     if (value == null) return null;
-    final unit = (match.group(2) ?? defaultUnit).toLowerCase();
+    final unit = (selectedMatch.group(2) ?? defaultUnit).toLowerCase();
     final grams = (unit == 'kg' ? value * 1000 : value).round();
     final upper = normalized.toUpperCase();
     final unstable =
@@ -329,8 +356,7 @@ class ScaleSession {
 
   void addReading(ScaleReading reading, {DateTime? now}) {
     if (_state == ScaleSessionState.idle ||
-        _state == ScaleSessionState.accepted ||
-        _state == ScaleSessionState.error) {
+        _state == ScaleSessionState.accepted) {
       return;
     }
 
@@ -338,6 +364,26 @@ class ScaleSession {
     if (currentTime.difference(reading.measuredAt).abs() > maximumReadingAge) {
       return;
     }
+
+    // If session is in error, check if reading has normalized to auto-recover
+    if (_state == ScaleSessionState.error) {
+      if (!reading.overload && reading.netGrams >= -zeroToleranceGrams) {
+        _samples.clear();
+        if (reading.netGrams.abs() <= zeroToleranceGrams) {
+          _zeroSeenSinceAcceptance = true;
+          _state = ScaleSessionState.waitingForWeight;
+        } else if (_zeroSeenSinceAcceptance && reading.netGrams >= minimumWeightGrams) {
+          _state = ScaleSessionState.measuring;
+          _samples.add(reading);
+        } else {
+          _state = _zeroSeenSinceAcceptance
+              ? ScaleSessionState.waitingForWeight
+              : ScaleSessionState.waitingForZero;
+        }
+      }
+      return;
+    }
+
     if (reading.overload || reading.netGrams < -zeroToleranceGrams) {
       _state = ScaleSessionState.error;
       return;
