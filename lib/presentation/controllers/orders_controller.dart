@@ -388,13 +388,18 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       await addOrder(order);
       try {
         final paymentService = await ref.read(paymentServiceProvider.future);
+        final orderPaymentMetadata = <String, dynamic>{
+          'reference_type': 'order',
+          'order_id': order.id,
+          if (paymentMetadata != null) ...paymentMetadata,
+        };
         await paymentService.processSalePayment(
           saleId: order.id,
           customerId: customerId,
           totalAmount: orderTotal.toDouble(),
           paidAmount: orderPaid.toDouble(),
           paymentMethod: paymentMethod,
-          terminalMetadata: paymentMetadata,
+          terminalMetadata: orderPaymentMetadata,
         );
       } catch (e) {
         // Compensating rollback: Eğer finansal kayıt oluşturulamazsa, yarım kalmış sipariş kalmaması için sil ve stokları iade et

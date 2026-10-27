@@ -93,15 +93,25 @@ extension SyncV4Orchestration on SyncV4Service {
                       'customer' => 'customers',
                       'order' => 'orders',
                       'sale' => 'sales',
+                      'refund' => 'refunds',
+                      'cash_count' => 'cash_counts',
+                      'cash_expense' => 'cash_expenses',
+                      'gib_invoice' => 'gib_invoices',
+                      'customer_installment_plan' => 'customer_installment_plans',
+                      'customer_installment' => 'customer_installments',
                       _ => null,
                     };
                     if (domainTable != null) {
-                      await txn.update(
-                        domainTable,
-                        {'is_synced': 1},
-                        where: 'id = ?',
-                        whereArgs: [entityId],
-                      );
+                      try {
+                        await txn.update(
+                          domainTable,
+                          {'is_synced': 1},
+                          where: 'id = ?',
+                          whereArgs: [entityId],
+                        );
+                      } catch (_) {
+                        // Domain table may lack is_synced column in legacy SQLite migrations
+                      }
                     }
                   }
                 }

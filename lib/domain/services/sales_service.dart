@@ -142,6 +142,11 @@ class SalesService {
       throw ArgumentError(
           'Veresiye satışta başlangıç ödemesi sıfır olmalıdır; kısmi ödeme için karma yöntemini kullanın.');
     }
+    if ((paymentMethod == 'debt' || (totalAmount - finalPaidAmount) > 0.009) &&
+        customerId.trim().isEmpty) {
+      throw ArgumentError(
+          'Borç/veresiye kalan satışlar için müşteri seçilmesi zorunludur.');
+    }
     if ((paymentMethod == 'cash' || paymentMethod == 'card') &&
         (finalPaidAmount - totalAmount).abs() > 0.001) {
       throw ArgumentError(

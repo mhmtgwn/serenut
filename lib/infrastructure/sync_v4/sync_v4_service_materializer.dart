@@ -34,6 +34,8 @@ extension SyncV4Materializer on SyncV4Service {
       'sale' => 'sales',
       'financial_transaction' => 'financial_transactions',
       'cash_count' => 'cash_counts',
+      'cash_expense' => 'cash_expenses',
+      'gib_invoice' => 'gib_invoices',
       'customer_installment_plan' => 'customer_installment_plans',
       'customer_installment' => 'customer_installments',
       _ => null,

@@ -609,7 +609,8 @@ class LicenseService {
           return await saveLicenseToken(tokenStr);
         }
       } else if (response.statusCode == 403 || response.statusCode == 404) {
-        await clearLicense();
+        // Çevrimdışı tolerans (Grace Period) korunmalı; geçici yetki/süre dolumu
+        // durumlarında yerel lisans dosyası silinmez, false dönülerek grace devreye girer.
         return false;
       }
     } catch (_) {

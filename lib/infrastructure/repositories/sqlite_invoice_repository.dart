@@ -4,6 +4,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/models/gib_invoice_models.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 abstract class IGibInvoiceRepository {
   Future<void> saveInvoice(GibInvoiceRecord invoice);
@@ -64,6 +65,17 @@ class SqliteInvoiceRepository implements IGibInvoiceRepository {
       invoice.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    try {
+      await SyncOutboxV4.enqueue(
+        _gateway,
+        entityType: 'gib_invoice',
+        entityId: invoice.id,
+        operation: 'UPSERT',
+        payload: invoice.toMap(),
+      );
+    } catch (_) {
+      // Non-fatal if outbox is currently unavailable
+    }
   }
 
   @override
@@ -152,6 +164,21 @@ class SqliteInvoiceRepository implements IGibInvoiceRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+
+    try {
+      final updated = await findById(id);
+      if (updated != null) {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'gib_invoice',
+          entityId: id,
+          operation: 'UPSERT',
+          payload: updated.toMap(),
+        );
+      }
+    } catch (_) {
+      // Non-fatal if outbox is currently unavailable
+    }
   }
 
   @override

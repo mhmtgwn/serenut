@@ -357,7 +357,15 @@ class _SalesPageState extends ConsumerState<SalesPage>
                         },
                         ...?cardMetadata,
                       }
-                    : cardMetadata,
+                    : flowState.paymentMethod == 'cash' &&
+                            flowState.paidAmount > totalAmount
+                        ? <String, dynamic>{
+                            'cash_tendered': flowState.paidAmount,
+                            'change': (flowState.paidAmount - totalAmount)
+                                .clamp(0.0, double.infinity),
+                            ...?cardMetadata,
+                          }
+                        : cardMetadata,
               );
 
       if (createdSale == null) {
@@ -398,7 +406,14 @@ class _SalesPageState extends ConsumerState<SalesPage>
                   'card': flowState.karmaCard,
                   'debt': flowState.karmaDebt,
                 }
-              : null,
+              : flowState.paymentMethod == 'cash' &&
+                      flowState.paidAmount > totalAmount
+                  ? {
+                      'cash_tendered': flowState.paidAmount,
+                      'change': (flowState.paidAmount - totalAmount)
+                          .clamp(0.0, double.infinity),
+                    }
+                  : null,
         );
       }
 

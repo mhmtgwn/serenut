@@ -88,12 +88,8 @@ class InventoryService {
 
       await _productRepository.decreaseStock(item.productId, qtyToDeduct);
 
-      final parsedProductId =
-          int.tryParse(item.productId.replaceAll(RegExp(r'[^0-9]'), '')) ??
-              item.productId.hashCode.abs();
-
       _eventPublisher.publish(StockChangedEvent(
-        productId: parsedProductId,
+        productId: item.productId,
         quantityChange: -qtyToDeduct,
         reason: 'sale',
       ));
@@ -110,12 +106,8 @@ class InventoryService {
 
       await _productRepository.increaseStock(item.productId, qtyToApply);
 
-      final parsedProductId =
-          int.tryParse(item.productId.replaceAll(RegExp(r'[^0-9]'), '')) ??
-              item.productId.hashCode.abs();
-
       _eventPublisher.publish(StockChangedEvent(
-        productId: parsedProductId,
+        productId: item.productId,
         quantityChange: qtyToApply,
         reason: 'refund',
       ));

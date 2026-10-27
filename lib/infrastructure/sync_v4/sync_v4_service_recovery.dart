@@ -130,6 +130,12 @@ extension SyncV4Recovery on SyncV4Service {
           'sale': 'sales',
           'order': 'orders',
           'financial_transaction': 'financial_transactions',
+          'refund': 'refunds',
+          'customer_installment_plan': 'customer_installment_plans',
+          'customer_installment': 'customer_installments',
+          'cash_count': 'cash_counts',
+          'cash_expense': 'cash_expenses',
+          'gib_invoice': 'gib_invoices',
         };
 
         for (final entry in entityTables.entries) {
@@ -185,6 +191,11 @@ extension SyncV4Recovery on SyncV4Service {
       'sale': 3,
       'refund': 4,
       'financial_transaction': 5,
+      'customer_installment_plan': 6,
+      'customer_installment': 7,
+      'cash_count': 8,
+      'cash_expense': 9,
+      'gib_invoice': 10,
     };
     List<Map<String, dynamic>> orderSegment(
         List<Map<String, dynamic>> segment) {

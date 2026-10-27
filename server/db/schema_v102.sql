@@ -64,3 +64,4 @@ BEGIN
     WHERE r.name = 'sysadmin'
   );
 END $$;
+

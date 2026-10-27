@@ -73,7 +73,11 @@ class PaymentService {
     }
 
     final debt = totalAmount - paidAmount;
-    if (debt > 0 && customerId.isNotEmpty) {
+    if (debt > 0.009) {
+      if (customerId.trim().isEmpty) {
+        throw ArgumentError(
+            'Borç/veresiye kalan satışlar için müşteri seçilmesi zorunludur.');
+      }
       final customer = await _customerRepository.findById(customerId);
       if (customer != null &&
           customer.creditLimit != null &&

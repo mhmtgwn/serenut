@@ -215,7 +215,7 @@ class OrderDeliveredEvent extends DomainEvent {
 }
 
 class StockChangedEvent extends DomainEvent {
-  final int productId;
+  final String productId;
   final num quantityChange; // + for increase, - for decrease
   final String reason; // 'sale', 'order_delivery', 'adjustment', 'receipt'
 
@@ -227,7 +227,7 @@ class StockChangedEvent extends DomainEvent {
     super.metadata,
   }) : super(
           type: EventType.stockChanged,
-          aggregateId: productId,
+          aggregateId: int.tryParse(productId),
           aggregateType: 'Product',
         );
 }

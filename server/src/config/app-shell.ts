@@ -1,6 +1,8 @@
 export interface AppNavItem {
   id: string;
   label: string;
+  subtabLabel?: string;
+  parentId?: string;
   section: 'overview' | 'operations' | 'commerce' | 'customers' | 'communication' | 'security' | 'platform' | 'account';
   href: string;
   description: string;
@@ -14,6 +16,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'workspace-home',
     label: 'Çalışma Alanı',
+    subtabLabel: 'Hızlı Kısayollar',
+    parentId: 'company-dashboard',
     section: 'overview',
     href: '/app/#home',
     description: 'Rolünüze uygun özet, kısayollar ve görev akışı.',
@@ -21,10 +25,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'company-dashboard',
-    label: 'Firma Paneli',
+    label: 'Genel Bakış',
+    subtabLabel: 'İşletme Özeti',
     section: 'overview',
     href: '/app/#company-dashboard',
-    description: 'Firma dashboard, cihaz, kullanıcı ve lisans görünümü.',
+    description: 'Kurulum rehberi, aktif paket, bağlı cihaz ve işletme özeti.',
     module: 'portal',
     moduleTab: 'dashboard',
     permissions: ['devices:view']
@@ -32,17 +37,32 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'sales-operations',
     label: 'SMS ve Operasyon',
+    subtabLabel: 'SMS Ana Cihazı & Saha Özeti',
+    parentId: 'notification-channels',
     section: 'operations',
     href: '/app/#sales-operations',
-    description: 'Cihaz, şube ve operasyon durumları.',
+    description: 'SMS ana cihazı, şube ve terminal bağlantı özeti.',
     module: 'portal',
     moduleTab: 'devices',
     permissions: ['notifications.templates.manage'],
     roles: ['owner']
   },
   {
+    id: 'company-devices',
+    label: 'Cihazlar ve Şubeler',
+    subtabLabel: 'Bağlı Cihazlar (Terminaller)',
+    section: 'operations',
+    href: '/app/#company-devices',
+    description: 'Kasadaki bilgisayarları, mobil terminalleri ve mağaza şubelerinizi yönetin.',
+    module: 'portal',
+    moduleTab: 'devices',
+    permissions: ['devices:view']
+  },
+  {
     id: 'company-stores',
     label: 'Şubeler',
+    subtabLabel: 'Mağaza Şubeleri',
+    parentId: 'company-devices',
     section: 'operations',
     href: '/app/#company-stores',
     description: 'Şube kayıtlarını, adreslerini ve durumlarını yönetin.',
@@ -51,31 +71,22 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     permissions: ['settings:manage']
   },
   {
-    id: 'company-devices',
-    label: 'Cihazlar',
-    section: 'operations',
-    href: '/app/#company-devices',
-    description: 'Bağlı terminalleri, şubelerini ve çevrimiçi durumlarını izleyin.',
-    module: 'portal',
-    moduleTab: 'devices',
-    permissions: ['devices:view']
-  },
-  {
     id: 'team-management',
-    label: 'Kullanıcılar ve Roller',
+    label: 'Ekip ve Yetkiler',
     section: 'operations',
     href: '/app/#team-management',
-    description: 'Alt kullanıcı yönetimi ve rol atamaları.',
+    description: 'Personel hesapları, şube görevleri ve özel rol yetkileri.',
     module: 'portal',
     moduleTab: 'users',
     permissions: ['users:manage']
   },
   {
     id: 'billing-center',
-    label: 'Abonelik ve Faturalama',
+    label: 'Abonelik ve Faturalar',
+    subtabLabel: 'Paketler ve Ödemeler',
     section: 'commerce',
     href: '/app/#billing-center',
-    description: 'Planlar, faturalar ve ödeme akışları.',
+    description: 'Paket yükseltme, kredi kartı / havale ödemeleri ve fatura geçmişi.',
     module: 'portal',
     moduleTab: 'subscription',
     permissions: ['billing:view']
@@ -83,6 +94,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'company-licenses',
     label: 'Lisanslar',
+    subtabLabel: 'Lisans ve Cihaz Hakları',
+    parentId: 'billing-center',
     section: 'commerce',
     href: '/app/#company-licenses',
     description: 'Lisans anahtarlarını, cihaz haklarını ve geçerlilik tarihlerini görün.',
@@ -95,35 +108,39 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Uygulama İndir',
     section: 'commerce',
     href: '/app/#company-downloads',
-    description: 'Yetkili Windows ve Android kurulum paketlerini indirin.',
+    description: 'Windows masaüstü (.exe) ve Android mobil (.apk) kurulum paketlerini indirin.',
     module: 'portal',
     moduleTab: 'downloads'
   },
   {
-    id: 'support-center',
-    label: 'Destek Merkezi',
-    section: 'communication',
-    href: '/app/#support-center',
-    description: 'Destek talepleri ve yanıt geçmişi.',
-    module: 'portal',
-    moduleTab: 'support'
-  },
-  {
     id: 'notification-channels',
-    label: 'Bildirim Kanalları',
+    label: 'WhatsApp ve SMS',
+    subtabLabel: 'WhatsApp & SMS Ayarları',
     section: 'communication',
     href: '/app/#notification-channels',
-    description: 'SMS ve şirkete ait WhatsApp Business bağlantısını yönetin.',
+    description: 'WhatsApp Web QR bağlantısını ve Android SMS ana cihazını yönetin.',
     module: 'portal',
     moduleTab: 'notifications',
     roles: ['owner']
   },
   {
+    id: 'support-center',
+    label: 'Destek Merkezi',
+    subtabLabel: 'Destek Taleplerim',
+    section: 'communication',
+    href: '/app/#support-center',
+    description: 'Destek talebi oluşturun ve teknik ekibimizle yazışmalarınızı takip edin.',
+    module: 'portal',
+    moduleTab: 'support'
+  },
+  {
     id: 'system-diagnostics',
     label: 'Sistem ve Loglar',
+    subtabLabel: 'Teknik Tanılama ve Loglar',
+    parentId: 'support-center',
     section: 'operations',
     href: '/app/#system-diagnostics',
-    description: 'Cihaz, senkronizasyon ve uygulama hatalarını inceleyin.',
+    description: 'Cihaz, senkronizasyon ve uygulama kayıtlarını inceleyin.',
     module: 'portal',
     moduleTab: 'diagnostics',
     roles: ['owner', 'admin', 'manager']
@@ -133,34 +150,27 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Genel Bakış',
     section: 'overview',
     href: '/app/#platform-overview',
-    description: 'Kayıt, deneme, abonelik, lisans ve havale özeti.',
+    description: 'Canlı ticari metrikler, bekleyen havale onayları ve sunucu durumu.',
     module: 'admin',
     moduleTab: 'commercial',
     roles: ['sysadmin']
   },
   {
     id: 'platform-companies',
-    label: 'Firmalar',
+    label: 'Firmalar ve Lisanslar',
+    subtabLabel: 'Firmalar (CRM)',
     section: 'customers',
     href: '/app/#platform-companies',
-    description: 'Tenant ve müşteri organizasyonlarını yönetin.',
+    description: 'Müşteri firmaları, özel paketleri, cihaz ve abonelik haklarını yönetin.',
     module: 'admin',
     moduleTab: 'companies',
     roles: ['sysadmin']
   },
   {
-    id: 'platform-billing',
-    label: 'Ödemeler',
-    section: 'commerce',
-    href: '/app/#platform-billing',
-    description: 'Havale onayları ve ödeme yöntemlerini yönetin.',
-    module: 'admin',
-    moduleTab: 'transfers',
-    roles: ['sysadmin']
-  },
-  {
     id: 'platform-subscriptions',
     label: 'Abonelikler',
+    subtabLabel: 'Tüm Abonelikler',
+    parentId: 'platform-companies',
     section: 'customers',
     href: '/app/#platform-subscriptions',
     description: 'Firma aboneliklerini, dönemlerini ve durumlarını inceleyin.',
@@ -169,8 +179,33 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-licenses',
+    label: 'Lisanslar',
+    subtabLabel: 'Lisans Anahtarları',
+    parentId: 'platform-companies',
+    section: 'customers',
+    href: '/app/#platform-licenses',
+    description: 'Lisans üretin, yenileyin, askıya alın veya iptal edin.',
+    module: 'admin',
+    moduleTab: 'licenses',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-billing',
+    label: 'Ödemeler ve Paketler',
+    subtabLabel: 'Havale Onayları & Tahsilat',
+    section: 'commerce',
+    href: '/app/#platform-billing',
+    description: 'Bekleyen havale bildirimlerini onaylayın, banka IBAN ve iyzico ayarlarını yönetin.',
+    module: 'admin',
+    moduleTab: 'transfers',
+    roles: ['sysadmin']
+  },
+  {
     id: 'platform-plans',
     label: 'Planlar',
+    subtabLabel: 'Satış Paketleri ve Fiyatlar',
+    parentId: 'platform-billing',
     section: 'commerce',
     href: '/app/#platform-plans',
     description: 'Satış planlarını, limitleri ve fiyatları yönetin.',
@@ -180,27 +215,20 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-releases',
-    label: 'Güncellemeler',
+    label: 'Sürümler ve Cihazlar',
+    subtabLabel: 'Uygulama Sürümleri (OTA)',
     section: 'operations',
     href: '/app/#platform-releases',
-    description: 'Android ve Windows sürümlerini yayınlayın, kademeli dağıtın veya geri çekin.',
+    description: 'Windows ve Android sürümlerini yayınlayın ve bağlı terminalleri yönetin.',
     module: 'admin',
     moduleTab: 'releases',
     roles: ['sysadmin']
   },
   {
-    id: 'platform-licenses',
-    label: 'Lisanslar',
-    section: 'customers',
-    href: '/app/#platform-licenses',
-    description: 'Lisans üretin, yenileyin, askıya alın veya iptal edin.',
-    module: 'admin',
-    moduleTab: 'licenses',
-    roles: ['sysadmin']
-  },
-  {
     id: 'platform-devices',
     label: 'Cihazlar',
+    subtabLabel: 'Tüm Kayıtlı Cihazlar',
+    parentId: 'platform-releases',
     section: 'customers',
     href: '/app/#platform-devices',
     description: 'Tüm firmalara bağlı cihazları yönetin ve gerektiğinde değiştirin.',
@@ -209,41 +237,12 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
-    id: 'platform-health',
-    label: 'Sistem',
-    section: 'operations',
-    href: '/app/#platform-health',
-    description: 'Telemetri, servis sağlığı ve sistem olaylarını izleyin.',
-    module: 'admin',
-    moduleTab: 'health',
-    roles: ['sysadmin']
-  },
-  {
-    id: 'platform-maintenance',
-    label: 'Sunucu Bakımı',
-    section: 'operations',
-    href: '/app/#platform-maintenance',
-    description: 'Disk kullanımını inceleyin ve güvenli bakım görevlerini çalıştırın.',
-    module: 'admin',
-    moduleTab: 'maintenance',
-    roles: ['sysadmin']
-  },
-  {
-    id: 'platform-security',
-    label: 'Güvenlik ve Loglar',
-    section: 'security',
-    href: '/app/#platform-security',
-    description: 'Admin şifreleri, güvenlik işlemleri ve sistem kayıtları.',
-    module: 'admin',
-    moduleTab: 'security',
-    roles: ['sysadmin']
-  },
-  {
     id: 'platform-support',
-    label: 'Destek Talepleri',
+    label: 'Destek ve E-posta',
+    subtabLabel: 'Destek Talepleri & Başvurular',
     section: 'communication',
     href: '/app/#platform-support',
-    description: 'Firmalardan gelen destek taleplerini görüntüleyin.',
+    description: 'Müşteri destek taleplerini, ön başvuruları ve kurumsal e-postaları yönetin.',
     module: 'admin',
     moduleTab: 'support',
     roles: ['sysadmin']
@@ -251,6 +250,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-mail',
     label: 'E-posta Kutusu',
+    subtabLabel: 'Kurumsal E-posta Kutusu',
+    parentId: 'platform-support',
     section: 'communication',
     href: '/app/#platform-mail',
     description: 'Gelen ve gönderilen e-postaları yönetin.',
@@ -259,11 +260,46 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-security',
+    label: 'Sistem ve Güvenlik',
+    subtabLabel: 'Güvenlik, Şifre ve Loglar',
+    section: 'security',
+    href: '/app/#platform-security',
+    description: 'Yönetici şifresi, kurtarma kodları, hata logları ve sunucu bakımı.',
+    module: 'admin',
+    moduleTab: 'security',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-maintenance',
+    label: 'Sunucu Bakımı',
+    subtabLabel: 'Disk ve Sunucu Temizliği',
+    parentId: 'platform-security',
+    section: 'operations',
+    href: '/app/#platform-maintenance',
+    description: 'Disk kullanımını inceleyin ve güvenli bakım görevlerini çalıştırın.',
+    module: 'admin',
+    moduleTab: 'maintenance',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-health',
+    label: 'Sistem',
+    subtabLabel: 'Altyapı Sağlığı & Olaylar',
+    parentId: 'platform-security',
+    section: 'operations',
+    href: '/app/#platform-health',
+    description: 'Telemetri, servis sağlığı ve sistem olaylarını izleyin.',
+    module: 'admin',
+    moduleTab: 'health',
+    roles: ['sysadmin']
+  },
+  {
     id: 'account-settings',
-    label: 'Hesap Ayarları',
+    label: 'Hesap ve Firma Ayarları',
     section: 'account',
     href: '/app/#account-settings',
-    description: 'Profil, şifre ve marka ayarları.',
+    description: 'Şifre, kurtarma kodları, firma/fatura bilgileri ve aktif oturumlar.',
     module: 'portal',
     moduleTab: 'settings',
     permissions: ['settings:view']

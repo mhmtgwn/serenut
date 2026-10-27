@@ -3,6 +3,7 @@
 // Created: 28 Sep 2026
 
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
@@ -1213,14 +1214,34 @@ class EndOfDayRepository {
     await _ensureCashTables();
     final id = 'exp_${DateTime.now().millisecondsSinceEpoch}';
     final now = (date ?? DateTime.now()).toIso8601String();
+    final cat = category.trim().isEmpty ? 'Genel' : category.trim();
+    final desc = description.trim();
     await _gateway.insert('cash_expenses', {
       'id': id,
       'amount': amount,
-      'category': category.trim().isEmpty ? 'Genel' : category.trim(),
-      'description': description.trim(),
+      'category': cat,
+      'description': desc,
       'created_at': now,
       'is_deleted': 0,
     });
+    try {
+      await SyncOutboxV4.enqueue(
+        _gateway,
+        entityType: 'cash_expense',
+        entityId: id,
+        operation: 'UPSERT',
+        payload: {
+          'id': id,
+          'amount': amount,
+          'category': cat,
+          'description': desc,
+          'created_at': now,
+          'is_deleted': 0,
+        },
+      );
+    } catch (_) {
+      // Non-fatal if outbox is currently unavailable
+    }
   }
 
   /// Masraf kaydını siler (soft-delete)
@@ -1232,23 +1253,51 @@ class EndOfDayRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+    try {
+      await SyncOutboxV4.enqueue(
+        _gateway,
+        entityType: 'cash_expense',
+        entityId: id,
+        operation: 'DELETE',
+        payload: {
+          'id': id,
+          'is_deleted': 1,
+        },
+      );
+    } catch (_) {
+      // Non-fatal if outbox is currently unavailable
+    }
   }
 
-  /// Gün sonu kasa sayımını ve açılış devrini kaydeder
+  /// Gün sonu kasa sayımını ve açılış devrini kaydeder (Çoklu kasa destekli)
   Future<void> saveCashCount({
     required String date,
     required double openingBalance,
     required double countedCash,
     required double expectedCash,
     String? notes,
+    String? terminalId,
   }) async {
     await _ensureCashTables();
     final diff = countedCash - expectedCash;
     final now = DateTime.now().toIso8601String();
+    String? effectiveTerminalId = terminalId;
+    if (effectiveTerminalId == null || effectiveTerminalId.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        effectiveTerminalId = prefs.getString('installation_id') ??
+            prefs.getString('device_id') ??
+            prefs.getString('terminal_id');
+      } catch (_) {}
+    }
+    final countId = (effectiveTerminalId != null && effectiveTerminalId.isNotEmpty)
+        ? 'count_${effectiveTerminalId}_$date'
+        : 'count_$date';
+
     await _gateway.rawInsert('''
       INSERT INTO cash_counts (id, date, opening_balance, counted_cash, expected_cash, difference, notes, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(date) DO UPDATE SET
+      ON CONFLICT(id) DO UPDATE SET
         opening_balance = excluded.opening_balance,
         counted_cash = excluded.counted_cash,
         expected_cash = excluded.expected_cash,
@@ -1256,7 +1305,7 @@ class EndOfDayRepository {
         notes = excluded.notes,
         updated_at = excluded.updated_at
     ''', [
-      'count_$date',
+      countId,
       date,
       openingBalance,
       countedCash,
@@ -1271,11 +1320,12 @@ class EndOfDayRepository {
       await SyncOutboxV4.enqueue(
         _gateway,
         entityType: 'cash_count',
-        entityId: 'count_$date',
+        entityId: countId,
         operation: 'UPSERT',
         payload: {
-          'id': 'count_$date',
+          'id': countId,
           'date': date,
+          'terminal_id': effectiveTerminalId,
           'opening_balance': openingBalance,
           'counted_cash': countedCash,
           'expected_cash': expectedCash,

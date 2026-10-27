@@ -95,6 +95,7 @@ function initApp() {
     if (event.key === 'Escape') document.body.classList.remove('sidebar-open');
   });
 
+  window.selectAppModule = selectModule;
   bootShell();
 }
 
@@ -138,6 +139,10 @@ function setBootState(state, detail = '') {
     document.getElementById('boot-state-copy').innerText = detail;
     retry.onclick = bootShell;
   }
+}
+
+function getPrimaryNavItems(items) {
+  return items.filter((item) => !item.parentId || !items.some((parent) => parent.id === item.parentId));
 }
 
 function renderShell(bootstrap) {
@@ -188,10 +193,11 @@ function normalizeNavigation(navigation) {
 function renderNav(items) {
   const nav = document.getElementById('app-nav');
   const labels = { overview: 'Genel', customers: 'Müşteriler', commerce: 'Ticari', communication: 'İletişim', operations: 'Operasyon', security: 'Güvenlik', platform: 'Yönetim', account: 'Hesap' };
+  const primaryItems = getPrimaryNavItems(items);
   nav.innerHTML = '';
 
   ['overview', 'customers', 'commerce', 'communication', 'operations', 'security', 'platform', 'account'].forEach((section) => {
-    const sectionItems = items.filter((item) => item.section === section);
+    const sectionItems = primaryItems.filter((item) => item.section === section);
     if (!sectionItems.length) return;
     nav.insertAdjacentHTML('beforeend', `<div class="nav-section-label">${labels[section]}</div>`);
     sectionItems.forEach((item) => {
@@ -214,7 +220,9 @@ function renderNav(items) {
 
 function renderModuleCards(items) {
   const grid = document.getElementById('module-grid');
-  grid.innerHTML = items.map((item) => `
+  const primaryItems = getPrimaryNavItems(items).filter((item) => item.module !== 'home');
+  const cardItems = primaryItems.length ? primaryItems : items;
+  grid.innerHTML = cardItems.map((item) => `
     <article class="module-card">
       <div class="module-card-icon">${navIcon(item.id)}</div><h3>${escapeHtml(item.label)}</h3>
       <p>${escapeHtml(item.description)}</p>
@@ -226,12 +234,40 @@ function renderModuleCards(items) {
   });
 }
 
+function renderSubNav(primaryId, activeId) {
+  const subnav = document.getElementById('module-subnav');
+  if (!subnav) return;
+  const groupItems = navigationItems.filter(
+    (entry) => (entry.id === primaryId || entry.parentId === primaryId) && entry.module !== 'home'
+  );
+  if (groupItems.length <= 1) {
+    subnav.classList.add('app-hidden');
+    subnav.innerHTML = '';
+    return;
+  }
+  subnav.classList.remove('app-hidden');
+  subnav.innerHTML = groupItems.map((entry) => `
+    <button type="button" class="btn btn-secondary btn-sm company-tab ${entry.id === activeId ? 'active' : ''}" data-sub-module="${escapeHtml(entry.id)}" style="display:inline-flex;align-items:center;gap:6px">
+      <span style="display:inline-flex;width:15px;height:15px">${navIcon(entry.id)}</span>
+      <span>${escapeHtml(entry.subtabLabel || entry.label)}</span>
+    </button>
+  `).join('');
+  subnav.querySelectorAll('[data-sub-module]').forEach((btn) => {
+    btn.onclick = () => selectModule(btn.getAttribute('data-sub-module'));
+  });
+}
+
 function resolveInitialModule(bootstrap) {
   const hashId = window.location.hash.replace('#', '').trim();
   const requested = hashId && navigationItems.find((item) =>
     item.id === hashId || item.href.split('#')[1] === hashId
   );
-  if (requested) return requested.id;
+  if (requested) {
+    if (requested.module === 'home' && navigationItems.some((item) => item.id === 'company-dashboard')) {
+      return 'company-dashboard';
+    }
+    return requested.id;
+  }
 
   const pathMap = {
     '/portal/invoices': 'billing-center',
@@ -265,16 +301,22 @@ async function selectModule(moduleId) {
   selectedModuleId = activeId;
   document.body.classList.remove('sidebar-open');
   const item = navigationItems.find((entry) => entry.id === activeId);
-  document.querySelectorAll('.nav-link').forEach((link) => {
-    link.classList.toggle('active', link.getAttribute('data-module-id') === activeId);
-  });
 
   if (!item) {
-    const fallback = navigationItems.find((entry) => entry.module === 'home') || navigationItems[0];
+    const fallback = navigationItems.find((entry) => entry.id === 'company-dashboard') || navigationItems.find((entry) => entry.module === 'home') || navigationItems[0];
     if (fallback && fallback.id !== activeId) return selectModule(fallback.id);
     setBootState('error', 'İstenen panel alanı bulunamadı.');
     return;
   }
+
+  const primaryId = (item.parentId && navigationItems.some((parent) => parent.id === item.parentId))
+    ? item.parentId
+    : item.id;
+  const primaryItem = navigationItems.find((entry) => entry.id === primaryId) || item;
+
+  document.querySelectorAll('.nav-link').forEach((link) => {
+    link.classList.toggle('active', link.getAttribute('data-module-id') === primaryId);
+  });
 
   if (item.module === 'home') {
     document.querySelector('.shell-title').innerText = 'Çalışma Alanı';
@@ -285,9 +327,10 @@ async function selectModule(moduleId) {
     return;
   }
 
-  document.querySelector('.shell-title').innerText = item.label;
-  document.getElementById('embed-title').innerText = item.label;
+  document.querySelector('.shell-title').innerText = primaryItem.label;
+  document.getElementById('embed-title').innerText = item.subtabLabel || item.label;
   document.getElementById('embed-description').innerText = item.description;
+  renderSubNav(primaryId, item.id);
   overviewGrid.classList.add('app-hidden');
   modulePanel.classList.add('app-hidden');
   embedPanel.classList.remove('app-hidden');
@@ -295,7 +338,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20260813-whatsapp1');
+    const { loadModule } = await import('./module-runtime.js?v=20261028-pro1');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `

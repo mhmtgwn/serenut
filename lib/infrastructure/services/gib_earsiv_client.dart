@@ -437,7 +437,11 @@ class GibEArsivClient implements IEArsivProvider {
       throw GibInvoiceException(resJson['messages'].toString());
     }
 
-    return true;
+    throw GibInvoiceException(
+      data.isNotEmpty
+          ? 'GİB SMS onay yanıtı doğrulanamadı: $data'
+          : 'GİB SMS onay yanıtı başarısız oldu.',
+    );
   }
 
   /// 5. İmzalanmış Resmi Faturanın HTML Çıktısını Al (Görüntüleme & Fiş Yazdırma İçin)
