@@ -3,6 +3,7 @@ export interface AppNavItem {
   label: string;
   subtabLabel?: string;
   parentId?: string;
+  hiddenSubtab?: boolean;
   section: 'overview' | 'operations' | 'commerce' | 'customers' | 'communication' | 'security' | 'platform' | 'account';
   href: string;
   description: string;
@@ -39,6 +40,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'SMS ve Operasyon',
     subtabLabel: 'SMS Ana Cihazı & Saha Özeti',
     parentId: 'notification-channels',
+    hiddenSubtab: true,
     section: 'operations',
     href: '/app/#sales-operations',
     description: 'SMS ana cihazı, şube ve terminal bağlantı özeti.',
@@ -157,7 +159,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-companies',
-    label: 'Firmalar ve Lisanslar',
+    label: 'Firmalar',
     subtabLabel: 'Firmalar (CRM)',
     section: 'customers',
     href: '/app/#platform-companies',
@@ -171,6 +173,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Abonelikler',
     subtabLabel: 'Tüm Abonelikler',
     parentId: 'platform-companies',
+    hiddenSubtab: true,
     section: 'customers',
     href: '/app/#platform-subscriptions',
     description: 'Firma aboneliklerini, dönemlerini ve durumlarını inceleyin.',
@@ -183,6 +186,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Lisanslar',
     subtabLabel: 'Lisans Anahtarları',
     parentId: 'platform-companies',
+    hiddenSubtab: true,
     section: 'customers',
     href: '/app/#platform-licenses',
     description: 'Lisans üretin, yenileyin, askıya alın veya iptal edin.',
@@ -273,7 +277,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-maintenance',
     label: 'Sunucu Bakımı',
-    subtabLabel: 'Disk ve Sunucu Temizliği',
+    subtabLabel: 'Sunucu Durumu ve Disk Bakımı',
     parentId: 'platform-security',
     section: 'operations',
     href: '/app/#platform-maintenance',
@@ -287,6 +291,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Sistem',
     subtabLabel: 'Altyapı Sağlığı & Olaylar',
     parentId: 'platform-security',
+    hiddenSubtab: true,
     section: 'operations',
     href: '/app/#platform-health',
     description: 'Telemetri, servis sağlığı ve sistem olaylarını izleyin.',

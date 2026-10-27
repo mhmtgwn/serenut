@@ -404,7 +404,12 @@ router.get('/companies', async (req: AuthenticatedRequest, res: Response) => {
              (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.is_active = TRUE) as store_count,
              (SELECT COUNT(*) FROM device_activations da
               WHERE da.company_id = c.id AND da.status = 'active') as device_count,
-             (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1) as license_expires_at
+             (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1) as license_expires_at,
+             COALESCE((SELECT p.name FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT p.name FROM license_entitlements le JOIN plans p ON p.id = le.plan_id WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 'Deneme / Paket Yok') AS plan_name,
+             COALESCE((SELECT s.status FROM subscriptions s WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT le.status FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 'none') AS subscription_status,
+             COALESCE((SELECT le.valid_until FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), (SELECT s.current_period_end FROM subscriptions s WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1)) AS valid_until,
+             COALESCE((SELECT le.device_limit FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 1) AS device_limit,
+             COALESCE((SELECT le.store_limit FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 1) AS store_limit
       FROM companies c 
       ORDER BY c.created_at DESC
     `);
@@ -646,7 +651,7 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) => {
-  const { status, name, phone, email, address } = req.body;
+  const { status, name, phone, email, address, tax_number, tax_office } = req.body;
   if (status != null) {
     return res.status(400).json({
       error: 'company_status_requires_lifecycle_action',
@@ -665,9 +670,11 @@ router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
            phone = COALESCE($2, phone),
            email = COALESCE($3, email),
            address = COALESCE($4, address),
+           tax_number = COALESCE($6, tax_number),
+           tax_office = COALESCE($7, tax_office),
            updated_at = NOW()
        WHERE id = $5`,
-      [name || null, phone || null, email || null, address || null, req.params.id]
+      [name || null, phone || null, email || null, address || null, req.params.id, tax_number || null, tax_office || null]
     );
 
     await writeAdminAudit(req.user!.id, 'UPDATE_COMPANY', 'companies', req.params.id, original.rows[0], { name, phone, email, address }, req.ip);
@@ -1282,8 +1289,8 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
     const pendingTransfers = await runBypassingRLS("SELECT COUNT(*) FROM bank_transfer_notifications WHERE status = 'pending_review'");
     
     const expiringLicenses = await runBypassingRLS(`
-      SELECT COUNT(*) FROM licenses 
-      WHERE expires_at BETWEEN NOW() AND NOW() + INTERVAL '7 days'
+      SELECT COUNT(*) FROM license_entitlements WHERE valid_until BETWEEN NOW() AND NOW() + INTERVAL '14 days'
+      AND status IN ('active', 'trial', 'grace')
     `);
 
     const todaySignups = await runBypassingRLS(`
@@ -1321,7 +1328,8 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
         noLicense: parseInt(noLicense.rows[0].count, 10),
         pendingTransfers: parseInt(pendingTransfers.rows[0].count, 10)
       },
-      subscriptions: subReport
+      subscriptions: subReport,
+      expiringCompanies: (await runBypassingRLS(`SELECT c.id, c.name, c.phone, c.email, le.valid_until, le.status, COALESCE(p.name, 'Paket') AS plan_name FROM license_entitlements le JOIN companies c ON c.id = le.company_id LEFT JOIN plans p ON p.id = le.plan_id WHERE c.status != 'archived' AND le.valid_until BETWEEN NOW() - INTERVAL '7 days' AND NOW() + INTERVAL '14 days' ORDER BY le.valid_until ASC LIMIT 8`)).rows
     });
   } catch (err) {
     console.error('Commercial dashboard error:', err);
@@ -1350,6 +1358,11 @@ router.get('/support/search', async (req: AuthenticatedRequest, res: Response) =
     const results = await runBypassingRLS(`
       SELECT DISTINCT c.*,
              (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1) as license_expires_at,
+             COALESCE((SELECT p.name FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT p.name FROM license_entitlements le JOIN plans p ON p.id = le.plan_id WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 'Deneme / Paket Yok') AS plan_name,
+             COALESCE((SELECT s.status FROM subscriptions s WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT le.status FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 'none') AS subscription_status,
+             COALESCE((SELECT le.valid_until FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), (SELECT s.current_period_end FROM subscriptions s WHERE s.company_id = c.id ORDER BY s.current_period_end DESC NULLS LAST LIMIT 1), (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1)) AS valid_until,
+             COALESCE((SELECT le.device_limit FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 1) AS device_limit,
+             COALESCE((SELECT le.store_limit FROM license_entitlements le WHERE le.company_id = c.id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), 1) AS store_limit,
              (SELECT status FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1) as license_status
       FROM companies c
       LEFT JOIN licenses l ON l.company_id = c.id

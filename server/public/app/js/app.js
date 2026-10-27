@@ -238,7 +238,7 @@ function renderSubNav(primaryId, activeId) {
   const subnav = document.getElementById('module-subnav');
   if (!subnav) return;
   const groupItems = navigationItems.filter(
-    (entry) => (entry.id === primaryId || entry.parentId === primaryId) && entry.module !== 'home'
+    (entry) => (entry.id === primaryId || entry.parentId === primaryId) && entry.module !== 'home' && (!entry.hiddenSubtab || entry.id === activeId)
   );
   if (groupItems.length <= 1) {
     subnav.classList.add('app-hidden');
