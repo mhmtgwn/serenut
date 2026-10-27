@@ -44,31 +44,31 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
           COALESCE(SUM(total_amount), 0) as revenue,
           COUNT(*) as orders
         FROM sales
-        WHERE created_at >= CURRENT_DATE AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= CURRENT_DATE AND is_deleted = FALSE
       `);
 
       // 2. Weekly metrics & previous week comparison
       const weekRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '7 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '7 days' AND is_deleted = FALSE
       `);
       const prevWeekRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days' AND is_deleted = FALSE
       `);
 
       // 3. Monthly metrics & previous month comparison
       const monthRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
       `);
       const prevMonthRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days' AND is_deleted = FALSE
       `);
 
       // 4. Top selling product
@@ -77,7 +77,7 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         JOIN products p ON si.product_id = p.id
-        WHERE s.created_at >= NOW() - INTERVAL '30 days' AND s.is_deleted = FALSE
+        WHERE s.company_id = current_setting('app.current_company_id', true) AND s.created_at >= NOW() - INTERVAL '30 days' AND s.is_deleted = FALSE
         GROUP BY p.name
         ORDER BY qty DESC
         LIMIT 1
@@ -87,7 +87,7 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
       const busiestHourRes = await client.query(`
         SELECT EXTRACT(HOUR FROM created_at) as hour, COUNT(*) as count
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
         GROUP BY hour
         ORDER BY count DESC
         LIMIT 1
@@ -97,7 +97,7 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
       const payBreakdown = await client.query(`
         SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
         GROUP BY payment_method
       `);
 
@@ -205,7 +205,7 @@ router.get('/sales-trend', authenticateUser, async (req: AuthenticatedRequest, r
           COALESCE(SUM(total_amount), 0) as total_revenue,
           COUNT(*) as sales_count
         FROM sales
-        WHERE created_at >= NOW() - INTERVAL '${limitDays} days' AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND created_at >= NOW() - INTERVAL '${limitDays} days' AND is_deleted = FALSE
         GROUP BY label_time
         ORDER BY label_time ASC
       `);
@@ -248,7 +248,7 @@ router.get('/products', authenticateUser, async (req: AuthenticatedRequest, res:
         FROM products p
         LEFT JOIN sale_items si ON si.product_id = p.id
         LEFT JOIN sales s ON si.sale_id = s.id AND s.is_deleted = FALSE
-        WHERE p.is_deleted = FALSE
+        WHERE p.company_id = current_setting('app.current_company_id', true) AND p.is_deleted = FALSE
         GROUP BY p.id, p.name, p.category, p.quantity
         ORDER BY ${sortBy === 'quantity' ? 'units_sold' : 'revenue'} DESC
         LIMIT 50
@@ -258,7 +258,7 @@ router.get('/products', authenticateUser, async (req: AuthenticatedRequest, res:
         id: row.id,
         name: row.name,
         category: row.category,
-        stock: parseInt(row.stock_quantity, 10),
+        stock: parseFloat(row.stock_quantity || 0),
         unitsSold: parseFloat(row.units_sold),
         revenue: parseFloat(row.revenue)
       }));
@@ -285,14 +285,14 @@ router.get('/stock', authenticateUser, async (req: AuthenticatedRequest, res: Re
       const criticalRes = await client.query(`
         SELECT id, name, category, quantity
         FROM products
-        WHERE quantity <= 10 AND is_deleted = FALSE
+        WHERE company_id = current_setting('app.current_company_id', true) AND quantity <= 10 AND is_deleted = FALSE
         ORDER BY quantity ASC
         LIMIT 20
       `);
 
       // 2. Low stock count
       const lowCountRes = await client.query(`
-        SELECT COUNT(*) FROM products WHERE quantity <= 5 AND is_deleted = FALSE
+        SELECT COUNT(*) FROM products WHERE company_id = current_setting('app.current_company_id', true) AND quantity <= 5 AND is_deleted = FALSE
       `);
 
       return {

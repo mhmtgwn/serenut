@@ -13,6 +13,7 @@ import { exec } from 'child_process';
 import { logger } from '../../config/logger';
 import crypto from 'crypto';
 import { PasswordRecoveryService } from '../auth/password-recovery.service';
+import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
 
 const router = Router();
 
@@ -131,9 +132,10 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
              da.status,
              da.activated_at AS created_at,
              da.last_seen_at AS last_active_at,
-             s.name AS store_name
+             COALESCE(b.name, s.name) AS store_name
       FROM device_activations da
       LEFT JOIN device_fingerprints df ON df.device_id = da.id
+      LEFT JOIN branches b ON b.id = da.branch_id AND b.company_id = da.company_id
       LEFT JOIN stores s ON s.id = da.store_id AND s.company_id = da.company_id
       WHERE da.company_id = $1
       ORDER BY da.activated_at DESC
@@ -314,6 +316,26 @@ router.post('/stores', async (req: AuthenticatedRequest, res: Response) => {
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const entitlementRes = await client.query(
+      `SELECT store_limit FROM license_entitlements
+       WHERE company_id = $1 AND status IN ('active', 'trial')
+       ORDER BY valid_until DESC LIMIT 1`,
+      [user.company_id]
+    );
+    const quotas = await CommercialLifecycleService.getEffectiveQuotas(client, user.company_id);
+    const storeLimit = entitlementRes.rows[0]?.store_limit ?? quotas.storeLimit;
+    const branchCountRes = await client.query(
+      `SELECT COUNT(*)::int AS count FROM branches WHERE company_id = $1 AND is_active = TRUE`,
+      [user.company_id]
+    );
+    const currentBranches = branchCountRes.rows[0]?.count ?? 0;
+    if (currentBranches >= storeLimit) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'BRANCH_LIMIT_EXCEEDED',
+        message: `Paketinizdeki şube sınırına (${storeLimit}) ulaştınız. Yeni şube eklemek için paketinizi yükseltin.`,
+      });
+    }
     await client.query('INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, $3, $4)',
       [storeId, user.company_id, name.trim(), address || null]);
     await client.query(
@@ -325,6 +347,68 @@ router.post('/stores', async (req: AuthenticatedRequest, res: Response) => {
     await writeTenantAudit(user.company_id, user.id, 'CREATE_BRANCH', 'branches', branchId, null, { name });
 
     return res.status(201).json({ success: true, branch_id: branchId, store_id: storeId });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') return res.status(409).json({ error: 'duplicate_branch' });
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
+});
+
+router.patch('/stores/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!user.roles?.some(role => ['owner', 'admin'].includes(role)) && !user.permissions?.includes('settings:manage') && !user.permissions?.includes('settings:update')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Şube düzenleme yetkiniz yok.' });
+  }
+  const { name, address, phone, is_active } = req.body;
+  const branchId = req.params.id;
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const existing = await client.query(
+      'SELECT id, store_id, name, address, phone, is_active FROM branches WHERE (id = $1 OR store_id = $1) AND company_id = $2 FOR UPDATE',
+      [branchId, user.company_id]
+    );
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'branch_not_found', message: 'Şube bulunamadı.' });
+    }
+    const row = existing.rows[0];
+    const nextName = typeof name === 'string' && name.trim() ? name.trim() : row.name;
+    const nextAddress = address !== undefined ? (address || null) : row.address;
+    const nextPhone = phone !== undefined ? (phone || null) : row.phone;
+    const nextActive = is_active !== undefined ? Boolean(is_active) : row.is_active;
+
+    await client.query(
+      `UPDATE branches
+       SET name = $1, address = $2, phone = $3, is_active = $4, updated_at = NOW()
+       WHERE id = $5 AND company_id = $6`,
+      [nextName, nextAddress, nextPhone, nextActive, row.id, user.company_id]
+    );
+    if (row.store_id) {
+      await client.query(
+        `UPDATE stores SET name = $1, address = $2 WHERE id = $3 AND company_id = $4`,
+        [nextName, nextAddress, row.store_id, user.company_id]
+      );
+    }
+    await client.query('COMMIT');
+    await writeTenantAudit(user.company_id, user.id, 'UPDATE_BRANCH', 'branches', row.id, row, { name: nextName, address: nextAddress, phone: nextPhone, is_active: nextActive });
+    return res.json({ success: true, branch_id: row.id });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') return res.status(409).json({ error: 'duplicate_branch' });
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/stores-legacy-unused', async (req: AuthenticatedRequest, res: Response) => {
+  const client = await pgPool.connect();
+  try {
+    return res.status(410).json({ error: 'unused' });
   } catch (err: any) {
     await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(409).json({ error: 'duplicate_branch' });
@@ -400,7 +484,10 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
        ORDER BY MAX(s.current_period_start) DESC LIMIT 1`,
       [user.company_id]
     );
-    if (limitResult.rows[0] && limitResult.rows[0].current_users >= limitResult.rows[0].user_limit) {
+    const quotas = await CommercialLifecycleService.getEffectiveQuotas(pgPool, user.company_id);
+    const activeUsersCount = limitResult.rows[0]?.current_users ?? 0;
+    const effectiveUserLimit = Math.max(Number(limitResult.rows[0]?.user_limit || 0), quotas.userLimit);
+    if (activeUsersCount >= effectiveUserLimit) {
       return res.status(409).json({ error: 'user_limit_reached', message: 'Planınızdaki kullanıcı sınırına ulaştınız.' });
     }
 
@@ -411,7 +498,7 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
       await client.query('BEGIN');
       await client.query("SELECT set_config('app.current_company_id',$1,true)", [user.company_id]);
       await client.query(
-        'INSERT INTO users (id,company_id,name,email,password_hash,is_active) VALUES($1,$2,$3,$4,$5,TRUE)',
+        'INSERT INTO users (id,company_id,name,email,password_hash,is_active,email_verified_at) VALUES($1,$2,$3,$4,$5,TRUE,NOW())',
         [id, user.company_id, name.trim(), email.trim().toLowerCase(), passwordHash],
       );
       await client.query('INSERT INTO user_roles(user_id,role_id) VALUES($1,$2)', [id, role_id]);
@@ -519,6 +606,9 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
       await client.query('DELETE FROM user_roles WHERE user_id = $1', [targetId]);
       await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [targetId, role_id]);
     }
+    if (is_active === false || role_id !== undefined) {
+      await client.query('UPDATE sessions SET is_revoked = true, updated_at = NOW() WHERE user_id = $1', [targetId]);
+    }
 
     await client.query('COMMIT');
 
@@ -551,6 +641,7 @@ router.delete('/users/:id', async (req: AuthenticatedRequest, res: Response) => 
   }
 
   try {
+    await runWithTenantContext(user.company_id, 'UPDATE sessions SET is_revoked = true, updated_at = NOW() WHERE user_id = $1 AND company_id = $2', [targetId, user.company_id]);
     const result = await runWithTenantContext(
       user.company_id,
       'DELETE FROM users WHERE id = $1 AND company_id = $2',
@@ -606,7 +697,12 @@ router.post('/roles', async (req: AuthenticatedRequest, res: Response) => {
   }
   const name = String(req.body.name || '').trim();
   const description = String(req.body.description || '').trim();
-  const permissionCodes = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.map(String))] : [];
+  const rawPermissions = Array.isArray(req.body.permissions) ? req.body.permissions.map((c: any) => String(c).replace(/^notifications:history:read$/, 'notifications.history.read').replace(/^notifications:templates:manage$/, 'notifications.templates.manage')) : [];
+  const portalTriggerPerms = new Set(['billing:view', 'devices:view', 'devices:manage', 'users:view', 'users:manage', 'settings:update', 'settings:manage', 'reports:view', 'notifications.history.read', 'notifications.templates.manage', 'audit:read']);
+  if (rawPermissions.some((p: string) => portalTriggerPerms.has(p)) && !rawPermissions.includes('portal:access')) {
+    rawPermissions.push('portal:access');
+  }
+  const permissionCodes = [...new Set(rawPermissions)];
   if (!name || permissionCodes.length === 0) {
     return res.status(400).json({ error: 'missing_fields', message: 'Rol adı ve en az bir yetki zorunludur.' });
   }

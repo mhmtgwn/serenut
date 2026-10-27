@@ -33,8 +33,23 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/:id/attachments/:attachmentId', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const attachment = await MailService.getAttachment(req.params.id, req.params.attachmentId);
+    
+    // SSRF & Protocol validation
+    const parsedUrl = new URL(attachment.downloadUrl);
+    if (!['https:', 'http:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ error: { code: 'INVALID_URL', message: 'Geçersiz indirme bağlantısı.' } });
+    }
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('10.') || hostname.startsWith('192.168.') || hostname === '169.254.169.254') {
+      return res.status(400).json({ error: { code: 'SSRF_BLOCKED', message: 'Güvenlik nedeniyle bu adrese erişilemez.' } });
+    }
+
     const response = await fetch(attachment.downloadUrl);
     if (!response.ok) throw new Error(`attachment_download_failed:${response.status}`);
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: { code: 'TOO_LARGE', message: 'Ek 25 MB sınırını aşıyor.' } });
+    }
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.length > 25 * 1024 * 1024) return res.status(413).json({ error: { code: 'TOO_LARGE', message: 'Ek 25 MB sınırını aşıyor.' } });
     res.setHeader('Content-Type', attachment.contentType);

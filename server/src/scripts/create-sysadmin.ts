@@ -10,7 +10,9 @@ const PLATFORM_TAX_NUMBER = '0000000000';
 
 function readHidden(prompt: string): Promise<string> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error('Parola yalnız etkileşimli bir terminalden girilebilir.');
+    throw new Error(
+      'Etkileşimli terminal (TTY) bulunamadı. Otomatik güçlü parola üretmek için komuta --generate-password ekleyin.'
+    );
   }
 
   return new Promise((resolve, reject) => {
@@ -51,22 +53,25 @@ function validatePassword(password: string): void {
   }
 }
 
+function generateStrongPassword(): string {
+  const token = crypto.randomBytes(6).toString('hex');
+  return `SrnAdmin-${token.slice(0, 4)}-${token.slice(4, 8)}-${token.slice(8, 12)}9`;
+}
+
 async function main() {
-  const name = process.argv[2]?.trim();
-  const email = process.argv[3]?.trim().toLowerCase();
+  const rawArgs = process.argv.slice(2);
+  const isReset = rawArgs.includes('--reset');
+  const shouldGeneratePw = rawArgs.includes('--generate-password') || rawArgs.includes('--auto');
+  const positional = rawArgs.filter((a) => !a.startsWith('--'));
 
-  if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
-    throw new Error(
-      'Kullanım: npm run create:sysadmin -- "Admin" "sysadmin@serenut.com"'
-    );
-  }
+  let name = isReset
+    ? (positional.length > 1 ? positional[0]?.trim() : 'Sysadmin')
+    : positional[0]?.trim();
+  let email = (isReset
+    ? (positional.length > 1 ? positional[1] : positional[0])
+    : positional[1]
+  )?.trim().toLowerCase();
 
-  const password = await readHidden('Parola: ');
-  const confirmation = await readHidden('Parola tekrar: ');
-  if (password !== confirmation) throw new Error('Parolalar eşleşmiyor.');
-  validatePassword(password);
-
-  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const client = await pgPool.connect();
 
   try {
@@ -74,12 +79,63 @@ async function main() {
     await client.query("SET LOCAL app.bypass_rls = 'true'");
     await client.query("SELECT pg_advisory_xact_lock(hashtext('serenut:create-sysadmin'))");
 
-    const duplicateEmail = await client.query(
-      'SELECT 1 FROM users WHERE LOWER(email) = $1 LIMIT 1',
+    if (isReset && !email) {
+      const sysadmins = await client.query(
+        `SELECT u.id, u.name, u.email
+         FROM users u
+         JOIN user_roles ur ON ur.user_id = u.id
+         JOIN roles r ON r.id = ur.role_id
+         WHERE r.name = 'sysadmin' AND u.deleted_at IS NULL
+         ORDER BY u.is_active DESC, u.created_at ASC`
+      );
+      if (sysadmins.rows.length === 0) {
+        throw new Error(
+          'Sistemde kayıtlı bir sysadmin bulunamadı. Yeni oluşturmak için:\n' +
+          '  npm run create:sysadmin -- "Admin" "sysadmin@serenut.com"'
+        );
+      }
+      if (sysadmins.rows.length > 1) {
+        const list = sysadmins.rows.map((r: any) => `  - ${r.email} (${r.name})`).join('\n');
+        throw new Error(
+          `Birden fazla sysadmin hesabı bulundu. Lütfen sıfırlanacak e-postayı belirtin:\n${list}\n` +
+          `Örnek: npm run reset:sysadmin -- "${sysadmins.rows[0].email}"`
+        );
+      }
+      email = String(sysadmins.rows[0].email).trim().toLowerCase();
+      name = sysadmins.rows[0].name || 'Sysadmin';
+      console.log(`Tespit edilen sysadmin hesabı: ${name} <${email}>`);
+    }
+
+    if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
+      throw new Error(
+        'Kullanım:\n' +
+        '  Mevcut sysadmin şifresini sıfırlamak: npm run reset:sysadmin -- "sysadmin@serenut.com"\n' +
+        '  Otomatik şifre üreterek sıfırlamak:   npm run reset:sysadmin -- --generate-password\n' +
+        '  Yeni sysadmin oluşturmak:             npm run create:sysadmin -- "Admin" "sysadmin@serenut.com"'
+      );
+    }
+
+    let password: string;
+    if (shouldGeneratePw) {
+      password = generateStrongPassword();
+    } else {
+      password = await readHidden('Yeni Parola: ');
+      const confirmation = await readHidden('Parola Tekrar: ');
+      if (password !== confirmation) throw new Error('Parolalar eşleşmiyor.');
+    }
+    validatePassword(password);
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    const existingUserRes = await client.query(
+      'SELECT id, name FROM users WHERE LOWER(email) = $1 AND deleted_at IS NULL LIMIT 1',
       [email]
     );
-    if (duplicateEmail.rows.length > 0) {
-      throw new Error('Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut.');
+
+    if (existingUserRes.rows.length > 0 && !isReset) {
+      throw new Error(
+        `Bu e-posta adresiyle kayıtlı bir kullanıcı zaten mevcut. Parolasını sıfırlamak için:\n  npm run reset:sysadmin -- "${email}"`
+      );
     }
 
     await client.query(
@@ -97,25 +153,70 @@ async function main() {
     const roleResult = await client.query(`SELECT id FROM roles WHERE name='sysadmin' LIMIT 1`);
     if (!roleResult.rowCount) throw new Error('Sysadmin rolü oluşturulamadı.');
 
-    const userId = `sysadmin-${crypto.randomUUID()}`;
-    await client.query(
-      `INSERT INTO users
-         (id, company_id, name, email, password_hash, is_active, email_verified_at)
-       VALUES ($1, $2, $3, $4, $5, true, NOW())`,
-      [userId, PLATFORM_COMPANY_ID, name, email, passwordHash]
-    );
-    await client.query(
-      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
-      [userId, roleResult.rows[0].id]
-    );
+    let userId: string;
+    let displayName: string;
+
+    if (existingUserRes.rows.length > 0) {
+      userId = existingUserRes.rows[0].id;
+      displayName = existingUserRes.rows[0].name || name;
+
+      await client.query(
+        `UPDATE users
+         SET password_hash = $1,
+             is_active = true,
+             failed_login_attempts = 0,
+             locked_until = NULL,
+             email_verified_at = COALESCE(email_verified_at, NOW()),
+             token_version = COALESCE(token_version, 0) + 1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [passwordHash, userId]
+      );
+
+      await client.query(
+        `INSERT INTO user_roles (user_id, role_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [userId, roleResult.rows[0].id]
+      );
+
+      await client.query(
+        `UPDATE sessions
+         SET is_revoked = true, updated_at = NOW()
+         WHERE user_id = $1`,
+        [userId]
+      );
+    } else {
+      userId = `sysadmin-${crypto.randomUUID()}`;
+      displayName = name;
+
+      await client.query(
+        `INSERT INTO users
+           (id, company_id, name, email, password_hash, is_active, email_verified_at)
+         VALUES ($1, $2, $3, $4, $5, true, NOW())`,
+        [userId, PLATFORM_COMPANY_ID, name, email, passwordHash]
+      );
+      await client.query(
+        'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
+        [userId, roleResult.rows[0].id]
+      );
+    }
+
     const recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
 
     await client.query('COMMIT');
-    console.log(`Sysadmin oluşturuldu: ${name} <${email}>`);
-    console.log('\nKurtarma kodları (yalnızca şimdi gösterilir):');
-    recoveryCodes.forEach(code => console.log(code));
+    console.log(
+      existingUserRes.rows.length > 0
+        ? `\n✅ Sysadmin parolası sıfırlandı ve eski oturumlar sonlandırıldı: ${displayName} <${email}>`
+        : `\n✅ Sysadmin oluşturuldu: ${displayName} <${email}>`
+    );
+    if (shouldGeneratePw) {
+      console.log(`\n🔑 Yeni Geçici / Güçlü Parolanız (yalnızca şimdi gösterilir):\n${password}`);
+    }
+    console.log('\n🛡️ Yeni Kurtarma Kodlarınız (yalnızca şimdi gösterilir):');
+    recoveryCodes.forEach((code) => console.log(code));
     console.log('\nKodları çevrimdışı ve güvenli bir yerde saklayın.');
-    console.log('Parola daha sonra Hesap Ayarları ekranından değiştirilebilir.');
+    console.log('Şifrenizi unutursanız /forgot-password ekranından sadece E-posta + Kurtarma Kodu ile giriş yapabilirsiniz.');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

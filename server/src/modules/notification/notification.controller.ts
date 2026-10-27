@@ -5,6 +5,7 @@ import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
 import { isNotificationChannelEnabled } from './notification_channels';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
+import { dispatchNotificationOutboxBatch } from '../../workers/notification.worker';
 
 const router = Router();
 
@@ -16,7 +17,7 @@ const requireSmsHistoryAccess = (
   const permissions = req.user?.permissions || [];
   if (
     permissions.includes('notifications.history.read') ||
-    permissions.includes('settings:view')
+    permissions.includes('settings:view') || req.user?.roles?.some(r => ['owner', 'admin', 'sysadmin'].includes(r))
   ) {
     return next();
   }
@@ -183,6 +184,7 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
         null, parsedScheduledAt, user.id]
     );
 
+    dispatchNotificationOutboxBatch().catch(() => {});
     return res.status(201).json({ success: true, queue_id: id });
   } catch (err) {
     logger.error('Failed direct notify queue push:', err);
@@ -396,8 +398,8 @@ router.get('/queue', requireSmsHistoryAccess, async (req: AuthenticatedRequest, 
       user.company_id,
       `SELECT id, channel, recipient, title, body, status, retry_count, error_message,
               provider_message_id,provider_status,provider_error_code,delivered_at,created_at
-       FROM notification_queue WHERE created_by_user_id = $1 ORDER BY created_at DESC LIMIT 100`,
-      [user.id]
+       FROM notification_queue WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [user.company_id]
     );
     return res.json(history.rows);
   } catch (err) {
@@ -416,7 +418,7 @@ router.get('/credits', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const creditsRes = await runWithTenantContext(
       user.company_id,
-      'SELECT sms_credits, whatsapp_credits, email_credits FROM company_notification_credits'
+      'SELECT sms_credits, whatsapp_credits, email_credits FROM company_notification_credits WHERE company_id = $1', [user.company_id]
     );
 
     if (creditsRes.rows.length === 0) {
@@ -552,7 +554,10 @@ router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notificat
       for (const rec of recipients) {
         // Enforce credit check per record
         const hasCredit = await hasSufficientCredits(user.company_id, channel);
-        if (!hasCredit) {
+        const creditCol = channel === 'sms' ? 'sms_credits' : channel === 'whatsapp' ? 'whatsapp_credits' : 'email_credits';
+        const remRes = await client.query(`SELECT ${creditCol} AS rem FROM company_notification_credits WHERE company_id = $1`, [user.company_id]);
+        const remCredits = remRes.rows.length > 0 ? Number(remRes.rows[0].rem || 0) : 100;
+        if (!hasCredit || queuedCount >= remCredits) {
           logger.warn(`Campaign aborted midway for company ${user.company_id} due to out of credits.`);
           break;
         }
@@ -577,6 +582,7 @@ router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notificat
       }
 
       await client.query('COMMIT');
+      dispatchNotificationOutboxBatch().catch(() => {});
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

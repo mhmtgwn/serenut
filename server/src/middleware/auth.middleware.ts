@@ -44,6 +44,16 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       return res.status(401).json({ error: 'unauthorized', message: 'Yetkileriniz veya şifreniz güncellendi. Lütfen tekrar giriş yapın.' });
     }
 
+    if (decoded.session_id) {
+      const sessRes = await tenantLocalStorage.run(databaseContext, () =>
+        pgPool.query('SELECT is_revoked, expires_at FROM sessions WHERE id = $1', [decoded.session_id])
+      );
+      if (sessRes.rows.length === 0 || sessRes.rows[0].is_revoked || new Date(sessRes.rows[0].expires_at) <= new Date()) {
+        incrementJwtFailures();
+        return res.status(401).json({ error: 'session_revoked', message: 'Oturum sonlandırılmıştır. Lütfen tekrar giriş yapın.' });
+      }
+    }
+
     req.user = decoded;
     
     // Bind context of PG RLS for asynchronous callbacks

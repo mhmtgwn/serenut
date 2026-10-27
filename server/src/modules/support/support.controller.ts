@@ -11,6 +11,7 @@ import { Router, Response } from 'express';
 import { Webhook } from 'svix';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { SupportService } from './support.service';
+import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import { MailService } from '../mail/mail.service';
@@ -358,8 +359,18 @@ router.patch('/tickets/:id/status', async (req: AuthenticatedRequest, res: Respo
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!req.user!.roles?.includes('sysadmin')) {
-    return res.status(403).json(createError('AUTH005'));
+  const isSysadmin = req.user!.roles?.includes('sysadmin');
+  if (!isSysadmin) {
+    if (status !== 'closed') {
+      return res.status(403).json(createError('AUTH005', 'Müşteriler yalnızca kendi biletlerini kapatabilir.'));
+    }
+    const ticketCheck = await pgPool.query(
+      `SELECT company_id FROM support_tickets WHERE id = $1`,
+      [id]
+    );
+    if (!ticketCheck.rowCount || ticketCheck.rows[0].company_id !== req.user!.company_id) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
+    }
   }
 
   if (!status) {

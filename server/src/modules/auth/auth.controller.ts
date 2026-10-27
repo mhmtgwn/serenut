@@ -134,6 +134,9 @@ router.post('/refresh', async (req: Request, res: Response) => {
     const result = await AuthService.refresh(refresh_token, ipAddress, userAgent);
     return res.json(result);
   } catch (err: any) {
+    if (err.message === 'user_suspended') {
+      return res.status(403).json(createError('AUTH003'));
+    }
     if (err.message === 'invalid_refresh_token' || err.message === 'refresh_token_expired') {
       return res.status(401).json(createError('AUTH002'));
     }
@@ -228,6 +231,19 @@ router.post('/session-bootstrap', authenticateUser, async (req: AuthenticatedReq
       'device_limit_exceeded', 'hardware_tampered_limit_exceeded'
     ]);
     if (known.has(err.message)) {
+      if (err.message === 'license_expired' || err.message === 'no_license_found') {
+        const user = (req as any).user;
+        return res.status(200).json({
+          user: user ? { id: user.id, company_id: user.company_id, roles: user.roles, permissions: user.permissions } : null,
+          subscription: null,
+          company: null,
+          license_key: null,
+          activation: null,
+          entitlement_state: 'expired',
+          requires_subscription: true,
+          message: 'Abonelik veya deneme süreniz sona erdi. Lütfen devam etmek için bir paket seçin.',
+        });
+      }
       return res.status(409).json({ error: err.message });
     }
     logger.error('Session bootstrap error:', err);
@@ -282,7 +298,7 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
         userName: recovery.userName,
         resetLink: `${publicUrl}/reset-password?token=${encodeURIComponent(recovery.resetToken)}`,
       });
-      const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const notificationId = `notif-auth-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
       await pgPool.query(
         `INSERT INTO notification_queue (id,company_id,channel,recipient,title,body,status,scheduled_at)
          VALUES($1,$2,'email',$3,$4,$5,'pending',NOW())`,
@@ -314,6 +330,7 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
     if (!success) {
       return res.status(400).json({ error: 'invalid_token', message: 'Geçersiz veya süresi dolmuş token.' });
     }
+    if (success && success.email) { try { const loginData = await AuthService.login(success.email, newPassword, req.ip || req.socket.remoteAddress || undefined, req.headers['user-agent'] || undefined); return res.json({ success: true, ...loginData, message: 'Şifreniz başarıyla güncellendi ve giriş yapıldı.' }); } catch (_) {} }
     return res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
     if ((err as Error).message === 'weak_password') {
@@ -329,12 +346,12 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
 
 router.post('/recovery/authorize-code', passwordResetLimiter, async (req: Request, res: Response) => {
   const { identifier, company_name, tax_number, recovery_code } = req.body;
-  if (![identifier, company_name, tax_number, recovery_code].every(value => typeof value === 'string' && value.trim())) {
-    return res.status(400).json({ error: 'missing_fields', message: 'Hesap, işletme, TC/VKN ve kurtarma kodu zorunludur.' });
+  if (![identifier, recovery_code].every(value => typeof value === 'string' && value.trim())) {
+    return res.status(400).json({ error: 'missing_fields', message: 'E-posta (veya kullanıcı adı) ve kurtarma kodu zorunludur.' });
   }
   try {
     const authorization = await PasswordRecoveryService.recoverWithIdentityAndCode({
-      identifier, companyName: company_name, taxNumber: tax_number, recoveryCode: recovery_code,
+      identifier, companyName: typeof company_name === 'string' ? company_name : '', taxNumber: typeof tax_number === 'string' ? tax_number : '', recoveryCode: recovery_code,
       context: { ip: req.ip, userAgent: req.headers['user-agent'] },
     });
     if (!authorization) return res.status(400).json({ error: 'recovery_verification_failed', message: 'Bilgiler veya kurtarma kodu doğrulanamadı.' });
@@ -499,7 +516,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       `INSERT INTO users (id, company_id, name, email, username, password_hash, is_active, email_verified_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [userId, companyId, name, normalizedEmail, normalizedUsername, passwordHash,
-        true, emailVerificationRequired ? null : new Date()]
+        !emailVerificationRequired, emailVerificationRequired ? null : new Date()]
     );
     registeredUserId = userId;
     recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
@@ -547,7 +564,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
           userName: name,
           verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${verificationToken}`
         });
-        const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+        const notificationId = `notif-auth-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         await client.query(
           `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
            VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
@@ -596,7 +613,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
 router.get('/verify-email', async (req: Request, res: Response) => {
   const token = String(req.query.token || '');
   if (!/^[a-f0-9]{64}$/i.test(token)) {
-    return res.status(400).send('Geçersiz doğrulama bağlantısı.');
+    return res.redirect(302, '/login?error=verification_invalid');
   }
 
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -612,7 +629,7 @@ router.get('/verify-email', async (req: Request, res: Response) => {
     );
     if (result.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).send('Doğrulama bağlantısının süresi dolmuş veya bağlantı daha önce kullanılmış.');
+      return res.redirect(302, '/login?error=verification_expired');
     }
     await client.query(
       `UPDATE users SET email_verified_at = NOW(), is_active = true WHERE id = $1`,
@@ -653,7 +670,7 @@ router.post('/resend-verification', signupLimiter, async (req: Request, res: Res
     await client.query("SET LOCAL app.bypass_rls = 'true'");
     const userResult = await client.query(
       `SELECT id, company_id, name FROM users
-       WHERE LOWER(email) = $1 AND email_verified_at IS NULL AND is_active = false
+       WHERE LOWER(email) = $1 AND (email_verified_at IS NULL OR is_active = false)
        LIMIT 1`,
       [normalizedEmail]
     );
@@ -679,7 +696,7 @@ router.post('/resend-verification', signupLimiter, async (req: Request, res: Res
       userName: user.name,
       verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${rawToken}`
     });
-    const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const notificationId = `notif-auth-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     await client.query(
       `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
        VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,

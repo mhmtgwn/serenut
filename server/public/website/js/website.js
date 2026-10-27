@@ -20,9 +20,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const icons = { product:icon('M4 6h16M4 12h16M4 18h10'), plans:icon('M4 4h16v16H4zM8 9h8M8 13h5'), download:icon('M12 3v12m0 0 5-5m-5 5-5-5M5 21h14'), contact:icon('M4 5h16v14H4zM4 7l8 6 8-6') };
   const escapeHtml = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let profile = null;
-  try { profile = JSON.parse(sessionStorage.getItem('app_profile') || localStorage.getItem('app_profile') || 'null'); } catch (_) {}
+  const hasToken = Boolean(sessionStorage.getItem('access_token') || localStorage.getItem('access_token'));
+  try { if (hasToken) profile = JSON.parse(sessionStorage.getItem('app_profile') || localStorage.getItem('app_profile') || 'null'); } catch (_) {}
   const accountWidget = profile
-    ? `<a class="account-widget is-authenticated" href="/app/?flow=panel"><span class="account-avatar">${escapeHtml((profile.name||profile.email||'S').slice(0,1).toUpperCase())}</span><span><strong>${escapeHtml(profile.name||'Hesabım')}</strong><small>Panele git</small></span></a>`
+    ? `<a class="account-widget is-authenticated" href="/app/?flow=panel"><span class="account-avatar">${escapeHtml((profile.full_name||profile.name||profile.email||'S').slice(0,1).toUpperCase())}</span><span><strong>${escapeHtml(profile.full_name||profile.name||'Hesabım')}</strong><small>Panele git</small></span></a>`
     : `<div class="auth-launcher" aria-label="Hesap işlemleri"><a href="/login">Giriş yap</a><a href="/register?flow=account">Kayıt ol</a></div>`;
   const navigationLinks = `<a href="/platform" ${currentPath==='/platform'?'aria-current="page"':''}>${icons.product}<span>Ürün</span></a><a href="/plans" ${currentPath==='/plans'?'aria-current="page"':''}>${icons.plans}<span>Planlar</span></a><a href="/downloads" ${currentPath==='/downloads'?'aria-current="page"':''}>${icons.download}<span>İndir</span></a><a href="/contact" ${currentPath==='/contact'?'aria-current="page"':''}>${icons.contact}<span>İletişim</span></a>`;
   const headerMarkup = `<div class="container header-row"><a class="brand" href="/">Serenut</a><nav class="desktop-nav" aria-label="Ana navigasyon">${navigationLinks}</nav><div class="header-actions">${accountWidget}</div><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Ana menüyü aç" aria-expanded="false" aria-controls="mobile-panel"><span>Menü</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button></div><div class="mobile-panel app-hidden" id="mobile-panel"><nav class="mobile-nav container" aria-label="Mobil navigasyon">${navigationLinks}<div class="mobile-account">${accountWidget}</div></nav></div>`;
@@ -138,7 +139,7 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
   try {
     const response = await fetch('/api/v1/support/guest-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('contact-name').value.trim(), email: document.getElementById('contact-email').value.trim(), phone: document.getElementById('contact-phone').value.trim(), company_name: document.getElementById('contact-company').value.trim(), customer_claim: document.getElementById('contact-customer-claim').value, category: document.getElementById('contact-category').value, subject: document.getElementById('contact-subject').value.trim(), message: document.getElementById('contact-message').value.trim(), privacy_consent: document.getElementById('contact-privacy-consent').checked, privacy_notice_version: '2026-08-09' }) });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || 'Mesaj gönderilemedi.');
+    if (!response.ok) throw new Error(data.error?.message || data.message || 'Mesaj gönderilemedi.');
     status.className = 'form-status full success'; status.textContent = data.message || 'Mesajınız iletildi.'; form.reset();
   } catch (error) { status.className = 'form-status full error'; status.textContent = error.message; }
   finally { button.disabled = false; button.textContent = 'Mesajı Gönder'; }

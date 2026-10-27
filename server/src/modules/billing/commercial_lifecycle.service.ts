@@ -56,7 +56,8 @@ export class CommercialLifecycleService {
       licenseId: prior.rows[0].license_id,
       licenseKey: prior.rows[0].license_key,
     };
-    const trialDays = Math.max(1, Number(plan.rows[0].trial_days || 30));
+    const _trialDays = Math.max(1, Number(plan.rows[0].trial_days || 30));
+    void _trialDays;
     const subscriptionId = BillingDomainService.opaqueId('sub');
     const entitlementId = BillingDomainService.opaqueId('ent');
     const licenseId = BillingDomainService.opaqueId('lic');
@@ -64,20 +65,20 @@ export class CommercialLifecycleService {
     await client.query(
       `INSERT INTO subscriptions(id,company_id,plan_id,status,current_period_start,current_period_end,
          trial_started_at,trial_ends_at,payment_retry_count)
-       VALUES($1,$2,$3,'trialing',NOW(),NOW() + ($4 || ' days')::interval,NOW(),NOW() + ($4 || ' days')::interval,0)`,
-      [subscriptionId, params.companyId, planId, trialDays],
+       VALUES($1,$2,$3,'trialing',NOW(),NOW() + INTERVAL '90 days',NULL,NULL,0)`,
+      [subscriptionId, params.companyId, planId],
     );
     await client.query(
       `INSERT INTO license_entitlements(id,company_id,subscription_id,plan_id,status,
          device_limit,store_limit,valid_from,valid_until,token_version,license_key)
-       VALUES($1,$2,$3,$4,'trial',$5,$6,NOW(),NOW() + ($7 || ' days')::interval,1,$8)`,
+       VALUES($1,$2,$3,$4,'trial',$5,$6,NOW(),NOW() + INTERVAL '90 days',1,$7)`,
       [entitlementId, params.companyId, subscriptionId, planId,
-        plan.rows[0].device_limit, plan.rows[0].store_limit, trialDays, licenseKey],
+        plan.rows[0].device_limit, plan.rows[0].store_limit, licenseKey],
     );
     await client.query(
       `INSERT INTO licenses(id,company_id,license_key,tier,allowed_devices_count,status,expires_at)
-       VALUES($1,$2,$3,'trial',$4,'active',NOW() + ($5 || ' days')::interval)`,
-      [licenseId, params.companyId, licenseKey, plan.rows[0].device_limit, trialDays],
+       VALUES($1,$2,$3,'trial',$4,'active',NOW() + INTERVAL '90 days')`,
+      [licenseId, params.companyId, licenseKey, plan.rows[0].device_limit],
     );
     return { subscriptionId, entitlementId, licenseId, licenseKey };
   }
@@ -238,7 +239,20 @@ export class CommercialLifecycleService {
       now, periodEnd, licenseKey
     ]);
 
-    // 4b. Sync legacy licenses table for backward compatibility
+    // 4b. Rebind existing active / suspended device activations to the new entitlement
+    await client.query(`
+      UPDATE device_activations
+      SET entitlement_id = $1, status = 'active', revoked_at = NULL, revoked_by = NULL, updated_at = NOW()
+      WHERE company_id = $2 AND status IN ('active', 'suspended', 'revoked')
+        AND id IN (
+          SELECT id FROM device_activations
+          WHERE company_id = $2
+          ORDER BY last_seen_at DESC NULLS LAST, activated_at DESC
+          LIMIT $3
+        )
+    `, [entId, companyId, resolvedDeviceLimit]);
+
+    // 4c. Sync legacy licenses table for backward compatibility
     const existingLicense = await client.query(
       `SELECT id FROM licenses WHERE company_id = $1 LIMIT 1`,
       [companyId]
@@ -415,28 +429,52 @@ export class CommercialLifecycleService {
     },
   ): Promise<void> {
     if (!params.reason.trim()) throw new Error('status_reason_required');
-    const entitlementStatus = params.status === 'suspended' ? 'suspended' : params.status;
-    const legacyStatus = params.status === 'active' ? 'active' : params.status;
     const locked = await client.query(
-      `SELECT id FROM license_entitlements
-       WHERE company_id=$1 AND status IN ('trial','active','suspended') FOR UPDATE`,
+      `SELECT id, status, subscription_id FROM license_entitlements
+       WHERE company_id=$1 AND status IN ('trial','active','suspended')
+       ORDER BY valid_until DESC NULLS LAST LIMIT 1 FOR UPDATE`,
       [params.companyId],
     );
     if (!locked.rowCount) throw new Error('entitlement_not_found');
+
+    let entitlementStatus: 'trial' | 'active' | 'suspended' | 'revoked' =
+      params.status === 'suspended' ? 'suspended' : params.status;
+
     if (params.status === 'active') {
       const valid = await client.query(
         `SELECT 1 FROM license_entitlements WHERE company_id=$1 AND valid_until>NOW() LIMIT 1`,
         [params.companyId],
       );
       if (!valid.rowCount) throw new Error('expired_entitlement_requires_grant');
+
+      // Determine whether this company is on a paid subscription or still in trial
+      const paidGrant = await client.query(
+        `SELECT 1 FROM commercial_entitlement_grants g
+         JOIN license_entitlements le ON le.id = g.entitlement_id
+         WHERE le.company_id = $1 AND le.valid_until > NOW() LIMIT 1`,
+        [params.companyId],
+      );
+      const subRes = await client.query(
+        `SELECT status, trial_ends_at FROM subscriptions
+         WHERE company_id = $1 ORDER BY current_period_end DESC NULLS LAST LIMIT 1`,
+        [params.companyId],
+      );
+      const subStatus = subRes.rows[0]?.status;
+      if (!paidGrant.rowCount && (subStatus === 'trialing' || subStatus === 'trial' || locked.rows[0].status === 'trial')) {
+        entitlementStatus = 'trial';
+      } else {
+        entitlementStatus = 'active';
+      }
     }
+
+    const legacyStatus = params.status === 'active' ? 'active' : params.status;
     await client.query(
       `UPDATE license_entitlements SET status=$1, token_version=token_version+1, updated_at=NOW()
        WHERE company_id=$2 AND status IN ('trial','active','suspended')`,
       [entitlementStatus, params.companyId],
     );
     await client.query(
-      `UPDATE licenses SET status=$1, updated_at=NOW() WHERE company_id=$2 AND status!='revoked'`,
+      `UPDATE licenses SET status=$1 WHERE company_id=$2 AND status!='revoked'`,
       [legacyStatus, params.companyId],
     );
     if (params.status === 'suspended') {
@@ -451,6 +489,11 @@ export class CommercialLifecycleService {
          WHERE company_id=$2 AND status IN ('active','suspended')`,
         [params.actorId, params.companyId],
       );
+      await client.query(
+        `UPDATE subscriptions SET status='cancelled', cancel_at_period_end=true, updated_at=NOW()
+         WHERE company_id=$1 AND status IN ('active','trialing')`,
+        [params.companyId],
+      );
     } else {
       await client.query(
         `UPDATE device_activations SET status='active', revoked_at=NULL, revoked_by=NULL, updated_at=NOW()
@@ -462,8 +505,97 @@ export class CommercialLifecycleService {
       `INSERT INTO audit_logs (id,company_id,user_id,user_name,action,entity,entity_id,new_value)
        VALUES ($1,$2,$3,'Admin',$4,'license_entitlement',$2,$5::jsonb)`,
       [BillingDomainService.opaqueId('al'), params.companyId, params.actorId,
-        `ENTITLEMENT_${params.status.toUpperCase()}`, JSON.stringify({ reason: params.reason })],
+        `ENTITLEMENT_${params.status.toUpperCase()}`, JSON.stringify({ reason: params.reason, resolved_status: entitlementStatus })],
     );
+  }
+
+  /**
+   * Canonical quota calculation (Single Source of Truth) for users, stores/branches, and devices.
+   * Avoids Cartesian row multiplication when multiple subscription_addons rows exist.
+   */
+  static async getEffectiveQuotas(
+    client: { query: (sql: string, params?: any[]) => Promise<any> },
+    companyId: string,
+  ): Promise<{
+    planId: string;
+    planName: string;
+    status: string;
+    userLimit: number;
+    storeLimit: number;
+    deviceLimit: number;
+    validUntil: Date | null;
+    trialEndsAt: Date | null;
+  }> {
+    const baseRes = await client.query(
+      `SELECT
+         COALESCE(le.plan_id, s.plan_id, 'plan-basic') AS plan_id,
+         COALESCE(p.name, 'Standart Paket') AS plan_name,
+         COALESCE(le.status, s.status, 'inactive') AS status,
+         COALESCE(o.user_limit, p.user_limit, 5) AS base_user_limit,
+         COALESCE(le.store_limit, o.store_limit, p.store_limit, 1) AS base_store_limit,
+         COALESCE(le.device_limit, o.device_limit, p.device_limit, 1) AS base_device_limit,
+         COALESCE(le.valid_until, s.current_period_end) AS valid_until,
+         s.trial_ends_at
+       FROM companies c
+       LEFT JOIN LATERAL (
+         SELECT * FROM subscriptions
+         WHERE company_id = c.id
+         ORDER BY current_period_end DESC NULLS LAST LIMIT 1
+       ) s ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT * FROM license_entitlements
+         WHERE company_id = c.id AND status IN ('active', 'trial', 'suspended')
+         ORDER BY valid_until DESC NULLS LAST LIMIT 1
+       ) le ON TRUE
+       LEFT JOIN plans p ON p.id = COALESCE(le.plan_id, s.plan_id)
+       LEFT JOIN subscription_overrides o ON o.company_id = c.id
+         AND o.is_active = TRUE
+         AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
+       WHERE c.id = $1`,
+      [companyId],
+    );
+
+    const row = baseRes.rows[0] || {
+      plan_id: 'plan-basic',
+      plan_name: 'Standart Paket',
+      status: 'inactive',
+      base_user_limit: 5,
+      base_store_limit: 1,
+      base_device_limit: 1,
+      valid_until: null,
+      trial_ends_at: null,
+    };
+
+    let extraUsers = 0;
+    let extraStores = 0;
+    let extraDevices = 0;
+    try {
+      const addonsRes = await client.query(
+        `SELECT addon_type, COALESCE(SUM(quantity), 0)::int AS total_qty
+         FROM subscription_addons
+         WHERE company_id = $1 AND status = 'active'
+         GROUP BY addon_type`,
+        [companyId],
+      );
+      for (const addon of addonsRes.rows) {
+        if (addon.addon_type === 'extra_user') extraUsers += Number(addon.total_qty || 0);
+        if (addon.addon_type === 'extra_store') extraStores += Number(addon.total_qty || 0);
+        if (addon.addon_type === 'extra_device') extraDevices += Number(addon.total_qty || 0);
+      }
+    } catch (_) {
+      // Table may not exist in older test schemas
+    }
+
+    return {
+      planId: row.plan_id,
+      planName: row.plan_name,
+      status: row.status,
+      userLimit: Number(row.base_user_limit || 5) + extraUsers,
+      storeLimit: Number(row.base_store_limit || 1) + extraStores,
+      deviceLimit: Number(row.base_device_limit || 1) + extraDevices,
+      validUntil: row.valid_until ? new Date(row.valid_until) : null,
+      trialEndsAt: row.trial_ends_at ? new Date(row.trial_ends_at) : null,
+    };
   }
 
   static async setAutoRenewal(
@@ -510,7 +642,7 @@ export class CommercialLifecycleService {
         `UPDATE licenses SET status='inactive',updated_at=NOW()
          WHERE company_id=$1 AND tier='trial' AND status!='revoked'`, [subscription.company_id]);
       await client.query(
-        `UPDATE device_activations SET status='revoked',revoked_at=NOW(),updated_at=NOW()
+        `UPDATE device_activations SET status='suspended',updated_at=NOW()
          WHERE company_id=$1 AND status='active'
            AND entitlement_id IN(SELECT id FROM license_entitlements WHERE subscription_id=$2)`,
         [subscription.company_id, subscription.id]);

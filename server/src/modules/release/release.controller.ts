@@ -509,7 +509,7 @@ router.post('/report-version', authenticateUser, async (req: AuthenticatedReques
     await requireActiveDeviceActivation(user.company_id, device_activation_id);
     await pgPool.query(`
       INSERT INTO device_runtime_state (device_activation_id, company_id, platform, current_version, channel, last_reported_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
       ON CONFLICT (device_activation_id) DO UPDATE SET
         platform = EXCLUDED.platform,
         current_version = EXCLUDED.current_version,

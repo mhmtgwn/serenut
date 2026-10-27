@@ -117,7 +117,7 @@ export function welcomeTrialEmail(vars: EmailVars): { subject: string; html: str
       <p><strong>📧 Hesap:</strong> ${vars.userEmail || ''}</p>
     </div>
     <p>Uygulamayı aşağıdaki linkten indirip lisans anahtarınızı girerek hemen başlayabilirsiniz:</p>
-    <a href="${vars.downloadLink || 'https://serenut.com/download'}" class="btn">Uygulamayı İndir</a>
+    <a href="${vars.downloadLink || 'https://serenut.com/downloads'}" class="btn">Uygulamayı İndir</a>
     <div class="divider"></div>
     <p style="font-size:13px;color:#64748B">Herhangi bir sorunuzda destek ekibimiz yardıma hazır: <a href="mailto:destek@serenut.com" style="color:#4ADE80">destek@serenut.com</a></p>
   `);
@@ -135,7 +135,7 @@ export function trialExpiring7Email(vars: EmailVars): { subject: string; html: s
       <p><strong>📅 Deneme Bitiş:</strong> ${vars.expiryDate}</p>
       <p><strong>📦 Önerilen Plan:</strong> ${vars.planName || 'Pro'} — ${vars.amount || '₺900'}/ay</p>
     </div>
-    <a href="${vars.upgradeLink || 'https://serenut.com/portal'}" class="btn">Hemen Abonelik Başlat</a>
+    <a href="${vars.upgradeLink || 'https://serenut.com/app/'}" class="btn">Hemen Abonelik Başlat</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">Abonelik başlatmazsanız deneme süreniz dolduğunda uygulamaya erişiminiz geçici olarak kısıtlanacaktır. Tüm verileriniz güvende kalacak.</p>
   `);
   return { subject, html };
@@ -152,7 +152,7 @@ export function trialExpiring1Email(vars: EmailVars): { subject: string; html: s
       <p>⚠️ <strong>Yarından itibaren uygulamaya erişiminiz kısıtlanacak.</strong></p>
       <p>Tüm verileriniz güvende — abonelik başlatınca anında erişim yeniden açılacak.</p>
     </div>
-    <a href="${vars.upgradeLink || 'https://serenut.com/portal'}" class="btn">Şimdi Abonelik Başlat</a>
+    <a href="${vars.upgradeLink || 'https://serenut.com/app/'}" class="btn">Şimdi Abonelik Başlat</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">Sorularınız için: <a href="mailto:destek@serenut.com" style="color:#4ADE80">destek@serenut.com</a> — 7/24 destek</p>
   `);
   return { subject, html };
@@ -168,7 +168,7 @@ export function trialExpiredEmail(vars: EmailVars): { subject: string; html: str
       <p>✅ <strong>Tüm verileriniz güvende</strong> — 30 gün boyunca saklanacak.</p>
       <p>💾 Abonelik başlatırsanız anında erişiminiz yeniden açılır.</p>
     </div>
-    <a href="${vars.upgradeLink || 'https://serenut.com/portal'}" class="btn">Abonelik Başlat</a>
+    <a href="${vars.upgradeLink || 'https://serenut.com/app/'}" class="btn">Abonelik Başlat</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">30 gün içinde abonelik başlatmazsanız verileriniz silinebilir. Verilerinizi dışa aktarmak için bizimle iletişime geçin.</p>
   `);
   return { subject, html };
@@ -186,8 +186,8 @@ export function welcomePaidEmail(vars: EmailVars): { subject: string; html: stri
       <p><strong>📅 Sonraki Ödeme:</strong> ${vars.nextBillingDate}</p>
       <p><strong>🧾 Fatura No:</strong> ${vars.invoiceNumber}</p>
     </div>
-    <a href="${vars.downloadLink || 'https://serenut.com/portal/invoices'}" class="btn">Faturayı İndir</a>
-    <p style="font-size:13px;color:#64748B;margin-top:16px">Aboneliğinizi yönetmek için <a href="https://serenut.com/portal" style="color:#4ADE80">müşteri portalını</a> ziyaret edin.</p>
+    <a href="${vars.downloadLink || 'https://serenut.com/app/#billing-center'}" class="btn">Faturayı İndir</a>
+    <p style="font-size:13px;color:#64748B;margin-top:16px">Aboneliğinizi yönetmek için <a href="https://serenut.com/app/" style="color:#4ADE80">müşteri portalını</a> ziyaret edin.</p>
   `);
   return { subject, html };
 }
@@ -203,7 +203,7 @@ export function invoiceIssuedEmail(vars: EmailVars): { subject: string; html: st
       <p><strong>Tutar:</strong> ${vars.amount} ${vars.currency || 'TRY'}</p>
       <p><strong>Son Ödeme:</strong> ${vars.nextBillingDate}</p>
     </div>
-    <a href="${vars.paymentLink || 'https://serenut.com/portal/invoices'}" class="btn">Faturayı Görüntüle & İndir</a>
+    <a href="${vars.paymentLink || 'https://serenut.com/app/#billing-center'}" class="btn">Faturayı Görüntüle & İndir</a>
   `);
   return { subject, html };
 }
@@ -219,7 +219,7 @@ export function paymentSuccessEmail(vars: EmailVars): { subject: string; html: s
       <p><strong>Tutar:</strong> ${vars.amount} ${vars.currency || 'TRY'}</p>
       <p><strong>Sonraki Ödeme:</strong> ${vars.nextBillingDate}</p>
     </div>
-    <a href="${vars.downloadLink || 'https://serenut.com/portal/invoices'}" class="btn">Makbuzu İndir</a>
+    <a href="${vars.downloadLink || 'https://serenut.com/app/#billing-center'}" class="btn">Makbuzu İndir</a>
   `);
   return { subject, html };
 }
@@ -233,7 +233,7 @@ export function paymentFailedEmail(vars: EmailVars): { subject: string; html: st
     <div class="warning-box">
       <p>⚠️ Aboneliğiniz 7 günlük tolerans süresi içindedir. Bu süre içinde ödeme yapmazsanız hizmetiniz askıya alınacaktır.</p>
     </div>
-    <a href="${vars.paymentLink || 'https://serenut.com/portal/billing'}" class="btn btn-amber">Kartı Güncelle & Öde</a>
+    <a href="${vars.paymentLink || 'https://serenut.com/app/#billing-center'}" class="btn btn-amber">Kartı Güncelle & Öde</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">Ödeme sorunlarınız için: <a href="mailto:destek@serenut.com" style="color:#4ADE80">destek@serenut.com</a></p>
   `);
   return { subject, html };
@@ -250,7 +250,7 @@ export function paymentRetryEmail(vars: EmailVars): { subject: string; html: str
       <p><strong>Tutar:</strong> ${vars.amount} ${vars.currency || 'TRY'}</p>
     </div>
     <p>Ödeme başarısız olmaya devam ederse kart bilgilerinizi güncellemenizi öneririz:</p>
-    <a href="${vars.paymentLink || 'https://serenut.com/portal/billing'}" class="btn btn-amber">Kartı Güncelle</a>
+    <a href="${vars.paymentLink || 'https://serenut.com/app/#billing-center'}" class="btn btn-amber">Kartı Güncelle</a>
   `);
   return { subject, html };
 }
@@ -265,7 +265,7 @@ export function subscriptionCancelledEmail(vars: EmailVars): { subject: string; 
       <p>📁 Verilerinizi indirmek için 30 gün süreniz var.</p>
       <p>🔄 Fikrinizi değiştirirseniz aboneliği yeniden başlatabilirsiniz.</p>
     </div>
-    <a href="${vars.upgradeLink || 'https://serenut.com/portal'}" class="btn">Aboneliği Yeniden Başlat</a>
+    <a href="${vars.upgradeLink || 'https://serenut.com/app/'}" class="btn">Aboneliği Yeniden Başlat</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">İptal nedeninizi paylaşmak ister misiniz? <a href="mailto:destek@serenut.com" style="color:#4ADE80">Geri bildirim gönderin</a></p>
   `);
   return { subject, html };
@@ -278,7 +278,7 @@ export function passwordResetEmail(vars: EmailVars): { subject: string; html: st
     <h1>Şifre Sıfırlama 🔐</h1>
     <p>Hesabınız için şifre sıfırlama isteği aldık.</p>
     <div class="warning-box">
-      <p>⚠️ Bu link <strong>1 saat</strong> geçerlidir. Siz istemediyseniz bu e-postayı görmezden gelebilirsiniz.</p>
+      <p>⚠️ Bu link <strong>15 dakika</strong> geçerlidir. Siz istemediyseniz bu e-postayı görmezden gelebilirsiniz.</p>
     </div>
     <a href="${vars.resetLink}" class="btn">Şifremi Sıfırla</a>
     <p style="font-size:13px;color:#64748B;margin-top:16px">Güvenlik sorunu için: <a href="mailto:destek@serenut.com" style="color:#4ADE80">destek@serenut.com</a></p>
@@ -297,7 +297,7 @@ export function newDeviceLoginEmail(vars: EmailVars): { subject: string; html: s
       <p><strong>Zaman:</strong> ${vars.deviceTime}</p>
     </div>
     <p>Siz yapmadıysanız lisansı hemen iptal edin:</p>
-    <a href="${vars.revokeLink || 'https://serenut.com/portal/devices'}" class="btn btn-danger">Cihazı İptal Et</a>
+    <a href="${vars.revokeLink || 'https://serenut.com/app/#company-devices'}" class="btn btn-danger">Cihazı İptal Et</a>
   `);
   return { subject, html };
 }
@@ -305,16 +305,16 @@ export function newDeviceLoginEmail(vars: EmailVars): { subject: string; html: s
 // ── SMS ŞABLONları ────────────────────────────────────────────────────────────
 export const SmsTemplates = {
   trialExpiring: (daysRemaining: number) =>
-    `Serenut OS: Deneme süreniz ${daysRemaining} gün içinde doluyor. Abonelik için: https://serenut.com/portal`,
+    `Serenut OS: Deneme süreniz ${daysRemaining} gün içinde doluyor. Abonelik için: https://serenut.com/app/`,
 
   paymentFailed: (amount: string) =>
-    `Serenut OS: ${amount} TL tutarindaki odemeniz alinamadi. Guncelleme icin: https://serenut.com/portal/billing`,
+    `Serenut OS: ${amount} TL tutarindaki odemeniz alinamadi. Guncelleme icin: https://serenut.com/app/#billing-center`,
 
   activationOtp: (code: string) =>
     `Serenut OS aktivasyon kodunuz: ${code}. 5 dakika gecerlidir.`,
 
   newDevice: (deviceName: string) =>
-    `Serenut OS: ${deviceName} cihazi hesabiniza eklendi. Siz degilseniz: https://serenut.com/portal/devices`,
+    `Serenut OS: ${deviceName} cihazi hesabiniza eklendi. Siz degilseniz: https://serenut.com/app/#company-devices`,
 
   subscriptionActivated: (planName: string) =>
     `Serenut OS: ${planName} aboneliginiz aktif edildi. Iyi satislar!`,

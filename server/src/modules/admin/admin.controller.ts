@@ -339,16 +339,16 @@ async function writeAdminAudit(userId: string, action: string, entity: string, e
 router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const companiesCount = await runBypassingRLS('SELECT COUNT(*) FROM companies');
-    const devicesCount = await runBypassingRLS('SELECT COUNT(*) FROM devices');
-    const licensesCount = await runBypassingRLS('SELECT COUNT(*) FROM licenses');
-    const trialCount = await runBypassingRLS("SELECT COUNT(*) FROM licenses WHERE tier = 'trial'");
+    const devicesCount = await runBypassingRLS("SELECT COUNT(*) FROM device_activations WHERE status = 'active'");
+    const licensesCount = await runBypassingRLS("SELECT COUNT(*) FROM license_entitlements WHERE status IN ('active', 'trial')");
+    const trialCount = await runBypassingRLS("SELECT COUNT(*) FROM license_entitlements WHERE status = 'trial' OR tier = 'trial'");
     
     const expiringCount = await runBypassingRLS(
-      "SELECT COUNT(*) FROM licenses WHERE expires_at BETWEEN NOW() AND NOW() + INTERVAL '7 days'"
+      "SELECT COUNT(*) FROM license_entitlements WHERE valid_until BETWEEN NOW() AND NOW() + INTERVAL '7 days'"
     );
     
     const syncCount24h = await runBypassingRLS(
-      "SELECT COUNT(*) FROM sync_queue WHERE created_at >= NOW() - INTERVAL '24 hours'"
+      "SELECT COUNT(*) FROM sync_v4_changes WHERE created_at >= NOW() - INTERVAL '24 hours'"
     );
 
     // Dynamic Server Health
@@ -506,6 +506,26 @@ router.put('/companies/:id/package-override', async (req: AuthenticatedRequest, 
       [`ovr-${crypto.randomUUID()}`,req.params.id,base_plan_id,custom_price??null,billing_interval||null,
        user_limit??null,store_limit??null,device_limit??null,feature_overrides||{},valid_from,valid_until,
        Boolean(auto_renew),reason.trim(),req.user!.id]);
+    await client.query(
+      `UPDATE license_entitlements
+       SET valid_from = LEAST(valid_from, $2::timestamptz),
+           valid_until = GREATEST(valid_until, $3::timestamptz),
+           device_limit = COALESCE($4, device_limit),
+           store_limit = COALESCE($5, store_limit),
+           status = CASE WHEN $3::timestamptz > NOW() THEN 'active' ELSE status END,
+           token_version = token_version + 1,
+           updated_at = NOW()
+       WHERE company_id = $1`,
+      [req.params.id, valid_from, valid_until, device_limit ?? null, store_limit ?? null]
+    );
+    await client.query(
+      `UPDATE licenses
+       SET expires_at = GREATEST(expires_at, $2::timestamptz),
+           allowed_devices_count = COALESCE($3, allowed_devices_count),
+           status = CASE WHEN $2::timestamptz > NOW() THEN 'active' ELSE status END
+       WHERE company_id = $1`,
+      [req.params.id, valid_until, device_limit ?? null]
+    );
     await client.query('COMMIT');
     await writeAdminAudit(req.user!.id,'UPSERT_COMPANY_PACKAGE_OVERRIDE','companies',req.params.id,null,
       {base_plan_id,custom_price,user_limit,store_limit,device_limit,valid_from,valid_until,reason});
@@ -584,8 +604,8 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
       const passwordHash = await AuthService.hashPassword(crypto.randomBytes(48).toString('base64url'));
       const userId = `usr-${crypto.randomUUID()}`;
       await client.query(
-        `INSERT INTO users (id, company_id, name, email, password_hash, is_active, is_email_verified)
-         VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)`,
+        `INSERT INTO users (id, company_id, name, email, password_hash, is_active, email_verified_at)
+         VALUES ($1, $2, $3, $4, $5, TRUE, NOW())`,
         [userId, id, admin_name || name, normalizedEmail, passwordHash]
       );
       // Assign owner role
@@ -670,7 +690,12 @@ router.post('/companies/:id/password-recovery', async (req: AuthenticatedRequest
       return res.status(400).json({ error: 'missing_fields', message: 'Hedef kullanıcı ve en az 10 karakterlik gerekçe zorunludur.' });
     }
     const user = await runBypassingRLS(
-      `SELECT id FROM users WHERE company_id=$1 AND LOWER(email)=LOWER($2) AND is_active=TRUE AND deleted_at IS NULL`,
+      `SELECT u.id FROM users u
+       LEFT JOIN user_roles ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE u.company_id=$1 AND u.is_active=TRUE AND u.deleted_at IS NULL
+         AND (LOWER(u.email)=LOWER($2) OR LOWER($2)=LOWER((SELECT email FROM companies WHERE id=$1)))
+       ORDER BY CASE WHEN LOWER(u.email)=LOWER($2) THEN 0 WHEN r.name='owner' THEN 1 ELSE 2 END, u.created_at ASC LIMIT 1`,
       [req.params.id, targetEmail],
     );
     if (!user.rowCount) return res.status(404).json({ error: 'user_not_found' });
@@ -694,7 +719,7 @@ router.post('/companies/:id/password-recovery', async (req: AuthenticatedRequest
 router.get('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runBypassingRLS(`
-      SELECT l.*, c.name as company_name 
+      SELECT l.id, l.company_id, COALESCE((SELECT le.license_key FROM license_entitlements le WHERE le.company_id = l.company_id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), l.license_key) AS license_key, COALESCE((SELECT CASE WHEN le.status = 'trial' THEN 'trial' WHEN le.plan_id LIKE '%enterprise%' THEN 'pro_plus' WHEN le.plan_id LIKE '%pro%' THEN 'pro' ELSE l.tier END FROM license_entitlements le WHERE le.company_id = l.company_id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), l.tier) AS tier, COALESCE((SELECT le.device_limit FROM license_entitlements le WHERE le.company_id = l.company_id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), l.allowed_devices_count) AS allowed_devices_count, COALESCE((SELECT le.status FROM license_entitlements le WHERE le.company_id = l.company_id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), l.status) AS status, COALESCE((SELECT le.valid_until FROM license_entitlements le WHERE le.company_id = l.company_id ORDER BY le.valid_until DESC NULLS LAST LIMIT 1), l.expires_at) AS expires_at, l.created_at, c.name as company_name 
       FROM licenses l 
       JOIN companies c ON l.company_id = c.id 
       ORDER BY l.created_at DESC
@@ -722,7 +747,7 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    const planId = tier === 'trial' ? 'plan-free' : tier === 'pro_plus' ? 'plan-enterprise' : 'plan-pro';
+    const planId = (tier === 'trial' || tier === 'basic') ? 'plan-basic' : tier === 'pro_plus' ? 'plan-enterprise' : 'plan-pro';
     const storeLimit = tier === 'pro_plus' ? 99 : tier === 'pro' ? 3 : 1;
     const client = await pgPool.connect();
     try {
@@ -744,8 +769,8 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
         [company_id],
       );
       await client.query('COMMIT');
-      return res.status(201).json({ success: true, license_id: license.rows[0].id,
-        license_key: license.rows[0].license_key, entitlement_id: activation.entitlementId,
+      return res.status(201).json({ success: true, license_id: license.rows[0]?.id || activation.entitlementId,
+        license_key: license.rows[0]?.license_key || null, entitlement_id: activation.entitlementId,
         valid_until: activation.validUntil });
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {});
@@ -809,7 +834,10 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
   }
 
   try {
-    const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
+    const license = await runBypassingRLS(
+      'SELECT company_id, license_key, status, expires_at FROM licenses WHERE id = $1 OR license_key = $1 UNION ALL SELECT company_id, license_key, status, valid_until AS expires_at FROM license_entitlements WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
     if (license.rows.length === 0) {
       return res.status(404).json({ error: 'license_not_found' });
     }
@@ -853,7 +881,10 @@ router.post('/licenses/:id/suspend', async (req: AuthenticatedRequest, res: Resp
   const newStatus = suspend ? 'suspended' : 'active';
   if (!String(reason || '').trim()) return res.status(400).json({ error: 'status_reason_required' });
   try {
-    const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
+    const license = await runBypassingRLS(
+      'SELECT company_id, license_key, status, expires_at FROM licenses WHERE id = $1 OR license_key = $1 UNION ALL SELECT company_id, license_key, status, valid_until AS expires_at FROM license_entitlements WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
     if (license.rows.length === 0) {
       return res.status(404).json({ error: 'license_not_found' });
     }
@@ -891,7 +922,10 @@ router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Respo
   const reason = String(req.body?.reason || '').trim();
   if (!reason) return res.status(400).json({ error: 'revocation_reason_required' });
   try {
-    const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
+    const license = await runBypassingRLS(
+      'SELECT company_id, license_key, status, expires_at FROM licenses WHERE id = $1 OR license_key = $1 UNION ALL SELECT company_id, license_key, status, valid_until AS expires_at FROM license_entitlements WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
     if (license.rows.length === 0) {
       return res.status(404).json({ error: 'license_not_found' });
     }
@@ -937,7 +971,7 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
              COALESCE(df.cpu_architecture, '—') AS cpu_architecture,
              da.status,
              da.activated_at, da.last_seen_at AS last_active_at,
-             c.name AS company_name, NULL::text AS store_name
+             c.name AS company_name, (SELECT b.name FROM branches b WHERE b.id = da.branch_id LIMIT 1) AS store_name
       FROM device_activations da
       JOIN companies c ON da.company_id = c.id
       LEFT JOIN device_fingerprints df ON df.device_id = da.id
@@ -1111,27 +1145,30 @@ router.delete('/updates/:id', async (req: AuthenticatedRequest, res: Response) =
 // ── 6. SYNC MONITOR ─────────────────────────────────────────────────────────
 router.get('/sync/monitor', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const pendingCount = await runBypassingRLS("SELECT COUNT(*) FROM sync_queue WHERE status = 'pending'");
-    const failedCount = await runBypassingRLS("SELECT COUNT(*) FROM sync_queue WHERE status = 'failed'");
-    const completedCount = await runBypassingRLS("SELECT COUNT(*) FROM sync_queue WHERE status = 'completed'");
+    const total24h = await runBypassingRLS("SELECT COUNT(*) FROM sync_v4_changes WHERE created_at >= NOW() - INTERVAL '24 hours'");
+    const activeDevices = await runBypassingRLS("SELECT COUNT(*) FROM device_activations WHERE status = 'active'");
+    const totalChanges = await runBypassingRLS("SELECT COUNT(*) FROM sync_v4_changes");
 
-    const failedJobs = await runBypassingRLS(`
-      SELECT sq.*, c.name as company_name, d.name as device_name 
-      FROM sync_queue sq
-      JOIN companies c ON sq.company_id = c.id
-      JOIN devices d ON sq.device_id = d.id
-      WHERE sq.status = 'failed'
-      ORDER BY sq.created_at DESC
+    const recentMutations = await runBypassingRLS(`
+      SELECT sc.id, sc.company_id, sc.entity_type, sc.entity_id, sc.version, sc.created_at,
+             c.name as company_name, da.device_name
+      FROM sync_v4_changes sc
+      LEFT JOIN companies c ON sc.company_id = c.id
+      LEFT JOIN device_activations da ON sc.company_id = da.company_id AND da.status = 'active'
+      ORDER BY sc.created_at DESC
       LIMIT 20
     `);
 
     return res.json({
       summary: {
-        pending: parseInt(pendingCount.rows[0].count, 10),
-        failed: parseInt(failedCount.rows[0].count, 10),
-        completed: parseInt(completedCount.rows[0].count, 10),
+        pending: 0,
+        failed: 0,
+        completed: parseInt(total24h.rows[0].count, 10),
+        active_devices: parseInt(activeDevices.rows[0].count, 10),
+        total_changes: parseInt(totalChanges.rows[0].count, 10),
       },
-      failed_jobs: failedJobs.rows
+      failed_jobs: [],
+      recent_changes: recentMutations.rows
     });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
@@ -1142,10 +1179,10 @@ router.get('/sync/monitor', async (req: AuthenticatedRequest, res: Response) => 
 router.get('/crash-logs', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runBypassingRLS(`
-      SELECT cl.*, c.name as company_name, d.name as device_name 
+      SELECT cl.*, c.name as company_name, d.device_name 
       FROM crash_logs cl 
       LEFT JOIN companies c ON cl.company_id = c.id 
-      LEFT JOIN devices d ON cl.device_id = d.id 
+      LEFT JOIN device_activations d ON cl.device_id = d.device_id 
       ORDER BY cl.created_at DESC 
       LIMIT 50
     `);
@@ -1555,7 +1592,7 @@ router.post('/companies/:id/suspend', async (req: AuthenticatedRequest, res: Res
 
     // Suspend all users of this company
     await client.query(
-      'UPDATE users SET is_active = $1, updated_at = NOW() WHERE company_id = $2',
+      'UPDATE users SET is_active = $1, updated_at = NOW() WHERE company_id = $2 AND deleted_at IS NULL',
       [isActive, req.params.id]
     );
 
@@ -1652,7 +1689,7 @@ router.post('/companies/:id/restore', async (req: AuthenticatedRequest, res: Res
     });
 
     await client.query(
-      'UPDATE users SET is_active = true, updated_at = NOW() WHERE company_id = $1',
+      'UPDATE users SET is_active = true, updated_at = NOW() WHERE company_id = $1 AND deleted_at IS NULL',
       [req.params.id]
     );
 

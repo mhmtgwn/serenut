@@ -19,7 +19,7 @@ const SLA_HOURS: Record<string, number> = {
 // ── ALLOWED TRANSITIONS ───────────────────────────────────────────────────────
 const TICKET_TRANSITIONS: Record<string, string[]> = {
   open: ['in_progress', 'closed'],
-  in_progress: ['pending_customer', 'resolved'],
+  in_progress: ['pending_customer', 'resolved', 'closed'],
   pending_customer: ['in_progress', 'closed'],
   resolved: ['closed', 'in_progress'],
   closed: [],

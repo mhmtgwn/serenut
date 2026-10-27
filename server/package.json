@@ -12,6 +12,7 @@
     "preflight": "ts-node src/scripts/deployment-precheck.ts",
     "migrate:company-logos": "ts-node src/scripts/migrate-company-logos.ts",
     "create:sysadmin": "ts-node src/scripts/create-sysadmin.ts",
+    "reset:sysadmin": "ts-node src/scripts/create-sysadmin.ts --reset",
     "test": "ts-node src/test/run_all_ac_tests.ts",
     "test:release-signing": "ts-node src/test/release_signing_contract.test.ts",
     "publish:release": "node dist/scripts/publish-release.js",

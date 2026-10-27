@@ -290,7 +290,10 @@ router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const storesRes = await pgPool.query(
-      'SELECT id, name, address, created_at FROM stores WHERE company_id = $1 ORDER BY name ASC',
+      `SELECT id, name, address, created_at FROM branches WHERE company_id = $1 AND is_active = TRUE
+       UNION ALL
+       SELECT id, name, address, created_at FROM stores WHERE company_id = $1 AND NOT EXISTS (SELECT 1 FROM branches WHERE company_id = $1)
+       ORDER BY name ASC`,
       [user.company_id]
     );
     return res.json(storesRes.rows);

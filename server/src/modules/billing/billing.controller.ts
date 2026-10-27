@@ -17,6 +17,7 @@ import { CommercialLifecycleService } from './commercial_lifecycle.service';
 import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { BillingDomainService } from './billing-domain.service';
+import { InvoicePdfService } from './invoice-pdf.service';
 import bankTransferRouter from './billing.bank-transfer.routes';
 
 const router = Router();
@@ -608,6 +609,48 @@ router.get('/invoices', authenticateUser, async (req: AuthenticatedRequest, res:
  *       - BearerAuth: []
  */
 router.get('/invoices/:id/pdf', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  try {
+    const generated = await InvoicePdfService.ensureInvoicePdf(
+      req.params.id,
+      user.company_id,
+      Boolean(user.roles?.includes('sysadmin')),
+    );
+    if (!generated) {
+      return res.status(404).json({ error: 'invoice_not_found' });
+    }
+    const resolvedPath = path.resolve(generated.pdfPath);
+    const invoicesDir = InvoicePdfService.getInvoicesDir();
+    if (!resolvedPath.startsWith(invoicesDir) && !resolvedPath.startsWith('/var/invoices')) {
+      return res.status(403).json({ error: 'forbidden', message: 'Geçersiz fatura dizini.' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${generated.invoiceNumber}.pdf"`);
+    return fs.createReadStream(resolvedPath).pipe(res);
+  } catch (err) {
+    logger.error('Invoice PDF generation error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/reactivate', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    await CommercialLifecycleService.setAutoRenewal(client, {
+      companyId: user.company_id, actorId: user.id, enabled: true,
+    });
+    await client.query('COMMIT');
+    return res.json({ success: true, message: 'Otomatik abonelik yenilemesi tekrar aktifleştirildi.' });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    return res.status(err.message === 'active_subscription_not_found' ? 404 : 500).json({ error: err.message });
+  } finally { client.release(); }
+});
+
+router.get('/invoices/:id/pdf-legacy-unused', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const invoiceRes = await runWithTenantContext(

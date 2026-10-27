@@ -42,9 +42,9 @@ router.post('/upload', authenticateUser, async (req: AuthenticatedRequest, res: 
     const filename = `logs_${user.company_id}_${deviceId}_${Date.now()}.zip.enc`;
     const targetPath = path.join(uploadDir, filename);
 
-    // Decode base64 and save binary encrypted package to disk
+    // Decode base64 and save binary encrypted package to disk asynchronously
     const buffer = Buffer.from(fileData.encrypted_data, 'base64');
-    fs.writeFileSync(targetPath, buffer);
+    await fs.promises.writeFile(targetPath, buffer);
 
     logger.info(`Diagnostic logs uploaded successfully for company ${user.company_id} (Device: ${deviceId}).`);
     return res.json({ success: true, filename });

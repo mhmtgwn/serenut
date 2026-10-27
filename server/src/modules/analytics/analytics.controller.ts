@@ -18,7 +18,7 @@ router.post('/crash', async (req: Request, res: Response) => {
     
     if (device_hash) {
       const devRes = await pgPool.query(
-        'SELECT id, company_id FROM devices WHERE device_hash = $1',
+        'SELECT id, company_id FROM device_activations WHERE device_hash = $1 ORDER BY last_seen_at DESC NULLS LAST LIMIT 1',
         [device_hash]
       );
       if (devRes.rows.length > 0) {

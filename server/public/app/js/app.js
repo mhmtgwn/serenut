@@ -1,6 +1,7 @@
-import { clearAuthSession, apiFetch } from '/shared/js/api-client.js';
+import { clearAuthSession, apiFetch, refreshAccessToken } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { escapeHtml } from '/shared/js/formatters.js';
+import { escapeHtml, translateStatus } from '/shared/js/formatters.js';
+import { showToast } from '/shared/js/ui.js';
 
 const overviewGrid = document.getElementById('overview-grid');
 const modulePanel = document.getElementById('module-panel');
@@ -45,8 +46,32 @@ const iconPaths = {
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[id] || iconPaths['workspace-home']}</svg>`;
 
+function handlePaymentQueryFeedback() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const paymentState = searchParams.get('payment');
+  if (!paymentState) return;
+  if (window.top && window.top !== window.self) {
+    try {
+      window.top.location.replace(window.location.href);
+      return;
+    } catch (_) {}
+  }
+  if (paymentState === 'success') {
+    refreshAccessToken().catch(() => {});
+    showToast('Ödemeniz başarıyla alındı ve aboneliğiniz aktifleştirildi.', 'success', 6000);
+  } else if (paymentState === 'pending') {
+    showToast('Ödemeniz alındı, doğrulama tamamlandığında aboneliğiniz aktifleşecektir.', 'info', 6000);
+  } else {
+    showToast('Ödeme işlemi tamamlanamadı veya doğrulanamadı.', 'error', 6000);
+  }
+  searchParams.delete('payment');
+  const nextQuery = searchParams.toString();
+  window.history.replaceState({}, document.title, `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`);
+}
+
 function initApp() {
   document.body.dataset.bootStage = 'initializing';
+  handlePaymentQueryFeedback();
   if (!isAuthenticated()) {
     window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`);
     return;
@@ -125,23 +150,24 @@ function renderShell(bootstrap) {
   document.body.classList.toggle('sysadmin-shell', isSysadmin);
   document.body.classList.toggle('customer-shell', !isSysadmin);
 
+  const roleLabels = (bootstrap.user?.roles || []).map((role) => translateStatus(role));
   document.querySelector('.sidebar-brand').innerText = isSysadmin ? 'Serenut Yönetim' : 'Serenut OS';
   document.getElementById('tenant-name').innerText = isSysadmin ? 'Sistem sahibi paneli' : (bootstrap.company?.name || 'Firma');
   document.getElementById('user-name').innerText = bootstrap.user?.name || 'Kullanıcı';
-  document.getElementById('user-roles').innerText = (bootstrap.user?.roles || []).join(', ') || 'rol yok';
+  document.getElementById('user-roles').innerText = roleLabels.join(', ') || 'rol yok';
   document.getElementById('shell-subtitle').innerText = isSysadmin
     ? 'Firmaları, ödemeleri, lisansları ve uygulama yayınlarını yönetin.'
     : `Aktif firma: ${bootstrap.company?.name || 'Tanımsız'}`;
   document.getElementById('workspace-note').innerText = bootstrap.workspaces?.platform
     ? 'Bu kullanıcı hem platform hem firma modüllerine erişebilir.'
     : 'Bu kullanıcı firma modülleri ile sınırlandırılmıştır.';
-  document.getElementById('role-chips').innerHTML = (bootstrap.user?.roles || [])
+  document.getElementById('role-chips').innerHTML = roleLabels
     .map((role) => `<span class="role-chip">${escapeHtml(role)}</span>`)
     .join('');
   document.getElementById('company-meta').innerHTML = `
     <div><strong>Şirket:</strong> ${escapeHtml(bootstrap.company?.name || '—')}</div>
     <div><strong>Kod:</strong> ${escapeHtml(bootstrap.company?.business_code || '—')}</div>
-    <div><strong>Durum:</strong> ${escapeHtml(bootstrap.company?.status || '—')}</div>
+    <div><strong>Durum:</strong> ${escapeHtml(translateStatus(bootstrap.company?.status || '—'))}</div>
   `;
 
   renderNav(navigationItems);
@@ -206,6 +232,28 @@ function resolveInitialModule(bootstrap) {
     item.id === hashId || item.href.split('#')[1] === hashId
   );
   if (requested) return requested.id;
+
+  const pathMap = {
+    '/portal/invoices': 'billing-center',
+    '/portal/billing': 'billing-center',
+    '/portal/devices': 'company-devices',
+    '/portal/stores': 'company-stores',
+    '/portal/users': 'team-management',
+    '/portal/support': 'support-center',
+  };
+  const mappedPathId = pathMap[window.location.pathname];
+  if (mappedPathId) {
+    const fromPath = navigationItems.find((item) => item.id === mappedPathId);
+    if (fromPath) return fromPath.id;
+  }
+
+  try {
+    if (sessionStorage.getItem('selected_plan_id')) {
+      const billingMod = navigationItems.find((item) => item.id === 'billing-center');
+      if (billingMod) return billingMod.id;
+    }
+  } catch (_) {}
+
   const landing = navigationItems.find((item) =>
     item.id === bootstrap.landing_module_id || item.href === bootstrap.landing_route
   );
@@ -309,13 +357,43 @@ async function startRealtime() {
   }
 }
 
+function isUserEditingEmbedForm() {
+  const container = document.getElementById('embed-content');
+  if (!container) return false;
+  if (container.querySelector('.checkout-frame, .recovery-claim-banner')) return true;
+  const active = document.activeElement;
+  if (active && container.contains(active) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) && !active.hasAttribute('data-table-filter')) {
+    return true;
+  }
+  const fileInputs = container.querySelectorAll('input[type="file"]');
+  for (const fi of fileInputs) {
+    if (fi.files && fi.files.length > 0) return true;
+  }
+  return false;
+}
+
 function scheduleModuleRefresh(eventType) {
+  if (eventType === 'LicenseUpdated') {
+    refreshAccessToken().catch(() => {});
+  }
   clearTimeout(realtimeRefreshTimer);
   realtimeRefreshTimer = setTimeout(() => {
     document.dispatchEvent(new CustomEvent('serenut:realtime', { detail: { eventType } }));
     if (selectedModuleId === 'home' || selectedModuleId === 'workspace-home') {
       apiFetch('/app/bootstrap').then(renderShell).catch(() => {});
     } else if (selectedModuleId) {
+      if (isUserEditingEmbedForm()) {
+        const container = document.getElementById('embed-content');
+        if (container && !container.querySelector('.realtime-stale-banner')) {
+          const banner = document.createElement('div');
+          banner.className = 'attention-strip realtime-stale-banner';
+          banner.style.marginBottom = '12px';
+          banner.innerHTML = '<span>Yeni veriler alındı. Düzenlemeniz kesilmedi.</span> <button type="button" class="btn btn-secondary btn-sm">Şimdi Yenile</button>';
+          banner.querySelector('button').onclick = () => selectModule(selectedModuleId);
+          container.prepend(banner);
+        }
+        return;
+      }
       selectModule(selectedModuleId);
     }
   }, 400);

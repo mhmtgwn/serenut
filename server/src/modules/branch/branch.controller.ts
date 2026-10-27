@@ -95,6 +95,29 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+    // Şirketin lisansındaki store_limit (şube kotası) denetlenir
+    const limitRes = await client.query(
+      `SELECT store_limit FROM license_entitlements
+       WHERE company_id = $1 AND status IN ('active', 'trial')
+       ORDER BY valid_until DESC LIMIT 1`,
+      [user.company_id]
+    );
+    const storeLimit = limitRes.rows[0]?.store_limit ?? 1;
+    const currentCountRes = await client.query(
+      `SELECT COUNT(*)::int as count FROM branches WHERE company_id = $1`,
+      [user.company_id]
+    );
+    if ((currentCountRes.rows[0]?.count ?? 0) >= storeLimit) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: {
+          code: 'BRANCH_LIMIT_EXCEEDED',
+          message: `Mevcut paketinizin şube limiti (${storeLimit}) dolmuştur. Lütfen paketinizi yükseltin.`,
+        },
+      });
+    }
+
     await client.query(
       `INSERT INTO stores (id, company_id, name, address)
        VALUES ($1, $2, $3, $4)`,
@@ -241,7 +264,13 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
           [user.company_id, storeId]
         )
       : { rows: [{ count: '0' }] };
-    const licCheck = { rows: [{ count: '0' }] };
+    const licCheck = storeId
+      ? await client.query(
+          `SELECT COUNT(*) as count FROM license_entitlements
+           WHERE company_id = $1 AND metadata->>'store_id' = $2 AND status IN ('active', 'trial')`,
+          [user.company_id, storeId]
+        )
+      : { rows: [{ count: '0' }] };
 
     if (parseInt(deviceCheck.rows[0].count, 10) > 0 ||
         parseInt(licCheck.rows[0].count, 10) > 0) {

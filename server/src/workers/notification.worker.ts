@@ -424,7 +424,8 @@ async function markFailed(notificationId: string, companyId: string, channel: st
 }
 
 export async function reserveNotificationCredit(notificationId: string, companyId: string, channel: string): Promise<boolean> {
-  if (channel === 'push' || channel === 'whatsapp') return true;
+  const isSystemNotification = /^(notif-auth-|notif-sys-|cancel-notify-|reactivate-notify-|trial-|pay-failed-|pay-retry-|data-deletion-)/.test(notificationId);
+  if (channel === 'push' || channel === 'whatsapp' || isSystemNotification) return true;
   const creditCol = creditColumn(channel);
   const client = await pgPool.connect();
   let allowed = false;

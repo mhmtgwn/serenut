@@ -30,6 +30,8 @@ const entityTypes = new Set([
   "financial_transaction",
   "refund",
   "cash_count",
+  "cash_expense",
+  "gib_invoice",
   "customer_installment_plan",
   "customer_installment",
 ]);
@@ -63,7 +65,14 @@ function payloadDeepEqual(a: any, b: any): boolean {
 }
 
 router.use(authenticateUser as any);
-router.use(requireActiveEntitlement as any);
+// /push rotası, çevrimdışı birikmiş yerel mutasyonların (satış, iade, kasa sayımı)
+// lisans süresi dolsa dahi veri kaybı olmadan buluta aktarılabilmesi için açık tutulur.
+router.use((req, res, next) => {
+  if (req.path === "/push") {
+    return next();
+  }
+  return (requireActiveEntitlement as any)(req, res, next);
+});
 router.use((req, res, next) => {
   if (req.header("x-sync-protocol-version") !== String(syncProtocolVersion)) {
     return res.status(426).json({

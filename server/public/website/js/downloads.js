@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (Array.isArray(all) && all.length > 0) {
         const seen = new Set();
         const rows = all.filter(r => {
+          if (r.is_available === false) return false;
           const p = String(r.platform).toLowerCase();
           if (seen.has(p)) return false;
           seen.add(p);

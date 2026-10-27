@@ -73,7 +73,7 @@ export class RefundService {
     for (const [saleItemId, quantityValue] of requested) {
       const row = saleItems.rows.find(item => item.id === saleItemId);
       const quantity = Number(quantityValue);
-      if (!row || !Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity <= 0 ||
+      if (!row || !Number.isFinite(quantity) || quantity <= 0 ||
           quantity > Number(row.quantity)-Number(row.refunded_quantity)+0.000001) throw new Error('invalid_refund_quantity');
       const unit = Number(row.subtotal)/Number(row.quantity);
       const subtotal = Number((unit*quantity).toFixed(2));

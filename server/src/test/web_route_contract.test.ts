@@ -167,6 +167,18 @@ async function run() {
     assert.ok(sysadminNav.some((item) => item.id === id && item.module === 'admin'), `${id} must be visible to sysadmin`);
   }
 
+  // Round 3 & 4 Architectural Contract Assertions (K1–K28)
+  const licenseService = fs.readFileSync(path.join(projectRoot, 'src/modules/license/license.service.ts'), 'utf8');
+  const commercialLifecycle = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/commercial_lifecycle.service.ts'), 'utf8');
+  const authService = fs.readFileSync(path.join(projectRoot, 'src/modules/auth/auth.service.ts'), 'utf8');
+  assert.match(licenseService, /le\.status IN \('active', 'trial'\) AND le\.valid_until > NOW\(\)/, 'LicenseService.validate must accept active and trial entitlements');
+  assert.match(commercialLifecycle, /static async getEffectiveQuotas/, 'CommercialLifecycleService must expose canonical quota resolution');
+  assert.match(authService, /sub\.trial_ends_at \?\? sub\.current_period_end/, 'pending trial login must use current_period_end fallback before first POS activation');
+  assert.ok(fs.existsSync(path.join(projectRoot, 'src/modules/billing/invoice-pdf.service.ts')), 'InvoicePdfService must exist for dynamic invoice PDF generation');
+  assert.match(billingController, /InvoicePdfService\.ensureInvoicePdf/, 'invoice PDF route must generate and serve PDFs via InvoicePdfService');
+  assert.match(runtime, /"portal:access":'Web yönetim portalına erişim'/, 'custom role creator must expose portal:access permission');
+  assert.match(runtime, /"notifications\.history\.read":'SMS geçmişini görüntüle'/, 'custom role creator must use dot-separated notification permissions');
+
   console.log('Web route contract passed.');
 }
 

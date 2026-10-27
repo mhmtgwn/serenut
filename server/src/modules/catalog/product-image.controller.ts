@@ -1,7 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
+import { pgPool } from '../../config/database';
+import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import {
   storeProductImage,
   resolveProductImagePath,
@@ -17,6 +20,40 @@ const rawBodyParser = express.raw({
 
 // JSON body parser for base64 uploads if passed as JSON
 const jsonBodyParser = express.json({ limit: '12mb' });
+
+async function authenticateImageUpload(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  const peerToken = (req.headers['x-serenut-peer-token'] as string | undefined)?.trim();
+
+  // 1. Try Bearer JWT authentication first
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authenticateUser(req as AuthenticatedRequest, res, next);
+  }
+
+  // 2. Try Peer Token verification (used by POS terminals during LAN/cloud background image push)
+  if (peerToken && peerToken.length === 64) {
+    try {
+      const companies = await pgPool.query('SELECT id FROM companies WHERE is_active = true');
+      const matched = companies.rows.some((row: { id: string }) => {
+        const expected = crypto
+          .createHash('sha256')
+          .update(`serenut-product-images:${row.id}`)
+          .digest('hex');
+        return expected === peerToken.toLowerCase();
+      });
+      if (matched) {
+        return next();
+      }
+    } catch {
+      // Continue to 401
+    }
+  }
+
+  return res.status(401).json({
+    error: 'unauthorized',
+    message: 'Görsel yüklemek için geçerli bir oturum veya yetkili terminal anahtarı gereklidir.',
+  });
+}
 
 async function handleImageUpload(req: Request, res: Response) {
   try {
@@ -73,9 +110,9 @@ async function handleImageUpload(req: Request, res: Response) {
   }
 }
 
-// Support both POST / and POST /image
-router.post('/', rawBodyParser, jsonBodyParser, handleImageUpload);
-router.post('/image', rawBodyParser, jsonBodyParser, handleImageUpload);
+// Support both POST / and POST /image with authentication
+router.post('/', authenticateImageUpload, rawBodyParser, jsonBodyParser, handleImageUpload);
+router.post('/image', authenticateImageUpload, rawBodyParser, jsonBodyParser, handleImageUpload);
 
 async function handleGetImage(req: Request, res: Response) {
   const imageId = (req.params.imageId || '').trim().toLowerCase();

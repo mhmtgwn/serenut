@@ -234,7 +234,7 @@ export async function processSubscriptionCancellation(
       body: subscriptionCancelledEmail({
         companyName: info.name,
         expiryDate: periodEnd?.toLocaleDateString('tr-TR'),
-        upgradeLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+        upgradeLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
       }).html,
     });
 
@@ -374,7 +374,7 @@ export function startBillingScheduler(): void {
               companyName: data.companyName,
               daysRemaining: 7,
               expiryDate: data.expiryDate,
-              upgradeLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+              upgradeLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
             }).html,
           });
           if (data.phone) {
@@ -401,7 +401,7 @@ export function startBillingScheduler(): void {
               companyName: data.companyName,
               daysRemaining: 1,
               expiryDate: data.expiryDate,
-              upgradeLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+              upgradeLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
             }).html,
           });
           if (data.phone) {
@@ -427,7 +427,7 @@ export function startBillingScheduler(): void {
             title: 'Deneme süreniz sona erdi',
             body: trialExpiredEmail({
               companyName: data.companyName,
-              upgradeLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+              upgradeLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
             }).html,
           });
           break;
@@ -451,7 +451,7 @@ export function startBillingScheduler(): void {
               companyName: data.companyName,
               amount: data.amount,
               currency: data.currency,
-              paymentLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+              paymentLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
             }).html,
           });
           if (data.phone) {
@@ -516,7 +516,7 @@ export function startBillingScheduler(): void {
                 amount: data.amount,
                 currency: data.currency,
                 retryCount,
-                paymentLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
+                paymentLink: `${(process.env.PORTAL_URL || 'https://serenut.com').replace(/\/portal\/?$/, '')}/app/#billing-center`,
               }).html,
             });
           break;
@@ -530,7 +530,7 @@ export function startBillingScheduler(): void {
             channel: 'email',
             recipient: data.email,
             title: 'Verileriniz 7 gün içinde silinecek',
-            body: `Serenut OS hesabınızı kapattığınızdan bu yana 30 gün geçti. Verileriniz 7 gün içinde kalıcı olarak silinecek. Hemen indirmek için https://serenut.com/portal adresini ziyaret edin.`,
+            body: `Serenut OS hesabınızı kapattığınızdan bu yana 30 gün geçti. Verileriniz 7 gün içinde kalıcı olarak silinecek. Hemen indirmek için https://serenut.com/app/ adresini ziyaret edin.`,
           });
           break;
         }

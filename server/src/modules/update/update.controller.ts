@@ -138,7 +138,7 @@ router.get('/download/:platform/version/:version', async (req: Request, res: Res
       WHERE platform = $1 AND version_code = $2
         AND status = 'active' AND channel = 'stable'
         AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-      LIMIT 1
+      LIMIT 50
     `, [platform, version]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'release_not_found' });
@@ -165,14 +165,15 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
         AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
       ORDER BY created_at DESC
-      LIMIT 1
+      LIMIT 50
     `;
     const result = await pgPool.query(query, [platform]);
     let resolvedPath: string | null = null;
     let versionCode = '1.1.9';
 
     if (result.rows.length > 0 && result.rows[0].file_path) {
-      const release = result.rows[0];
+      const sortedCandidates = [...result.rows].sort((a, b) => compareVersions(b.version_code || '0.0.0', a.version_code || '0.0.0'));
+      const release = sortedCandidates.find(r => r.file_path && resolveReleaseFilePath(r.file_path)) || sortedCandidates[0];
       versionCode = release.version_code || versionCode;
       resolvedPath = resolveReleaseFilePath(release.file_path);
       if (resolvedPath) {
@@ -278,25 +279,29 @@ router.get('/latest-metadata', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const query = `
-      (SELECT id, version_code, platform, sha256_hash, file_size_bytes, release_notes, created_at
-       FROM app_versions
-       WHERE platform = 'windows' AND status = 'active' AND channel = 'stable'
-       ORDER BY created_at DESC LIMIT 1)
-      UNION ALL
-      (SELECT id, version_code, platform, sha256_hash, file_size_bytes, release_notes, created_at
-       FROM app_versions
-       WHERE platform = 'android' AND status = 'active' AND channel = 'stable'
-       ORDER BY created_at DESC LIMIT 1)
+      SELECT id, version_code, platform, sha256_hash, file_size_bytes, release_notes, created_at, file_path
+      FROM app_versions
+      WHERE status = 'active' AND channel = 'stable'
+        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
     `;
     const result = await pgPool.query(query);
-    return res.json(result.rows);
+    const validRows = result.rows.filter(r => resolveReleaseFilePath(r.file_path) !== null);
+
+    const windows = validRows
+      .filter(r => r.platform === 'windows')
+      .sort((a, b) => compareVersions(b.version_code, a.version_code))[0] || null;
+
+    const android = validRows
+      .filter(r => r.platform === 'android')
+      .sort((a, b) => compareVersions(b.version_code, a.version_code))[0] || null;
+
+    const list = [windows, android].filter(Boolean);
+    return res.json(list);
   } catch (err: any) {
     console.error('Latest metadata error:', err);
     return res.status(500).json({ error: 'server_error', message: err.message });
   }
 });
-
-
 
 router.get('/check', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -309,16 +314,19 @@ router.get('/check', async (req: Request, res: Response) => {
 
   try {
     const query = `
-      SELECT version_code, platform, download_url, sha256_hash, signature, file_size_bytes, is_mandatory, release_notes
+      SELECT version_code, platform, download_url, sha256_hash, signature, file_size_bytes, is_mandatory, release_notes, file_path
       FROM app_versions
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
         AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-      ORDER BY created_at DESC
-      LIMIT 1
     `;
     const result = await pgPool.query(query, [platform]);
     
-    if (result.rows.length === 0) {
+    // Semantik versiyona göre en büyük sürümü seç
+    const sorted = result.rows
+      .filter(r => resolveReleaseFilePath(r.file_path) !== null)
+      .sort((a, b) => compareVersions(b.version_code, a.version_code));
+
+    if (sorted.length === 0) {
       return res.json({
         latestVersion: current_version,
         minRequiredVersion: current_version,
@@ -331,7 +339,7 @@ router.get('/check', async (req: Request, res: Response) => {
       });
     }
 
-    const latest = result.rows[0];
+    const latest = sorted[0];
 
     // Simple comparison logic: if latest version code is different, suggest update
     const hasUpdate = compareVersions(current_version, latest.version_code) < 0;

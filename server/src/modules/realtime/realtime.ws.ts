@@ -156,7 +156,8 @@ export function initRealtimeWebSocket(server: Server) {
         );
 
         const companyStatus = companyRes.rows[0]?.status;
-        if (companyRes.rows.length === 0 || (companyStatus !== 'active' && companyStatus !== 'trial')) {
+        const isSysadmin = Array.isArray(user.roles) && user.roles.includes('sysadmin');
+        if (!isSysadmin && (companyRes.rows.length === 0 || (companyStatus !== 'active' && companyStatus !== 'trial'))) {
           logger.warn(`WS Upgrade failed: Company suspended or invalid company_id=${user.company_id} status=${companyStatus}`);
           tenantRejections++;
           socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');

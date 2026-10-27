@@ -29,6 +29,15 @@ function randomCode(): string {
   return `SRNT-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}`;
 }
 
+function normalizeRecoveryCode(input: string): string {
+  const cleaned = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const hexPart = cleaned.startsWith('SRNT') ? cleaned.slice(4) : cleaned;
+  if (hexPart.length === 16) {
+    return `SRNT-${hexPart.slice(0, 4)}-${hexPart.slice(4, 8)}-${hexPart.slice(8, 12)}-${hexPart.slice(12, 16)}`;
+  }
+  return String(input || '').trim().toUpperCase();
+}
+
 function randomClaimCode(): string {
   return crypto.randomBytes(5).toString('hex').toUpperCase();
 }
@@ -121,23 +130,23 @@ export class PasswordRecoveryService {
 
   static async recoverWithIdentityAndCode(params: {
     identifier: string;
-    companyName: string;
-    taxNumber: string;
+    companyName?: string;
+    taxNumber?: string;
     recoveryCode: string;
     context?: RequestContext;
   }): Promise<{ resetToken: string; expiresInSeconds: number } | null> {
     const identifier = params.identifier.trim().toLowerCase();
-    const companyName = params.companyName.trim();
-    const taxNumber = params.taxNumber.replace(/\D/g, '');
+    const companyName = String(params.companyName || '').trim();
+    const taxNumber = String(params.taxNumber || '').replace(/\D/g, '');
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls='true'");
       const user = await client.query(
-        `SELECT u.id,u.company_id FROM users u JOIN companies c ON c.id=u.company_id
+        `SELECT u.id,u.company_id FROM users u LEFT JOIN companies c ON c.id=u.company_id
          WHERE (LOWER(u.email)=$1 OR LOWER(u.username)=$1)
-           AND LOWER(c.name)=LOWER($2)
-           AND REGEXP_REPLACE(c.tax_number,'\\D','','g')=$3
+           AND ($2='' OR LOWER(COALESCE(c.name,''))=LOWER($2))
+           AND ($3='' OR REGEXP_REPLACE(COALESCE(c.tax_number,''),'\\D','','g')=$3)
            AND u.is_active=TRUE AND u.deleted_at IS NULL
          FOR UPDATE OF u`,
         [identifier, companyName, taxNumber],
@@ -151,7 +160,7 @@ export class PasswordRecoveryService {
         `SELECT id FROM user_recovery_codes
          WHERE user_id=$1 AND code_hash=$2 AND used_at IS NULL AND revoked_at IS NULL
          FOR UPDATE`,
-        [target.id, digest(params.recoveryCode)],
+        [target.id, digest(normalizeRecoveryCode(params.recoveryCode))],
       );
       if (!code.rowCount) {
         await this.securityEvent(client, target.id, target.company_id, null, 'RECOVERY_CODE_REJECTED', null, params.context);
@@ -180,7 +189,7 @@ export class PasswordRecoveryService {
     }
   }
 
-  static async resetPassword(resetToken: string, newPassword: string, context?: RequestContext): Promise<boolean> {
+  static async resetPassword(resetToken: string, newPassword: string, context?: RequestContext): Promise<{ email: string } | false> {
     if (!this.isStrongPassword(newPassword)) {
       throw new Error('weak_password');
     }
@@ -189,7 +198,7 @@ export class PasswordRecoveryService {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls='true'");
       const request = await client.query(
-        `SELECT pr.id,pr.user_id,pr.company_id,u.password_hash
+        `SELECT pr.id,pr.user_id,pr.company_id,pr.method,u.password_hash,u.email
          FROM password_recovery_requests pr JOIN users u ON u.id=pr.user_id
          WHERE pr.authorization_hash=$1 AND pr.state='authorized' AND pr.expires_at>NOW()
          FOR UPDATE OF pr,u`,
@@ -205,8 +214,8 @@ export class PasswordRecoveryService {
       const hash = await AuthService.hashPassword(newPassword);
       await client.query(
         `UPDATE users SET password_hash=$1,token_version=token_version+1,
-         failed_login_attempts=0,locked_until=NULL,updated_at=NOW() WHERE id=$2`,
-        [hash, row.user_id],
+         failed_login_attempts=0,locked_until=NULL,email_verified_at=CASE WHEN $3='email_link' THEN COALESCE(email_verified_at,NOW()) ELSE email_verified_at END,updated_at=NOW() WHERE id=$2`,
+        [hash, row.user_id, row.method],
       );
       await client.query('UPDATE sessions SET is_revoked=TRUE,updated_at=NOW() WHERE user_id=$1', [row.user_id]);
       await client.query(
@@ -221,7 +230,7 @@ export class PasswordRecoveryService {
       );
       await this.securityEvent(client, row.user_id, row.company_id, row.id, 'PASSWORD_RESET_COMPLETED', row.user_id, context);
       await client.query('COMMIT');
-      return true;
+      return { email: row.email };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
       throw error;

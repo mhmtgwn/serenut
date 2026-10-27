@@ -31,7 +31,7 @@ export function setRefreshToken(token) {
 
 let refreshPromise = null;
 
-async function refreshAccessToken() {
+export async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
   const refreshToken = sessionStorage.getItem('app_refresh_token') ||
                         localStorage.getItem('app_refresh_token') ||
@@ -124,8 +124,8 @@ export async function apiFetch(endpoint, options = {}, retry = true) {
     headers
   });
 
-  // Handle unauthorized redirects
-  if (response.status === 401) {
+  // Handle unauthorized redirects and entitlement renewal
+  if (response.status === 401 || response.status === 402) {
     if (retry && await refreshAccessToken()) {
       const retryOptions = { ...options };
       if (typeof retryOptions.body === 'string' && headers['Content-Type'] === 'application/json') {
@@ -133,8 +133,10 @@ export async function apiFetch(endpoint, options = {}, retry = true) {
       }
       return apiFetch(endpoint, retryOptions, false);
     }
-    clearAuthToken();
-    throw new Error('Unauthorized');
+    if (response.status === 401) {
+      clearAuthToken();
+      throw new Error('Unauthorized');
+    }
   }
 
   if (!response.ok) {

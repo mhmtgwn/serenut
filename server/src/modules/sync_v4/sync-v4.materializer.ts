@@ -118,6 +118,12 @@ export async function applyDomainMutation(
           [id, companyId],
         );
         return;
+      case "cash_expense":
+        await client.query(
+          "UPDATE cash_expenses SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
       case "customer_installment_plan":
         await client.query(
           "UPDATE customer_installment_plans SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
@@ -138,11 +144,16 @@ export async function applyDomainMutation(
       const name = stringValue(payload, "name");
       if (!name) throw new Error("invalid_mutation");
       const deleted = payload.is_deleted === 1 || payload.is_deleted === true;
+      let imagePath = stringValue(payload, "image_url") || stringValue(payload, "image_path") || null;
+      if (imagePath && imagePath.startsWith("device-image://")) {
+        const fileName = imagePath.replace("device-image://", "").trim();
+        imagePath = `/uploads/product-images/${fileName}`;
+      }
       await client.query(
         `INSERT INTO products (id, company_id, name, description, price, purchase_price, quantity, min_stock, brand, unit, shelf_code, category, sku, vat, image_path, status, is_deleted, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18::timestamptz,NOW()),NOW())
          ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description,
-           price=EXCLUDED.price, purchase_price=EXCLUDED.purchase_price, quantity=EXCLUDED.quantity,
+           price=EXCLUDED.price, purchase_price=EXCLUDED.purchase_price, quantity=products.quantity,
            min_stock=EXCLUDED.min_stock, brand=EXCLUDED.brand, unit=EXCLUDED.unit,
            shelf_code=EXCLUDED.shelf_code, category=EXCLUDED.category, sku=EXCLUDED.sku,
            vat=EXCLUDED.vat, image_path=EXCLUDED.image_path, status=EXCLUDED.status,
@@ -154,7 +165,7 @@ export async function applyDomainMutation(
           stringValue(payload, "unit", "adet"), stringValue(payload, "shelf_code"),
           stringValue(payload, "category", "Genel"),
           stringValue(payload, "sku", id), Number.isFinite(Number(payload.vat)) ? Number(payload.vat) : null,
-          stringValue(payload, "image_url") || null, deleted ? "inactive" : stringValue(payload, "status", "active"),
+          imagePath, deleted ? "inactive" : stringValue(payload, "status", "active"),
           deleted, isoDateValue(payload, "created_at")],
       );
       return;
@@ -208,6 +219,12 @@ export async function applyDomainMutation(
     }
     case "cash_count":
       await upsertCashCount(client, companyId, id, payload);
+      return;
+    case "cash_expense":
+      await upsertCashExpense(client, companyId, id, payload);
+      return;
+    case "gib_invoice":
+      await upsertGibInvoice(client, companyId, id, payload);
       return;
     case "customer_installment_plan":
       await upsertInstallmentPlan(client, companyId, id, payload);
@@ -276,6 +293,8 @@ export async function upsertSale(
       [customerId, companyId],
     );
     if (!customer.rowCount) throw new Error("invalid_customer");
+  } else if (paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") {
+    throw new Error("credit_sale_requires_customer");
   }
   let computedTotalCents = 0;
   const normalizedItems: Array<{ id: string; productId: string; productName: string | null; quantity: number; unitPrice: number; subtotal: number; createdAt: string | null }> = [];
@@ -512,13 +531,22 @@ export async function upsertFinancialTransaction(
   }
 
   if (type === "sale") {
-    let sale = referenceId ? await client.query(
-      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-      [referenceId, companyId]) : { rowCount: 0, rows: [] };
-    if (!sale.rowCount && referenceId) {
+    const isOrderRef = (payload.metadata as Record<string, unknown>)?.reference_type === "order" ||
+      stringValue(payload, "reference_type") === "order";
+    let sale: { rowCount: number | null; rows: any[] } = { rowCount: 0, rows: [] as any[] };
+    if (isOrderRef && referenceId) {
       sale = await client.query(
         `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
         [referenceId, companyId, paidAmount]);
+    } else if (referenceId) {
+      sale = await client.query(
+        `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+        [referenceId, companyId]);
+      if (!sale.rowCount) {
+        sale = await client.query(
+          `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+          [referenceId, companyId, paidAmount]);
+      }
     }
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
     const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
@@ -653,6 +681,81 @@ export async function upsertCashCount(
      WHERE cash_counts.company_id = EXCLUDED.company_id`,
     [id, companyId, countDate, openingBalance, countedCash, expectedCash, difference, notes, isDeleted,
      isoDateValue(payload, "created_at")],
+  );
+}
+
+export async function upsertCashExpense(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const amount = numberValue(payload, "amount", 0);
+  const category = stringValue(payload, "category", "Genel");
+  const description = stringValue(payload, "description") || null;
+  const isDeleted = payload.is_deleted === 1 || payload.is_deleted === true;
+
+  await client.query(
+    `INSERT INTO cash_expenses (id, company_id, amount, category, description, is_deleted, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       amount = EXCLUDED.amount,
+       category = EXCLUDED.category,
+       description = EXCLUDED.description,
+       is_deleted = EXCLUDED.is_deleted,
+       deleted_at = CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
+       updated_at = NOW()
+     WHERE cash_expenses.company_id = EXCLUDED.company_id`,
+    [id, companyId, amount, category, description, isDeleted, isoDateValue(payload, "created_at")],
+  );
+}
+
+export async function upsertGibInvoice(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const gibUuid = stringValue(payload, "gib_uuid") || null;
+  const invoiceNumber = stringValue(payload, "invoice_number") || null;
+  const saleId = stringValue(payload, "sale_id") || null;
+  const customerId = stringValue(payload, "customer_id") || null;
+  const recipientJson = typeof payload.recipient_json === "string"
+    ? payload.recipient_json
+    : JSON.stringify(payload.recipient_json ?? {});
+  const itemsJson = typeof payload.items_json === "string"
+    ? payload.items_json
+    : JSON.stringify(payload.items_json ?? []);
+  const totalWithoutVat = numberValue(payload, "total_without_vat", 0);
+  const totalVat = numberValue(payload, "total_vat", 0);
+  const totalAmount = numberValue(payload, "total_amount", 0);
+  const invoiceType = stringValue(payload, "invoice_type", "SATIS");
+  const status = stringValue(payload, "status", "draft");
+  const note = stringValue(payload, "note") || null;
+  const htmlContent = stringValue(payload, "html_content") || null;
+
+  await client.query(
+    `INSERT INTO gib_invoices (
+       id, company_id, gib_uuid, invoice_number, sale_id, customer_id,
+       recipient_json, items_json, total_without_vat, total_vat, total_amount,
+       invoice_type, status, note, html_content, created_at, signed_at, updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, COALESCE($16::timestamptz, NOW()), $17::timestamptz, NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       gib_uuid = EXCLUDED.gib_uuid,
+       invoice_number = EXCLUDED.invoice_number,
+       status = EXCLUDED.status,
+       signed_at = EXCLUDED.signed_at,
+       html_content = COALESCE(EXCLUDED.html_content, gib_invoices.html_content),
+       updated_at = NOW()
+     WHERE gib_invoices.company_id = EXCLUDED.company_id`,
+    [
+      id, companyId, gibUuid, invoiceNumber, saleId, customerId,
+      recipientJson, itemsJson, totalWithoutVat, totalVat, totalAmount,
+      invoiceType, status, note, htmlContent,
+      isoDateValue(payload, "created_at"),
+      isoDateValue(payload, "signed_at"),
+    ],
   );
 }
 

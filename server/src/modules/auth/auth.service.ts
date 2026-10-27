@@ -34,6 +34,7 @@ const SHA256_HEX_LENGTH = 64;
 
 export interface UserPayload {
   jti?: string; // JWT unique ID claim
+  session_id?: string;
   id: string;
   name: string;
   email: string;
@@ -101,21 +102,6 @@ export class AuthService {
       const user = userRes.rows[0];
       const now = new Date();
 
-      if (!user.is_active) {
-        if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION !== 'true') {
-          await client.query(
-            `UPDATE users SET is_active = true, email_verified_at = NOW() WHERE id = $1`,
-            [user.id]
-          );
-          user.is_active = true;
-          user.email_verified_at = now;
-        } else if (!user.email_verified_at) {
-          throw new Error('email_not_verified');
-        } else {
-          throw new Error('user_suspended');
-        }
-      }
-
       if (user.locked_until && new Date(user.locked_until) > now) {
         throw new Error('account_locked');
       }
@@ -141,6 +127,33 @@ export class AuthService {
         );
         await client.query('COMMIT');
         throw new Error('invalid_credentials');
+      }
+
+      // 3. Verify account & company active status after successful credential check
+      const companyStatusRes = await client.query(
+        'SELECT status FROM companies WHERE id = $1 LIMIT 1',
+        [user.company_id]
+      );
+      if (companyStatusRes.rows[0]?.status === 'suspended') {
+        throw new Error('user_suspended');
+      }
+      if (!user.is_active) {
+        const unverifiedTokenRes = await client.query(
+          'SELECT 1 FROM email_verification_tokens WHERE user_id = $1 AND used_at IS NULL LIMIT 1',
+          [user.id]
+        );
+        if (!user.email_verified_at && unverifiedTokenRes.rowCount && process.env.REQUIRE_EMAIL_VERIFICATION !== 'true') {
+          await client.query(
+            `UPDATE users SET is_active = true, email_verified_at = NOW() WHERE id = $1`,
+            [user.id]
+          );
+          user.is_active = true;
+          user.email_verified_at = now;
+        } else if (!user.email_verified_at) {
+          throw new Error('email_not_verified');
+        } else {
+          throw new Error('user_suspended');
+        }
       }
 
       // 3. Transparent SHA-256 → bcrypt upgrade
@@ -206,14 +219,21 @@ export class AuthService {
       
       let entitlementValidUntil: number | undefined;
       const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
-      const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+      const baseExpiration = sub.status === 'trialing' ? (sub.trial_ends_at ?? sub.current_period_end) : sub.current_period_end;
       
       if (baseExpiration) {
         entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
       }
 
+      const sessionId = crypto.randomUUID();
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const expiresAt = new Date(
+        Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+      );
+
       const payload: UserPayload = {
         jti: crypto.randomUUID(),
+        session_id: sessionId,
         id: userRow.id,
         name: userRow.name,
         email: userRow.email,
@@ -231,12 +251,7 @@ export class AuthService {
         issuer: JWT_ISSUER,
         audience: JWT_AUDIENCE,
       });
-      const refreshToken = crypto.randomBytes(40).toString('hex');
-      const expiresAt = new Date(
-        Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-      );
 
-      const sessionId = crypto.randomUUID();
       await client.query(
         `INSERT INTO sessions (id, user_id, company_id, refresh_token, ip_address, user_agent, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -248,7 +263,7 @@ export class AuthService {
       return {
         access_token: accessToken,
         refresh_token: refreshToken,
-        expires_in: 3600,
+        expires_in: 900,
         trial_started: false,
         subscription: {
           status: sub.status || 'inactive',
@@ -348,13 +363,14 @@ export class AuthService {
               const sub = subRes.rows[0] || {};
               let entitlementValidUntil: number | undefined;
               const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
-              const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+              const baseExpiration = sub.status === 'trialing' ? (sub.trial_ends_at ?? sub.current_period_end) : sub.current_period_end;
               if (baseExpiration) {
                 entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
               }
 
               const payload: UserPayload = {
                 jti: crypto.randomUUID(),
+                session_id: session.replaced_by,
                 id: userRow.id,
                 name: userRow.name,
                 email: userRow.email,
@@ -376,7 +392,7 @@ export class AuthService {
               return {
                 access_token: accessToken,
                 refresh_token: activeSessRes.rows[0].refresh_token,
-                expires_in: 3600,
+                expires_in: 900,
                 subscription: {
                   status: sub.status || 'inactive',
                   trial_started_at: sub.trial_started_at ?? null,
@@ -390,6 +406,11 @@ export class AuthService {
           }
         }
 
+        if (!session.is_revoked) {
+          await client.query('UPDATE sessions SET is_revoked = TRUE, updated_at = NOW() WHERE id = $1', [session.id]);
+          await client.query('COMMIT');
+          throw new Error('refresh_token_expired');
+        }
         logger.warn(`Refresh token replay detected! Revoking all sessions for user: ${session.user_id}`);
         await client.query('UPDATE sessions SET is_revoked = TRUE, updated_at = NOW() WHERE user_id = $1', [session.user_id]);
         await client.query('COMMIT');
@@ -408,7 +429,10 @@ export class AuthService {
         [session.user_id]
       );
 
-      if (userRes.rows.length === 0 || !userRes.rows[0].is_active) {
+      const companyRefreshRes = userRes.rows[0]?.company_id
+        ? await client.query('SELECT status FROM companies WHERE id = $1 LIMIT 1', [userRes.rows[0].company_id])
+        : { rows: [] };
+      if (userRes.rows.length === 0 || !userRes.rows[0].is_active || companyRefreshRes.rows[0]?.status === 'suspended') {
         await client.query('COMMIT');
         throw new Error('user_suspended');
       }
@@ -439,13 +463,18 @@ export class AuthService {
       const sub = subRes.rows[0] || {};
       let entitlementValidUntil: number | undefined;
       const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
-      const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+      const baseExpiration = sub.status === 'trialing' ? (sub.trial_ends_at ?? sub.current_period_end) : sub.current_period_end;
       if (baseExpiration) {
         entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
       }
 
+      const newSessionId = crypto.randomUUID();
+      const newRefreshToken = crypto.randomBytes(40).toString('hex');
+      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
       const payload: UserPayload = {
         jti: crypto.randomUUID(),
+        session_id: newSessionId,
         id: userRow.id,
         name: userRow.name,
         email: userRow.email,
@@ -462,10 +491,7 @@ export class AuthService {
         issuer: JWT_ISSUER,
         audience: JWT_AUDIENCE,
       });
-      const newRefreshToken = crypto.randomBytes(40).toString('hex');
-      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-      const newSessionId = crypto.randomUUID();
       await client.query(
         `INSERT INTO sessions (id, user_id, company_id, refresh_token, ip_address, user_agent, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -483,7 +509,7 @@ export class AuthService {
       return {
         access_token: newAccessToken,
         refresh_token: newRefreshToken,
-        expires_in: 3600,
+        expires_in: 900,
         subscription: {
           status: sub.status || 'inactive',
           trial_started_at: sub.trial_started_at ?? null,

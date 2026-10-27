@@ -45,7 +45,7 @@ export class LicenseService {
         [
           deviceId, fp.installation_id, fp.machine_hash, fp.hardware_hash,
           fp.cpu_architecture || null, fp.os_version || null, fp.app_version || null,
-          fp.device_name || null, fp.platform || null, new Date(fp.install_date)
+          fp.device_name || null, fp.platform || null, fp.install_date && !Number.isNaN(new Date(fp.install_date).getTime()) ? new Date(fp.install_date) : new Date()
         ]
       );
     } else {
@@ -281,7 +281,20 @@ export class LicenseService {
         deviceId = insertRes.rows[0].id;
         deviceTokenVersion = insertRes.rows[0].device_token_version;
       } else {
-        if (devRes.rows[0].status !== 'active') {
+        if (devRes.rows[0].status === 'suspended' || devRes.rows[0].status === 'revoked') {
+          const countRes = await client.query(
+            "SELECT COUNT(*) as count FROM device_activations WHERE entitlement_id = $1 AND status = 'active'",
+            [entitlement.id]
+          );
+          if (parseInt(countRes.rows[0].count, 10) >= entitlement.device_limit) {
+            throw new Error('device_limit_exceeded');
+          }
+          await client.query(
+            "UPDATE device_activations SET status = 'active', entitlement_id = $1, revoked_at = NULL, revoked_by = NULL, updated_at = NOW() WHERE id = $2",
+            [entitlement.id, devRes.rows[0].id]
+          );
+          devRes.rows[0].status = 'active';
+        } else if (devRes.rows[0].status !== 'active') {
           throw new Error('device_blocked');
         }
         deviceId = devRes.rows[0].id;
@@ -380,7 +393,11 @@ export class LicenseService {
         throw new Error('no_license_found');
       }
       await client.query('COMMIT');
-      return this.activate(keyRes.rows[0].license_key, deviceHash, deviceName, enforceAuthUser, fingerprint);
+      const resolvedCompanyId = typeof enforceAuthUser === 'string' ? enforceAuthUser : (enforceAuthUser?.company_id || companyId);
+      if (enforceAuthUser && typeof enforceAuthUser === 'object' && enforceAuthUser.company_id && enforceAuthUser.company_id !== companyId) {
+        throw new Error('company_mismatch');
+      }
+      return this.activate(keyRes.rows[0].license_key, deviceHash, deviceName, resolvedCompanyId, fingerprint);
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       throw err;
@@ -393,7 +410,7 @@ export class LicenseService {
     const res = await pgPool.query(
       `SELECT da.status FROM device_activations da
        JOIN license_entitlements le ON da.entitlement_id = le.id
-       WHERE le.license_key = $1 AND da.device_hash = $2 AND da.status = 'active' AND le.status = 'active'`,
+       WHERE le.license_key = $1 AND da.device_hash = $2 AND da.status = 'active' AND le.status IN ('active', 'trial') AND le.valid_until > NOW()`,
       [licenseKey, deviceHash]
     );
     return res.rows.length > 0;
@@ -596,7 +613,7 @@ export class LicenseService {
     return {
       id: entitlement.id,
       company_id: entitlement.company_id,
-      tier: entitlement.tier.includes('pro') ? 'pro_plus' : 'basic',
+      tier: String(entitlement.tier || '').toLowerCase().includes('pro') ? 'pro_plus' : 'basic',
       allowed_devices_count: entitlement.allowed_devices_count,
       status: entitlement.status,
       expires_at: entitlement.expires_at,

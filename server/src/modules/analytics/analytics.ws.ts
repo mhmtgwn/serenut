@@ -4,6 +4,7 @@ import url from 'url';
 import { AuthService } from '../auth/auth.service';
 import { logger } from '../../config/logger';
 import { consumeRealtimeTicket } from '../realtime/realtime-ticket.service';
+import { ConnectionRegistry } from '../realtime/connection-registry';
 
 // Store active connections by company_id
 const companyClients = new Map<string, Set<WebSocket>>();
@@ -109,9 +110,5 @@ export function broadcastToCompany(companyId: string, event: string, payload: an
 }
 
 export function getActiveWebSocketCount(): number {
-  let count = 0;
-  for (const clients of companyClients.values()) {
-    count += clients.size;
-  }
-  return count;
+  return ConnectionRegistry.getActiveConnectionsCount();
 }
