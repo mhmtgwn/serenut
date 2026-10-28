@@ -95,7 +95,7 @@ void main() {
     }
   });
 
-  Future<void> runUpdateFlow(WidgetTester tester, UpdateInfo updateInfo, FakeReleaseManager fakeReleaseManager) async {
+  Future<void> _runUpdateFlow(WidgetTester tester, UpdateInfo updateInfo, FakeReleaseManager fakeReleaseManager) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -152,7 +152,7 @@ void main() {
       channel: 'stable',
     );
 
-    await runUpdateFlow(tester, updateInfo, fakeReleaseManager);
+    await _runUpdateFlow(tester, updateInfo, fakeReleaseManager);
 
     expect(
       find.text('Güncelleme paketinin SHA-256 özeti veya dijital imzası eksik. Güvenlik nedeniyle kurulum reddedildi.'),
@@ -179,7 +179,7 @@ void main() {
       channel: 'stable',
     );
 
-    await runUpdateFlow(tester, updateInfo, fakeReleaseManager);
+    await _runUpdateFlow(tester, updateInfo, fakeReleaseManager);
 
     expect(
       find.text('Güncelleme paketinin SHA-256 özeti veya dijital imzası eksik. Güvenlik nedeniyle kurulum reddedildi.'),

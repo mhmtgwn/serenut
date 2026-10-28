@@ -1,5 +1,6 @@
 // lib/infrastructure/repositories/sqlite_hazelnut_repository.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -89,7 +90,9 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
         operation: 'UPSERT',
         payload: warehouse.toMap(),
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+    }
   }
 
   @override
@@ -268,7 +271,9 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
           operation: 'UPSERT',
           payload: movement.toMap(),
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+      }
 
       return escrow;
     });
@@ -443,7 +448,9 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
           operation: 'UPSERT',
           payload: priceCut.toMap(),
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+      }
 
       return priceCut;
     });
@@ -522,7 +529,9 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
           operation: 'UPSERT',
           payload: movement.toMap(),
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+      }
 
       return movement;
     });
