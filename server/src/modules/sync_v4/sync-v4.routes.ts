@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { authenticateUser, requireActiveEntitlement } from "../../middleware/auth.middleware";
 import { pgPool } from "../../config/database";
 import { syncLimiter } from "../../middleware/rate-limit.middleware";
@@ -38,6 +39,13 @@ const entityTypes = new Set([
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const syncProtocolVersion = 6;
+const deterministicMutationPrefixPattern = /^(evt-|mut-|ev-|legacy-mutation-)[A-Za-z0-9._:-]{1,120}$/;
+function resolveMutationUuid(rawId: string): string | null {
+  if (uuidPattern.test(rawId)) return rawId;
+  if (!deterministicMutationPrefixPattern.test(rawId)) return null;
+  const h = crypto.createHash("sha256").update(`serenut-sync-v4:${rawId}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
 
 function payloadDeepEqual(a: any, b: any): boolean {
   if (a === b) return true;
@@ -148,7 +156,7 @@ router.post("/push", async (req, res) => {
       if (
         !mutation ||
         typeof mutation.mutation_id !== "string" ||
-        !uuidPattern.test(mutation.mutation_id) ||
+        !resolveMutationUuid(mutation.mutation_id) ||
         !entityTypes.has(mutation.entity_type) ||
         typeof mutation.entity_id !== "string" ||
         !["UPSERT", "DELETE"].includes(mutation.operation) ||
@@ -168,7 +176,7 @@ router.post("/push", async (req, res) => {
       }
       const prior = await client.query(
         "SELECT revision, payload FROM sync_v4_changes WHERE tenant_id = $1 AND mutation_id = $2::uuid",
-        [user.company_id, mutation.mutation_id],
+        [user.company_id, resolveMutationUuid(mutation.mutation_id)],
       );
       if (prior.rowCount) {
         const rawPayload = prior.rows[0].payload;
@@ -209,7 +217,7 @@ router.post("/push", async (req, res) => {
              (tenant_id, mutation_id, entity_type, entity_id, base_revision, server_revision, device_id, payload)
              VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb)
              ON CONFLICT (tenant_id, mutation_id) DO NOTHING`,
-            [user.company_id, mutation.mutation_id, mutation.entity_type,
+            [user.company_id, resolveMutationUuid(mutation.mutation_id), mutation.entity_type,
               mutation.entity_id, mutation.base_revision, currentRevision,
               deviceInstallationId, JSON.stringify(mutation.payload)],
           );
@@ -267,7 +275,7 @@ router.post("/push", async (req, res) => {
          RETURNING revision`,
         [
           user.company_id,
-          mutation.mutation_id,
+          resolveMutationUuid(mutation.mutation_id),
           deviceInstallationId,
           deviceActivationId,
           mutation.entity_type,
@@ -313,7 +321,7 @@ router.post("/push", async (req, res) => {
       } else {
         const previous = await client.query(
           "SELECT revision FROM sync_v4_changes WHERE tenant_id = $1 AND mutation_id = $2::uuid",
-          [user.company_id, mutation.mutation_id],
+          [user.company_id, resolveMutationUuid(mutation.mutation_id)],
         );
         results.push({
           mutation_id: mutation.mutation_id,

@@ -755,7 +755,7 @@ class MigrationBridgeEngine {
                 totalCents = (st * 100).round();
               }
 
-              final int quantity = ((row['quantity'] as num?)?.toDouble() ?? 1.0).round();
+              final double quantity = (row['quantity'] as num?)?.toDouble() ?? 1.0;
               final int vatRate = ((row['vat_rate'] ?? row['vat'] ?? 20) as num).toInt();
               final int discountCents = ((row['discount_amount_minor'] ?? 0) as num).toInt();
 
@@ -807,6 +807,15 @@ class MigrationBridgeEngine {
             int batchCount = 0;
 
             for (final row in ftRows) {
+              final isDeletedVal = row['is_deleted'];
+              final isDeleted = isDeletedVal == 1 ||
+                  isDeletedVal == true ||
+                  isDeletedVal?.toString() == '1';
+              final deletedAtStr = row['deleted_at']?.toString().trim();
+              if (isDeleted || (deletedAtStr != null && deletedAtStr.isNotEmpty)) {
+                continue;
+              }
+
               final cid = row['customer_id']?.toString() ?? '';
               final rawAmount = (row['amount'] as num?)?.toDouble() ?? 0.0;
               final rawMinor = (row['amount_minor'] as num?)?.toInt();
@@ -816,8 +825,53 @@ class MigrationBridgeEngine {
               );
 
               final rawType = (row['type'] ?? 'ADJUSTMENT').toString().toLowerCase().trim();
-              final entryType = rawType.toUpperCase();
+              var entryType = rawType.toUpperCase();
+              var effectiveAmountCents = amountCents;
+              var rawDesc = row['description']?.toString() ?? 'Eski Finansal Hareket';
               final rawRefId = row['reference_id']?.toString();
+
+              final hasSubAmounts = row['debt_amount'] != null ||
+                  row['paid_amount'] != null ||
+                  row['debt_amount_minor'] != null ||
+                  row['paid_amount_minor'] != null;
+              if (hasSubAmounts) {
+                final paidCents = resolveAmountCents(
+                  rawAmountNum: (row['paid_amount'] as num?)?.toDouble(),
+                  rawMinorNum: (row['paid_amount_minor'] as num?)?.toInt(),
+                );
+                final debtCents = (row['debt_amount'] != null || row['debt_amount_minor'] != null)
+                    ? resolveAmountCents(
+                        rawAmountNum: (row['debt_amount'] as num?)?.toDouble(),
+                        rawMinorNum: (row['debt_amount_minor'] as num?)?.toInt(),
+                      )
+                    : (amountCents - paidCents).clamp(0, amountCents);
+                if (rawType == 'sale') {
+                  if (debtCents == 0 && paidCents > 0) {
+                    entryType = 'SALE_PAID';
+                    effectiveAmountCents = amountCents;
+                  } else if (paidCents > 0 && debtCents > 0) {
+                    effectiveAmountCents = debtCents;
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                } else if (rawType == 'cancellation') {
+                  if (debtCents != amountCents) {
+                    effectiveAmountCents = debtCents;
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                } else if (rawType == 'refund') {
+                  if (paidCents == amountCents && paidCents > 0) {
+                    entryType = 'REFUND_CASH';
+                  } else if (paidCents > 0) {
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                }
+              }
 
               final createdAtVal = row['created_at'];
               final int createdAtMs = createdAtVal is int
@@ -866,11 +920,17 @@ class MigrationBridgeEngine {
 
               // ── MÜŞTERİLİ CARİ HAREKETLER: ledger_entries'e aktar ──
               final currentRunning = customerRunningBalances[cid] ?? 0;
-              final isDebtIncrease = entryType.contains('SALE') || entryType.contains('DEBT') || entryType.contains('BORC');
-              final newRunning = isDebtIncrease ? currentRunning - amountCents : currentRunning + amountCents;
+              final isDebtIncrease = entryType != 'SALE_PAID' &&
+                  (entryType.contains('SALE') || entryType.contains('DEBT') || entryType.contains('BORC'));
+              final newRunning = (entryType == 'SALE_PAID' || entryType == 'REFUND_CASH')
+                  ? currentRunning
+                  : (isDebtIncrease ? currentRunning - effectiveAmountCents : currentRunning + effectiveAmountCents);
               customerRunningBalances[cid] = newRunning;
 
-              final String? refSaleId = (rawRefId != null && validSalesSet.contains(rawRefId))
+              final String? refSaleId = (rawRefId != null &&
+                      (validSalesSet.contains(rawRefId) ||
+                          rawRefId.startsWith('ord-') ||
+                          rawRefId.startsWith('refund-')))
                   ? rawRefId
                   : null;
 
@@ -883,9 +943,9 @@ class MigrationBridgeEngine {
                   'customer_id': cid,
                   'reference_sale_id': refSaleId,
                   'entry_type': entryType,
-                  'amount_cents': amountCents,
+                  'amount_cents': effectiveAmountCents,
                   'balance_after_cents': newRunning,
-                  'description': row['description']?.toString() ?? 'Eski Finansal Hareket',
+                  'description': rawDesc,
                   'created_at': createdAtMs,
                 },
                 conflictAlgorithm: ConflictAlgorithm.ignore,

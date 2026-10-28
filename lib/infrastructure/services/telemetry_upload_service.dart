@@ -22,6 +22,21 @@ class TelemetryUploadService {
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value,
       {Object? metadata}) {
+    // If called inside an active SQLite transaction zone, never block the caller
+    // waiting for a detached database connection write (which would deadlock sqflite).
+    if (Zone.current[#sqlite_txn] != null) {
+      Zone.root.run(() {
+        Future<void>.delayed(Duration.zero, () {
+          _writeQueue = _writeQueue.then((_) async {
+            try {
+              await _recordMetricInternal(name, value, metadata: metadata);
+            } catch (_) {}
+          });
+        });
+      });
+      return Future<void>.value();
+    }
+
     final completer = Completer<void>();
     _writeQueue = _writeQueue.then((_) async {
       try {
@@ -51,16 +66,20 @@ class TelemetryUploadService {
       };
 
       // Always execute detached from any ongoing SQLite transaction zone
-      // to prevent using a closing/aborted transaction executor.
+      // and serialized via DbGatewayImpl so telemetry writes never collide
+      // with active Database.transaction locks.
       await runZoned(() async {
-        final db = await DatabaseManager.instance.getDatabase();
-        await db.insert('client_telemetry_logs', payload);
+        final gateway = _gateway ?? DbGatewayImpl(DatabaseManager.instance);
+        await gateway.insert('client_telemetry_logs', payload);
 
         // FIFO eviction: maintain local queue under 5,000 records
-        final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM client_telemetry_logs')) ?? 0;
+        final rows = await gateway.rawQuery(
+          'SELECT COUNT(*) as cnt FROM client_telemetry_logs',
+        );
+        final count = Sqflite.firstIntValue(rows) ?? 0;
         if (count > maxTelemetryQueueSize) {
           final excess = count - maxTelemetryQueueSize;
-          await db.rawDelete('''
+          await gateway.rawDelete('''
             DELETE FROM client_telemetry_logs WHERE id IN (
               SELECT id FROM client_telemetry_logs ORDER BY id ASC LIMIT ?
             )

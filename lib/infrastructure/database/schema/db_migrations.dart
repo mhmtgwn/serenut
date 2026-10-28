@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/infrastructure/database/product_search_index.dart';
 import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
+import 'package:serenutos/infrastructure/database/schema/db_schema.dart';
 
 class DatabaseMigrations {
   /// Handle database upgrades
@@ -1273,6 +1274,15 @@ class DatabaseMigrations {
 
           await txn.insert('app_migration_history', {
             'version': 60,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+
+        if (oldVersion < 61 && newVersion >= 61) {
+          await DatabaseSchema.createHazelnutTables(txn);
+          await txn.insert('app_migration_history', {
+            'version': 61,
             'migrated_at': DateTime.now().toIso8601String(),
             'status': 'success'
           });

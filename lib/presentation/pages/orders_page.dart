@@ -109,12 +109,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
     _scrollController.addListener(_onScroll);
     // Load initial status counts and apply filter if passed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initialStatusFilter != null &&
-          widget.initialStatusFilter != 'all') {
-        ref
-            .read(ordersControllerProvider.notifier)
-            .applyFilter(widget.initialStatusFilter!);
-      }
+      ref
+          .read(ordersControllerProvider.notifier)
+          .applyFilter(_statusFilter);
       _refreshCounts();
     });
   }

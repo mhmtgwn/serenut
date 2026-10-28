@@ -142,6 +142,13 @@ extension SyncV4Recovery on SyncV4Service {
           final entityType = entry.key;
           final tableName = entry.value;
 
+          final tableInfo = await txn.rawQuery('PRAGMA table_info($tableName)');
+          final columns = tableInfo
+              .map((c) => c['name']?.toString())
+              .whereType<String>()
+              .toSet();
+          if (!columns.contains('is_synced')) continue;
+
           final unsynced = await txn.rawQuery('''
             SELECT t.* FROM $tableName t
             WHERE COALESCE(t.is_synced, 0) = 0

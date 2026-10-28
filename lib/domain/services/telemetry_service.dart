@@ -205,12 +205,25 @@ class TelemetryService {
       // Suppress telemetry errors to prevent cascading failures in production
     }
 
+    final inSqliteTransaction = Zone.current[#sqlite_txn] != null;
+
     if (telemetryEvent.level.index >= LogLevel.warning.index &&
         onOperationalEvent != null) {
-      try {
-        await onOperationalEvent!(telemetryEvent);
-      } catch (_) {
-        // Uzak kuyruk hatası aktif işlemi veya yerel loglamayı durduramaz.
+      final callback = onOperationalEvent!;
+      if (inSqliteTransaction) {
+        Zone.root.run(() {
+          Future<void>.delayed(Duration.zero, () async {
+            try {
+              await callback(telemetryEvent);
+            } catch (_) {}
+          });
+        });
+      } else {
+        try {
+          await callback(telemetryEvent);
+        } catch (_) {
+          // Uzak kuyruk hatası aktif işlemi veya yerel loglamayı durduramaz.
+        }
       }
     }
 
@@ -218,10 +231,21 @@ class TelemetryService {
     if (telemetryEvent.level == LogLevel.critical &&
         remotePushEnabled &&
         onCriticalEvent != null) {
-      try {
-        await onCriticalEvent!(telemetryEvent);
-      } catch (_) {
-        // Remote push failures must never crash the local logging path
+      final criticalCallback = onCriticalEvent!;
+      if (inSqliteTransaction) {
+        Zone.root.run(() {
+          Future<void>.delayed(Duration.zero, () async {
+            try {
+              await criticalCallback(telemetryEvent);
+            } catch (_) {}
+          });
+        });
+      } else {
+        try {
+          await criticalCallback(telemetryEvent);
+        } catch (_) {
+          // Remote push failures must never crash the local logging path
+        }
       }
     }
   }

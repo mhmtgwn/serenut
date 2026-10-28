@@ -52,7 +52,7 @@ class OrderCancellationService {
       final transactions =
           await _transactionRepository.getByCustomerId(order.customerId);
       final relatedTransactions = transactions.where(
-        (tx) => tx.referenceId == order.id && (tx.type == 'sale' || tx.type == 'payment'),
+        (tx) => tx.referenceId == order.id && (tx.type == 'sale' || tx.type == 'payment' || tx.type == 'collection'),
       );
       final saleTx = relatedTransactions.where((tx) => tx.type == 'sale').firstOrNull;
       totalAmount = saleTx?.amount ?? order.totalAmount;
@@ -102,6 +102,7 @@ class OrderCancellationService {
             customerId: customerId,
             refundTotal: actualMoneyPaid,
             refundMethod: 'balance',
+            refundId: 'refund-cancel-$id',
           );
         }
       }

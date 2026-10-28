@@ -288,6 +288,8 @@ extension _StatusStepperMixin on OrderDetailsPage {
                     .read(ordersControllerProvider.notifier)
                     .updateStatus(order.id, 'cancelled');
                 if (context.mounted) {
+                  ref.invalidate(orderDetailProvider(order.id));
+                  ref.invalidate(orderPaymentInfoProvider(order.id));
                   AppNotificationHost.show(
                     const SnackBar(
                         content: Text('Sipariş iptal edildi.'),
@@ -372,6 +374,7 @@ extension _StatusStepperMixin on OrderDetailsPage {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
+              final pageNavigator = Navigator.of(context);
               // 1. Close confirmation dialog
               Navigator.pop(dialogCtx);
 
@@ -385,14 +388,6 @@ extension _StatusStepperMixin on OrderDetailsPage {
 
               try {
                 final controller = ref.read(ordersControllerProvider.notifier);
-                if (order.status != 'cancelled' &&
-                    order.status != 'delivered') {
-                  try {
-                    await controller.updateStatus(order.id, 'cancelled');
-                  } catch (err) {
-                    debugPrint('Pre-delete cancellation skipped: $err');
-                  }
-                }
                 await controller.deleteOrder(order.id);
 
                 if (context.mounted) {
@@ -408,9 +403,9 @@ extension _StatusStepperMixin on OrderDetailsPage {
                       ref.read(customersControllerProvider.notifier).refresh());
                 }
 
-                // 2. Pop OrderDetailsPage after state invalidations complete
-                if (context.mounted) {
-                  Navigator.pop(context);
+                // 2. Pop OrderDetailsPage after deletion completes
+                if (pageNavigator.canPop()) {
+                  pageNavigator.pop();
                 }
 
                 AppNotificationHost.show(

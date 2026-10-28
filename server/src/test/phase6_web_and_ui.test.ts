@@ -45,7 +45,7 @@ async function runPhase6Tests() {
 
   // 4. Verify crash-logs joins with device_activations
   assert.ok(
-    adminContent.includes("LEFT JOIN device_activations d ON cl.device_id = d.device_id"),
+    adminContent.includes("LEFT JOIN device_activations d ON cl.device_id = d.id"),
     "FAIL: crash-logs should join with device_activations instead of devices"
   );
   console.log("✔ 4. Crash-logs device_activations relationship verified");

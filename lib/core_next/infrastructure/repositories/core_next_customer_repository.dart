@@ -493,13 +493,25 @@ class CoreNextCustomerRepository implements ICustomerRepository {
     final balanceCents = (entity.balance * 100).round();
     final cleanId = entity.id.trim();
 
+    // Bakiye (balance_cents) yalnızca defter hareketleri (ledger_entries) üzerinden güncellenir.
+    // Müşteri profili düzenlenirken mevcut defter bakiyesi korunur.
+    final currentRows = await _db.query(
+      'customers',
+      columns: ['balance_cents'],
+      where: 'id = ?',
+      whereArgs: [cleanId],
+      limit: 1,
+    );
+    final authoritativeBalanceCents = currentRows.isNotEmpty
+        ? ((currentRows.first['balance_cents'] as num?)?.toInt() ?? balanceCents)
+        : balanceCents;
+
     final count = await _db.update(
       'customers',
       {
         'name': entity.name.trim(),
         'phone': entity.phone.trim(),
         'email': entity.email.trim(),
-        'balance_cents': balanceCents,
         'notes': entity.address,
         'is_active': 1,
         'is_deleted': 0,
@@ -516,7 +528,7 @@ class CoreNextCustomerRepository implements ICustomerRepository {
         phone: entity.phone,
         email: entity.email,
         address: entity.address,
-        balanceCents: balanceCents,
+        balanceCents: authoritativeBalanceCents,
         isDeleted: false,
         updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
         deterministicEventId: 'evt-cust-$cleanId-$now',

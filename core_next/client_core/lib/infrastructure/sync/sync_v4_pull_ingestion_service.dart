@@ -258,6 +258,9 @@ class SyncV4PullIngestionService {
       costPriceCents = (payload['cost_price_cents'] as num).toInt();
     } else if (payload['cost_price'] != null) {
       costPriceCents = ((payload['cost_price'] as num).toDouble() * 100).round();
+    } else if (payload['purchase_price'] != null) {
+      costPriceCents =
+          ((payload['purchase_price'] as num).toDouble() * 100).round();
     } else {
       costPriceCents = null;
     }
@@ -280,10 +283,30 @@ class SyncV4PullIngestionService {
     );
     final effectiveStock = rawRemoteStock - unreflectedSold;
 
+    final rawCategoryId =
+        (payload['category_id'] ?? payload['category'])?.toString().trim();
+    final String? resolvedCategoryId =
+        (rawCategoryId != null && rawCategoryId.isNotEmpty)
+            ? rawCategoryId
+            : null;
+    if (resolvedCategoryId != null) {
+      await txn.insert(
+        'categories',
+        {
+          'id': resolvedCategoryId,
+          'name': resolvedCategoryId,
+          'sort_order': 0,
+          'is_active': 1,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+
     final productMap = {
       'barcode': barcode,
       'name': name,
-      'category_id': payload['category_id']?.toString(),
+      'category_id': resolvedCategoryId,
       'price_cents': priceCents,
       'cost_price_cents': costPriceCents,
       'vat_rate': vatRate,

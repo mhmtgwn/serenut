@@ -188,6 +188,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
       _discountAmount = order.discountAmount;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
         CustomerEntity? cust;
         if (order.customerId.isNotEmpty) {
           try {
@@ -197,6 +198,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
             // Ignored: fallback or safe default applied
           }
         }
+        if (!mounted) return;
         if (cust == null) {
           final customers = ref.read(ordersCustomersControllerProvider).value;
           cust = customers?.where((c) => c.id == order.customerId).firstOrNull;
@@ -207,8 +209,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
           });
         }
 
+        if (!mounted) return;
         final products = ref.read(productsControllerProvider).value;
-        if (products != null) {
+        if (mounted && products != null) {
           setState(() {
             for (final item in order.items) {
               final productId = item['product_id']?.toString() ?? '';
@@ -229,29 +232,33 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
           });
         }
 
+        if (!mounted) return;
         await _loadExistingPaymentInfo();
       });
     }
   }
 
   Future<void> _loadExistingPaymentInfo() async {
-    if (widget.existingOrder == null) return;
+    if (!mounted || widget.existingOrder == null) return;
     final order = widget.existingOrder!;
     try {
       final repo =
           await ref.read(financialTransactionRepositoryProvider.future);
+      if (!mounted) return;
       final transactions = await repo.getByReferenceId(order.id);
+      if (!mounted) return;
       FinancialTransactionEntity? orderTx =
           transactions.where((t) => t.type == 'sale').firstOrNull;
 
       // Fallback if not found by referenceId
       if (orderTx == null && order.customerId.isNotEmpty) {
         final custTransactions = await repo.getByCustomerId(order.customerId);
+        if (!mounted) return;
         orderTx = custTransactions
             .where((t) => t.referenceId == order.id && t.type == 'sale')
             .firstOrNull;
       }
-      if (orderTx != null) {
+      if (mounted && orderTx != null) {
         final subsequentPaid = transactions
             .where((t) => t.type == 'payment' || t.type == 'collection')
             .fold<double>(0.0, (sum, t) => sum + t.paidAmount);

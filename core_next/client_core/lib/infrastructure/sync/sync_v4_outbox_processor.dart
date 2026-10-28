@@ -102,9 +102,19 @@ class SyncV4OutboxProcessor {
         };
 
         for (final m in mutations) {
-          if (ackedIds.contains(m.eventId)) {
+          final ackKey = ackedIds.contains(m.eventId)
+              ? m.eventId
+              : (ackedIds.contains(m.serverMutationId) ? m.serverMutationId : null);
+          final conflictKey = conflictMap.containsKey(m.eventId)
+              ? m.eventId
+              : (conflictMap.containsKey(m.serverMutationId) ? m.serverMutationId : null);
+          final rejectedKey = rejectedMap.containsKey(m.eventId)
+              ? m.eventId
+              : (rejectedMap.containsKey(m.serverMutationId) ? m.serverMutationId : null);
+
+          if (ackKey != null) {
             // Başarılı: Yalnızca sunucu tarafından onaylanan mutasyon SYNCED olur
-            final ackRev = ackMap[m.eventId] ?? 0;
+            final ackRev = ackMap[ackKey] ?? 0;
             await txn.update(
               'sync_events',
               {
@@ -116,9 +126,9 @@ class SyncV4OutboxProcessor {
               whereArgs: [m.eventId],
             );
             synced++;
-          } else if (conflictMap.containsKey(m.eventId)) {
+          } else if (conflictKey != null) {
             // Çatışma: LWW / Conflict tablosuna kaydedildi
-            final conf = conflictMap[m.eventId]!;
+            final conf = conflictMap[conflictKey]!;
             final targetRev = conf.serverRevision > 0 ? conf.serverRevision : m.baseRevision;
             await txn.update(
               'sync_events',
@@ -131,9 +141,9 @@ class SyncV4OutboxProcessor {
               whereArgs: [m.eventId],
             );
             conflicts++;
-          } else if (rejectedMap.containsKey(m.eventId)) {
+          } else if (rejectedKey != null) {
             // Ret: Kalıcı 4xx veya sunucu doğrulama hatası ayrımı
-            final error = rejectedMap[m.eventId]!;
+            final error = rejectedMap[rejectedKey]!;
             final isNonRetryable = nonRetryableServerErrors.contains(error);
             final newAttempts = m.attempts + 1;
             final isMaxAttemptsExceeded = newAttempts >= maxTransientAttempts;

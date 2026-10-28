@@ -24,6 +24,9 @@ import 'package:serenutos/presentation/controllers/installment_controller.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/widgets/hazelnut/customer_escrow_tab_view.dart';
+
+final customerActiveDetailTabProvider = StateProvider.autoDispose.family<int, String>((ref, customerId) => 0);
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -559,6 +562,7 @@ class CustomerDetailsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customerAsync = ref.watch(customerDetailProvider(customerId));
+    final activeTab = ref.watch(customerActiveDetailTabProvider(customerId));
     final transactionsVal = ref.watch(customerTransactionsProvider(customerId));
     final balanceVal = ref.watch(customerBalanceDetailsProvider(customerId));
     final plansVal = ref.watch(customerInstallmentPlansProvider(customerId));
@@ -835,74 +839,156 @@ class CustomerDetailsPage extends ConsumerWidget {
                 ),
               ),
 
-              // ── Taksit Planları Bölümü (Varsa) ──
-              _buildInstallmentPlansSliver(
-                  context, ref, customer, plansVal, installmentsVal),
-
-              // ── Banka Ekstresi: İşlem Geçmişi ───────────────────────────────────
+              // ── Sekme Seçici: Hareketler vs Emanet Fındık ──
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _kBorder),
+                  ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                            color: _kGreenLight,
-                            borderRadius: BorderRadius.circular(8)),
-                        child: const Icon(Icons.receipt_long_rounded,
-                            size: 14, color: _kGreenDark),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => ref.read(customerActiveDetailTabProvider(customerId).notifier).state = 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 0 ? _kGreenLight : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long_rounded,
+                                    size: 16, color: activeTab == 0 ? _kGreenDark : _kTextSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Hesap Hareketleri',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: activeTab == 0 ? _kGreenDark : _kTextSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Hareket Geçmişi',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: _kText),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => ref.read(customerActiveDetailTabProvider(customerId).notifier).state = 1,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 1 ? _kGreenLight : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.warehouse_rounded,
+                                    size: 16, color: activeTab == 1 ? _kGreenDark : _kTextSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Emanet Fındık',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: activeTab == 1 ? _kGreenDark : _kTextSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              transactionsVal.when(
-                skipLoadingOnReload: true,
-                loading: () => const SliverToBoxAdapter(
-                  child: Center(
-                      child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(_kGreen)),
-                  )),
-                ),
-                error: (e, _) => SliverToBoxAdapter(
+              if (activeTab == 1)
+                SliverToBoxAdapter(
+                  child: CustomerEscrowTabView(customer: customer),
+                )
+              else ...[
+                // ── Taksit Planları Bölümü (Varsa) ──
+                _buildInstallmentPlansSliver(
+                    context, ref, customer, plansVal, installmentsVal),
+
+                // ── Banka Ekstresi: İşlem Geçmişi ───────────────────────────────────
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('Hareketler yüklenemedi: $e',
-                        style: const TextStyle(color: _kRed)),
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                              color: _kGreenLight,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.receipt_long_rounded,
+                              size: 14, color: _kGreenDark),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Hareket Geçmişi',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: _kText),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                data: (txns) {
-                  if (txns.isEmpty) {
-                    return SliverToBoxAdapter(child: _buildEmptyState());
-                  }
-                  // Group by month
-                  final grouped = _groupByMonth(txns);
-                  final months = grouped.keys.toList();
 
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, idx) {
-                        final month = months[idx];
-                        final items = grouped[month]!;
-                        return _buildMonthGroup(month, items);
-                      },
-                      childCount: months.length,
+                transactionsVal.when(
+                  skipLoadingOnReload: true,
+                  loading: () => const SliverToBoxAdapter(
+                    child: Center(
+                        child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(_kGreen)),
+                    )),
+                  ),
+                  error: (e, _) => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Hareketler yüklenemedi: $e',
+                          style: const TextStyle(color: _kRed)),
                     ),
-                  );
-                },
-              ),
+                  ),
+                  data: (txns) {
+                    if (txns.isEmpty) {
+                      return SliverToBoxAdapter(child: _buildEmptyState());
+                    }
+                    // Group by month
+                    final grouped = _groupByMonth(txns);
+                    final months = grouped.keys.toList();
+
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, idx) {
+                          final month = months[idx];
+                          final items = grouped[month]!;
+                          return _buildMonthGroup(month, items);
+                        },
+                        childCount: months.length,
+                      ),
+                    );
+                  },
+                ),
+              ],
 
               // Bottom padding
               const SliverToBoxAdapter(child: SizedBox(height: 32)),

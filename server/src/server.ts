@@ -737,6 +737,22 @@ if (process.env.SENTRY_DSN) {
 // ── GLOBAL ERROR HANDLER ─────────────────────────────────────────────────────
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const correlationId = String(req.headers['x-correlation-id'] || crypto.randomUUID());
+  res.setHeader('X-Correlation-Id', correlationId);
+
+  if (err instanceof SyntaxError && 'body' in err) {
+    logger.warn('Malformed JSON request body', {
+      route: req.originalUrl,
+      method: req.method,
+      correlation_id: correlationId,
+    });
+    return res.status(400).json({ error: 'invalid_json', message: 'Geçersiz JSON formatı.' });
+  }
+
+  // CORS hataları özel mesaj
+  if (err.message && err.message.startsWith('CORS')) {
+    return res.status(403).json({ error: 'cors_error', message: err.message });
+  }
+
   logger.error('Unhandled request error', {
     error: err?.message || String(err),
     stack: err?.stack,
@@ -746,16 +762,6 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     company_id: (req as any).user?.company_id,
     user_id: (req as any).user?.id,
   });
-  res.setHeader('X-Correlation-Id', correlationId);
-
-  // CORS hataları özel mesaj
-  if (err.message && err.message.startsWith('CORS')) {
-    return res.status(403).json({ error: 'cors_error', message: err.message });
-  }
-
-  if (err instanceof SyntaxError && 'body' in err) {
-    return res.status(400).json({ error: 'invalid_json', message: 'Geçersiz JSON formatı.' });
-  }
 
   res.status(err.status || 500).json({
     error: 'server_error',

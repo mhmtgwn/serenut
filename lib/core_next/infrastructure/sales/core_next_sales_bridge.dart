@@ -73,13 +73,19 @@ class CoreNextSalesBridge {
           price: MoneyCents((item.unitPrice * 100).round()),
           updatedAt: DateTime.now(),
         );
+        final rawQty = item.saleQuantity != 1.0 || item.quantity == 1
+            ? item.saleQuantity
+            : item.quantity.toDouble();
         final itemQty = prod.isWeighed
-            ? (item.quantity * 1000).round()
-            : item.quantity.toInt();
+            ? (rawQty < 100 ? (rawQty * 1000).round() : rawQty.round())
+            : rawQty.round().clamp(1, 1000000000);
+        final effectiveUnitPrice = item.unitPrice > 0
+            ? MoneyCents((item.unitPrice * 100).round())
+            : prod.price;
         cartItems.add(CoreCartItem(
           product: prod,
           quantity: itemQty,
-          unitPrice: prod.price,
+          unitPrice: effectiveUnitPrice,
           isWeighed: prod.isWeighed,
         ));
       }
@@ -219,6 +225,7 @@ class CoreNextSalesBridge {
       final refundItems = itemsToReturn
           .map((it) => RefundItemRequest(
                 productId: it.productId,
+                saleItemId: it.saleItemId,
                 quantity: it.quantity.toInt(),
               ))
           .toList();
@@ -231,12 +238,18 @@ class CoreNextSalesBridge {
               role: _mapRole(userRole ?? 'manager'),
             );
 
+      final normalizedMethod = refundMethod.trim().toLowerCase();
+      final allowManual = normalizedMethod == 'cash' ||
+          normalizedMethod == 'balance' ||
+          normalizedMethod == 'credit';
+
       final request = RefundRequest(
         originalSaleId: saleId,
         items: refundItems,
         reason: reason.trim().isNotEmpty ? reason.trim() : 'Müşteri İadesi',
         idempotencyKey: idempotencyKey,
         actor: effectiveActor,
+        allowManualRefundToCashOrBalance: allowManual,
       );
 
       await refundUseCase.execute(request);

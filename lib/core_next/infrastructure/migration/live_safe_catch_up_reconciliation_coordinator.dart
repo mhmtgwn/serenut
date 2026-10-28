@@ -790,12 +790,40 @@ class LiveSafeCatchUpReconciliationCoordinator {
                 whereArgs: _buildTimestampParams(cutoff, cutoffIso))
             : await legacyDb.query('financial_transactions');
 
+        if (finCols.contains('is_deleted')) {
+          final deletedLegacyTxs = await legacyDb.query(
+            'financial_transactions',
+            columns: ['id'],
+            where: 'COALESCE(is_deleted, 0) != 0',
+          );
+          if (deletedLegacyTxs.isNotEmpty) {
+            await _executeWithRetry(() => targetCoreDb.transaction((txn) async {
+              for (final delRow in deletedLegacyTxs) {
+                final delId = delRow['id']?.toString() ?? '';
+                if (delId.isNotEmpty) {
+                  await txn.delete('ledger_entries', where: 'id = ?', whereArgs: [delId]);
+                }
+              }
+            }));
+          }
+        }
+
         if (finTxs.isNotEmpty) {
           debugPrint('[CatchUpCoordinator] 🔄 ${finTxs.length} adet yeni defter hareketi yakalandı.');
           await _executeWithRetry(() => targetCoreDb.transaction((txn) async {
             for (final tx in finTxs) {
               final txId = tx['id']?.toString() ?? '';
               if (txId.isEmpty) continue;
+
+              final isDeletedVal = tx['is_deleted'];
+              final isDeleted = isDeletedVal == 1 ||
+                  isDeletedVal == true ||
+                  isDeletedVal?.toString() == '1';
+              final deletedAtStr = tx['deleted_at']?.toString().trim();
+              if (isDeleted || (deletedAtStr != null && deletedAtStr.isNotEmpty)) {
+                await txn.delete('ledger_entries', where: 'id = ?', whereArgs: [txId]);
+                continue;
+              }
 
               final amountCents = resolveAmountCents(tx['amount'], tx['amount_minor']);
               final createdAtVal = tx['created_at'];
@@ -814,8 +842,61 @@ class LiveSafeCatchUpReconciliationCoordinator {
               final refId = tx['reference_id']?.toString();
               String? refSaleId;
               if (refId != null && refId.isNotEmpty) {
-                final s = await txn.query('sales', columns: ['id'], where: 'id = ?', whereArgs: [refId]);
-                if (s.isNotEmpty) refSaleId = refId;
+                if (refId.startsWith('ord-') || refId.startsWith('refund-')) {
+                  refSaleId = refId;
+                } else {
+                  final s = await txn.query('sales', columns: ['id'], where: 'id = ?', whereArgs: [refId]);
+                  if (s.isNotEmpty) refSaleId = refId;
+                }
+              }
+
+              final rawType = (tx['type'] ?? 'transaction').toString();
+              final lowerType = rawType.toLowerCase().trim();
+              var effectiveType = rawType;
+              var effectiveAmountCents = amountCents;
+              var rawDesc = tx['description']?.toString() ?? 'Catch-up defter kaydı';
+
+              final hasSubAmounts = tx['debt_amount'] != null ||
+                  tx['paid_amount'] != null ||
+                  tx['debt_amount_minor'] != null ||
+                  tx['paid_amount_minor'] != null;
+              if (hasSubAmounts) {
+                final paidCents = resolveAmountCents(
+                  tx['paid_amount'],
+                  tx['paid_amount_minor'],
+                );
+                final debtCents = (tx['debt_amount'] != null || tx['debt_amount_minor'] != null)
+                    ? resolveAmountCents(
+                        tx['debt_amount'],
+                        tx['debt_amount_minor'],
+                      )
+                    : (amountCents - paidCents).clamp(0, amountCents);
+                if (lowerType == 'sale') {
+                  if (debtCents == 0 && paidCents > 0) {
+                    effectiveType = 'SALE_PAID';
+                    effectiveAmountCents = amountCents;
+                  } else if (paidCents > 0 && debtCents > 0) {
+                    effectiveAmountCents = debtCents;
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                } else if (lowerType == 'cancellation') {
+                  if (debtCents != amountCents) {
+                    effectiveAmountCents = debtCents;
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                } else if (lowerType == 'refund') {
+                  if (paidCents == amountCents && paidCents > 0) {
+                    effectiveType = 'REFUND_CASH';
+                  } else if (paidCents > 0) {
+                    if (!rawDesc.contains('[ft:total=')) {
+                      rawDesc = '$rawDesc [ft:total=$amountCents,paid=$paidCents,debt=$debtCents]';
+                    }
+                  }
+                }
               }
 
               final ins = await txn.rawInsert('''
@@ -827,9 +908,9 @@ class LiveSafeCatchUpReconciliationCoordinator {
                 txId,
                 custId,
                 refSaleId,
-                tx['type']?.toString() ?? 'transaction',
-                amountCents,
-                tx['description']?.toString() ?? 'Catch-up defter kaydı',
+                effectiveType,
+                effectiveAmountCents,
+                rawDesc,
                 createdAtMs,
               ]);
               if (ins > 0) ledgerMigrated++;

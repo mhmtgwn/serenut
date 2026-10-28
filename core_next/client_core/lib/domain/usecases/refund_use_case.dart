@@ -214,7 +214,9 @@ class CoreRefundUseCase {
                   : sampleItemByProduct[reqItem.productId];
               if (lineItem != null) {
                 requestedQtyByProduct[reqItem.productId] = (requestedQtyByProduct[reqItem.productId] ?? 0) + reqItem.quantity;
-                final lineCents = lineItem.unitPrice.value * reqItem.quantity;
+                final lineCents = lineItem.quantity > 0
+                    ? ((lineItem.total.value * reqItem.quantity) / lineItem.quantity).round()
+                    : lineItem.unitPrice.value * reqItem.quantity;
                 requestedAmountByProduct[reqItem.productId] = (requestedAmountByProduct[reqItem.productId] ?? 0) + lineCents;
                 reqTotalCents += lineCents;
               }
@@ -309,7 +311,9 @@ class CoreRefundUseCase {
           }
 
           final sample = sampleItemByProduct[pId]!;
-          final lineRefundCents = sample.unitPrice.value * availableQty;
+          final lineRefundCents = sample.quantity > 0
+              ? ((sample.total.value * availableQty) / sample.quantity).round()
+              : sample.unitPrice.value * availableQty;
           itemsToRefund.add(
             SaleOrderItemEntity(
               id: _uuid.v4(),
@@ -348,7 +352,9 @@ class CoreRefundUseCase {
           final lineItem = reqItem.saleItemId != null
               ? (originalItemsByLineId[reqItem.saleItemId] ?? sampleItemByProduct[reqItem.productId]!)
               : sampleItemByProduct[reqItem.productId]!;
-          final lineRefundCents = lineItem.unitPrice.value * reqItem.quantity;
+          final lineRefundCents = lineItem.quantity > 0
+              ? ((lineItem.total.value * reqItem.quantity) / lineItem.quantity).round()
+              : lineItem.unitPrice.value * reqItem.quantity;
           itemsToRefund.add(
             SaleOrderItemEntity(
               id: _uuid.v4(),

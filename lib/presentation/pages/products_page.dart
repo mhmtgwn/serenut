@@ -22,6 +22,7 @@ import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/config/utils.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+import 'package:serenutos/presentation/widgets/hazelnut/warehouses_tab_view.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -52,6 +53,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
   bool _isLabelSelectionMode = false;
   bool _isSelectingAllLabels = false;
   final Set<String> _selectedLabelProductIds = <String>{};
+  int _activeTabIndex = 0; // 0: Ürünler, 1: Depolar
 
   @override
   void initState() {
@@ -307,7 +309,90 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
           ),
         ),
       ],
-      body: Builder(
+      body: Column(
+        children: [
+          // ── Sekme Seçici: Ürünler vs Depolar ──
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _activeTabIndex = 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeTabIndex == 0 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: _activeTabIndex == 0
+                            ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inventory_2_rounded,
+                              size: 16, color: _activeTabIndex == 0 ? _kGreenDark : _kTextSecondary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Ürünler',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _activeTabIndex == 0 ? _kGreenDark : _kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _activeTabIndex = 1),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeTabIndex == 1 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: _activeTabIndex == 1
+                            ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.warehouse_rounded,
+                              size: 16, color: _activeTabIndex == 1 ? _kGreenDark : _kTextSecondary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Depolar',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _activeTabIndex == 1 ? _kGreenDark : _kTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _activeTabIndex == 1
+                ? const WarehousesTabView()
+                : Builder(
         builder: (context) {
           final cachedProducts = filteredProductsVal.valueOrNull ??
               (ref.watch(productSearchQueryProvider).isEmpty &&
@@ -486,7 +571,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
           );
         },
       ),
-      floatingActionButton: LayoutBuilder(
+    ),
+  ],
+),
+      floatingActionButton: _activeTabIndex == 1 ? null : LayoutBuilder(
         builder: (context, constraints) {
           final isDesktop = MediaQuery.of(context).size.width >= 900;
           if (isDesktop) {

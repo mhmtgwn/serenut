@@ -4,6 +4,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/providers/sync_provider.dart';
@@ -177,19 +178,53 @@ class DualDatabaseRoutingCoordinator {
             final deviceActivationId = lic?.activationId;
             final deviceId = ref.read(deviceManagerProvider).getDeviceId();
             final apiClient = ref.read(apiClientProvider);
-            final baseUrl = apiClient.baseUrl;
+            final rawBaseUrl = apiClient.baseUrl.replaceAll(RegExp(r'/+$'), '');
+            final syncBaseUrl = rawBaseUrl.endsWith('/api/v1')
+                ? '${rawBaseUrl.substring(0, rawBaseUrl.length - '/api/v1'.length)}/api/v4/sync'
+                : (rawBaseUrl.endsWith('/api/v4/sync')
+                    ? rawBaseUrl
+                    : '$rawBaseUrl/api/v4/sync');
 
             if (deviceActivationId == null || deviceActivationId.isEmpty) {
               return;
             }
 
             final httpClient = SyncV4HttpClient(
-              baseUrl: baseUrl,
+              baseUrl: syncBaseUrl,
               deviceActivationId: deviceActivationId,
               deviceId: deviceId,
+              tokenProvider: () async => apiClient.jwtToken,
+              onUnauthorized: apiClient.onTokenExpired,
             );
             final outboxProcessor = SyncV4OutboxProcessor(db: coreDb, httpClient: httpClient);
             final ingestionService = SyncV4PullIngestionService(coreDb, localDeviceId: deviceId);
+
+            final currentCursor = await ingestionService.getSavedCursor();
+            if (currentCursor == 0) {
+              try {
+                final legacyDb = await ref.read(databaseProvider.future);
+                final cursorRows = await legacyDb.query(
+                  'sync_cursor_v4',
+                  where: 'key = ?',
+                  whereArgs: ['global'],
+                  limit: 1,
+                );
+                final legacyCursor =
+                    (cursorRows.firstOrNull?['cursor'] as num?)?.toInt() ?? 0;
+                if (legacyCursor > 0) {
+                  await coreDb.db.insert(
+                    'app_settings',
+                    {
+                      'key': 'sync_pull_cursor',
+                      'value': '$legacyCursor',
+                      'updated_at': DateTime.now().millisecondsSinceEpoch,
+                    },
+                    conflictAlgorithm: ConflictAlgorithm.replace,
+                  );
+                }
+              } catch (_) {}
+            }
+
             final pullWorker = SyncV4PullWorker(
               httpClient: httpClient,
               ingestionService: ingestionService,

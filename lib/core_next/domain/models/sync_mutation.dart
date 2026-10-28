@@ -1,12 +1,19 @@
 // core_next/client_core/lib/domain/models/sync_mutation.dart
 
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 /// Çevrimdışı senkronizasyon kuyruğundaki (sync_events) tekil mutasyon modeli.
 /// 
 /// Sunucu Sync V4 / Protocol 6 sözleşmesiyle tam uyumlu alanları ve nedensel
 /// sıralama (causal_sequence) metadata'sını taşır.
 class SyncMutation {
+  static const _uuid = Uuid();
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
   final String eventId;
   final String entityType;
   final String entityId;
@@ -83,6 +90,15 @@ class SyncMutation {
       groupId: row['group_id'] as String?,
       causalSequence: (row['causal_sequence'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Sunucu PostgreSQL `uuid` sütunu ve `uuidPattern` doğrulaması için
+  /// RFC-4122 uyumlu deterministik mutasyon kimliği.
+  String get serverMutationId {
+    if (_uuidPattern.hasMatch(eventId)) {
+      return eventId;
+    }
+    return _uuid.v5(Namespace.oid.value, eventId);
   }
 
   /// Üretim sunucusu `/api/v4/sync/push` DTO'sunun beklediği mutasyon haritası.

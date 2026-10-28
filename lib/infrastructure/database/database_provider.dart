@@ -39,7 +39,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 60;
+  static const int databaseVersion = 61;
 
   static String? overrideDatabasePath;
   static String? overrideCoreNextDatabasePath;

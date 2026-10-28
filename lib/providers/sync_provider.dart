@@ -17,7 +17,9 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/order_details_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -88,7 +90,12 @@ final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) {
     final deviceActivationId = lic?.activationId;
     final deviceId = ref.read(deviceManagerProvider).getDeviceId();
     final apiClient = ref.read(apiClientProvider);
-    final baseUrl = apiClient.baseUrl;
+    final rawBaseUrl = apiClient.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final syncBaseUrl = rawBaseUrl.endsWith('/api/v1')
+        ? '${rawBaseUrl.substring(0, rawBaseUrl.length - '/api/v1'.length)}/api/v4/sync'
+        : (rawBaseUrl.endsWith('/api/v4/sync')
+            ? rawBaseUrl
+            : '$rawBaseUrl/api/v4/sync');
 
     if (deviceActivationId == null || deviceActivationId.isEmpty) {
       return;
@@ -96,12 +103,40 @@ final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) {
 
     final coreDb = await CoreAppDatabase.open();
     final httpClient = SyncV4HttpClient(
-      baseUrl: baseUrl,
+      baseUrl: syncBaseUrl,
       deviceActivationId: deviceActivationId,
       deviceId: deviceId,
+      tokenProvider: () async => apiClient.jwtToken,
     );
     final outboxProcessor = SyncV4OutboxProcessor(db: coreDb, httpClient: httpClient);
     final ingestionService = SyncV4PullIngestionService(coreDb, localDeviceId: deviceId);
+
+    final currentCursor = await ingestionService.getSavedCursor();
+    if (currentCursor == 0 && !kIsWeb) {
+      try {
+        final legacyDb = await ref.read(databaseProvider.future);
+        final cursorRows = await legacyDb.query(
+          'sync_cursor_v4',
+          where: 'key = ?',
+          whereArgs: ['global'],
+          limit: 1,
+        );
+        final legacyCursor =
+            (cursorRows.firstOrNull?['cursor'] as num?)?.toInt() ?? 0;
+        if (legacyCursor > 0) {
+          await coreDb.db.insert(
+            'app_settings',
+            {
+              'key': 'sync_pull_cursor',
+              'value': '$legacyCursor',
+              'updated_at': DateTime.now().millisecondsSinceEpoch,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      } catch (_) {}
+    }
+
     final pullWorker = SyncV4PullWorker(
       httpClient: httpClient,
       ingestionService: ingestionService,
@@ -338,38 +373,39 @@ class SyncNotifier extends StateNotifier<SyncState>
       return;
     }
     final isCoreNextEnabled = _ref.read(coreNextSalesEngineEnabledProvider);
-    if (isCoreNextEnabled) {
-      final coreNextSync = _ref.read(coreNextSyncExecutorProvider);
-      if (coreNextSync != null) {
-        if (state.status == SyncStatus.syncing) {
-          _syncRequestedWhileRunning = true;
-          return;
-        }
-        state = state.copyWith(status: SyncStatus.syncing);
-        try {
-          await coreNextSync();
-          state = state.copyWith(
-            status: SyncStatus.success,
-            lastSyncAt: DateTime.now(),
-            lastError: null,
-          );
-        } catch (e) {
-          final errStr = e.toString();
-          state = state.copyWith(
-            status: SyncStatus.error,
-            lastError: errStr,
-            userFriendlyError: _humanizeSyncError(errStr),
-          );
-        }
-        return;
-      }
-    }
+    final coreNextSync =
+        isCoreNextEnabled ? _ref.read(coreNextSyncExecutorProvider) : null;
     final service = _syncService;
-    if (service == null) return;
+    if (service == null && coreNextSync == null) return;
     if (state.status == SyncStatus.syncing) {
       // Never lose a mutation/event that arrives during an active pass. One
       // trailing pass is sufficient because the outbox coalesces entity edits.
       _syncRequestedWhileRunning = true;
+      return;
+    }
+
+    if (service == null) {
+      state = state.copyWith(status: SyncStatus.syncing);
+      try {
+        await coreNextSync!();
+        state = state.copyWith(
+          status: SyncStatus.success,
+          lastSyncAt: DateTime.now(),
+          lastError: null,
+          clearError: true,
+        );
+      } catch (e) {
+        final errStr = e.toString();
+        state = state.copyWith(
+          status: SyncStatus.error,
+          lastError: errStr,
+          userFriendlyError: _humanizeSyncError(errStr),
+        );
+      }
+      return;
+    }
+
+    if (_ref.read(apiClientProvider).isSessionInvalidated) {
       return;
     }
 
@@ -420,6 +456,19 @@ class SyncNotifier extends StateNotifier<SyncState>
 
     state = state.copyWith(status: SyncStatus.syncing);
     try {
+      if (coreNextSync != null) {
+        try {
+          await coreNextSync();
+        } catch (e, st) {
+          TelemetryService().logError(
+            e,
+            st,
+            context: 'SyncNotifier.coreNextSync',
+            level: LogLevel.warning,
+          );
+        }
+      }
+
       final db = kIsWeb ? null : await _ref.read(databaseProvider.future);
       final machine = SyncStateMachine(db: db);
       _machine = machine;
@@ -468,6 +517,8 @@ class SyncNotifier extends StateNotifier<SyncState>
         if (invalidateAll || types.contains('order')) {
           _ref.invalidate(orderRepositoryProvider);
           _ref.invalidate(ordersControllerProvider);
+          _ref.invalidate(orderDetailProvider);
+          _ref.invalidate(orderPaymentInfoProvider);
           _ref.invalidate(ordersCustomersControllerProvider);
           _ref.invalidate(ordersProductsControllerProvider);
           _ref.invalidate(customerLookupMapProvider);
@@ -533,7 +584,15 @@ class SyncNotifier extends StateNotifier<SyncState>
           errStr.contains('No Internet connection') ||
           errStr.contains('Connection refused') ||
           errStr.contains('Failed host lookup') ||
-          errStr.contains('Network is unreachable');
+          errStr.contains('Network is unreachable') ||
+          errStr.contains('Status: 408') ||
+          errStr.contains('Status: 502') ||
+          errStr.contains('Status: 503') ||
+          errStr.contains('Status: 504') ||
+          errStr.contains('TimeoutException') ||
+          errStr.contains('ClientException') ||
+          errStr.contains('HandshakeException') ||
+          errStr.contains('zaman aşımı');
 
       if (!isSessionExpired && !isNetworkIssue) {
         await TelemetryService().logError(

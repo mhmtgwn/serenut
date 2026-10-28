@@ -227,10 +227,10 @@ router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
 
     if (source === 'all' || source === 'crash') {
       const crashEvents = await runBypassingRLS(
-        `SELECT cl.*, c.name AS company_name, d.name AS device_name
+        `SELECT cl.*, c.name AS company_name, d.device_name
            FROM crash_logs cl
            LEFT JOIN companies c ON c.id = cl.company_id
-           LEFT JOIN devices d ON d.id = cl.device_id
+           LEFT JOIN device_activations d ON d.id = cl.device_id
           WHERE cl.created_at >= NOW() - ($1::text || ' hours')::interval
             AND ($2 = '' OR cl.company_id = $2)
             AND (
@@ -1012,13 +1012,26 @@ router.delete('/devices/:id', async (req: AuthenticatedRequest, res: Response) =
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-      await client.query('DELETE FROM hardware_jobs WHERE owner_activation_id = $1 OR requested_by_activation_id = $1', [deviceId]).catch(() => {});
-      await client.query('DELETE FROM shared_hardware WHERE owner_activation_id = $1', [deviceId]).catch(() => {});
-      await client.query('DELETE FROM device_fingerprints WHERE device_id = $1', [deviceId]).catch(() => {});
+      const safeExec = async (sp: string, sql: string, params: unknown[]) => {
+        await client.query(`SAVEPOINT ${sp}`);
+        try {
+          await client.query(sql, params);
+          await client.query(`RELEASE SAVEPOINT ${sp}`);
+        } catch (_) {
+          await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+        }
+      };
 
+      await safeExec('sp_hw_jobs', 'DELETE FROM hardware_jobs WHERE owner_activation_id = $1 OR requested_by_activation_id = $1', [deviceId]);
+      await safeExec('sp_shared_hw', 'DELETE FROM shared_hardware WHERE owner_activation_id = $1', [deviceId]);
+      await safeExec('sp_dev_fp', 'DELETE FROM device_fingerprints WHERE device_id = $1', [deviceId]);
+
+      await client.query('SAVEPOINT sp_del_act');
       try {
         await client.query('DELETE FROM device_activations WHERE id = $1', [deviceId]);
+        await client.query('RELEASE SAVEPOINT sp_del_act');
       } catch (_) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_del_act');
         await client.query("UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = 'sysadmin', updated_at = NOW() WHERE id = $1", [deviceId]);
       }
 
@@ -1081,7 +1094,7 @@ router.post('/devices/block-by-hash', async (req: AuthenticatedRequest, res: Res
 
   try {
     const result = await runBypassingRLS(
-      "UPDATE devices SET status = 'blocked', updated_at = NOW() WHERE device_hash = $1 RETURNING id, name, company_id",
+      "UPDATE device_activations SET status = 'blocked', updated_at = NOW() WHERE device_hash = $1 RETURNING id, device_name AS name, company_id",
       [device_hash]
     );
     if (result.rows.length === 0) {
@@ -1189,7 +1202,7 @@ router.get('/crash-logs', async (req: AuthenticatedRequest, res: Response) => {
       SELECT cl.*, c.name as company_name, d.device_name 
       FROM crash_logs cl 
       LEFT JOIN companies c ON cl.company_id = c.id 
-      LEFT JOIN device_activations d ON cl.device_id = d.device_id 
+      LEFT JOIN device_activations d ON cl.device_id = d.id 
       ORDER BY cl.created_at DESC 
       LIMIT 50
     `);

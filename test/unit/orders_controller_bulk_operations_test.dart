@@ -1,6 +1,8 @@
 // test/unit/orders_controller_bulk_operations_test.dart
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
@@ -12,6 +14,18 @@ import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/domain/services/audit_service.dart';
 import 'package:serenutos/domain/services/order_cancellation_service.dart';
+import 'package:serenutos/domain/services/data_integrity_service.dart';
+import 'package:serenutos/domain/services/inventory_service.dart';
+import 'package:serenutos/domain/services/payment_service.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:serenutos/infrastructure/services/telemetry_upload_service.dart';
+import 'package:serenutos/core_next/infrastructure/database/app_database.dart';
+import 'package:serenutos/core_next/infrastructure/repositories/core_next_customer_repository.dart';
+import 'package:serenutos/core_next/infrastructure/repositories/core_next_financial_transaction_repository.dart';
+import 'package:serenutos/core_next/infrastructure/repositories/core_next_product_repository.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 
 class MockOrderRepo implements IOrderRepository {
@@ -32,8 +46,13 @@ class MockOrderRepo implements IOrderRepository {
     int limit = 25,
     int offset = 0,
   }) async {
-    final active =
+    var active =
         orders.values.where((o) => !deletedIds.contains(o.id)).toList();
+    if (status != null && status.isNotEmpty) {
+      active = active
+          .where((o) => o.status.toLowerCase() == status.toLowerCase())
+          .toList();
+    }
     return active.skip(offset).take(limit).toList();
   }
 
@@ -81,6 +100,11 @@ class MockOrderRepo implements IOrderRepository {
 class MockAuditRepo implements IAuditRepository {
   Future<void> insert(dynamic event) async {}
 
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class MockApiClient implements ApiClient {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -232,5 +256,183 @@ void main() {
     expect(updatedCount, equals(1));
     expect(mockRepo.updatedStatuses['ord-created'], equals('ready'));
     expect(mockRepo.updatedStatuses.containsKey('ord-delivered'), isFalse);
+  });
+
+  test(
+      'ordersControllerProvider preserves active statusFilter across sync invalidation when remote device updates order status',
+      () async {
+    await container.read(ordersControllerProvider.future);
+    final notifier = container.read(ordersControllerProvider.notifier);
+
+    // User filters by 'created' (Yeni) on laptop
+    await notifier.applyFilter('created');
+    final beforeSync = await container.read(ordersControllerProvider.future);
+    expect(beforeSync.map((o) => o.id), equals(['ord-created']));
+
+    // Desktop PC transitions 'ord-created' from 'created' -> 'preparing' and sync pulls it
+    await mockRepo.updateStatus('ord-created', 'preparing');
+    container.invalidate(ordersControllerProvider);
+
+    // After invalidation, 'created' filter is preserved and 'ord-created' is no longer in 'Yeni'
+    final afterSyncCreated =
+        await container.read(ordersControllerProvider.future);
+    expect(afterSyncCreated, isEmpty);
+
+    // Switching to 'preparing' (Hazırlanıyor) shows both preparing orders
+    await container
+        .read(ordersControllerProvider.notifier)
+        .applyFilter('preparing');
+    final preparingList = await container.read(ordersControllerProvider.future);
+    expect(
+      preparingList.map((o) => o.id),
+      containsAll(['ord-created', 'ord-preparing']),
+    );
+  });
+
+  test(
+      'deleteOrder and OrderCancellationService do not deadlock SQLite or trigger false silent_data_corruption_alarm when TelemetryUploadService is active',
+      () async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+
+    final tempDir =
+        await Directory.systemTemp.createTemp('serenut_order_delete_freeze_');
+    final coreDb = await CoreAppDatabase.open(
+      inMemoryOrCustomPath: '${tempDir.path}/core.db',
+    );
+
+    final prevOverridePath = DatabaseManager.overrideDatabasePath;
+    DatabaseManager.overrideDatabasePath = '${tempDir.path}/legacy.db';
+    DatabaseManager.instance.reset();
+    final legacyDb = await DatabaseManager.instance.getDatabase();
+
+    final dbGateway = DbGatewayImpl(DatabaseManager.instance);
+    final telemetryUpload = TelemetryUploadService(MockApiClient(), dbGateway);
+    final prevOpCallback = TelemetryService().onOperationalEvent;
+    TelemetryService().onOperationalEvent = (event) async {
+      await telemetryUpload.recordMetric(
+        event.event,
+        event.level.index.toDouble(),
+        metadata: event.metadata,
+      );
+    };
+
+    try {
+      final customerRepo =
+          CoreNextCustomerRepository.fromCoreAppDatabase(coreDb);
+      final productRepo = CoreNextProductRepository.fromCoreAppDatabase(coreDb);
+      final ftRepo =
+          CoreNextFinancialTransactionRepository.fromCoreAppDatabase(coreDb);
+      final eventPub = EventPublisher();
+
+      final custId = await customerRepo.create(
+        CustomerEntity(
+          id: 'cust-1',
+          name: 'Test Müşteri',
+          phone: '05551112233',
+          balance: 0.0,
+          createdAt: DateTime.now(),
+        ),
+      );
+      expect(custId, isNotNull);
+
+      await productRepo.create(
+        ProductEntity(
+          id: 'prod-freeze-1',
+          name: 'Test Ürün',
+          description: 'Açıklama',
+          category: 'Genel',
+          price: 150.0,
+          quantity: 10.0,
+        ),
+      );
+
+      // 1. Order with partial upfront payment (total=300, paid=100, debt=200)
+      await ftRepo.create(
+        FinancialTransactionEntity(
+          id: 'tx-sale-ord-created',
+          type: 'sale',
+          customerId: 'cust-1',
+          amount: 300.0,
+          paidAmount: 100.0,
+          debtAmount: 200.0,
+          date: DateTime.now(),
+          referenceId: 'ord-created',
+          metadata: const {'origin': 'order'},
+        ),
+      );
+
+      final integrityService = DataIntegrityService(
+        customerRepository: customerRepo,
+        transactionRepository: ftRepo,
+        telemetryService: TelemetryService(),
+      );
+
+      // Verify invariant holds right after order creation (balance = -200)
+      expect(
+        await integrityService.verifyLedgerInvariant('cust-1'),
+        isTrue,
+      );
+
+      final realCancellationService = OrderCancellationService(
+        orderRepository: mockRepo,
+        inventoryService: InventoryService(
+          productRepository: productRepo,
+          eventPublisher: eventPub,
+        ),
+        paymentService: PaymentService(
+          customerRepository: customerRepo,
+          transactionRepository: ftRepo,
+          eventPublisher: eventPub,
+        ),
+        transactionRepository: ftRepo,
+        transactionRunner: dbGateway,
+        dataIntegrityService: integrityService,
+      );
+
+      // Also verify that even a direct critical log inside an active SQLite transaction
+      // never deadlocks DbGatewayImpl or Database.txnSynchronized!
+      await dbGateway
+          .transaction(() async {
+            await TelemetryService().logStructured(
+              event: 'test_in_txn_telemetry',
+              level: LogLevel.critical,
+              metadata: const {'order_id': 'ord-created'},
+            );
+          })
+          .timeout(const Duration(seconds: 3));
+
+      // Cancel & delete 'ord-created' via real OrderCancellationService inside SQLite transaction
+      await realCancellationService
+          .cancel(id: 'ord-created')
+          .timeout(const Duration(seconds: 3));
+
+      // After cancelling order with 200 debt and 100 upfront payment:
+      // - 200 debt is reversed by CANCELLATION (+200) -> balance = 0
+      // - 100 upfront payment is credited to customer balance by REFUND (+100) -> balance = +100
+      // And verifyLedgerInvariant MUST be 100% consistent (true)!
+      expect(
+        await integrityService.verifyLedgerInvariant('cust-1'),
+        isTrue,
+      );
+      final updatedCustomer = await customerRepo.findById('cust-1');
+      expect(updatedCustomer?.balance, closeTo(100.0, 0.001));
+
+      // Subsequent DB write on DbGatewayImpl must complete immediately (no queue deadlock)
+      await dbGateway
+          .transaction(() async {
+            await dbGateway.rawQuery('SELECT 1');
+          })
+          .timeout(const Duration(seconds: 2));
+    } finally {
+      TelemetryService().onOperationalEvent = prevOpCallback;
+      await coreDb.close();
+      await legacyDb.close();
+      DatabaseManager.overrideDatabasePath = prevOverridePath;
+      DatabaseManager.instance.reset();
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
+    }
   });
 }

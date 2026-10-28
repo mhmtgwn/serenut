@@ -29,7 +29,7 @@ class SqliteLedgerRepository implements ILedgerRepository {
       'customers',
       {
         'balance_cents': newBalance.value,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'id = ?',
       whereArgs: [customerId],

@@ -299,11 +299,22 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
         resetLink: `${publicUrl}/reset-password?token=${encodeURIComponent(recovery.resetToken)}`,
       });
       const notificationId = `notif-auth-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      await pgPool.query(
-        `INSERT INTO notification_queue (id,company_id,channel,recipient,title,body,status,scheduled_at)
-         VALUES($1,$2,'email',$3,$4,$5,'pending',NOW())`,
-        [notificationId, recovery.companyId, recovery.email, message.subject, message.html],
-      );
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SET LOCAL app.bypass_rls = 'true'");
+        await client.query(
+          `INSERT INTO notification_queue (id,company_id,channel,recipient,title,body,status,scheduled_at)
+           VALUES($1,$2,'email',$3,$4,$5,'pending',NOW())`,
+          [notificationId, recovery.companyId, recovery.email, message.subject, message.html],
+        );
+        await client.query('COMMIT');
+      } catch (qErr) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw qErr;
+      } finally {
+        client.release();
+      }
       await enqueueNotification({ notification_id: notificationId, company_id: recovery.companyId,
         channel: 'email', recipient: recovery.email, title: message.subject, body: message.html });
     }

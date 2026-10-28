@@ -80,7 +80,7 @@ final realtimeOrdersStreamProvider = StreamProvider<RealtimeEvent>((ref) {
   if (user == null) return const Stream.empty();
 
   // Trigger connect on subscription
-  ref.read(connectionManagerProvider).connect();
+  Future.microtask(() => ref.read(connectionManagerProvider).connect());
 
   return repo.subscribeToTopic(user.companyId, 'orders');
 });
@@ -91,7 +91,7 @@ final realtimeInventoryStreamProvider = StreamProvider<RealtimeEvent>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return const Stream.empty();
 
-  ref.read(connectionManagerProvider).connect();
+  Future.microtask(() => ref.read(connectionManagerProvider).connect());
 
   return repo.subscribeToTopic(user.companyId, 'inventory');
 });

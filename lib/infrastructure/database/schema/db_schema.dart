@@ -868,6 +868,117 @@ class DatabaseSchema {
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
     }
+
+    // Hazelnut & Warehouse Escrow Tables
+    await createHazelnutTables(db);
+  }
+
+  static Future<void> createHazelnutTables(DatabaseExecutor db) async {
+    // 1. Warehouses
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS warehouses (
+        id TEXT PRIMARY KEY,
+        company_id TEXT,
+        name TEXT NOT NULL,
+        location TEXT,
+        capacity_kg REAL NOT NULL DEFAULT 0.0,
+        current_stock_kg REAL NOT NULL DEFAULT 0.0,
+        average_rendiment REAL NOT NULL DEFAULT 50.0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_warehouses_name ON warehouses(name)');
+
+    // 2. Customer hazelnut escrow batches
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customer_hazelnut_escrow (
+        id TEXT PRIMARY KEY,
+        company_id TEXT,
+        customer_id TEXT NOT NULL,
+        warehouse_id TEXT NOT NULL,
+        receipt_no TEXT,
+        gross_kg REAL NOT NULL,
+        sack_count INTEGER NOT NULL DEFAULT 0,
+        tare_kg REAL NOT NULL DEFAULT 0.0,
+        net_kg REAL NOT NULL,
+        rendiment REAL NOT NULL DEFAULT 50.0,
+        remaining_kg REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        notes TEXT,
+        created_by TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_hazelnut_escrow_customer ON customer_hazelnut_escrow(customer_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_hazelnut_escrow_warehouse ON customer_hazelnut_escrow(warehouse_id)');
+
+    // 3. Warehouse movements
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS warehouse_hazelnut_movements (
+        id TEXT PRIMARY KEY,
+        company_id TEXT,
+        warehouse_id TEXT NOT NULL,
+        movement_type TEXT NOT NULL,
+        quantity_kg REAL NOT NULL,
+        rendiment REAL NOT NULL DEFAULT 50.0,
+        balance_kg_after REAL NOT NULL,
+        average_rendiment_after REAL NOT NULL,
+        reference_id TEXT,
+        description TEXT,
+        created_by TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_hazelnut_movements_warehouse ON warehouse_hazelnut_movements(warehouse_id)');
+
+    // 4. Hazelnut price cuts
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS hazelnut_price_cuts (
+        id TEXT PRIMARY KEY,
+        company_id TEXT,
+        escrow_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        cut_kg REAL NOT NULL,
+        rendiment REAL NOT NULL,
+        base_price_50 REAL NOT NULL,
+        effective_price REAL NOT NULL,
+        total_amount REAL NOT NULL,
+        settlement_type TEXT NOT NULL DEFAULT 'ACCOUNT_CREDIT',
+        financial_transaction_id TEXT,
+        notes TEXT,
+        created_by TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_hazelnut_price_cuts_escrow ON hazelnut_price_cuts(escrow_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_hazelnut_price_cuts_customer ON hazelnut_price_cuts(customer_id)');
+
+    // Seed default warehouse if none exists
+    final now = DateTime.now().toIso8601String();
+    await db.insert(
+      'warehouses',
+      {
+        'id': 'wh-main',
+        'name': 'Ana Depo (Silo 1)',
+        'location': 'Merkez',
+        'capacity_kg': 50000.0,
+        'current_stock_kg': 0.0,
+        'average_rendiment': 50.0,
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
   static Future<void> createAuditLogsTable(Database db) async {

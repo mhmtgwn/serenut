@@ -77,6 +77,9 @@ class ApiClient {
   /// Returns the current JWT token (read-only).
   String? get jwtToken => _jwtToken;
 
+  /// Returns true if the current session was explicitly invalidated due to a 401.
+  bool get isSessionInvalidated => _sessionInvalidated;
+
   /// Returns the base URL of the active environment.
   String get baseUrl => _config.apiBaseUrl;
 
@@ -189,7 +192,7 @@ class ApiClient {
 
       // Handle transparent JWT token refresh on 401s
       if (response.statusCode == 401 &&
-          !path.startsWith('/auth/') &&
+          !path.startsWith('/auth/') && !path.startsWith('/api/v1/auth/') &&
           onTokenExpired != null) {
         _refreshFuture ??= onTokenExpired!();
         bool success = false;
@@ -263,7 +266,9 @@ class ApiClient {
       // Background services can own a lightweight ApiClient without a token
       // refresh callback. A rejected token must still stop that client's
       // polling loop instead of sending the same invalid JWT indefinitely.
-      if (response.statusCode == 401 && !path.startsWith('/auth/')) {
+      if (response.statusCode == 401 &&
+          !path.startsWith('/auth/') &&
+          !path.startsWith('/api/v1/auth/')) {
         _invalidateSession(
             'Yetkilendirme hatası (HTTP 401). Lütfen tekrar giriş yapın.');
         throw const ApiException('Session expired', statusCode: 401);

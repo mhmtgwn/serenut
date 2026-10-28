@@ -232,13 +232,18 @@ class SqliteReportRepository implements IReportRepository {
       limit,
     ]);
 
-    // Resolve category names
+    // Resolve category names if a dedicated categories table exists
     final categoryNames = <String, String>{};
     try {
-      final catRows =
-          await _gateway.query('categories', columns: ['id', 'name']);
-      for (final r in catRows) {
-        categoryNames[r['id'].toString()] = r['name'] as String;
+      final hasCategoriesTable = await _gateway.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'categories'",
+      );
+      if (hasCategoriesTable.isNotEmpty) {
+        final catRows =
+            await _gateway.query('categories', columns: ['id', 'name']);
+        for (final r in catRows) {
+          categoryNames[r['id'].toString()] = r['name'] as String;
+        }
       }
     } catch (_) {
       // Ignored: fallback or safe default applied
@@ -251,7 +256,8 @@ class SqliteReportRepository implements IReportRepository {
       return ProductPerformance(
         productId: row['pid'] as String? ?? '',
         productName: row['pname'] as String? ?? 'Bilinmeyen',
-        categoryName: categoryNames[catId] ?? 'Genel',
+        categoryName:
+            categoryNames[catId] ?? (catId.isNotEmpty ? catId : 'Genel'),
         totalSold: (row['sold'] as num?)?.toInt() ?? 0,
         totalRevenue: (row['revenue'] as num?)?.toDouble() ?? 0.0,
         avgPrice: (row['avg_price'] as num?)?.toDouble() ?? 0.0,

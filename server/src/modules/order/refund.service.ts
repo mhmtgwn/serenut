@@ -71,14 +71,20 @@ export class RefundService {
     const normalized: Array<{ saleItemId:string; productId:string; quantity:number; unit:number; subtotal:number }> = [];
     let amount = 0;
     for (const [saleItemId, quantityValue] of requested) {
-      const row = saleItems.rows.find(item => item.id === saleItemId);
+      let row = saleItems.rows.find(item => item.id === saleItemId);
+      if (!row && saleItemId.startsWith(`sync-${params.saleId}-`)) {
+        row = saleItems.rows.find(item =>
+          saleItemId === `sync-${params.saleId}-${item.product_id}` ||
+          saleItemId.startsWith(`sync-${params.saleId}-${item.product_id}-`),
+        );
+      }
       const quantity = Number(quantityValue);
       if (!row || !Number.isFinite(quantity) || quantity <= 0 ||
           quantity > Number(row.quantity)-Number(row.refunded_quantity)+0.000001) throw new Error('invalid_refund_quantity');
       const unit = Number(row.subtotal)/Number(row.quantity);
       const subtotal = Number((unit*quantity).toFixed(2));
       amount += subtotal;
-      normalized.push({ saleItemId, productId: row.product_id, quantity, unit, subtotal });
+      normalized.push({ saleItemId: row.id, productId: row.product_id, quantity, unit, subtotal });
     }
     amount = Number(amount.toFixed(2));
     const remaining = Number(sale.total_amount)-Number(sale.refunded_amount || 0);

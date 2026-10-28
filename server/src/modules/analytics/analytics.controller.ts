@@ -11,13 +11,17 @@ router.post('/crash', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'missing_error_message', message: 'Hata detayı belirtilmelidir.' });
   }
 
+  const client = await pgPool.connect();
   try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+
     // Attempt to match device_hash to retrieve company_id
     let companyId: string | null = null;
     let deviceId: string | null = null;
     
     if (device_hash) {
-      const devRes = await pgPool.query(
+      const devRes = await client.query(
         'SELECT id, company_id FROM device_activations WHERE device_hash = $1 ORDER BY last_seen_at DESC NULLS LAST LIMIT 1',
         [device_hash]
       );
@@ -29,19 +33,24 @@ router.post('/crash', async (req: Request, res: Response) => {
 
     const incidentId = crypto.randomUUID ? crypto.randomUUID() : `inc-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    await pgPool.query(
+    await client.query(
       `INSERT INTO crash_logs (id, company_id, device_id, error_message, stack_trace, app_version)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [incidentId, companyId, deviceId, error_message, stack_trace || null, app_version || null]
     );
+
+    await client.query('COMMIT');
 
     return res.status(201).json({
       status: 'logged',
       incident_id: incidentId
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Failed to log crash:', err);
     return res.status(500).json({ error: 'server_error', message: 'Hata raporlama başarısız.' });
+  } finally {
+    client.release();
   }
 });
 

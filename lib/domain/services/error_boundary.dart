@@ -38,6 +38,8 @@ class ErrorBoundary {
     // ── 1. Flutter framework errors (widget build, layout, rendering) ────────
     FlutterError.onError = (FlutterErrorDetails details) async {
       final isMissingPlugin = details.exception is MissingPluginException;
+      final isLayoutOverflow =
+          details.exceptionAsString().contains('RenderFlex overflowed');
       final refCode = _generateErrorReference(details.exception.toString());
 
       // Enrich with additional context from FlutterErrorDetails
@@ -47,12 +49,19 @@ class ErrorBoundary {
         if (details.context != null) 'context:${details.context}',
       ].join(' | ');
 
+      final effectiveStack = (details.stack != null &&
+              details.stack.toString().trim().isNotEmpty)
+          ? details.stack!
+          : StackTrace.fromString(details.toString());
+
       await _telemetry.logError(
         details.exception,
-        details.stack ?? StackTrace.empty,
+        effectiveStack,
         context: enrichedContext,
         correlationId: refCode,
-        level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
+        level: (isMissingPlugin || isLayoutOverflow)
+            ? LogLevel.warning
+            : LogLevel.critical,
       );
 
       // Do not show red screen for MissingPluginException

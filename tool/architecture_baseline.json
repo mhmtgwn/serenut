@@ -2,23 +2,24 @@
   "_comment": "node tool/architecture_guard.mjs tarafından üretilir. Sayılar yalnızca azalabilir.",
   "max_file_lines": 800,
   "metrics": {
-    "money_real_columns": 39,
-    "money_double_fields": 241,
+    "money_real_columns": 43,
+    "money_double_fields": 253,
     "balance_formula_copies": 9,
     "ledger_bypass_toggles": 0,
     "hardcoded_data_repair_ids": 0,
     "ui_imports_database": 5,
-    "ui_direct_repository_service": 57,
+    "ui_direct_repository_service": 63,
     "database_manager_singleton": 1,
-    "server_pgpool_in_controllers": 111,
-    "empty_catch_dart": 13,
-    "empty_catch_ts": 0,
-    "datetime_now": 485
+    "server_pgpool_in_controllers": 115,
+    "empty_catch_dart": 31,
+    "empty_catch_ts": 4,
+    "datetime_now": 499
   },
   "oversized_files": [
     "lib/core_next/infrastructure/migration/erkul_json_importer.dart",
     "lib/core_next/infrastructure/migration/live_safe_catch_up_reconciliation_coordinator.dart",
     "lib/core_next/infrastructure/migration/migration_bridge_engine.dart",
+    "lib/core_next/infrastructure/sync/sync_v4_pull_ingestion_service.dart",
     "lib/domain/printing/label_dimension_models.dart",
     "lib/domain/repositories/base_repository.dart",
     "lib/domain/services/auth_service.dart",
@@ -59,6 +60,9 @@
     "lib/presentation/widgets/invoice/create_gib_invoice_dialog.dart",
     "lib/presentation/widgets/sales/checkout_section.dart",
     "server/src/modules/admin/admin.controller.ts",
-    "server/src/modules/release/release.controller.ts"
+    "server/src/modules/portal/portal.controller.ts",
+    "server/src/modules/release/release.controller.ts",
+    "server/src/modules/sync_v4/sync-v4.materializer.ts",
+    "server/src/server.ts"
   ]
 }

@@ -28,6 +28,13 @@ const _kPageSize = 25;
 /// Reactive indicator for orders pagination loading state
 final ordersLoadingMoreProvider = StateProvider<bool>((ref) => false);
 
+/// Persistent filter states so background sync invalidations preserve active UI filters
+final ordersStatusFilterProvider = StateProvider<String?>((ref) => null);
+final ordersSearchQueryProvider = StateProvider<String?>((ref) => null);
+final ordersDateFromFilterProvider = StateProvider<DateTime?>((ref) => null);
+final ordersDateToFilterProvider = StateProvider<DateTime?>((ref) => null);
+final ordersOverdueOnlyFilterProvider = StateProvider<bool>((ref) => false);
+
 class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   late IOrderRepository _repository;
 
@@ -47,6 +54,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   @override
   FutureOr<List<OrderEntity>> build() async {
     _repository = await ref.watch(orderRepositoryProvider.future);
+    _statusFilter = ref.read(ordersStatusFilterProvider);
+    _searchQuery = ref.read(ordersSearchQueryProvider);
+    _dateFrom = ref.read(ordersDateFromFilterProvider);
+    _dateTo = ref.read(ordersDateToFilterProvider);
+    _overdueOnly = ref.read(ordersOverdueOnlyFilterProvider);
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
@@ -68,6 +80,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> applyFilter(String? status) async {
     final normalized = (status == 'all' || status == null) ? null : status;
+    ref.read(ordersStatusFilterProvider.notifier).state = normalized;
     if (_statusFilter == normalized) return;
     _statusFilter = normalized;
     _offset = 0;
@@ -101,6 +114,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> applySearch(String? query) async {
     _searchQuery = (query == null || query.isEmpty) ? null : query;
+    ref.read(ordersSearchQueryProvider.notifier).state = _searchQuery;
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
@@ -126,6 +140,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _dateFrom = dateFrom;
     _dateTo = dateTo;
     _overdueOnly = overdueOnly;
+    ref.read(ordersDateFromFilterProvider.notifier).state = dateFrom;
+    ref.read(ordersDateToFilterProvider.notifier).state = dateTo;
+    ref.read(ordersOverdueOnlyFilterProvider.notifier).state = overdueOnly;
     await refresh();
   }
 
@@ -552,20 +569,20 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     }
 
-    // Log to Audit Trail
-    try {
-      final auditService = await ref.read(auditServiceProvider.future);
-      await auditService.logDelete(
-        'order',
-        id,
-        'Sipariş Silindi - ID: $id (Müşteri ID: ${order.customerId})',
-        approvedByUserId: approvedByUserId,
-        approvedByUserName: approvedByUserName,
-      );
-    } catch (e, st) {
-      TelemetryService().logError(e, st,
-          context: 'orders_controller', level: LogLevel.warning);
-    }
+    // Log to Audit Trail asynchronously so UI never waits on non-critical audit write
+    unawaited(
+      ref.read(auditServiceProvider.future).then((auditService) =>
+          auditService.logDelete(
+            'order',
+            id,
+            'Sipariş Silindi - ID: $id (Müşteri ID: ${order.customerId})',
+            approvedByUserId: approvedByUserId,
+            approvedByUserName: approvedByUserName,
+          )).catchError((e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller', level: LogLevel.warning);
+      }),
+    );
 
     ref.invalidate(customersControllerProvider);
     ref.invalidate(customerTransactionsProvider(order.customerId));
@@ -573,8 +590,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     ref.invalidate(customerDetailProvider(order.customerId));
     ref.invalidate(productsControllerProvider);
     ref.invalidate(dashboardProvider);
-    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
   }
 
   Future<void> updateStatus(String id, String status) async {
@@ -674,9 +691,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             context: 'orders_controller', level: LogLevel.warning);
       }));
 
-      // Non-blocking background sync trigger with slight delay to prevent SQLite locking
+      // Non-blocking background sync trigger
+      final syncNotifier = ref.read(syncProvider.notifier);
       Future.delayed(const Duration(milliseconds: 500), () {
-        ref.read(syncProvider.notifier).triggerSync().ignore();
+        try {
+          syncNotifier.triggerSync().ignore();
+        } catch (_) {}
       });
 
       // If active filter no longer matches new status, smoothly filter from in-memory state
@@ -725,8 +745,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
               await ref.read(orderCancellationServiceProvider.future);
           await cancellationService.cancel(id: order.id);
           affectedCustomerIds.add(order.customerId);
-        } catch (_) {
-          // Ignored: fallback or safe default applied
+        } catch (e, st) {
+          TelemetryService().logError(e, st,
+              context: 'orders_controller:bulkDelete:cancel',
+              level: LogLevel.error);
+          continue;
         }
       }
 
@@ -762,8 +785,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           state.requireValue.where((o) => !deletedIds.contains(o.id)).toList(),
         );
       }
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
       await refresh();
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
 
     return deletedCount;
@@ -824,8 +847,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         ref.invalidate(customerTransactionsProvider(custId));
         ref.invalidate(customerBalanceDetailsProvider(custId));
       }
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
       await refresh();
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
 
     return cancelledCount;
@@ -920,8 +943,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
       if (updatedCount > 0) {
         ref.invalidate(dashboardProvider);
+        final syncNotifier = ref.read(syncProvider.notifier);
         Future.delayed(const Duration(milliseconds: 500), () {
-          ref.read(syncProvider.notifier).triggerSync().ignore();
+          try {
+            syncNotifier.triggerSync().ignore();
+          } catch (_) {}
         });
         if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != targetStatus) {
           final current = state.valueOrNull;
@@ -1041,8 +1067,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     ref.invalidate(customerBalanceDetailsProvider(order.customerId));
     ref.invalidate(productsControllerProvider);
     ref.invalidate(dashboardProvider);
-    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
   }
 }
 

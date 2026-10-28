@@ -7,6 +7,7 @@ import '../../domain/models/sync_dtos.dart';
 import '../../domain/models/sync_mutation.dart';
 
 typedef TokenProvider = Future<String?> Function();
+typedef UnauthorizedRefreshHandler = Future<bool> Function();
 
 /// Serenut OS Sync V4 / Protocol 6 İzole HTTP İstemcisi.
 /// 
@@ -18,6 +19,7 @@ class SyncV4HttpClient {
   final String deviceActivationId;
   final String deviceId;
   final TokenProvider? tokenProvider;
+  final UnauthorizedRefreshHandler? onUnauthorized;
   final http.Client client;
   final Duration timeout;
 
@@ -26,6 +28,7 @@ class SyncV4HttpClient {
     required this.deviceActivationId,
     required this.deviceId,
     this.tokenProvider,
+    this.onUnauthorized,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
   }) : client = client ?? http.Client();
@@ -176,6 +179,16 @@ class SyncV4HttpClient {
   Future<T> _execute<T>(Future<T> Function() action) async {
     try {
       return await action();
+    } on SyncUnauthorizedException {
+      if (onUnauthorized != null) {
+        try {
+          final refreshed = await onUnauthorized!();
+          if (refreshed) {
+            return await action();
+          }
+        } catch (_) {}
+      }
+      rethrow;
     } on TimeoutException {
       throw const SyncTimeoutException();
     } on http.ClientException catch (e) {

@@ -128,7 +128,8 @@ class SharedHardwareService implements SharedHardwareJobGateway {
 
   Map<String, dynamic>? get _identity {
     final license = _licenseService.getLicenseInfo();
-    if (_apiClient.jwtToken?.isNotEmpty != true) {
+    if (_apiClient.jwtToken?.isNotEmpty != true ||
+        _apiClient.isSessionInvalidated) {
       return null;
     }
     // activationId may be absent during trial or before first license sync;

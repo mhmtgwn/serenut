@@ -164,7 +164,7 @@ export async function applyDomainMutation(
           numberValue(payload, "min_stock", 5), stringValue(payload, "brand"),
           stringValue(payload, "unit", "adet"), stringValue(payload, "shelf_code"),
           stringValue(payload, "category", "Genel"),
-          stringValue(payload, "sku", id), Number.isFinite(Number(payload.vat)) ? Number(payload.vat) : null,
+          stringValue(payload, "sku", id), Number.isFinite(Number(payload.vat)) ? Math.round(Number(payload.vat)) : null,
           imagePath, deleted ? "inactive" : stringValue(payload, "status", "active"),
           deleted, isoDateValue(payload, "created_at")],
       );
@@ -288,10 +288,22 @@ export async function upsertSale(
     return;
   }
   if (customerId) {
-    const customer = await client.query(
-      "SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_deleted = false",
+    let customer = await client.query(
+      "SELECT id FROM customers WHERE id = $1 AND company_id = $2",
       [customerId, companyId],
     );
+    if (!customer.rowCount) {
+      await client.query(
+        `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
+      );
+      customer = await client.query(
+        "SELECT id FROM customers WHERE id = $1 AND company_id = $2",
+        [customerId, companyId],
+      );
+    }
     if (!customer.rowCount) throw new Error("invalid_customer");
   } else if (paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") {
     throw new Error("credit_sale_requires_customer");
@@ -507,9 +519,12 @@ export async function upsertFinancialTransaction(
   const rawMetadata = typeof payload.metadata === "object" && payload.metadata !== null ? payload.metadata : null;
   const isRevision = (rawMetadata && (rawMetadata as any).reason === "order_revision") ||
                      (typeof payload.metadata === "string" && payload.metadata.includes('"order_revision"'));
+  const effectivePaidAmount = (type === "collection" && paidAmount === 0 && amount > 0)
+    ? amount
+    : paidAmount;
   let effectiveDebtAmount = debtAmount;
-  if (!Number.isFinite(effectiveDebtAmount) || effectiveDebtAmount < 0 || Math.abs(amount - paidAmount - effectiveDebtAmount) > 0.05) {
-    effectiveDebtAmount = Math.max(0, Number((amount - paidAmount).toFixed(2)));
+  if (!Number.isFinite(effectiveDebtAmount) || effectiveDebtAmount < 0 || Math.abs(amount - effectivePaidAmount - effectiveDebtAmount) > 0.05) {
+    effectiveDebtAmount = Math.max(0, Number((amount - effectivePaidAmount).toFixed(2)));
   }
 
   const prior = await client.query(
@@ -525,8 +540,18 @@ export async function upsertFinancialTransaction(
     return;
   }
   if (customerId) {
-    const customer = await client.query(
-      `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
+    let customer = await client.query(
+      `SELECT id FROM customers WHERE id=$1 AND company_id=$2`, [customerId, companyId]);
+    if (!customer.rowCount) {
+      await client.query(
+        `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
+      );
+      customer = await client.query(
+        `SELECT id FROM customers WHERE id=$1 AND company_id=$2`, [customerId, companyId]);
+    }
     if (!customer.rowCount) throw new Error("invalid_customer");
   }
 
@@ -537,7 +562,7 @@ export async function upsertFinancialTransaction(
     if (isOrderRef && referenceId) {
       sale = await client.query(
         `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-        [referenceId, companyId, paidAmount]);
+        [referenceId, companyId, effectivePaidAmount]);
     } else if (referenceId) {
       sale = await client.query(
         `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
@@ -545,7 +570,7 @@ export async function upsertFinancialTransaction(
       if (!sale.rowCount) {
         sale = await client.query(
           `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
-          [referenceId, companyId, paidAmount]);
+          [referenceId, companyId, effectivePaidAmount]);
       }
     }
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
@@ -577,28 +602,38 @@ export async function upsertFinancialTransaction(
       }
     }
   } else if (type === "collection" &&
-      (amount <= 0 || Math.abs(amount-paidAmount)>0.01)) {
+      (amount <= 0 || Math.abs(amount-effectivePaidAmount)>0.01)) {
     throw new Error("invalid_collection_transaction");
   } else if (type === "manual_debt" &&
-      (amount <= 0 || paidAmount !== 0 || Math.abs(amount-debtAmount)>0.01)) {
+      (amount <= 0 || effectivePaidAmount !== 0 || Math.abs(amount-effectiveDebtAmount)>0.01)) {
     throw new Error("invalid_manual_debt_transaction");
   } else if ((type === "cancellation" || type === "refund")) {
-    if (!referenceId || amount <= 0 || paidAmount > amount || debtAmount > amount) {
+    if (!referenceId || amount <= 0 || effectivePaidAmount > amount || effectiveDebtAmount > amount) {
       throw new Error(`invalid_${type}_transaction`);
     }
+    const lookupRefId = referenceId.startsWith("refund-")
+      ? referenceId.slice("refund-".length)
+      : referenceId;
     let sale = await client.query(
       `SELECT customer_id,total_amount FROM sales WHERE id=$1 AND company_id=$2`,
-      [referenceId, companyId]);
+      [lookupRefId, companyId]);
     if (!sale.rowCount) {
       sale = await client.query(
         `SELECT customer_id,total_amount FROM customer_orders WHERE id=$1 AND company_id=$2`,
-        [referenceId, companyId]);
+        [lookupRefId, companyId]);
     }
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
     const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
     if (!sale.rowCount || hasCustomerMismatch ||
         (!isRevision && amount > Number(sale.rows[0].total_amount)+0.01)) {
-      throw new Error(`${type}_sale_mismatch`);
+      logger.warn(`${type}_sale_mismatch detected, retaining financial transaction for ledger parity`, {
+        transaction_id: id,
+        reference_id: referenceId,
+        customer_id: customerId,
+        sale_customer_id: saleCustId,
+        amount,
+        sale_total: sale.rowCount ? Number(sale.rows[0].total_amount) : null,
+      });
     }
   }
   await client.query(
@@ -613,7 +648,7 @@ export async function upsertFinancialTransaction(
        payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method),
        updated_at = NOW()`,
     [id, companyId, type, customerId, amount,
-      paidAmount, effectiveDebtAmount,
+      effectivePaidAmount, effectiveDebtAmount,
       isoDateValue(payload, "date", "created_at"),
       referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod, isDeleted],
