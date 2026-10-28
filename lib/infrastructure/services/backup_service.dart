@@ -80,7 +80,8 @@ class BackupService implements IBackupService {
     // 4. Geçici dosyanın SQLite bütünlüğünü ve açılabilirliğini test et
     Database? verifyDb;
     try {
-      verifyDb = await openDatabase(tempBackupPath, readOnly: true);
+      verifyDb = await openDatabase(tempBackupPath,
+          readOnly: true, singleInstance: false);
       final testIntegrity = await verifyDb.rawQuery('PRAGMA integrity_check');
       if (testIntegrity.isEmpty || testIntegrity.first.values.first != 'ok') {
         throw Exception('Yedek dosyasının SQLite bütünlük doğrulaması başarısız oldu.');
@@ -474,7 +475,8 @@ class BackupService implements IBackupService {
 
       Database? testRestoredDb;
       try {
-        testRestoredDb = await openDatabase(targetDbPath, readOnly: true);
+        testRestoredDb = await openDatabase(targetDbPath,
+            readOnly: true, singleInstance: false);
         final integrity = await testRestoredDb.rawQuery('PRAGMA integrity_check');
         if (integrity.isEmpty || integrity.first.values.first != 'ok') {
           throw Exception('Geri yüklenen dosya bütünlük testini geçemedi.');

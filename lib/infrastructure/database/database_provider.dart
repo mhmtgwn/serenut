@@ -119,39 +119,48 @@ class DatabaseManager {
   }
 
   Database? _database;
-  Future<Database>? _databaseFuture;
+  Future<Database>? _initFuture;
 
   /// Reset database connection cache (used in testing)
   void reset() {
     _database = null;
-    _databaseFuture = null;
+    _initFuture = null;
   }
 
-  /// Get database instance (lazy initialization)
+  /// Get database instance (lazy initialization with mutex concurrency guard)
   Future<Database> getDatabase() async {
     if (_database != null && _database!.isOpen) {
       return _database!;
     }
-    _database = null;
-    _databaseFuture = null;
-    _databaseFuture = _initializeDatabase();
+    if (_initFuture != null) {
+      return await _initFuture!;
+    }
+
+    _initFuture = _openAndSetupDatabase();
     try {
-      _database = await _databaseFuture;
+      final db = await _initFuture!;
+      _database = db;
+      return db;
     } catch (e) {
-      _databaseFuture = null;
       _database = null;
       rethrow;
+    } finally {
+      _initFuture = null;
     }
+  }
+
+  Future<Database> _openAndSetupDatabase() async {
+    final db = await _initializeDatabase();
     try {
-      await _database!.rawQuery('PRAGMA busy_timeout = 30000');
+      await db.rawQuery('PRAGMA busy_timeout = 30000');
     } catch (_) {
       // Ignored: fallback or safe default applied
     }
-    await _verifyDatabaseSchemaInvariants(_database!);
-    await DatabaseTriggers.verifyAndRepairTriggers(_database!);
-    await _reconcileAllCustomerBalances(_database!);
-    await _standardizeCustomerNamesToTurkishUppercase(_database!);
-    return _database!;
+    await _verifyDatabaseSchemaInvariants(db);
+    await DatabaseTriggers.verifyAndRepairTriggers(db);
+    await _reconcileAllCustomerBalances(db);
+    await _standardizeCustomerNamesToTurkishUppercase(db);
+    return db;
   }
 
   /// Reconciles all customer balances against the append-only ledger on database startup.
@@ -939,9 +948,12 @@ class DatabaseManager {
 
   /// Close database connection
   Future<void> close() async {
-    await _database?.close();
+    final db = _database;
     _database = null;
-    _databaseFuture = null;
+    _initFuture = null;
+    if (db != null && db.isOpen) {
+      await db.close();
+    }
   }
 
   /// Factory Reset: Closes database connection and deletes all local database files

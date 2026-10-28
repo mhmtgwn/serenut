@@ -46,7 +46,7 @@ class DatabaseSchema {
         brand TEXT NOT NULL DEFAULT '',
         unit TEXT NOT NULL DEFAULT 'adet',
         shelf_code TEXT NOT NULL DEFAULT '',
-        category TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Genel',
         sku TEXT UNIQUE,
         vat INTEGER,
         is_active INTEGER NOT NULL DEFAULT 1,
@@ -92,7 +92,7 @@ class DatabaseSchema {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS sales (
         id TEXT PRIMARY KEY,
-        customer_id TEXT NOT NULL,
+        customer_id TEXT,
         receipt_no TEXT,
         total_amount REAL NOT NULL,
         total_amount_minor INTEGER NOT NULL DEFAULT 0,
@@ -142,7 +142,7 @@ class DatabaseSchema {
       CREATE TABLE IF NOT EXISTS financial_transactions (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
-        customer_id TEXT NOT NULL,
+        customer_id TEXT,
         amount REAL NOT NULL,
         amount_minor INTEGER NOT NULL DEFAULT 0,
         paid_amount REAL NOT NULL DEFAULT 0,
@@ -187,7 +187,7 @@ class DatabaseSchema {
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         order_number TEXT NOT NULL UNIQUE,
-        customer_id TEXT NOT NULL,
+        customer_id TEXT,
         status TEXT NOT NULL DEFAULT 'created',
         total_amount REAL,
         order_date TEXT,

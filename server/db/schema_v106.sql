@@ -12,3 +12,4 @@ ALTER TABLE warehouse_hazelnut_movements ADD COLUMN IF NOT EXISTS deleted_at TIM
 
 ALTER TABLE hazelnut_price_cuts ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE hazelnut_price_cuts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+

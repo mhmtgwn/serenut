@@ -384,7 +384,7 @@ class PilotCutoverGate {
     try {
       testDb = await factory.openDatabase(
         resolvedTargetPath,
-        options: OpenDatabaseOptions(readOnly: true),
+        options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
       );
 
       final integrity = await testDb.rawQuery('PRAGMA integrity_check;');
@@ -487,7 +487,7 @@ class PilotCutoverGate {
             File(resolvedLegacyPath).lengthSync() >= 512) {
           legacyTestDb = await factory.openDatabase(
             resolvedLegacyPath,
-            options: OpenDatabaseOptions(readOnly: true),
+            options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
           );
           final legCustRows = await legacyTestDb.rawQuery(
             "SELECT COUNT(*) FROM customers WHERE id != ''",

@@ -126,11 +126,11 @@ extension SyncV4Materializer on SyncV4Service {
       // requires one, so use a deterministic value that is stable on replay.
       payload['order_number'] = 'SYNC-$id';
     }
-    if ((type == 'sale' || type == 'order') &&
+    if ((type == 'sale' || type == 'order' || type == 'financial_transaction') &&
         (payload['customer_id'] == null ||
             payload['customer_id'].toString().trim().isEmpty)) {
-      // Sales and orders require a non-null customer_id referencing customers(id).
-      // Quick/walk-in sales default to the canonical cash customer ('').
+      // Sales, orders and ledger transactions require a non-null customer_id referencing customers(id).
+      // Quick/walk-in transactions default to the canonical cash customer ('').
       payload['customer_id'] = '';
     }
     final row = await _normalizeRowForLocalSchema(
@@ -138,7 +138,7 @@ extension SyncV4Materializer on SyncV4Service {
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
-    if ((type == 'sale' || type == 'order') &&
+    if ((type == 'sale' || type == 'order' || type == 'financial_transaction') &&
         (row['customer_id'] == null ||
             row['customer_id'].toString().trim().isEmpty)) {
       row['customer_id'] = '';
@@ -149,7 +149,8 @@ extension SyncV4Materializer on SyncV4Service {
     if ((type == 'order' ||
             type == 'sale' ||
             type == 'customer_installment_plan' ||
-            type == 'customer_installment') &&
+            type == 'customer_installment' ||
+            type == 'financial_transaction') &&
         row['customer_id'] != null) {
       final customerId = row['customer_id'].toString().trim();
       final existingCust = await db.query(
@@ -188,6 +189,10 @@ extension SyncV4Materializer on SyncV4Service {
       row.remove('balance');
     }
     if (type == 'financial_transaction') {
+      if (row['customer_id'] == null ||
+          row['customer_id'].toString().trim().isEmpty) {
+        row['customer_id'] = '';
+      }
       final existing = await db.query(
         table,
         where: 'id = ?',
@@ -440,6 +445,29 @@ extension SyncV4Materializer on SyncV4Service {
     }
     if (columns.contains('updated_at') && row['updated_at'] == null) {
       row['updated_at'] = row['created_at'] ?? now;
+    }
+    // Universal NOT NULL guard: If an older client schema has a NOT NULL column
+    // without a DEFAULT, and the sync payload omitted or set it to null, provide
+    // a safe zero-value fallback so SQLite never crashes with NOT NULL constraint violation.
+    for (final colInfo in schema) {
+      final colName = colInfo['name']?.toString();
+      if (colName == null || !columns.contains(colName)) continue;
+      final isNotNull = colInfo['notnull'] == 1;
+      final hasDefault = colInfo['dflt_value'] != null;
+      final isPk = colInfo['pk'] != 0;
+      if (isNotNull && !hasDefault && !isPk && row[colName] == null) {
+        final colType = (colInfo['type']?.toString() ?? '').toUpperCase();
+        if (colType.contains('INT')) {
+          row[colName] = 0;
+        } else if (colType.contains('REAL') ||
+            colType.contains('NUM') ||
+            colType.contains('DOUB') ||
+            colType.contains('FLOAT')) {
+          row[colName] = 0.0;
+        } else {
+          row[colName] = '';
+        }
+      }
     }
     // Dual-write: Populate *_minor currency columns if local schema contains them
     for (final col in columns) {

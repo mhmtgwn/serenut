@@ -543,7 +543,8 @@ class CoreNextBootstrapCoordinator {
           throw const BackupVerificationException('Yedek dosyası fiziksel olarak oluşturulamadı.');
         }
 
-        final verifyDb = await openDatabase(backupFilePath, readOnly: true);
+        final verifyDb = await openDatabase(backupFilePath,
+            readOnly: true, singleInstance: false);
         try {
           final backupIntegrity = await verifyDb.rawQuery('PRAGMA integrity_check;');
           if (backupIntegrity.isEmpty || backupIntegrity.first.values.first != 'ok') {
