@@ -302,11 +302,6 @@ class AppBootstrap {
     if (pilotResult.isPilotActive) {
       debugPrint(
           '[AppBootstrap] 🚀 Core Next Pilot Yönlendirmesi AKTİF: ${pilotResult.reason}');
-      try {
-        await dbManager.close();
-      } catch (e) {
-        debugPrint('[AppBootstrap] Note on dbManager reset: $e');
-      }
     } else {
       debugPrint(
           '[AppBootstrap] 🛡️ Core Next Pilot Kapalı (Legacy Aktif): ${pilotResult.reason}');

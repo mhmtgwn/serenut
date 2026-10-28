@@ -45,7 +45,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _searchController.text = ref.read(customerSearchQueryProvider);
-    _searchController.addListener(_onSearchChanged);
+
   }
 
   void _onSearchChanged([String? value]) {
@@ -60,7 +60,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
-    _searchController.removeListener(_onSearchChanged);
+
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();

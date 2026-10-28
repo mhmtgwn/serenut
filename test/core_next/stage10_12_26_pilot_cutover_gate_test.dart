@@ -533,5 +533,47 @@ void main() {
 
       container.dispose();
     });
+
+    test('14. Parite açığı koruması: Legacy müşteri sayısı hedef veritabanından fazlaysa fail-closed engellenir ve bayrak sıfırlanır', () async {
+      await createValidLegacyDb();
+      // Legacy DB'ye fazladan bir müşteri daha ekle (toplam 2 müşteri)
+      final legacyDb = await databaseFactory.openDatabase(legacyDbPath);
+      await legacyDb.insert('customers', {
+        'id': 'cust-extra-legacy',
+        'name': 'Ekstra Legacy Müşteri',
+        'balance': 0.0,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'is_active': 1,
+      });
+      await legacyDb.close();
+
+      // Core DB sadece 1 müşteriye sahip
+      await createValidCoreNextDb(coreNextDbPath, tenantId: testTenantId);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(PilotCutoverGate.prefKeyPilotEnabled, true);
+      await prefs.setString(CoreNextBootstrapCoordinator.prefKeyMigrationState, 'completed');
+      await prefs.setString('last_backup_date', DateTime.now().toIso8601String());
+      await prefs.setString(CoreNextBootstrapCoordinator.prefKeyBackupPath, backupFilePath);
+
+      final gate = PilotCutoverGate(
+        overrideGenerator: testOverrideGenerator(),
+      );
+
+      final result = await gate.evaluate(
+        prefs: prefs,
+        requestedTenantId: testTenantId,
+        legacyDbPath: legacyDbPath,
+        targetDbPath: coreNextDbPath,
+        dbFactory: databaseFactory,
+      );
+
+      expect(result.isPilotActive, isFalse);
+      expect(result.status, equals(PilotGateStatus.blockedParityMismatch));
+      expect(result.reason, contains('Legacy veritabanında hedef veritabanından daha fazla müşteri var'));
+      // Bayrağın otomatik iyileştirilerek kapatıldığını doğrula
+      expect(prefs.getBool(PilotCutoverGate.prefKeyPilotEnabled), isFalse);
+    });
   });
 }

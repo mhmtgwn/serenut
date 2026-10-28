@@ -609,7 +609,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     }
 
     try {
-      await future;
+      if (targetOrder == null) {
+        await future;
+      }
       final order = targetOrder ?? await _repository.findById(id);
       if (order == null) throw StateError('Sipariş bulunamadı: $id');
       final publisher = ref.read(eventPublisherProvider);
@@ -719,7 +721,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   /// Toplu sipariş silme (teslim edilenler hariç).
   Future<int> bulkDeleteOrders(Iterable<String> ids,
       {String? approvedByUserId, String? approvedByUserName}) async {
-    await future;
+    if (state.valueOrNull == null) {
+      await future;
+    }
     final cutoff = DatabaseManager.cutoffMaintenanceLock;
     if (cutoff != null && !cutoff.state.isWritePermitted) {
       cutoff.assertWritePermitted(operation: 'OrdersController.bulkDeleteOrders');
@@ -794,7 +798,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   /// Toplu sipariş iptali (teslim edilenler hariç).
   Future<int> bulkCancelOrders(Iterable<String> ids) async {
-    await future;
+    if (state.valueOrNull == null) {
+      await future;
+    }
     final idSet = ids.toSet();
     if (idSet.isEmpty) return 0;
 
@@ -856,7 +862,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   /// Toplu sipariş durumu güncelleme (teslim hariç).
   Future<int> bulkUpdateStatus(Iterable<String> ids, String newStatus) async {
-    await future;
+    if (state.valueOrNull == null) {
+      await future;
+    }
     final targetStatus = newStatus.toLowerCase();
     // TESLİM DURUMU TOPLU İŞLEMLERE KAPALIDIR
     if (targetStatus == 'delivered') {

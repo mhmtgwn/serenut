@@ -36,6 +36,7 @@ enum PilotGateStatus {
   blockedTimeout,
   blockedUnknownError,
   blockedUnsafeRollback,
+  blockedParityMismatch,
   pilotActiveApproved;
 
   bool get isApproved => this == PilotGateStatus.pilotActiveApproved;
@@ -476,6 +477,45 @@ class PilotCutoverGate {
               evaluatedDurationMs: stopwatch.elapsedMilliseconds,
             );
           }
+        }
+      }
+
+      // 6.b Kural: Veri Mutabakat ve Parite Doğrulaması (Legacy vs Target)
+      Database? legacyTestDb;
+      try {
+        if (File(resolvedLegacyPath).existsSync() &&
+            File(resolvedLegacyPath).lengthSync() >= 512) {
+          legacyTestDb = await factory.openDatabase(
+            resolvedLegacyPath,
+            options: OpenDatabaseOptions(readOnly: true),
+          );
+          final legCustRows = await legacyTestDb.rawQuery(
+            "SELECT COUNT(*) FROM customers WHERE id != ''",
+          );
+          final coreCustRows = await testDb.rawQuery(
+            "SELECT COUNT(*) FROM customers WHERE id != ''",
+          );
+          final legCustCount = Sqflite.firstIntValue(legCustRows) ?? 0;
+          final coreCustCount = Sqflite.firstIntValue(coreCustRows) ?? 0;
+
+          if (legCustCount > coreCustCount) {
+            stopwatch.stop();
+            // Otomatik iyileştirme: Eksik veriyle çalışmayı önlemek için pilot bayrağını temizle
+            await prefs.setBool(prefKeyPilotEnabled, false);
+            return PilotGateResult(
+              isPilotActive: false,
+              status: PilotGateStatus.blockedParityMismatch,
+              reason:
+                  'Legacy veritabanında hedef veritabanından daha fazla müşteri var ($legCustCount > $coreCustCount). Veri kaybını önlemek için Core Next pilot geçişi engellendi (fail-closed).',
+              evaluatedDurationMs: stopwatch.elapsedMilliseconds,
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[PilotCutoverGate] Parite kontrolü uyarısı: $e');
+      } finally {
+        if (legacyTestDb != null && legacyTestDb.isOpen) {
+          await legacyTestDb.close();
         }
       }
     } catch (e) {
