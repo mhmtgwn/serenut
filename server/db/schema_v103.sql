@@ -17,7 +17,16 @@ CREATE TABLE IF NOT EXISTS warehouses (
 
 CREATE INDEX IF NOT EXISTS idx_warehouses_company ON warehouses(company_id);
 ALTER TABLE warehouses ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON warehouses FOR ALL USING (company_id = NULLIF(current_setting('app.current_company_id', true), ''));
+ALTER TABLE warehouses FORCE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'warehouses' AND policyname = 'tenant_isolation'
+  ) THEN
+    CREATE POLICY tenant_isolation ON warehouses
+      USING (company_id = current_tenant_id() OR current_setting('app.bypass_rls', true) = 'true');
+  END IF;
+END $$;
 
 -- 2. Müşteri Emanet Fındık Defteri (Her üreticinin emanete bıraktığı fındık partileri)
 CREATE TABLE IF NOT EXISTS customer_hazelnut_escrow (
@@ -43,7 +52,16 @@ CREATE INDEX IF NOT EXISTS idx_hazelnut_escrow_company ON customer_hazelnut_escr
 CREATE INDEX IF NOT EXISTS idx_hazelnut_escrow_customer ON customer_hazelnut_escrow(customer_id);
 CREATE INDEX IF NOT EXISTS idx_hazelnut_escrow_warehouse ON customer_hazelnut_escrow(warehouse_id);
 ALTER TABLE customer_hazelnut_escrow ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON customer_hazelnut_escrow FOR ALL USING (company_id = NULLIF(current_setting('app.current_company_id', true), ''));
+ALTER TABLE customer_hazelnut_escrow FORCE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'customer_hazelnut_escrow' AND policyname = 'tenant_isolation'
+  ) THEN
+    CREATE POLICY tenant_isolation ON customer_hazelnut_escrow
+      USING (company_id = current_tenant_id() OR current_setting('app.bypass_rls', true) = 'true');
+  END IF;
+END $$;
 
 -- 3. Depo Fındık Hareketleri (Fiziksel giren/çıkan ekstre)
 CREATE TABLE IF NOT EXISTS warehouse_hazelnut_movements (
@@ -64,7 +82,16 @@ CREATE TABLE IF NOT EXISTS warehouse_hazelnut_movements (
 CREATE INDEX IF NOT EXISTS idx_hazelnut_movements_warehouse ON warehouse_hazelnut_movements(warehouse_id);
 CREATE INDEX IF NOT EXISTS idx_hazelnut_movements_company ON warehouse_hazelnut_movements(company_id);
 ALTER TABLE warehouse_hazelnut_movements ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON warehouse_hazelnut_movements FOR ALL USING (company_id = NULLIF(current_setting('app.current_company_id', true), ''));
+ALTER TABLE warehouse_hazelnut_movements FORCE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'warehouse_hazelnut_movements' AND policyname = 'tenant_isolation'
+  ) THEN
+    CREATE POLICY tenant_isolation ON warehouse_hazelnut_movements
+      USING (company_id = current_tenant_id() OR current_setting('app.bypass_rls', true) = 'true');
+  END IF;
+END $$;
 
 -- 4. Fındık Fiyat Kesim Bordrosu (Emanetin TL'ye / Satışa dönüşüm kayıtları)
 CREATE TABLE IF NOT EXISTS hazelnut_price_cuts (
@@ -88,5 +115,13 @@ CREATE INDEX IF NOT EXISTS idx_hazelnut_price_cuts_escrow ON hazelnut_price_cuts
 CREATE INDEX IF NOT EXISTS idx_hazelnut_price_cuts_customer ON hazelnut_price_cuts(customer_id);
 CREATE INDEX IF NOT EXISTS idx_hazelnut_price_cuts_company ON hazelnut_price_cuts(company_id);
 ALTER TABLE hazelnut_price_cuts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON hazelnut_price_cuts FOR ALL USING (company_id = NULLIF(current_setting('app.current_company_id', true), ''));
+ALTER TABLE hazelnut_price_cuts FORCE ROW LEVEL SECURITY;
 
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'hazelnut_price_cuts' AND policyname = 'tenant_isolation'
+  ) THEN
+    CREATE POLICY tenant_isolation ON hazelnut_price_cuts
+      USING (company_id = current_tenant_id() OR current_setting('app.bypass_rls', true) = 'true');
+  END IF;
+END $$;

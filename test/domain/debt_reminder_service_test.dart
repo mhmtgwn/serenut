@@ -79,6 +79,13 @@ void main() {
     mockSmsLogRepo = MockSmsLogRepository();
     mockSmsService = MockSmsService();
     final apiClient = ApiClient();
+    apiClient.mockHandler = (request) {
+      return const ApiResponse(
+        statusCode: 202,
+        body: '{"queued":true}',
+        headers: {},
+      );
+    };
     whatsappOutbox = WhatsappNotificationOutbox(apiClient);
   });
 

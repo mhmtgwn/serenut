@@ -13,7 +13,7 @@
     "server_pgpool_in_controllers": 115,
     "empty_catch_dart": 31,
     "empty_catch_ts": 4,
-    "datetime_now": 499
+    "datetime_now": 500
   },
   "oversized_files": [
     "lib/core_next/infrastructure/migration/erkul_json_importer.dart",

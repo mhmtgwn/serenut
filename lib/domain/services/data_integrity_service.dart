@@ -83,15 +83,7 @@ class DataIntegrityService {
 
     final customer = await _customerRepository.findById(customerId);
     if (customer != null) {
-      final updated = CustomerEntity(
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        balance: expectedBalance,
-        createdAt: customer.createdAt,
-      );
-      await _customerRepository.update(updated);
+      await _customerRepository.updateBalance(customerId, expectedBalance);
     }
     return expectedBalance;
   }
@@ -201,15 +193,7 @@ class DataIntegrityService {
             },
           );
 
-          final updated = CustomerEntity(
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            phone: customer.phone,
-            balance: expectedBalance,
-            createdAt: customer.createdAt,
-          );
-          await _customerRepository.update(updated);
+          await _customerRepository.updateBalance(customer.id, expectedBalance);
           correctedDrifts[customer.id] = expectedBalance;
         }
       }

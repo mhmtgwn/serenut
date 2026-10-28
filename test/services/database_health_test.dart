@@ -114,6 +114,7 @@ void main() {
           reference_id TEXT,
           created_at TEXT NOT NULL,
           is_deleted INTEGER NOT NULL DEFAULT 0,
+          deleted_at TEXT,
           is_synced INTEGER NOT NULL DEFAULT 0
         )
       ''');
