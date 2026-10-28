@@ -295,6 +295,7 @@ function resolveInitialModule(bootstrap) {
     return companyDashboard.id;
   }
 
+  const landing = navigationItems.find((item) =>
     item.id === bootstrap.landing_module_id || item.href === bootstrap.landing_route
   );
   return landing?.id || navigationItems.find((item) => item.module === 'home')?.id || navigationItems[0].id;
@@ -342,7 +343,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20261028-pro1');
+    const { loadModule } = await import('./module-runtime.js?v=20261028-pro2');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `
