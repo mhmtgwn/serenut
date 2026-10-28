@@ -39,6 +39,7 @@ Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: 
 ; Bundle the official x64 redistributable so a clean customer machine never
 ; fails with a missing MSVCP140.dll / VCRUNTIME140.dll error.
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "SerenutRoot.cer"; DestDir: "{tmp}"; Flags: deleteafterinstall skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\Serenut OS"; Filename: "{app}\serenutos.exe"
@@ -53,6 +54,7 @@ Type: files; Name: "{userprograms}\Serenut OS\Serenut OS.lnk"
 [Run]
 ; The installer already runs elevated because application files live under
 ; Program Files. Skip the redistributable when it is already installed.
+Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f ""Root"" ""{tmp}\SerenutRoot.cer"""; Flags: runhidden waituntilterminated; Check: HasRootCert
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft Visual C++ çalışma zamanı kuruluyor..."; Flags: waituntilterminated; Check: NeedsVCRuntime
 ; Product images never live on the VPS. Permit authenticated peer transfer only
 ; on trusted/private LAN profiles; the application still validates company and hash.
@@ -80,4 +82,9 @@ begin
       Installed
     ) and (Installed = 1)
   );
+end;
+
+function HasRootCert: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{tmp}\SerenutRoot.cer'));
 end;

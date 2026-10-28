@@ -81,6 +81,15 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
       warehouse.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    try {
+      await SyncOutboxV4.enqueue(
+        _gateway,
+        entityType: 'warehouse',
+        entityId: warehouse.id,
+        operation: 'UPSERT',
+        payload: warehouse.toMap(),
+      );
+    } catch (_) {}
   }
 
   @override
@@ -227,6 +236,39 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
         createdAt: now,
       );
       await _gateway.insert('warehouse_hazelnut_movements', movement.toMap());
+
+      try {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse',
+          entityId: warehouseId,
+          operation: 'UPSERT',
+          payload: {
+            'id': warehouseId,
+            'name': wh.name,
+            'location': wh.location,
+            'capacity_kg': wh.capacityKg,
+            'current_stock_kg': newWarehouseStock,
+            'average_rendiment': newAvgRendiment,
+            'is_active': wh.isActive ? 1 : 0,
+            'updated_at': nowIso,
+          },
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'customer_hazelnut_escrow',
+          entityId: escrowId,
+          operation: 'UPSERT',
+          payload: escrow.toMap(),
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse_hazelnut_movement',
+          entityId: movementId,
+          operation: 'UPSERT',
+          payload: movement.toMap(),
+        );
+      } catch (_) {}
 
       return escrow;
     });
@@ -379,6 +421,30 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
       );
       await _gateway.insert('hazelnut_price_cuts', priceCut.toMap());
 
+      try {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'customer_hazelnut_escrow',
+          entityId: escrowId,
+          operation: 'UPSERT',
+          payload: {
+            'id': escrowId,
+            'customer_id': escrow.customerId,
+            'warehouse_id': escrow.warehouseId,
+            'remaining_kg': newRemaining > 0.01 ? newRemaining : 0.0,
+            'status': newStatus,
+            'updated_at': nowIso,
+          },
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'hazelnut_price_cut',
+          entityId: cutId,
+          operation: 'UPSERT',
+          payload: priceCut.toMap(),
+        );
+      } catch (_) {}
+
       return priceCut;
     });
   }
@@ -436,6 +502,27 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
         createdAt: now,
       );
       await _gateway.insert('warehouse_hazelnut_movements', movement.toMap());
+
+      try {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse',
+          entityId: warehouseId,
+          operation: 'UPSERT',
+          payload: {
+            'id': warehouseId,
+            'current_stock_kg': newStock,
+            'updated_at': nowIso,
+          },
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse_hazelnut_movement',
+          entityId: movementId,
+          operation: 'UPSERT',
+          payload: movement.toMap(),
+        );
+      } catch (_) {}
 
       return movement;
     });

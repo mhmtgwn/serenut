@@ -136,6 +136,30 @@ export async function applyDomainMutation(
           [id, companyId],
         );
         return;
+      case "warehouse":
+        await client.query(
+          "UPDATE warehouses SET is_deleted = true, is_active = false, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
+      case "customer_hazelnut_escrow":
+        await client.query(
+          "UPDATE customer_hazelnut_escrow SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
+      case "warehouse_hazelnut_movement":
+        await client.query(
+          "UPDATE warehouse_hazelnut_movements SET is_deleted = true, deleted_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
+      case "hazelnut_price_cut":
+        await client.query(
+          "UPDATE hazelnut_price_cuts SET is_deleted = true, deleted_at = NOW() WHERE id = $1 AND company_id = $2",
+          [id, companyId],
+        );
+        return;
     }
   }
 
@@ -231,6 +255,18 @@ export async function applyDomainMutation(
       return;
     case "customer_installment":
       await upsertInstallment(client, companyId, id, payload);
+      return;
+    case "warehouse":
+      await upsertWarehouse(client, companyId, id, payload);
+      return;
+    case "customer_hazelnut_escrow":
+      await upsertCustomerHazelnutEscrow(client, companyId, id, payload);
+      return;
+    case "warehouse_hazelnut_movement":
+      await upsertWarehouseHazelnutMovement(client, companyId, id, payload);
+      return;
+    case "hazelnut_price_cut":
+      await upsertHazelnutPriceCut(client, companyId, id, payload);
       return;
   }
 }
@@ -891,5 +927,136 @@ export async function upsertInstallment(
      WHERE customer_installments.company_id = EXCLUDED.company_id`,
     [id, companyId, planId || null, customerId || null, installmentNo, amount, paidAmount, dueDate, status, paidAt, transactionId, isDeleted,
      isoDateValue(payload, "created_at")],
+  );
+}
+
+
+export async function upsertWarehouse(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const name = stringValue(payload, "name", "Depo");
+  const location = stringValue(payload, "location") || null;
+  const capacityKg = numberValue(payload, "capacity_kg", 0);
+  const currentStockKg = numberValue(payload, "current_stock_kg", 0);
+  const averageRendiment = numberValue(payload, "average_rendiment", 50);
+  const isActive = payload.is_active !== false && payload.is_active !== 0;
+
+  await client.query(
+    `INSERT INTO warehouses (id, company_id, name, location, capacity_kg, current_stock_kg, average_rendiment, is_active, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       location = EXCLUDED.location,
+       capacity_kg = EXCLUDED.capacity_kg,
+       current_stock_kg = EXCLUDED.current_stock_kg,
+       average_rendiment = EXCLUDED.average_rendiment,
+       is_active = EXCLUDED.is_active,
+       updated_at = NOW()
+     WHERE warehouses.company_id = EXCLUDED.company_id`,
+    [id, companyId, name, location, capacityKg, currentStockKg, averageRendiment, isActive, isoDateValue(payload, "created_at")],
+  );
+}
+
+export async function upsertCustomerHazelnutEscrow(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const customerId = stringValue(payload, "customer_id");
+  const warehouseId = stringValue(payload, "warehouse_id");
+  if (!customerId || !warehouseId) {
+    throw new Error("invalid_escrow_customer_or_warehouse");
+  }
+  const receiptNo = stringValue(payload, "receipt_no") || null;
+  const grossKg = numberValue(payload, "gross_kg", 0);
+  const sackCount = Math.round(numberValue(payload, "sack_count", 0));
+  const tareKg = numberValue(payload, "tare_kg", 0);
+  const netKg = numberValue(payload, "net_kg", grossKg - tareKg);
+  const rendiment = numberValue(payload, "rendiment", 50);
+  const remainingKg = numberValue(payload, "remaining_kg", netKg);
+  const status = stringValue(payload, "status", "active");
+  const notes = stringValue(payload, "notes") || null;
+  const createdBy = stringValue(payload, "created_by") || null;
+
+  await client.query(
+    `INSERT INTO customer_hazelnut_escrow (id, company_id, customer_id, warehouse_id, receipt_no, gross_kg, sack_count, tare_kg, net_kg, rendiment, remaining_kg, status, notes, created_by, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15::timestamptz, NOW()), NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       remaining_kg = EXCLUDED.remaining_kg,
+       status = EXCLUDED.status,
+       notes = COALESCE(EXCLUDED.notes, customer_hazelnut_escrow.notes),
+       updated_at = NOW()
+     WHERE customer_hazelnut_escrow.company_id = EXCLUDED.company_id`,
+    [id, companyId, customerId, warehouseId, receiptNo, grossKg, sackCount, tareKg, netKg, rendiment, remainingKg, status, notes, createdBy, isoDateValue(payload, "created_at")],
+  );
+}
+
+export async function upsertWarehouseHazelnutMovement(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const warehouseId = stringValue(payload, "warehouse_id");
+  if (!warehouseId) throw new Error("invalid_movement_warehouse");
+  const movementType = stringValue(payload, "movement_type", "ESCROW_IN");
+  const quantityKg = numberValue(payload, "quantity_kg", numberValue(payload, "net_kg", 0));
+  const rendiment = numberValue(payload, "rendiment", 50);
+  const balanceKgAfter = numberValue(payload, "balance_kg_after", 0);
+  const avgRendimentAfter = numberValue(payload, "average_rendiment_after", 50);
+  const referenceId = stringValue(payload, "reference_id") || null;
+  const description = stringValue(payload, "description") || null;
+  const createdBy = stringValue(payload, "created_by") || null;
+
+  await client.query(
+    `INSERT INTO warehouse_hazelnut_movements (id, company_id, warehouse_id, movement_type, quantity_kg, rendiment, balance_kg_after, average_rendiment_after, reference_id, description, created_by, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12::timestamptz, NOW()))
+     ON CONFLICT (id) DO UPDATE SET
+       quantity_kg = EXCLUDED.quantity_kg,
+       rendiment = EXCLUDED.rendiment,
+       balance_kg_after = EXCLUDED.balance_kg_after,
+       average_rendiment_after = EXCLUDED.average_rendiment_after,
+       description = EXCLUDED.description
+     WHERE warehouse_hazelnut_movements.company_id = EXCLUDED.company_id`,
+    [id, companyId, warehouseId, movementType, quantityKg, rendiment, balanceKgAfter, avgRendimentAfter, referenceId, description, createdBy, isoDateValue(payload, "created_at")],
+  );
+}
+
+export async function upsertHazelnutPriceCut(
+  client: PoolClient,
+  companyId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const escrowId = stringValue(payload, "escrow_id") || null;
+  const customerId = stringValue(payload, "customer_id");
+  if (!customerId) throw new Error("invalid_price_cut_customer");
+  const cutKg = numberValue(payload, "cut_kg", 0);
+  const rendiment = numberValue(payload, "rendiment", 50);
+  const basePrice50 = numberValue(payload, "base_price_50", 0);
+  const effectivePrice = numberValue(payload, "effective_price", numberValue(payload, "effective_unit_price", 0));
+  const totalAmount = numberValue(payload, "total_amount", 0);
+  const settlementType = stringValue(payload, "settlement_type", "ACCOUNT_CREDIT");
+  const financialTxId = stringValue(payload, "financial_transaction_id") || null;
+  const notes = stringValue(payload, "notes") || null;
+  const createdBy = stringValue(payload, "created_by") || null;
+
+  await client.query(
+    `INSERT INTO hazelnut_price_cuts (id, company_id, escrow_id, customer_id, cut_kg, rendiment, base_price_50, effective_price, total_amount, settlement_type, financial_transaction_id, notes, created_by, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, COALESCE($14::timestamptz, NOW()))
+     ON CONFLICT (id) DO UPDATE SET
+       cut_kg = EXCLUDED.cut_kg,
+       rendiment = EXCLUDED.rendiment,
+       base_price_50 = EXCLUDED.base_price_50,
+       effective_price = EXCLUDED.effective_price,
+       total_amount = EXCLUDED.total_amount,
+       settlement_type = EXCLUDED.settlement_type,
+       notes = EXCLUDED.notes
+     WHERE hazelnut_price_cuts.company_id = EXCLUDED.company_id`,
+    [id, companyId, escrowId, customerId, cutKg, rendiment, basePrice50, effectivePrice, totalAmount, settlementType, financialTxId, notes, createdBy, isoDateValue(payload, "created_at")],
   );
 }

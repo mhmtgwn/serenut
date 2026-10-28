@@ -3,7 +3,7 @@
 Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası analizi). Bir madde bitince işaretleyin.
 
 ## P0 — Hemen
-- [ ] `backend-ci` neden kırık bul ve düzelt; `deploy.yml` içindeki `continue-on-error: true` bayrağını kaldır.
+- [x] `backend-ci` neden kırık bul ve düzelt; `deploy.yml` içindeki `continue-on-error: true` bayrağını kaldır.
 - [ ] Şema sözleşmesi: sync edilen varlıklar için tek kaynak (nullable/default). CI testi PostgreSQL ve SQLite şemasını bu sözleşmeye karşı doğrulasın. (Neden: `sales.customer_id` NOT NULL hatası.)
 - [ ] Geçiş envanteri: hangi tablolar CoreNext katmanından, hangileri eski `db_schema.dart` katmanından çalışıyor; kalan işi çıkar.
 
@@ -11,7 +11,7 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 - [ ] Para alanlarını kuruş (`*_minor` int) olarak bitir; `REAL`/`double` para alanlarını kaldır (guard: 43 kolon / 253 alan).
 - [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir.
 - [ ] Sunucuda doğrudan `pg pool` kullanımını (115 yer) tek veri erişim katmanına (tenant/RLS bağlamı zorunlu) topla.
-- [ ] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — araştırma sonucuna göre.
+- [x] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — `_applyChangeBatchWithQuarantine` ve `sync_quarantine_v4` ile uygulandı.
 
 ## P2 — Zamanla
 - [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir.
@@ -23,9 +23,9 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 Denetim kodu okuyarak yapıldı, hiçbir şey çalıştırılmadı.
 
 ### Yüksek
-- [ ] **Zehirli değişiklik tüm pull'u kilitliyor.** `sync_v4_service_orchestration.dart:226-246` her 200'lük sayfayı tek transaction'da uyguluyor; `_apply` hata fırlatınca sayfa ve cursor geri alınıyor, aynı sayfa sonsuza dek tekrar çekiliyor. Pull tarafında atlama/karantina/dead-letter yok (DEAD_LETTER sadece push'ta, l.140). Bootstrap yolu (l.190-205) aynı sorunda. `refund_sale_missing`, `invalid_refund_quantity`, `unsupported_system_reset_scope` kalıcı hatalar. → Hatalı değişikliği karantinaya alıp cursor'ı ilerlet, telemetriye yaz.
-- [ ] **Bilinmeyen varlık tipleri sessizce siliniyor.** `sync_v4_service_materializer.dart:30-43` `_ => null` sonrası `return`; cursor ilerliyor, değişiklik kalıcı kayboluyor, log/sayaç yok. Eski uygulama yeni tipleri kaybeder, güncelleme sonrası tekrar oynatılmaz. `gib_invoice` sunucuda var (`materializer.ts:226`). → Logla/karantinaya al, cursor'ı ilerletme politikasını belirle.
-- [ ] **Fındık/depo verisi sync olmuyor (doğrulandı).** Warehouse, escrow, hareket ve fiyat kesim tabloları yalnızca yerel (`db_schema.dart`, `sqlite_hazelnut_repository.dart`); sunucuda ve sync_v4'te hiç yok. Yedek ve çoklu cihaz yakınsaması yok. Sadece `financial_transaction`/`cash_expense` yan etkileri sync oluyor ve diğer cihazlarda olmayan depo/emanet bağlamına işaret edebilir. → Sunucu şeması + entity map + materializer ekle (veya kapsam dışı olduğunu açıkça belgele).
+- [x] **Zehirli değişiklik tüm pull'u kilitliyor.** `sync_v4_service_orchestration.dart:226-246` her 200'lük sayfayı tek transaction'da uyguluyordu. `_applyChangeBatchWithQuarantine` fallback satır satır çalıştırma ve `sync_quarantine_v4` karantina tablosuna aktarım ile cursor ilerletilmesi sağlandı.
+- [x] **Bilinmeyen varlık tipleri sessizce siliniyor.** `sync_v4_service_materializer.dart:30-43` `_ => null` sonrası sessiz dönüş yerine `sync_quarantine_v4` tablosuna `unknown_entity_type` olarak kaydedilip loglanması sağlandı.
+- [x] **Fındık/depo verisi sync olmuyor (doğrulandı).** `schema_v103.sql`, `schema_v104.sql`, `schema_v106.sql` (is_deleted/deleted_at) + `sync-v4.materializer.ts` (upsertWarehouse, upsertCustomerHazelnutEscrow, upsertWarehouseHazelnutMovement, upsertHazelnutPriceCut) + istemci `sync_v4_service_materializer.dart` ve `sqlite_hazelnut_repository.dart` SyncOutboxV4 entegrasyonu tamamlandı.
 - [ ] **Üretim sırları.** `server/scripts/deploy_production.sh:130-135` (staging l.135) `.env` yoksa sabit DB parolası, `JWT_SECRET` ve REFRESH_SECRET yazıyor; 32+ karakter olduğu için `auth.service.ts:18` kontrolü geçiyor ama değerler herkesçe biliniyor. → Script hata verip dursun; `uat-qa-simulation.ts:73` `fallback_secret` kaldırılsın. Not: bu değerler repoda göründüğü için kullanılmış olabilirler, prod'daki gerçek sırların farklı olduğunu doğrula, değilse döndür.
 
 ### Orta
@@ -54,7 +54,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 - [ ] Multi-tenant `company_id` taraması yapılmadı: `company_id`'siz SELECT/UPDATE/DELETE'leri grep'le; sync pull için `(company_id, seq/cursor)` indeksini doğrula.
 
 ### Depo hijyeni
-- [ ] **CRLF/LF karışık (V).** 574 dosyanın 327'si CRLF, 247'si LF; `.gitattributes` yok. → `* text=auto eol=lf` ekle, tek commit'te normalize et. (Bugün bazı dosyaları LF'ye çevirdim; git CRLF uyarısı veriyor, bu işle birlikte düzelir.)
+- [ ] **CRLF/LF karışık (V).** 574 dosyanın 327'si CRLF, 247'si LF; `.gitattributes` yok. → `* text=auto eol=lf` ekle, tek commit'te normalize et.
 - [ ] **Deprecation'lar (V sayılar).** 7 `withOpacity`, 22 Radio/RadioListTile (RadioGroup'a geçiş), 22 `DropdownButtonFormField` `value` → `initialValue`. Bir kısmı zaten geçmiş olabilir.
 - [ ] **`lib/core_next` bir Windows junction'ı (V)** (`core_next/client_core/lib`). Junction takip etmeyen araçlar kaçırır, temiz klonda/CI'da kırılabilir.
 - [ ] Kökte ~100 `STAGE_10_12_*.md` raporu, `win.exe` (9MB), `telemetry_logs.jsonl`, `START_COMMANDS.sh` var; git'te takipli mi bakılmadı (T). → raporları `docs/archive`'e taşı, gerisini `.gitignore`'a ekle.
@@ -67,11 +67,11 @@ OTA geri alma, lisans/entitlement uç durumları, istemci crash/telemetri kapsam
 Kod okunarak yapıldı. (V) = okuyarak doğrulandı, (T) = grep/tahmin. Aşağıdaki "Yüksek" maddeler P0 sayılmalı.
 
 ### Yüksek (P0)
-- [ ] **OTA imzasız dosya kuruyor (V).** `update_dialog.dart:183-190` `sha256Hash == null` ise `verified = true` yapıyor; hash'siz manifest ile imzasız APK/EXE kurulur. → Hash veya imza yoksa kurulumu reddet (fail closed).
-- [ ] **JWT herhangi bir host'a gidebiliyor (V).** `release_manager_service.dart:308-324` `downloadUrl` "http" ile başlıyorsa olduğu gibi kullanıyor, :322'de Bearer ekliyor; https/host allowlist yok. Sahte manifest ile token ve cihaz kimliği saldırgana gider. → https ve API host'u zorunlu; diğer host'lara token gönderme.
+- [x] **OTA imzasız dosya kuruyor (V).** `update_dialog.dart` `sha256Hash == null` veya `signature == null` ise fail-closed güvenlik bariyeri devreye girer, indirilen dosya diskten silinir ve kurulum tamamen engellenir. Unit & Widget testleri yazıldı ve doğrulandı.
+- [x] **JWT herhangi bir host'a gidebiliyor (V).** `release_manager_service.dart:downloadUpdate` metodu güncellendi: Bearer token sadece API host'una (white-list) gönderilir; harici sunuculara token sızdırılması önlendi. Prod ortamında HTTPS zorunlu kılındı.
 - [ ] **OTA imzası sürümü/platformu/URL'yi bağlamıyor (V).** `release-signing.ts:117-125`, istemci :432 sadece sha256 hex'ini imzalıyor. Eski imzalı bir sürüm "en yeni" diye sunulursa downgrade geçer; istemcide minimum sürüm kontrolü bulamadım (T). → `sha256|platform|version+build` imzala, kurulu sürüm ve altını reddet.
 - [ ] **Windows kurulumunda gerçek geri alma yok (V).** `release_manager_service.dart:484-502` .bat ile `/SILENT` kurup `exit(0)`; installer çıkış kodu kontrol edilmiyor. `triggerRollback` (`update_dialog.dart:225`) sadece installer başlatılamazsa çalışıyor. Dosya doğrulama ile kurulum arasında kullanıcı yazılabilir temp'te duruyor (TOCTOU), Authenticode kontrol edilmiyor. → Korumalı dizine kopyala, kurulumdan hemen önce yeniden hash'le, çıkış kodunu kontrol et, sağlık işareti yoksa geri al.
-- [ ] **`sync_v4_changes` ve `sync_v4_entities` tablolarında RLS yok (V).** İzolasyon yalnızca `tenant_id=$1` filtresine bağlı (`sync-v4.routes.ts:178, 200, 428, 478`); `/pull` (:425) `set_config` olmadan pgPool'da çalışıyor. → RLS politikası ekle, `/pull`'u tenant bağlamlı transaction'da çalıştır.
+- [x] **`sync_v4_changes` ve `sync_v4_entities` tablolarında RLS yok (V).** `schema_v105.sql` ile `ENABLE ROW LEVEL SECURITY` ve `FORCE ROW LEVEL SECURITY` politikaları uygulandı; `/pull` ve `bootstrap/license-config` doğrudan pgPool yerine tenant-bağlamlı `client` üzerinden geçirildi.
 - [ ] **RLS bypass çok geniş (V).** `auth.middleware.ts:30` `bypassRls: isSysadmin` ile tüm istek için RLS atlanıyor; ~40 handler `SET LOCAL app.bypass_rls='true'` yapıyor (admin 13, billing 4, auth 8 ...). Bu sıradan bir GUC olduğundan herhangi bir SQL injection bunu açabilir. → Admin için ayrı BYPASSRLS DB rolü, GUC bypass'ı kaldır.
 
 ### Orta

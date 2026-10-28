@@ -38,10 +38,26 @@ extension SyncV4Materializer on SyncV4Service {
       'gib_invoice' => 'gib_invoices',
       'customer_installment_plan' => 'customer_installment_plans',
       'customer_installment' => 'customer_installments',
+      'warehouse' => 'warehouses',
+      'customer_hazelnut_escrow' => 'customer_hazelnut_escrow',
+      'warehouse_hazelnut_movement' => 'warehouse_hazelnut_movements',
+      'hazelnut_price_cut' => 'hazelnut_price_cuts',
       _ => null,
     };
     if (table == null) {
-      debugPrint('[SyncV4] ⚠️ Unknown entity type skipped: "$type" (id: $id)');
+      debugPrint('[SyncV4] ⚠️ Unknown entity type: "$type" (id: $id)');
+      try {
+        await db.insert('sync_quarantine_v4', {
+          'source': 'materializer',
+          'mutation_id': change['mutation_id']?.toString(),
+          'entity_type': type,
+          'entity_id': id,
+          'operation': change['operation']?.toString() ?? 'UPSERT',
+          'payload': jsonEncode(payload),
+          'error_message': 'unknown_entity_type',
+          'quarantined_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
       return;
     }
     if (change['operation'] == 'DELETE') {

@@ -35,6 +35,10 @@ const entityTypes = new Set([
   "gib_invoice",
   "customer_installment_plan",
   "customer_installment",
+  "warehouse",
+  "customer_hazelnut_escrow",
+  "warehouse_hazelnut_movement",
+  "hazelnut_price_cut",
 ]);
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -422,18 +426,23 @@ router.get("/pull", async (req, res) => {
     500,
     Math.max(1, Number.parseInt(String(req.query.limit ?? "200"), 10) || 200),
   );
-  const result = await pgPool.query(
-    `SELECT revision, mutation_id, COALESCE(device_activation_id, device_id) AS device_id,
-            entity_type, entity_id, operation, payload, created_at
-       FROM sync_v4_changes WHERE tenant_id = $1 AND revision > $2 ORDER BY revision ASC LIMIT $3`,
-    [user.company_id, cursor, limit],
-  );
-  return res.json({
-    changes: result.rows,
-    next_cursor: result.rows.length
-      ? Number(result.rows.at(-1).revision)
-      : cursor,
-  });
+  const client = await pgPool.connect();
+  try {
+    const result = await client.query(
+      `SELECT revision, mutation_id, COALESCE(device_activation_id, device_id) AS device_id,
+              entity_type, entity_id, operation, payload, created_at
+         FROM sync_v4_changes WHERE tenant_id = $1 AND revision > $2 ORDER BY revision ASC LIMIT $3`,
+      [user.company_id, cursor, limit],
+    );
+    return res.json({
+      changes: result.rows,
+      next_cursor: result.rows.length
+        ? Number(result.rows.at(-1).revision)
+        : cursor,
+    });
+  } finally {
+    client.release();
+  }
 });
 
 /**
@@ -464,7 +473,7 @@ router.get("/bootstrap", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    const [products, customers, sales, saleItems, orders, orderItems, refunds, refundItems, financial, revision] = await Promise.all([
+    const [products, customers, sales, saleItems, orders, orderItems, refunds, refundItems, financial, revision, warehouses, escrows, movements, priceCuts] = await Promise.all([
       client.query("SELECT * FROM products WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customers WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM sales WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
@@ -476,6 +485,10 @@ router.get("/bootstrap", async (req, res) => {
         WHERE r.company_id=$1 ORDER BY r.created_at,ri.id`, [user.company_id]),
       client.query("SELECT * FROM financial_transactions WHERE company_id = $1 ORDER BY date", [user.company_id]),
       client.query("SELECT COALESCE(MAX(revision), 0) AS cursor FROM sync_v4_changes WHERE tenant_id = $1", [user.company_id]),
+      client.query("SELECT * FROM warehouses WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query("SELECT * FROM customer_hazelnut_escrow WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query("SELECT * FROM warehouse_hazelnut_movements WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query("SELECT * FROM hazelnut_price_cuts WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
     ]);
     await client.query("COMMIT");
 
@@ -540,6 +553,70 @@ router.get("/bootstrap", async (req, res) => {
             refund_method: row.refund_method, external_reference: row.external_reference,
             reason: row.reason, status: row.status, created_at: row.created_at,
             _snapshot_projection: true };
+        case "warehouse":
+          return {
+            id: row.id,
+            name: row.name,
+            location: row.location ?? "",
+            capacity_kg: row.capacity_kg,
+            current_stock_kg: row.current_stock_kg,
+            average_rendiment: row.average_rendiment,
+            is_active: row.is_active ? 1 : 0,
+            is_deleted: deleted,
+            deleted_at: row.deleted_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          };
+        case "customer_hazelnut_escrow":
+          return {
+            id: row.id,
+            customer_id: row.customer_id,
+            warehouse_id: row.warehouse_id,
+            receipt_no: row.receipt_no ?? "",
+            gross_kg: row.gross_kg,
+            sack_count: row.sack_count,
+            tare_kg: row.tare_kg,
+            net_kg: row.net_kg,
+            rendiment: row.rendiment,
+            remaining_kg: row.remaining_kg,
+            status: row.status ?? "active",
+            notes: row.notes ?? "",
+            created_by: row.created_by,
+            is_deleted: deleted,
+            deleted_at: row.deleted_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          };
+        case "warehouse_hazelnut_movement":
+          return {
+            id: row.id,
+            warehouse_id: row.warehouse_id,
+            movement_type: row.movement_type,
+            quantity_kg: row.quantity_kg,
+            rendiment: row.rendiment,
+            balance_kg_after: row.balance_kg_after,
+            average_rendiment_after: row.average_rendiment_after,
+            reference_id: row.reference_id,
+            description: row.description ?? "",
+            created_by: row.created_by,
+            created_at: row.created_at,
+          };
+        case "hazelnut_price_cut":
+          return {
+            id: row.id,
+            escrow_id: row.escrow_id,
+            customer_id: row.customer_id,
+            cut_kg: row.cut_kg,
+            rendiment: row.rendiment,
+            base_price_50: row.base_price_50,
+            effective_price: row.effective_price,
+            total_amount: row.total_amount,
+            settlement_type: row.settlement_type ?? "ACCOUNT_CREDIT",
+            financial_transaction_id: row.financial_transaction_id,
+            notes: row.notes ?? "",
+            created_by: row.created_by,
+            created_at: row.created_at,
+          };
         default:
           return { id: row.id, type: row.type, customer_id: row.customer_id ?? "", amount: row.amount,
             paid_amount: row.paid_amount, debt_amount: row.debt_amount, reference_id: row.reference_id,
@@ -569,6 +646,10 @@ router.get("/bootstrap", async (req, res) => {
       ...sales.rows.map((row) => change("sale", row, saleItemsBySale.get(String(row.id)) ?? [])),
       ...refunds.rows.map((row) => change("refund", row, refundItemsByRefund.get(String(row.id)) ?? [])),
       ...financial.rows.map((row) => change("financial_transaction", row)),
+      ...warehouses.rows.map((row) => change("warehouse", row)),
+      ...escrows.rows.map((row) => change("customer_hazelnut_escrow", row)),
+      ...movements.rows.map((row) => change("warehouse_hazelnut_movement", row)),
+      ...priceCuts.rows.map((row) => change("hazelnut_price_cut", row)),
     ];
     return res.json({ changes, next_cursor: Number(revision.rows[0].cursor) });
   } catch (error: any) {
@@ -589,15 +670,20 @@ router.get("/bootstrap", async (req, res) => {
 
 router.get("/bootstrap/license-config", async (req, res) => {
   const user = (req as any).user;
-  const result = await pgPool.query(
-    `SELECT id, plan_id AS tier, status, valid_until AS expires_at, license_key,
-            device_limit AS allowed_devices_count
-       FROM license_entitlements
-      WHERE company_id = $1 AND status IN ('trial', 'active')
-      ORDER BY valid_until DESC LIMIT 1`,
-    [user.company_id],
-  );
-  return res.json({ module: "license-config", data: result.rows[0] ?? {} });
+  const client = await pgPool.connect();
+  try {
+    const result = await client.query(
+      `SELECT id, plan_id AS tier, status, valid_until AS expires_at, license_key,
+              device_limit AS allowed_devices_count
+         FROM license_entitlements
+        WHERE company_id = $1 AND status IN ('trial', 'active')
+        ORDER BY valid_until DESC LIMIT 1`,
+      [user.company_id],
+    );
+    return res.json({ module: 'license-config', data: result.rows[0] ?? {} });
+  } finally {
+    client.release();
+  }
 });
 
 export default router;

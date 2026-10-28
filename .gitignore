@@ -137,3 +137,8 @@ build_error.txt
 *.tmp
 *.db
 stage10_12_40_rehearsal_results.json
+
+*.pfx
+*.cer
+*pfx_base64.txt
+windows/installer/pfx_base64.txt
