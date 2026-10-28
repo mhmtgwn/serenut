@@ -242,6 +242,27 @@ class DatabaseManager {
       debugPrint('[DatabaseManager] sales.receipt_no self-healing error: $e');
     }
 
+    // Ensure sync_quarantine_v4 exists for resilient synchronization
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sync_quarantine_v4 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL,
+          mutation_id TEXT,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT,
+          operation TEXT,
+          payload TEXT,
+          error_message TEXT NOT NULL,
+          quarantined_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_sync_quarantine_v4_created ON sync_quarantine_v4(quarantined_at)');
+    } catch (e) {
+      debugPrint('[DatabaseManager] sync_quarantine_v4 self-healing error: $e');
+    }
+
     final Map<String, List<String>> expectedColumns = {
       'users': [
         'id',

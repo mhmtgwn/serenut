@@ -38,6 +38,7 @@ class SyncV4Result {
     required this.pulled,
     this.reconciled = 0,
     this.failed = 0,
+    this.quarantined = 0,
     this.errors = const [],
     this.pulledEntityTypes = const {},
   });
@@ -45,6 +46,7 @@ class SyncV4Result {
   final int pulled;
   final int reconciled;
   final int failed;
+  final int quarantined;
   final List<String> errors;
   final Set<String> pulledEntityTypes;
   int get synced => pushed;

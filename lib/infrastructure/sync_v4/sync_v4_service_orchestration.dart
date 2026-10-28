@@ -35,6 +35,7 @@ extension SyncV4Orchestration on SyncV4Service {
     });
     var pushed = 0;
     var failed = 0;
+    var quarantined = 0;
     final errors = <String>[];
     while (pending.isNotEmpty) {
       final orderedPending = _dependencyOrder(pending);
@@ -187,22 +188,16 @@ extension SyncV4Orchestration on SyncV4Service {
       );
       productImagesNeedCleanup = snapshot.any(_isProductImageReset);
       catalogSourceNeedsReset = snapshot.any(_isCatalogReset);
-      await DatabaseManager.retryOnLock(() async {
-        await db.transaction((txn) async {
-          for (final raw in snapshot) {
-            final entityType = raw['entity_type']?.toString();
-            if (entityType != null && entityType.isNotEmpty) {
-              pulledEntityTypes.add(entityType);
-            }
-            await _apply(txn, raw);
-          }
-          reconciled += await _reconcileCustomerBalances(txn);
-          cursor = bootstrapDto.nextCursor;
-          await txn.insert(
-              'sync_cursor_v4', {'key': 'global', 'cursor': cursor},
-              conflictAlgorithm: ConflictAlgorithm.replace);
-        });
-      });
+      final batchResult = await _applyChangeBatchWithQuarantine(
+        db,
+        snapshot,
+        bootstrapDto.nextCursor,
+        source: 'bootstrap',
+        pulledEntityTypes: pulledEntityTypes,
+      );
+      reconciled += batchResult.reconciledDelta;
+      quarantined += batchResult.quarantined;
+      cursor = bootstrapDto.nextCursor;
       // Bootstrap rows are remote changes too. Counting them ensures consumers
       // invalidate their in-memory lists immediately after first hydration.
       pulled += snapshot.length;
@@ -223,23 +218,15 @@ extension SyncV4Orchestration on SyncV4Service {
       catalogSourceNeedsReset =
           catalogSourceNeedsReset || changes.any(_isCatalogReset);
       final next = pullDto.nextCursor;
-      await DatabaseManager.retryOnLock(() async {
-        await db.transaction((txn) async {
-          for (final raw in changes.cast<Map>()) {
-            final rowMap = Map<String, dynamic>.from(raw);
-            final entityType = rowMap['entity_type']?.toString();
-            if (entityType != null && entityType.isNotEmpty) {
-              pulledEntityTypes.add(entityType);
-            }
-            await _apply(txn, rowMap);
-          }
-          if (changes.isNotEmpty) {
-            reconciled += await _reconcileCustomerBalances(txn);
-          }
-          await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
-              conflictAlgorithm: ConflictAlgorithm.replace);
-        });
-      });
+      final batchResult = await _applyChangeBatchWithQuarantine(
+        db,
+        changes,
+        next,
+        source: 'pull',
+        pulledEntityTypes: pulledEntityTypes,
+      );
+      reconciled += batchResult.reconciledDelta;
+      quarantined += batchResult.quarantined;
       pulled += changes.length;
       if (changes.length < 200 || next <= cursor) break;
       cursor = next;
@@ -267,9 +254,153 @@ extension SyncV4Orchestration on SyncV4Service {
       pulled: pulled,
       reconciled: reconciled,
       failed: failed,
+      quarantined: quarantined,
       errors: errors,
       pulledEntityTypes: pulledEntityTypes,
     );
+  }
+
+  static final _quarantineTableReady = <int, Future<void>>{};
+
+  Future<void> _ensureQuarantineTable(Database db) {
+    return _quarantineTableReady.putIfAbsent(db.hashCode, () async {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sync_quarantine_v4 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL,
+          mutation_id TEXT,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT,
+          operation TEXT,
+          payload TEXT,
+          error_message TEXT NOT NULL,
+          quarantined_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_sync_quarantine_v4_created ON sync_quarantine_v4(quarantined_at)');
+    });
+  }
+
+  Future<({int applied, int quarantined, int reconciledDelta})>
+      _applyChangeBatchWithQuarantine(
+    Database db,
+    List<Map<String, dynamic>> changes,
+    int nextCursor, {
+    required String source,
+    required Set<String> pulledEntityTypes,
+  }) async {
+    if (changes.isEmpty) {
+      await DatabaseManager.retryOnLock(() async {
+        await db.insert(
+          'sync_cursor_v4',
+          {'key': 'global', 'cursor': nextCursor},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
+      return (applied: 0, quarantined: 0, reconciledDelta: 0);
+    }
+
+    await _ensureQuarantineTable(db);
+
+    var reconciledDelta = 0;
+    var applied = 0;
+    var quarantined = 0;
+
+    // Fast path: attempt applying all changes atomically in a single transaction
+    bool batchSucceeded = false;
+    try {
+      await DatabaseManager.retryOnLock(() async {
+        await db.transaction((txn) async {
+          for (final raw in changes) {
+            final rowMap = Map<String, dynamic>.from(raw);
+            final entityType = rowMap['entity_type']?.toString();
+            if (entityType != null && entityType.isNotEmpty) {
+              pulledEntityTypes.add(entityType);
+            }
+            await _apply(txn, rowMap);
+          }
+          if (changes.isNotEmpty) {
+            reconciledDelta += await _reconcileCustomerBalances(txn);
+          }
+          await txn.insert(
+            'sync_cursor_v4',
+            {'key': 'global', 'cursor': nextCursor},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        });
+      });
+      batchSucceeded = true;
+      applied = changes.length;
+    } catch (batchError) {
+      debugPrint(
+        '[SyncV4] ⚠️ Batch application failed ($batchError). Switching to isolated row quarantine mode.',
+      );
+      batchSucceeded = false;
+    }
+
+    if (!batchSucceeded) {
+      // Fallback path: apply row-by-row so valid changes are persisted,
+      // toxic/poisonous rows are safely isolated in quarantine, and cursor advances!
+      for (final raw in changes) {
+        final rowMap = Map<String, dynamic>.from(raw);
+        final entityType = rowMap['entity_type']?.toString() ?? '';
+        final entityId = rowMap['entity_id']?.toString() ?? '';
+        final mutationId = rowMap['mutation_id']?.toString();
+        final operation = rowMap['operation']?.toString() ?? '';
+        final payloadStr = rowMap['payload'] != null ? jsonEncode(rowMap['payload']) : '';
+
+        try {
+          await DatabaseManager.retryOnLock(() async {
+            await db.transaction((txn) async {
+              if (entityType.isNotEmpty) {
+                pulledEntityTypes.add(entityType);
+              }
+              await _apply(txn, rowMap);
+            });
+          });
+          applied++;
+        } catch (itemError) {
+          quarantined++;
+          debugPrint(
+            '[SyncV4] 🛡️ Poisonous change quarantined ($entityType:$entityId): $itemError',
+          );
+          try {
+            await db.insert('sync_quarantine_v4', {
+              'source': source,
+              'mutation_id': mutationId,
+              'entity_type': entityType,
+              'entity_id': entityId,
+              'operation': operation,
+              'payload': payloadStr,
+              'error_message': itemError.toString(),
+              'quarantined_at': DateTime.now().toUtc().toIso8601String(),
+            });
+          } catch (qErr) {
+            debugPrint('[SyncV4] Failed to record quarantine log: $qErr');
+          }
+        }
+      }
+
+      // Reconcile balances and advance cursor to nextCursor
+      await DatabaseManager.retryOnLock(() async {
+        await db.transaction((txn) async {
+          if (applied > 0) {
+            reconciledDelta += await _reconcileCustomerBalances(txn);
+          }
+          await txn.insert(
+            'sync_cursor_v4',
+            {'key': 'global', 'cursor': nextCursor},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        });
+      });
+      debugPrint(
+        '[SyncV4] ✅ Quarantine recovery complete: $applied applied, $quarantined quarantined, cursor -> $nextCursor',
+      );
+    }
+
+    return (applied: applied, quarantined: quarantined, reconciledDelta: reconciledDelta);
   }
 
   Future<bool> _syncCompanyProfile(Database db) async {

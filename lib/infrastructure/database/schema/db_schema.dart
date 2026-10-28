@@ -256,6 +256,21 @@ class DatabaseSchema {
         resolved_at TEXT
       )
     ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_quarantine_v4 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL,
+        mutation_id TEXT,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT,
+        operation TEXT,
+        payload TEXT,
+        error_message TEXT NOT NULL,
+        quarantined_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sync_quarantine_v4_created ON sync_quarantine_v4(quarantined_at)');
 
     // Create audit logs table
     await db.execute('''

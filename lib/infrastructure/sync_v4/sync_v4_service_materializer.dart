@@ -40,7 +40,10 @@ extension SyncV4Materializer on SyncV4Service {
       'customer_installment' => 'customer_installments',
       _ => null,
     };
-    if (table == null) return;
+    if (table == null) {
+      debugPrint('[SyncV4] ⚠️ Unknown entity type skipped: "$type" (id: $id)');
+      return;
+    }
     if (change['operation'] == 'DELETE') {
       final schema = await db.rawQuery('PRAGMA table_info($table)');
       final columns = schema
