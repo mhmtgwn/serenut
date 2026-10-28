@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Lightweight anonymous pageview telemetry
+  try {
+    const pingPayload = JSON.stringify({
+      path: window.location.pathname,
+      referrer: document.referrer || '',
+      utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+      screen: window.innerWidth <= 768 ? 'Mobil' : 'Masaüstü'
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/v1/telemetry/visit', pingPayload);
+    } else {
+      fetch('/api/v1/telemetry/visit', { method: 'POST', body: pingPayload, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+    }
+  } catch (_) {}
+
   // Show the product lockup briefly once per browsing session. This is a
   // restrained brand reveal, not a blocking loading screen.
   if (!sessionStorage.getItem('serenut_brand_intro_seen')) {

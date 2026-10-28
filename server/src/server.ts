@@ -308,29 +308,99 @@ function enforceSchemaHandshake(req: Request, res: Response, next: NextFunction)
 app.use(enforceSchemaHandshake);
 
 let webVisitsTableReady = false;
-const trackedPublicPaths = new Set(['/', '/index.html', '/plans', '/plans.html', '/downloads', '/downloads.html', '/platform', '/platform.html', '/contact', '/contact.html', '/register', '/login', '/download/windows', '/download/android']);
+async function recordWebVisit(pagePath: string, visitorHash: string, source: string, device: string) {
+  let client;
+  try {
+    client = await pgPool.connect();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    if (!webVisitsTableReady) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS web_page_visits (
+          id BIGSERIAL PRIMARY KEY,
+          page_path VARCHAR(120) NOT NULL,
+          visitor_hash VARCHAR(64) NOT NULL,
+          traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş',
+          device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_web_page_visits_created_at ON web_page_visits(created_at DESC)`);
+      webVisitsTableReady = true;
+    }
+    await client.query(
+      `INSERT INTO web_page_visits (page_path, visitor_hash, traffic_source, device_type) VALUES ($1, $2, $3, $4)`,
+      [pagePath, visitorHash, source, device]
+    );
+    await client.query('COMMIT');
+  } catch (err: any) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    logger.warn('Web visit telemetry record failed', { error: err?.message, pagePath });
+  } finally {
+    if (client) client.release();
+  }
+}
+
+const trackedPublicPaths = new Set([
+  '/', '/plans', '/downloads', '/platform',
+  '/contact', '/register', '/login',
+  '/download/windows', '/download/android'
+]);
+
+function normalizeTrackedPath(rawPath: string): string | null {
+  let p = (rawPath || '/').toLowerCase().trim();
+  p = p.split('?')[0];
+  if (p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
+  if (p === '/index.html' || p === '/index') p = '/';
+  else if (p.endsWith('.html')) p = p.slice(0, -5);
+  return trackedPublicPaths.has(p) ? p : null;
+}
+
 app.use((req: Request, _res: Response, next: NextFunction) => {
-  if (req.method === 'GET' && trackedPublicPaths.has(req.path)) {
-    const ua = String(req.headers['user-agent'] || '');
-    if (ua && !/bot|crawl|spider|slurp|curl|wget|headless|lighthouse|monitor|uptime|python|axios/i.test(ua)) {
-      const normPath = req.path === '/index.html' ? '/' : req.path.replace(/\.html$/, '');
-      const dayKey = new Date().toISOString().slice(0, 10);
-      const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
-      const ref = String(req.headers['referer'] || req.query.utm_source || '').toLowerCase();
-      const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
-      const device = /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
-      setImmediate(async () => {
-        try {
-          if (!webVisitsTableReady) {
-            await pgPool.query(`CREATE TABLE IF NOT EXISTS web_page_visits (id BIGSERIAL PRIMARY KEY, page_path VARCHAR(120) NOT NULL, visitor_hash VARCHAR(64) NOT NULL, traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş', device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_web_page_visits_created_at ON web_page_visits(created_at DESC);`);
-            webVisitsTableReady = true;
-          }
-          await pgPool.query(`INSERT INTO web_page_visits (page_path, visitor_hash, traffic_source, device_type) VALUES ($1, $2, $3, $4)`, [normPath, visitorHash, source, device]);
-        } catch (_err) { /* ignore telemetry errors */ }
-      });
+  if (req.method === 'GET') {
+    const normPath = normalizeTrackedPath(req.path);
+    if (normPath) {
+      const ua = String(req.headers['user-agent'] || '');
+      if (ua && !/bot|crawl|spider|slurp|curl|wget|headless|lighthouse|monitor|uptime|python|axios/i.test(ua)) {
+        const dayKey = new Date().toISOString().slice(0, 10);
+        const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+        const ref = String(req.headers['referer'] || req.query.utm_source || '').toLowerCase();
+        const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
+        const device = /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
+        setImmediate(() => {
+          recordWebVisit(normPath, visitorHash, source, device).catch(() => {});
+        });
+      }
     }
   }
   next();
+});
+
+// Beacon / Client-Side Telemetry Ping Endpoint
+app.post('/api/v1/telemetry/visit', express.text({ type: ['application/json', 'text/plain'] }), (req: Request, res: Response) => {
+  try {
+    let body: any = {};
+    if (typeof req.body === 'string') {
+      try { body = JSON.parse(req.body); } catch (_) {}
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body;
+    }
+    const normPath = normalizeTrackedPath(body.path || req.headers['referer'] || '/');
+    if (normPath) {
+      const ua = String(req.headers['user-agent'] || '');
+      if (ua && !/bot|crawl|spider|slurp|curl|wget|headless|lighthouse|monitor|uptime|python|axios/i.test(ua)) {
+        const dayKey = new Date().toISOString().slice(0, 10);
+        const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+        const ref = String(body.referrer || req.headers['referer'] || body.utm_source || '').toLowerCase();
+        const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
+        const device = body.screen === 'Mobil' || /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
+        setImmediate(() => {
+          recordWebVisit(normPath, visitorHash, source, device).catch(() => {});
+        });
+      }
+    }
+  } catch (_) {}
+  res.status(204).end();
 });
 
 // ── REDIRECTS (301 KALICI YÖNLENDİRME) ─────────────────────────────────────────
