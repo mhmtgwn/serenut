@@ -374,7 +374,7 @@ extension SyncV4Orchestration on SyncV4Service {
               'operation': operation,
               'payload': payloadStr,
               'error_message': itemError.toString(),
-              'quarantined_at': DateTime.now().toUtc().toIso8601String(),
+              'quarantined_at': DateTime.timestamp().toIso8601String(),
             });
           } catch (qErr) {
             debugPrint('[SyncV4] Failed to record quarantine log: $qErr');

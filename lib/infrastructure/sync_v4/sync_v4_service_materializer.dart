@@ -55,9 +55,11 @@ extension SyncV4Materializer on SyncV4Service {
           'operation': change['operation']?.toString() ?? 'UPSERT',
           'payload': jsonEncode(payload),
           'error_message': 'unknown_entity_type',
-          'quarantined_at': DateTime.now().toUtc().toIso8601String(),
+          'quarantined_at': DateTime.timestamp().toIso8601String(),
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SyncV4] Quarantine record failed: $e');
+      }
       return;
     }
     if (change['operation'] == 'DELETE') {
