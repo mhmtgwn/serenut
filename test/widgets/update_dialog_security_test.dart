@@ -65,12 +65,12 @@ class FakeReleaseManager extends Fake implements ReleaseManagerService {
 class FakeRollbackManager extends Fake implements RollbackManager {
   @override
   Future<SystemSpecCheckResult> verifyInstallationSpecs() async {
-    return const SystemSpecCheckResult(
+    return SystemSpecCheckResult(
       hasRequiredSpace: true,
       hasRequiredRam: true,
       hasAdminPrivileges: true,
       freeSpaceGb: 10.0,
-      issues: [],
+      issues: const [],
     );
   }
 
@@ -95,7 +95,7 @@ void main() {
     }
   });
 
-  Future<void> _runUpdateFlow(WidgetTester tester, UpdateInfo updateInfo, FakeReleaseManager fakeReleaseManager) async {
+  Future<void> runUpdateFlow(WidgetTester tester, UpdateInfo updateInfo, FakeReleaseManager fakeReleaseManager) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -152,7 +152,7 @@ void main() {
       channel: 'stable',
     );
 
-    await _runUpdateFlow(tester, updateInfo, fakeReleaseManager);
+    await runUpdateFlow(tester, updateInfo, fakeReleaseManager);
 
     expect(
       find.text('Güncelleme paketinin SHA-256 özeti veya dijital imzası eksik. Güvenlik nedeniyle kurulum reddedildi.'),
@@ -179,7 +179,7 @@ void main() {
       channel: 'stable',
     );
 
-    await _runUpdateFlow(tester, updateInfo, fakeReleaseManager);
+    await runUpdateFlow(tester, updateInfo, fakeReleaseManager);
 
     expect(
       find.text('Güncelleme paketinin SHA-256 özeti veya dijital imzası eksik. Güvenlik nedeniyle kurulum reddedildi.'),
