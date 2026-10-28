@@ -49,6 +49,7 @@ const testFiles = [
   'refund_lifecycle.test.ts',
   'notification_credit_reservation.test.ts',
   'web_route_contract.test.ts',
+  'schema_contract.test.ts',
   'release_registry.test.ts',
   'ac_support.test.ts',
   'ac_monitoring.test.ts',

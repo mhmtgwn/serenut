@@ -4,7 +4,7 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 
 ## P0 — Hemen
 - [x] `backend-ci` neden kırık bul ve düzelt; `deploy.yml` içindeki `continue-on-error: true` bayrağını kaldır.
-- [ ] Şema sözleşmesi: sync edilen varlıklar için tek kaynak (nullable/default). CI testi PostgreSQL ve SQLite şemasını bu sözleşmeye karşı doğrulasın. (Neden: `sales.customer_id` NOT NULL hatası.)
+- [x] Şema sözleşmesi: sync edilen varlıklar için tek kaynak (nullable/default). CI testi PostgreSQL ve SQLite şemasını bu sözleşmeye karşı doğrulasın. (Neden: `sales.customer_id` NOT NULL hatası.) — `shared/schema_contract.json` tek kaynak oluşturuldu; istemcide `test/schema_contract_test.dart`, backend'de `server/src/test/schema_contract.test.ts` entegre edildi. `db_schema.dart` ve `sync_v4_service_materializer.dart` tam uyumlu hale getirildi.
 - [ ] Geçiş envanteri: hangi tablolar CoreNext katmanından, hangileri eski `db_schema.dart` katmanından çalışıyor; kalan işi çıkar.
 
 ## P1 — Sonraki sürümler

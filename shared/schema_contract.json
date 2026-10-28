@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SerenutSyncSchemaContract",
+  "version": "1.0.0",
+  "description": "Canonical single-source-of-truth contract for all entities synchronized between PostgreSQL and SQLite.",
+  "entities": {
+    "product": {
+      "table_pg": "products",
+      "table_sqlite": "products",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "name": { "type": "string", "nullable": false },
+        "description": { "type": "string", "nullable": true },
+        "price": { "type": "number", "nullable": false, "default": 0.0 },
+        "quantity": { "type": "integer", "nullable": false, "default": 0 },
+        "category": { "type": "string", "nullable": true, "default": "Genel" },
+        "is_active": { "type": "boolean", "nullable": false, "default": true },
+        "created_at": { "type": "string", "nullable": false }
+      }
+    },
+    "customer": {
+      "table_pg": "customers",
+      "table_sqlite": "customers",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "name": { "type": "string", "nullable": false },
+        "phone": { "type": "string", "nullable": true },
+        "email": { "type": "string", "nullable": true },
+        "address": { "type": "string", "nullable": true },
+        "status": { "type": "string", "nullable": false, "default": "active" }
+      }
+    },
+    "sale": {
+      "table_pg": "sales",
+      "table_sqlite": "sales",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "customer_id": { "type": "string", "nullable": true },
+        "receipt_no": { "type": "string", "nullable": true },
+        "total_amount": { "type": "number", "nullable": false, "default": 0.0 },
+        "paid_amount": { "type": "number", "nullable": false, "default": 0.0 },
+        "payment_method": { "type": "string", "nullable": false, "default": "cash" },
+        "status": { "type": "string", "nullable": false, "default": "completed" },
+        "created_at": { "type": "string", "nullable": false }
+      }
+    },
+    "order": {
+      "table_pg": "customer_orders",
+      "table_sqlite": "orders",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "order_number": { "type": "string", "nullable": false },
+        "customer_id": { "type": "string", "nullable": true },
+        "status": { "type": "string", "nullable": false, "default": "created" },
+        "total_amount": { "type": "number", "nullable": true },
+        "created_at": { "type": "string", "nullable": false }
+      }
+    },
+    "financial_transaction": {
+      "table_pg": "financial_transactions",
+      "table_sqlite": "financial_transactions",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "type": { "type": "string", "nullable": false },
+        "customer_id": { "type": "string", "nullable": true },
+        "amount": { "type": "number", "nullable": false, "default": 0.0 },
+        "paid_amount": { "type": "number", "nullable": false, "default": 0.0 },
+        "debt_amount": { "type": "number", "nullable": false, "default": 0.0 },
+        "payment_method": { "type": "string", "nullable": true },
+        "reference_id": { "type": "string", "nullable": true }
+      }
+    },
+    "warehouse": {
+      "table_pg": "warehouses",
+      "table_sqlite": "warehouses",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "name": { "type": "string", "nullable": false },
+        "location": { "type": "string", "nullable": true },
+        "capacity_kg": { "type": "number", "nullable": false, "default": 0.0 },
+        "current_stock_kg": { "type": "number", "nullable": false, "default": 0.0 },
+        "average_rendiment": { "type": "number", "nullable": false, "default": 50.0 },
+        "is_active": { "type": "boolean", "nullable": false, "default": true }
+      }
+    },
+    "customer_hazelnut_escrow": {
+      "table_pg": "customer_hazelnut_escrow",
+      "table_sqlite": "customer_hazelnut_escrow",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "customer_id": { "type": "string", "nullable": false },
+        "warehouse_id": { "type": "string", "nullable": false },
+        "receipt_no": { "type": "string", "nullable": true },
+        "gross_kg": { "type": "number", "nullable": false },
+        "sack_count": { "type": "integer", "nullable": false, "default": 0 },
+        "tare_kg": { "type": "number", "nullable": false, "default": 0.0 },
+        "net_kg": { "type": "number", "nullable": false },
+        "rendiment": { "type": "number", "nullable": false, "default": 50.0 },
+        "remaining_kg": { "type": "number", "nullable": false },
+        "status": { "type": "string", "nullable": false, "default": "active" }
+      }
+    },
+    "warehouse_hazelnut_movement": {
+      "table_pg": "warehouse_hazelnut_movements",
+      "table_sqlite": "warehouse_hazelnut_movements",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "warehouse_id": { "type": "string", "nullable": false },
+        "movement_type": { "type": "string", "nullable": false },
+        "quantity_kg": { "type": "number", "nullable": false },
+        "rendiment": { "type": "number", "nullable": false, "default": 50.0 },
+        "balance_kg_after": { "type": "number", "nullable": false, "default": 0.0 },
+        "average_rendiment_after": { "type": "number", "nullable": false, "default": 50.0 }
+      }
+    },
+    "hazelnut_price_cut": {
+      "table_pg": "hazelnut_price_cuts",
+      "table_sqlite": "hazelnut_price_cuts",
+      "columns": {
+        "id": { "type": "string", "nullable": false },
+        "customer_id": { "type": "string", "nullable": false },
+        "escrow_id": { "type": "string", "nullable": false },
+        "cut_kg": { "type": "number", "nullable": false },
+        "rendiment": { "type": "number", "nullable": false },
+        "base_price_50": { "type": "number", "nullable": false },
+        "effective_price": { "type": "number", "nullable": false },
+        "total_amount": { "type": "number", "nullable": false }
+      }
+    }
+  }
+}
