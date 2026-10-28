@@ -159,5 +159,44 @@ void main() {
       final items = await db.query('order_items', where: 'order_id = ?', whereArgs: ['ord-test-replay-1']);
       expect(items.length, equals(1)); // Mükerrer satır oluşmamalıdır
     });
+
+    test('4. Satış (Sale) müşteri bilgisi null geldiğinde (anonim peşin satış) NOT NULL kısıtını ihlal etmeden peşin müşteri ile materyalize edilmelidir', () async {
+      final anonSaleChange = {
+        'entity_type': 'sale',
+        'entity_id': 'sale-anon-3001',
+        'operation': 'UPSERT',
+        'payload': {
+          'id': 'sale-anon-3001',
+          'receipt_no': 'REC-ANON-001',
+          'customer_id': null, // Cloud quick-sale with no customer
+          'total_amount': 150.0,
+          'status': 'completed',
+          'created_at': '2026-10-28T20:00:00.000Z',
+          'items': [
+            {
+              'id': 'sale-item-anon-1',
+              'product_id': 'p-anon-1',
+              'product_name': 'Kavrulmuş Fındık',
+              'quantity': 1.0,
+              'unit_price': 150.0,
+            }
+          ],
+        },
+      };
+
+      // Bu işlem önceden NOT NULL constraint failed: sales.customer_id (kod 1299) hatası veriyordu
+      await db.transaction((txn) async {
+        await syncService.applyChangeForTesting(txn, anonSaleChange);
+      });
+
+      final sales = await db.query('sales', where: 'id = ?', whereArgs: ['sale-anon-3001']);
+      expect(sales.length, equals(1));
+      expect(sales.first['customer_id'], equals(''));
+
+      // Pesin musteri kaydinin olusturuldugunu dogrula
+      final cashCust = await db.query('customers', where: 'id = ?', whereArgs: ['']);
+      expect(cashCust.length, equals(1));
+      expect(cashCust.first['name'], equals('Peşin Müşteri'));
+    });
   });
 }

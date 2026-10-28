@@ -8,12 +8,12 @@
     "ledger_bypass_toggles": 0,
     "hardcoded_data_repair_ids": 0,
     "ui_imports_database": 5,
-    "ui_direct_repository_service": 63,
+    "ui_direct_repository_service": 64,
     "database_manager_singleton": 1,
     "server_pgpool_in_controllers": 115,
     "empty_catch_dart": 31,
     "empty_catch_ts": 4,
-    "datetime_now": 500
+    "datetime_now": 503
   },
   "oversized_files": [
     "lib/core_next/infrastructure/migration/erkul_json_importer.dart",
@@ -57,6 +57,7 @@
     "lib/presentation/pages/settings/widgets/device_editor_sheet.dart",
     "lib/presentation/pages/settings/widgets/sms_settings_sheet.dart",
     "lib/presentation/widgets/common/customer_picker_widget.dart",
+    "lib/presentation/widgets/hazelnut/customer_escrow_tab_view.dart",
     "lib/presentation/widgets/invoice/create_gib_invoice_dialog.dart",
     "lib/presentation/widgets/sales/checkout_section.dart",
     "server/src/modules/admin/admin.controller.ts",

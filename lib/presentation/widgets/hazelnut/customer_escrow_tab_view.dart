@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/hazelnut_models.dart';
 import 'package:serenutos/domain/services/hazelnut_calculator.dart';
@@ -13,11 +14,9 @@ import 'package:serenutos/providers/hazelnut_providers.dart';
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
-const _kAmber = POSColors.amber;
 const _kAmberLight = POSColors.amberLight;
 const _kAmberDark = POSColors.amberDark;
 const _kRed = POSColors.red;
-const _kRedLight = POSColors.redLight;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
 const _kBorder = POSColors.border;
@@ -40,16 +39,29 @@ class CustomerEscrowTabView extends ConsumerWidget {
     final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final warehouses = ref.read(warehousesProvider).valueOrNull ?? [];
+    final repo = ref.read(hazelnutRepositoryProvider);
+    var warehouses = await repo.getWarehouses();
     if (warehouses.isEmpty) {
-      AppNotificationHost.show(
-        const SnackBar(content: Text('Kayıtlı aktif depo bulunamadı. Önce depo oluşturunuz.')),
+      final defaultWh = WarehouseEntity(
+        id: 'wh-main',
+        name: 'Ana Depo (Silo 1)',
+        location: 'Merkez',
+        capacityKg: 50000.0,
+        currentStockKg: 0.0,
+        averageRendiment: 50.0,
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
-      return;
+      await repo.saveWarehouse(defaultWh);
+      ref.invalidate(warehousesProvider);
+      warehouses = [defaultWh];
     }
 
     String selectedWarehouseId = warehouses.first.id;
     var saving = false;
+
+    if (!context.mounted) return;
 
     await showDialog<void>(
       context: context,
@@ -67,7 +79,7 @@ class CustomerEscrowTabView extends ConsumerWidget {
           return AlertDialog(
             title: const Text('Yeni Emanet Fındık Girişi'),
             content: SizedBox(
-              width: 460,
+              width: 480,
               child: Form(
                 key: formKey,
                 child: SingleChildScrollView(
@@ -80,23 +92,97 @@ class CustomerEscrowTabView extends ConsumerWidget {
                         style: const TextStyle(fontSize: 13, color: _kTextSecondary),
                       ),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        value: selectedWarehouseId,
-                        decoration: const InputDecoration(
-                          labelText: 'Giriş Yapılacak Depo / Silo *',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: warehouses.map((w) {
-                          return DropdownMenuItem<String>(
-                            value: w.id,
-                            child: Text('${w.name} (Stok: ${_numFormat.format(w.currentStockKg)} kg)'),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => selectedWarehouseId = val);
-                          }
-                        },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: selectedWarehouseId,
+                              decoration: const InputDecoration(
+                                labelText: 'Giriş Yapılacak Depo / Silo *',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: warehouses.map((w) {
+                                return DropdownMenuItem<String>(
+                                  value: w.id,
+                                  child: Text('${w.name} (Stok: ${_numFormat.format(w.currentStockKg)} kg)'),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setDialogState(() => selectedWarehouseId = val);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Hızlı Yeni Depo Ekle',
+                            child: InkWell(
+                              onTap: () async {
+                                final whNameCtrl = TextEditingController();
+                                final created = await showDialog<WarehouseEntity>(
+                                  context: ctx,
+                                  builder: (subCtx) => AlertDialog(
+                                    title: const Text('Hızlı Depo / Silo Tanımla'),
+                                    content: TextField(
+                                      controller: whNameCtrl,
+                                      autofocus: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Depo Adı *',
+                                        hintText: 'Örn: Depo 2, Silo B',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(subCtx),
+                                        child: const Text('Vazgeç'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () async {
+                                          final name = whNameCtrl.text.trim();
+                                          if (name.isEmpty) return;
+                                          final now = DateTime.now();
+                                          final newWh = WarehouseEntity(
+                                            id: const Uuid().v4(),
+                                            name: name,
+                                            capacityKg: 50000.0,
+                                            currentStockKg: 0.0,
+                                            averageRendiment: 50.0,
+                                            createdAt: now,
+                                            updatedAt: now,
+                                          );
+                                          await repo.saveWarehouse(newWh);
+                                          ref.invalidate(warehousesProvider);
+                                          if (subCtx.mounted) Navigator.pop(subCtx, newWh);
+                                        },
+                                        child: const Text('Ekle'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (created != null) {
+                                  final freshWhs = await repo.getWarehouses();
+                                  setDialogState(() {
+                                    warehouses = freshWhs;
+                                    selectedWarehouseId = created.id;
+                                  });
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                height: 52,
+                                width: 52,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade400),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.add_business_rounded, color: _kGreenDark),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       Row(

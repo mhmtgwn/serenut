@@ -105,11 +105,23 @@ extension SyncV4Materializer on SyncV4Service {
       // requires one, so use a deterministic value that is stable on replay.
       payload['order_number'] = 'SYNC-$id';
     }
+    if ((type == 'sale' || type == 'order') &&
+        (payload['customer_id'] == null ||
+            payload['customer_id'].toString().trim().isEmpty)) {
+      // Sales and orders require a non-null customer_id referencing customers(id).
+      // Quick/walk-in sales default to the canonical cash customer ('').
+      payload['customer_id'] = '';
+    }
     final row = await _normalizeRowForLocalSchema(
       db,
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
+    if ((type == 'sale' || type == 'order') &&
+        (row['customer_id'] == null ||
+            row['customer_id'].toString().trim().isEmpty)) {
+      row['customer_id'] = '';
+    }
     if (type == 'order') {
       await _disambiguateOrderNumber(db, row, id);
     }
@@ -119,33 +131,34 @@ extension SyncV4Materializer on SyncV4Service {
             type == 'customer_installment') &&
         row['customer_id'] != null) {
       final customerId = row['customer_id'].toString().trim();
-      if (customerId.isNotEmpty) {
-        final existingCust = await db.query(
+      final existingCust = await db.query(
+        'customers',
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [customerId],
+        limit: 1,
+      );
+      if (existingCust.isEmpty) {
+        final now = DateTime.now().toUtc().toIso8601String();
+        final rawCustName = (payload['customer_name'] as String?)?.trim();
+        final customerName = customerId.isEmpty
+            ? 'Peşin Müşteri'
+            : (rawCustName?.isNotEmpty == true
+                ? rawCustName!
+                : 'Müşteri ($customerId)');
+        final customerPhone = (payload['customer_phone'] as String?)?.trim();
+        await db.insert(
           'customers',
-          columns: ['id'],
-          where: 'id = ?',
-          whereArgs: [customerId],
-          limit: 1,
+          {
+            'id': customerId,
+            'name': customerName,
+            'phone': customerPhone ?? '',
+            'created_at': now,
+            'updated_at': now,
+            'is_synced': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
         );
-        if (existingCust.isEmpty) {
-          final now = DateTime.now().toUtc().toIso8601String();
-          final customerName = (payload['customer_name'] as String?)?.trim();
-          final customerPhone = (payload['customer_phone'] as String?)?.trim();
-          await db.insert(
-            'customers',
-            {
-              'id': customerId,
-              'name': customerName?.isNotEmpty == true
-                  ? customerName!
-                  : 'Müşteri ($customerId)',
-              'phone': customerPhone,
-              'created_at': now,
-              'updated_at': now,
-              'is_synced': 1,
-            },
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
-        }
       }
     }
     if (type == 'customer') {

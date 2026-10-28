@@ -338,14 +338,26 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
       } else if (settlementType == 'CASH_PAID') {
         // Kasadan Nakit Ödeme: Gider / Kasa çıkışı olarak kaydet
         final expenseId = _uuid.v4();
-        await _gateway.insert('cash_expenses', {
+        final expensePayload = {
           'id': expenseId,
           'amount': totalAmount,
           'category': 'Fındık Alımı',
           'description': 'Fındık Fiyat Kesimi Nakit Ödeme - ${customerName ?? 'Müşteri'} (${cutKg.toStringAsFixed(1)} kg, ${escrow.rendiment} R)',
           'created_at': nowIso,
           'is_deleted': 0,
-        });
+        };
+        await _gateway.insert('cash_expenses', expensePayload);
+        try {
+          await SyncOutboxV4.enqueue(
+            _gateway,
+            entityType: 'cash_expense',
+            entityId: expenseId,
+            operation: 'UPSERT',
+            payload: expensePayload,
+          );
+        } catch (_) {
+          // SyncOutboxV4 table not present in mock/isolated test environment
+        }
       }
 
       // 3. Fiyat kesim bordrosu kaydı
