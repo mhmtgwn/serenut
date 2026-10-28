@@ -129,10 +129,12 @@ class DatabaseManager {
 
   /// Get database instance (lazy initialization)
   Future<Database> getDatabase() async {
-    if (_database != null) {
+    if (_database != null && _database!.isOpen) {
       return _database!;
     }
-    _databaseFuture ??= _initializeDatabase();
+    _database = null;
+    _databaseFuture = null;
+    _databaseFuture = _initializeDatabase();
     try {
       _database = await _databaseFuture;
     } catch (e) {

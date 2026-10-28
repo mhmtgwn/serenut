@@ -1,3 +1,4 @@
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 // test/services/release_manager_test.dart
 // Serenut Platform — ReleaseManagerService Unit Tests (Sprint 6)
 // Tests update check logic, version comparison, force update detection, SHA-256 verify.
@@ -41,7 +42,26 @@ MockClient mockClientWithResponse(int statusCode, Map<String, dynamic> body) {
   });
 }
 
+
+class _MockPathProvider extends PathProviderPlatform {
+  final String tempDir;
+  _MockPathProvider(this.tempDir);
+
+  @override
+  Future<String?> getTemporaryPath() async => tempDir;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => tempDir;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => tempDir;
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  final _testTempDir = Directory.systemTemp.createTempSync("serenut_rel_test_");
+  PathProviderPlatform.instance = _MockPathProvider(_testTempDir.path);
+
   group('UpdateInfo.fromJson', () {
     test('parses hasUpdate=false correctly', () {
       final json = {
@@ -458,6 +478,102 @@ void main() {
             )
             .drain<void>(),
         throwsA(isA<DownloadCancelledException>()),
+      );
+      service.dispose();
+    });
+  });
+
+  group('Security & Host Isolation in downloadUpdate', () {
+    test('forwards Bearer token to trusted API host', () async {
+      String? capturedAuthHeader;
+      final mockClient = MockClient((request) async {
+        capturedAuthHeader = request.headers['Authorization'];
+        return http.Response.bytes([1, 2, 3], 200, headers: {'content-length': '3'});
+      });
+
+      final service = ReleaseManagerService(config: testConfig);
+      const update = UpdateInfo(
+        hasUpdate: true,
+        isForceUpdate: false,
+        latestVersion: '1.2.0+99',
+        downloadUrl: 'http://test-api.serenut.com/api/v1/updates/download/rel',
+        fileSizeBytes: 3,
+        channel: 'stable',
+      );
+
+      await service
+          .downloadUpdate(
+            updateInfo: update,
+            platform: 'windows',
+            jwtToken: 'secret_jwt_token',
+            client: mockClient,
+          )
+          .drain<void>();
+
+      expect(capturedAuthHeader, 'Bearer secret_jwt_token');
+      service.dispose();
+    });
+
+    test('does NOT forward Bearer token to third-party untrusted hosts', () async {
+      String? capturedAuthHeader;
+      final mockClient = MockClient((request) async {
+        capturedAuthHeader = request.headers['Authorization'];
+        return http.Response.bytes([1, 2, 3], 200, headers: {'content-length': '3'});
+      });
+
+      final service = ReleaseManagerService(config: testConfig);
+      const update = UpdateInfo(
+        hasUpdate: true,
+        isForceUpdate: false,
+        latestVersion: '1.2.0+99',
+        downloadUrl: 'http://untrusted-external-mirror.com/downloads/rel.exe',
+        fileSizeBytes: 3,
+        channel: 'stable',
+      );
+
+      await service
+          .downloadUpdate(
+            updateInfo: update,
+            platform: 'windows',
+            jwtToken: 'secret_jwt_token',
+            client: mockClient,
+          )
+          .drain<void>();
+
+      expect(capturedAuthHeader, isNull,
+          reason: 'JWT token must never be leaked to third-party hosts');
+      service.dispose();
+    });
+
+    test('rejects insecure HTTP URLs in production environment', () async {
+      const prodConfig = EnvironmentConfig(
+        environment: AppEnvironment.prod,
+        apiBaseUrl: 'https://api.serenut.com/api/v1',
+        authEndpoint: '/auth',
+        syncEndpoint: '/sync',
+        updateEndpoint: '/updates',
+        releaseEndpoint: '/releases',
+        releaseChannel: 'stable',
+      );
+
+      final service = ReleaseManagerService(config: prodConfig);
+      const update = UpdateInfo(
+        hasUpdate: true,
+        isForceUpdate: false,
+        latestVersion: '1.2.0+99',
+        downloadUrl: 'http://api.serenut.com/api/v1/updates/download/rel.exe',
+        fileSizeBytes: 3,
+        channel: 'stable',
+      );
+
+      expect(
+        service
+            .downloadUpdate(
+              updateInfo: update,
+              platform: 'windows',
+            )
+            .drain<void>(),
+        throwsA(isA<StateError>()),
       );
       service.dispose();
     });

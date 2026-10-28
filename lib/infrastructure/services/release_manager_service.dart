@@ -272,6 +272,7 @@ class ReleaseManagerService {
     String? jwtToken,
     String? deviceId,
     DownloadCancellationToken? cancellationToken,
+    http.Client? client,
   }) async* {
     cancellationToken?.throwIfCancelled();
     final downloadPath = updateInfo.downloadUrl!;
@@ -318,9 +319,23 @@ class ReleaseManagerService {
           '${deviceId != null ? "?device_activation_id=$deviceId" : ""}';
     }
 
-    final request = http.Request('GET', Uri.parse(fullUrl));
-    if (jwtToken != null) {
-      request.headers['Authorization'] = 'Bearer $jwtToken';
+    final parsedUri = Uri.parse(fullUrl);
+    final apiUri = Uri.parse(_config.apiBaseUrl);
+
+    if (_config.environment == AppEnvironment.prod &&
+        parsedUri.scheme.toLowerCase() != 'https') {
+      throw StateError(
+          'Güvensiz OTA indirme URL reddedildi: Üretim ortamında HTTPS zorunludur: ' + fullUrl);
+    }
+
+    // Güvenlik Duvarı: Sadece yetkili API host'una Bearer JWT token gonder.
+    // Üçüncü taraf / harici host'lara token ve kimlik bilgisi sızdırılamaz.
+    final bool isTrustedApiHost =
+        parsedUri.host.toLowerCase() == apiUri.host.toLowerCase();
+
+    final request = http.Request('GET', parsedUri);
+    if (jwtToken != null && isTrustedApiHost) {
+      request.headers['Authorization'] = 'Bearer ' + jwtToken;
     }
 
     if (existingLength > 0 &&
@@ -331,7 +346,7 @@ class ReleaseManagerService {
           '[ReleaseManager] Resuming OTA download from offset: $existingLength bytes');
     }
 
-    final downloadClient = http.Client();
+    final downloadClient = client ?? http.Client();
     void cancelRequest() => downloadClient.close();
     cancellationToken?._addListener(cancelRequest);
     IOSink? iosink;

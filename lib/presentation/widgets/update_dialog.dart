@@ -174,20 +174,32 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
         throw Exception('İndirilen dosya bulunamadı.');
       }
 
-      // SHA-256 verification
+      // SHA-256 and digital signature verification (Fail-closed security guard)
       setState(() {
         _state = _DialogState.verifying;
-        _progressText = 'SHA-256 doğrulanıyor...';
+        _progressText = 'Paket bütünlüğü ve dijital imza doğrulanıyor...';
       });
 
-      bool verified = true;
-      if (widget.updateInfo.sha256Hash != null) {
-        verified = await widget.releaseManager.verifyDownload(
-          downloadedFile,
-          widget.updateInfo.sha256Hash!,
-          widget.updateInfo.signature ?? '',
-        );
+      final sha256 = widget.updateInfo.sha256Hash?.trim();
+      final sig = widget.updateInfo.signature?.trim();
+
+      if (sha256 == null || sha256.isEmpty || sig == null || sig.isEmpty) {
+        if (await downloadedFile.exists()) {
+          await downloadedFile.delete();
+        }
+        setState(() {
+          _state = _DialogState.error;
+          _errorMessage =
+              'Güncelleme paketinin SHA-256 özeti veya dijital imzası eksik. Güvenlik nedeniyle kurulum reddedildi.';
+        });
+        return;
       }
+
+      final verified = await widget.releaseManager.verifyDownload(
+        downloadedFile,
+        sha256,
+        sig,
+      );
 
       if (!verified) {
         if (await downloadedFile.exists()) {
