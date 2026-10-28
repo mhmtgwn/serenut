@@ -2641,7 +2641,15 @@ class ReverseMigrationEngine {
               }
               final existingType = existingFt['type']?.toString().toLowerCase().trim();
               final coreType = type.toLowerCase().trim();
-              if (existingType != null && existingType != coreType) {
+              bool typesMatch(String legType, String crType) {
+                if (legType == crType) return true;
+                if (legType == 'sale' && (crType == 'sale' || crType == 'sale_paid' || crType == 'sale_debt')) return true;
+                if ((legType == 'payment' || legType == 'collection') && (crType == 'payment' || crType == 'collection')) return true;
+                if ((legType == 'debt' || legType == 'manual_debt') && (crType == 'debt' || crType == 'manual_debt')) return true;
+                if ((legType == 'refund' || legType == 'cancellation') && (crType == 'refund' || crType == 'cancellation')) return true;
+                return false;
+              }
+              if (existingType != null && !typesMatch(existingType, coreType)) {
                 throw StateError(
                   'FİNANSAL HAREKET TÜR ÇAKIŞMASI TESPİT EDİLDİ! '
                   'Cari hareket [$leId] türü uyuşmuyor (Legacy: $existingType, Core: $type).',

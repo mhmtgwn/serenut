@@ -43,7 +43,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 
 ### Yüksek
 - [x] **Sunucuda graceful shutdown yok (V).** `server.ts:828-853` içinde SIGTERM ve SIGINT dinleyicileriyle HTTP sunucu (`server.close`), BullMQ worker'ları (`stopNotificationWorker`, `stopBillingScheduler`), Redis (`redisClient.quit`) ve PG bağlantı havuzu (`pgPool.end`) sıralı ve güvenli şekilde boşaltılarak kapatılmaktadır.
-- [ ] **SQLite upgrade başarısız olursa kurtarma yolu yok (kısmen V).** `core_next/.../app_database.dart:89` migrate'i doğrudan `onUpgrade`'den çağırıyor; yükseltme öncesi dosya kopyası ve try/catch görmedim. `onOpen` eski tablo varsa `IncompatibleDatabaseSchemaException` fırlatıyor, UI fallback görmedim (T). → Yükseltme öncesi `.bak` kopyası, hata olursa geri yükle, kurtarma ekranı göster.
+- [x] **SQLite upgrade başarısız olursa kurtarma yolu yok (kısmen V).** `CoreAppDatabase.open` içine pre-upgrade güvenli yedekleme (`.pre_upgrade_vX.bak`) eklendi; migration veya şema açılışında hata olursa veritabanı bozulmadan otomatik olarak eski sürüme geri yüklenir.
 - [ ] **Günlük kullanımda yedek/bütünlük kontrolü yok (V).** `PRAGMA integrity_check` ~10 yerde ama hepsi migration/cutover kapısında. Normal açılışta kontrol ve zamanlanmış yerel yedek yok.
 - [ ] **CI boşlukları (V).** `deploy.yml:99` `flutter analyze --no-fatal-infos --no-fatal-warnings`: uyarılar build'i hiç düşürmüyor, deprecation'lar böyle birikiyor. `sync-hotfix.yml` testsiz, sadece `npm run build`. PR'larda CI çalışıyor mu bilinmiyor (T).
 - [ ] **Refresh token (kısmen V).** `auth.controller.ts:124-153` sadece token'ın varlığını kontrol ediyor. `AuthService.refresh` içinde hash saklama, rotasyon ve eski token tekrar kullanılınca tüm ailenin iptali var mı, elle okunmalı.

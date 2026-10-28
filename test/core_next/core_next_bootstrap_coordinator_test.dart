@@ -14,8 +14,8 @@ import 'package:serenutos/infrastructure/bootstrap/core_next_bootstrap_coordinat
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 
-import '../../core_next/client_core/lib/infrastructure/database/app_database.dart';
-import '../../core_next/client_core/lib/infrastructure/migration/migration_bridge_engine.dart';
+import 'package:serenutos/core_next/infrastructure/database/app_database.dart';
+import 'package:serenutos/core_next/infrastructure/migration/migration_bridge_engine.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -284,6 +284,8 @@ void main() {
     String? customBackupDirectory,
     CoreNextMigrationRunner? migrationRunner,
     CoreNextCompletionChecker? completionChecker,
+    MigrationConsentRequester? consentRequester,
+    bool autonomousMode = true,
   }) {
     return CoreNextBootstrapCoordinator(
       customLegacyDb: customLegacyDb ?? legacyDb,
@@ -291,6 +293,8 @@ void main() {
       customLegacyFilePath: customLegacyFilePath ?? legacyDbPath,
       customBackupDirectory: customBackupDirectory ?? backupDirPath,
       prefs: prefs,
+      autonomousMode: autonomousMode,
+      consentRequester: consentRequester ?? (() async => MigrationConsentDecision.approved),
       migrationRunner: migrationRunner ??
           ({required legacyDb, required targetDb, legacyFilePath, fullScope = false}) async {
             return MigrationBridgeEngine(coreDb).migrateFromLegacy(
@@ -543,7 +547,7 @@ void main() {
         legacyDb: legacyDb,
         coreDb: coreDb,
       );
-      expect(reverseReport.isSuccess, true);
+      expect(reverseReport.isSuccess, true, reason: reverseReport.errorMessage);
 
       final legacyOutbox = await legacyDb.query('sync_outbox_v4');
       expect(legacyOutbox.isNotEmpty, true);
