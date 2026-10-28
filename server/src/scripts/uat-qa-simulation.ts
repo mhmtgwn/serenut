@@ -70,7 +70,10 @@ async function runUatSuite() {
       const mockLicenseKey = 'LIC-UAT-TEST-KEY-2026';
       const mockHardwareHash = 'uuid-pos-terminal-uat-999';
       // Simulate signature generate
-      const mockSecret = process.env.JWT_SECRET || 'fallback_secret';
+      const mockSecret = process.env.JWT_SECRET;
+      if (!mockSecret) {
+        throw new Error('UAT QA simulation requires JWT_SECRET environment variable to be set.');
+      }
       const crypto = require('crypto');
       const payload = {
         licenseKey: mockLicenseKey,

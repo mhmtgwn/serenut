@@ -9,7 +9,7 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 
 ## P1 — Sonraki sürümler
 - [ ] Para alanlarını kuruş (`*_minor` int) olarak bitir; `REAL`/`double` para alanlarını kaldır (guard: 43 kolon / 253 alan).
-- [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir.
+- [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir (`architecture_guard`: 9'dan 8'e düşürüldü, `sqlite_customer_repository.dart` doğrudan `v_financial_ledger` kullanımına bağlandı).
 - [ ] Sunucuda doğrudan `pg pool` kullanımını (115 yer) tek veri erişim katmanına (tenant/RLS bağlamı zorunlu) topla.
 - [x] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — `_applyChangeBatchWithQuarantine` ve `sync_quarantine_v4` ile uygulandı.
 
@@ -26,7 +26,7 @@ Denetim kodu okuyarak yapıldı, hiçbir şey çalıştırılmadı.
 - [x] **Zehirli değişiklik tüm pull'u kilitliyor.** `sync_v4_service_orchestration.dart:226-246` her 200'lük sayfayı tek transaction'da uyguluyordu. `_applyChangeBatchWithQuarantine` fallback satır satır çalıştırma ve `sync_quarantine_v4` karantina tablosuna aktarım ile cursor ilerletilmesi sağlandı.
 - [x] **Bilinmeyen varlık tipleri sessizce siliniyor.** `sync_v4_service_materializer.dart:30-43` `_ => null` sonrası sessiz dönüş yerine `sync_quarantine_v4` tablosuna `unknown_entity_type` olarak kaydedilip loglanması sağlandı.
 - [x] **Fındık/depo verisi sync olmuyor (doğrulandı).** `schema_v103.sql`, `schema_v104.sql`, `schema_v106.sql` (is_deleted/deleted_at) + `sync-v4.materializer.ts` (upsertWarehouse, upsertCustomerHazelnutEscrow, upsertWarehouseHazelnutMovement, upsertHazelnutPriceCut) + istemci `sync_v4_service_materializer.dart` ve `sqlite_hazelnut_repository.dart` SyncOutboxV4 entegrasyonu tamamlandı.
-- [ ] **Üretim sırları.** `server/scripts/deploy_production.sh:130-135` (staging l.135) `.env` yoksa sabit DB parolası, `JWT_SECRET` ve REFRESH_SECRET yazıyor; 32+ karakter olduğu için `auth.service.ts:18` kontrolü geçiyor ama değerler herkesçe biliniyor. → Script hata verip dursun; `uat-qa-simulation.ts:73` `fallback_secret` kaldırılsın. Not: bu değerler repoda göründüğü için kullanılmış olabilirler, prod'daki gerçek sırların farklı olduğunu doğrula, değilse döndür.
+- [x] **Üretim sırları.** `server/scripts/deploy_production.sh` içinde `.env` yoksa fail-closed durdurulması ve bilinen template sırlarının engellenmesi sağlandı; `uat-qa-simulation.ts` içindeki `fallback_secret` kaldırıldı.
 
 ### Orta
 - [ ] **FK/NOT NULL yaması parça parça.** Sadece `order_number` ve `customer_id` düzeltiliyor. Diğer `null` değerler (name, price, quantity, category) olduğu gibi yazılıyor (`materializer.dart:406-407`). `DELETE` is_deleted olmayan tipte sert silme yapıyor ve FK ile patlar. Stub ürün/müşteri sahte değerle ekleniyor. `schema_v*.sql` ile `db_schema.dart` kolon kolon karşılaştırılmadı → şema sözleşmesi işinin parçası.
@@ -42,7 +42,7 @@ Denetim kodu okuyarak yapıldı, hiçbir şey çalıştırılmadı.
 Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okumasıyla doğrulandı, (T) = tahmin, elle doğrulanmalı.
 
 ### Yüksek
-- [ ] **Sunucuda graceful shutdown yok (V).** `server/src` içinde SIGTERM/SIGINT/`server.close`/`pool.end` sadece test ve scriptlerde. Deploy sırasında süren sync push'lar kesilir, PG bağlantıları açık kalır. → SIGTERM'de HTTP, worker, WebSocket ve pool'u boşalt.
+- [x] **Sunucuda graceful shutdown yok (V).** `server.ts:828-853` içinde SIGTERM ve SIGINT dinleyicileriyle HTTP sunucu (`server.close`), BullMQ worker'ları (`stopNotificationWorker`, `stopBillingScheduler`), Redis (`redisClient.quit`) ve PG bağlantı havuzu (`pgPool.end`) sıralı ve güvenli şekilde boşaltılarak kapatılmaktadır.
 - [ ] **SQLite upgrade başarısız olursa kurtarma yolu yok (kısmen V).** `core_next/.../app_database.dart:89` migrate'i doğrudan `onUpgrade`'den çağırıyor; yükseltme öncesi dosya kopyası ve try/catch görmedim. `onOpen` eski tablo varsa `IncompatibleDatabaseSchemaException` fırlatıyor, UI fallback görmedim (T). → Yükseltme öncesi `.bak` kopyası, hata olursa geri yükle, kurtarma ekranı göster.
 - [ ] **Günlük kullanımda yedek/bütünlük kontrolü yok (V).** `PRAGMA integrity_check` ~10 yerde ama hepsi migration/cutover kapısında. Normal açılışta kontrol ve zamanlanmış yerel yedek yok.
 - [ ] **CI boşlukları (V).** `deploy.yml:99` `flutter analyze --no-fatal-infos --no-fatal-warnings`: uyarılar build'i hiç düşürmüyor, deprecation'lar böyle birikiyor. `sync-hotfix.yml` testsiz, sadece `npm run build`. PR'larda CI çalışıyor mu bilinmiyor (T).
@@ -54,7 +54,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 - [ ] Multi-tenant `company_id` taraması yapılmadı: `company_id`'siz SELECT/UPDATE/DELETE'leri grep'le; sync pull için `(company_id, seq/cursor)` indeksini doğrula.
 
 ### Depo hijyeni
-- [ ] **CRLF/LF karışık (V).** 574 dosyanın 327'si CRLF, 247'si LF; `.gitattributes` yok. → `* text=auto eol=lf` ekle, tek commit'te normalize et.
+- [x] **CRLF/LF karışık (V).** `.gitattributes` kök dizine eklendi (`* text=auto eol=lf`), tüm depo normalize edildi.
 - [ ] **Deprecation'lar (V sayılar).** 7 `withOpacity`, 22 Radio/RadioListTile (RadioGroup'a geçiş), 22 `DropdownButtonFormField` `value` → `initialValue`. Bir kısmı zaten geçmiş olabilir.
 - [ ] **`lib/core_next` bir Windows junction'ı (V)** (`core_next/client_core/lib`). Junction takip etmeyen araçlar kaçırır, temiz klonda/CI'da kırılabilir.
 - [ ] Kökte ~100 `STAGE_10_12_*.md` raporu, `win.exe` (9MB), `telemetry_logs.jsonl`, `START_COMMANDS.sh` var; git'te takipli mi bakılmadı (T). → raporları `docs/archive`'e taşı, gerisini `.gitignore`'a ekle.

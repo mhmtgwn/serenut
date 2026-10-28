@@ -95,3 +95,4 @@ Core Next'e %100 geçişin tamamlanması ve legacy katmanının emekliye ayrılm
    - `settings` tablosundaki konfigürasyon alanlarının `app_settings` KV tablosuna dinamik eşlenmesi.
 5. **İş Paketi 5 — Tam Kesim (Final Cutover Gate):**
    - Tüm tablolar Core Next'e aktarıldığında Legacy katmanının read-only arşive alınması (`LegacyDatabaseRetirementPolicy`).
+

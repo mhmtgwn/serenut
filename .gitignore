@@ -141,3 +141,4 @@ stage10_12_40_rehearsal_results.json
 *.pfx
 !windows/installer/SerenutRoot.cer
 !windows/installer/pfx_base64.txt
+vps_admin_token.json

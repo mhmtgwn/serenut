@@ -126,11 +126,11 @@ extension SyncV4Materializer on SyncV4Service {
       // requires one, so use a deterministic value that is stable on replay.
       payload['order_number'] = 'SYNC-$id';
     }
-    if ((type == 'sale' || type == 'order' || type == 'financial_transaction') &&
+    if ((type == 'sale' || type == 'order') &&
         (payload['customer_id'] == null ||
             payload['customer_id'].toString().trim().isEmpty)) {
-      // Sales, orders and ledger transactions require a non-null customer_id referencing customers(id).
-      // Quick/walk-in transactions default to the canonical cash customer ('').
+      // Sales and orders require a non-null customer_id referencing customers(id).
+      // Quick/walk-in sales default to the canonical cash customer ('').
       payload['customer_id'] = '';
     }
     final row = await _normalizeRowForLocalSchema(
@@ -138,7 +138,7 @@ extension SyncV4Materializer on SyncV4Service {
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
-    if ((type == 'sale' || type == 'order' || type == 'financial_transaction') &&
+    if ((type == 'sale' || type == 'order') &&
         (row['customer_id'] == null ||
             row['customer_id'].toString().trim().isEmpty)) {
       row['customer_id'] = '';
@@ -149,8 +149,7 @@ extension SyncV4Materializer on SyncV4Service {
     if ((type == 'order' ||
             type == 'sale' ||
             type == 'customer_installment_plan' ||
-            type == 'customer_installment' ||
-            type == 'financial_transaction') &&
+            type == 'customer_installment') &&
         row['customer_id'] != null) {
       final customerId = row['customer_id'].toString().trim();
       final existingCust = await db.query(
@@ -189,10 +188,6 @@ extension SyncV4Materializer on SyncV4Service {
       row.remove('balance');
     }
     if (type == 'financial_transaction') {
-      if (row['customer_id'] == null ||
-          row['customer_id'].toString().trim().isEmpty) {
-        row['customer_id'] = '';
-      }
       final existing = await db.query(
         table,
         where: 'id = ?',

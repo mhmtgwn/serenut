@@ -125,29 +125,23 @@ echo "🔒 [Env] Validating production .env parameters..."
 TARGET_DIR="/var/www/serenut-api"
 mkdir -p ${TARGET_DIR}
 
-# Ensure .env exists in host directory or generate a production-ready fallback
+# Ensure .env exists in host directory
 if [ ! -f "${TARGET_DIR}/.env" ]; then
-  echo "  ⚠️ Warning: No .env found under ${TARGET_DIR}. Creating a default production skeleton..."
-  cat <<EOT > ${TARGET_DIR}/.env
-PORT=3000
-NODE_ENV=production
-DATABASE_URL=postgresql://serenut_user:SerenutSecurePass123!@127.0.0.1:5432/serenut_db
-JWT_SECRET=super_secret_production_key_32_characters_long
-REFRESH_SECRET=refresh_secret_production_key_32_characters_long
-REDIS_URL=redis://127.0.0.1:6379
-SMTP_HOST=smtp.mailtrap.io
-SMTP_PORT=2525
-SMTP_USER=mock
-SMTP_PASS=mock
-DOMAIN=serenut.com
-COOKIE_DOMAIN=.serenut.com
-BACKUP_ENCRYPTION_KEY=supersecretbackupkey123
-SENTRY_DSN=https://mock@o450.ingest.sentry.io/mock
-EOT
+  echo "❌ FATAL: Production .env file missing in ${TARGET_DIR}."
+  echo "    Production environments must provide an authentic, securely generated .env file."
+  echo "    Automatic fallback with hardcoded secrets is strictly disabled (fail-closed)."
+  exit 1
 fi
 
 # Validate required variables
 source ${TARGET_DIR}/.env
+
+# Block deployment if known repository template secrets are detected in production
+if [[ "${JWT_SECRET}" == *"super_secret_production_key"* ]] || [[ "${REFRESH_SECRET}" == *"refresh_secret_production_key"* ]] || [[ "${DATABASE_URL}" == *"SerenutSecurePass123!"* ]]; then
+  echo "❌ FATAL: Known insecure or template secret detected in ${TARGET_DIR}/.env!"
+  echo "    Production JWT_SECRET, REFRESH_SECRET, and DATABASE_URL must be unique, securely generated secrets."
+  exit 1
+fi
 REQUIRED_VARS=("DATABASE_URL" "JWT_SECRET" "REFRESH_SECRET" "REDIS_URL" "DOMAIN")
 for var in "${REQUIRED_VARS[@]}"; do
   if [ -z "${!var}" ]; then
