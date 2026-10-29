@@ -3,6 +3,7 @@
 // Authoritative Core Next Customer Repository Bridge
 // Implements ICustomerRepository over serenut_core_v2.db
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/config/utils.dart';

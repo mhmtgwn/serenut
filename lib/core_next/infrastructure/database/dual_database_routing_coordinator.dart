@@ -2,6 +2,7 @@
 // SERENUT OS — STAGE 10.12.24
 // Çift Veritabanı Mimarisi ve Güvenli Core Next Yönlendirme Koordinatörü
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/providers/database_provider.dart';

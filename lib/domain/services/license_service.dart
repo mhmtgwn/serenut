@@ -354,7 +354,7 @@ class LicenseService {
             }
           }
         } catch (tableErr) {
-          debugPrint('[LicenseService] checkTable failed for $tableName: $tableErr');
+          debugPrint('[LicenseService] checkTable failed for $table: $tableErr');
         }
       }
 

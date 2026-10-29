@@ -12,6 +12,7 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/bootstrap/app_bootstrap.dart';
 import 'package:serenutos/infrastructure/bootstrap/core_next_bootstrap_coordinator.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';

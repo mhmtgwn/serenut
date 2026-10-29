@@ -3,6 +3,7 @@
 // Created: 28 Sep 2026
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
