@@ -219,8 +219,11 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
         _progressText = 'Kurulum başlatıldı. Uygulama kapatılıyor...';
       });
 
-      final result = await widget.releaseManager
-          .installUpdate(downloadedFile, widget.platform);
+      final result = await widget.releaseManager.installUpdate(
+        downloadedFile,
+        widget.platform,
+        expectedSha256: widget.updateInfo.sha256Hash,
+      );
 
       if (result == InstallResult.success) {
         // App will terminate automatically via releaseManager service

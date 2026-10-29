@@ -577,5 +577,51 @@ void main() {
       );
       service.dispose();
     });
+
+    test('rejects downgrade attacks when server offers equal or older version',
+        () async {
+      final mockClient = mockClientWithResponse(200, {
+        'hasUpdate': true,
+        'isForceUpdate': false,
+        'latestVersion': '1.2.0+10',
+        'downloadUrl': '/api/v1/releases/download/rel-old',
+        'channel': 'stable',
+      });
+
+      final svc =
+          ReleaseManagerService(config: testConfig, httpClient: mockClient);
+
+      // Current is newer than offered (1.5.0+30 > 1.2.0+10)
+      final resultOlder = await svc.checkForUpdates(
+        currentVersion: '1.5.0+30',
+        platform: 'android',
+      );
+      expect(resultOlder.hasUpdate, isFalse);
+
+      // Current is equal to offered (1.2.0+10 == 1.2.0+10)
+      final resultEqual = await svc.checkForUpdates(
+        currentVersion: '1.2.0+10',
+        platform: 'android',
+      );
+      expect(resultEqual.hasUpdate, isFalse);
+    });
+
+    test(
+        'TOCTOU defense: installUpdate fails if file SHA-256 does not match expected hash',
+        () async {
+      final svc = ReleaseManagerService(config: testConfig);
+      final tempDir = await Directory.systemTemp.createTemp('toctou_test_');
+      final testFile = File('${tempDir.path}/test_app.apk');
+      await testFile.writeAsString('legitimate_app_binary_data');
+
+      final result = await svc.installUpdate(
+        testFile,
+        'android',
+        expectedSha256: 'tampered_or_wrong_hash_123',
+      );
+
+      expect(result, equals(InstallResult.openFileFailed));
+      await tempDir.delete(recursive: true);
+    });
   });
 }

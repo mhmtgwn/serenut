@@ -16,6 +16,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/config/environment.dart';
+import 'package:serenutos/domain/services/version_checker.dart';
 
 /// Represents the result of an update check from the server.
 class UpdateInfo {
@@ -251,6 +252,19 @@ class ReleaseManagerService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final info = UpdateInfo.fromJson(data);
 
+      // Downgrade & Stale Release Protection:
+      // If server claims hasUpdate=true, verify that latestVersion is strictly newer than currentVersion.
+      if (info.hasUpdate) {
+        final isNewer =
+            VersionChecker.isVersionOlder(currentVersion, info.latestVersion);
+        if (!isNewer) {
+          debugPrint(
+            '[ReleaseManager] 🛡️ Downgrade/Stale update blocked: server offered ${info.latestVersion} which is not newer than current $currentVersion',
+          );
+          return UpdateInfo.noUpdate(currentVersion);
+        }
+      }
+
       debugPrint(
         '[ReleaseManager] Check OK — hasUpdate:${info.hasUpdate} '
         'force:${info.isForceUpdate} latest:${info.latestVersion}',
@@ -470,8 +484,23 @@ class ReleaseManagerService {
   }
 
   /// Open and install the downloaded APK / EXE.
-  Future<InstallResult> installUpdate(File file, String platform) async {
+  Future<InstallResult> installUpdate(
+    File file,
+    String platform, {
+    String? expectedSha256,
+  }) async {
     if (kIsWeb) return InstallResult.platformUnsupported;
+
+    // TOCTOU defense: re-verify physical file SHA-256 immediately before execution
+    if (expectedSha256 != null && expectedSha256.isNotEmpty) {
+      final verifiedHash = await _computeSha256(file);
+      if (verifiedHash.toLowerCase() != expectedSha256.toLowerCase().trim()) {
+        debugPrint(
+          '[ReleaseManager] ❌ Security check failed: file tampered before execution! Expected: $expectedSha256, Actual: $verifiedHash',
+        );
+        return InstallResult.openFileFailed;
+      }
+    }
 
     final path = file.path;
 
@@ -499,6 +528,11 @@ class ReleaseManagerService {
         final batchContent = '@echo off\r\n'
             'timeout /t 2 /nobreak >nul\r\n'
             'start /wait "" "$path" /SILENT /SP- /NOCANCEL\r\n'
+            'if %ERRORLEVEL% NEQ 0 (\r\n'
+            '    echo [ERROR] Installer exited with error %ERRORLEVEL% >> "%TEMP%\\serenut_update_error.log"\r\n'
+            '    if exist "$currentExe" start "" "$currentExe"\r\n'
+            '    exit /b %ERRORLEVEL%\r\n'
+            ')\r\n'
             'if exist "%ProgramFiles%\\Serenut OS\\serenutos.exe" (\r\n'
             '    start "" "%ProgramFiles%\\Serenut OS\\serenutos.exe"\r\n'
             ') else if exist "$currentExe" (\r\n'

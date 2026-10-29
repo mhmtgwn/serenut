@@ -143,25 +143,40 @@ class VersionChecker {
   }
 
   /// Helper to compare semantic versions formatted as major.minor.patch+build
-  static bool isVersionOlder(String current, String required) {
+  static bool isVersionOlder(String current, String target) {
     try {
-      final partsCurrent = current.split('+');
-      final partsReq = required.split('+');
+      String clean(String v) => v.trim().replaceFirst(RegExp(r'^[vV]'), '');
+      final partsCurrent = clean(current).split('+');
+      final partsTarget = clean(target).split('+');
 
-      final verCurrent = partsCurrent[0].split('.').map(int.parse).toList();
-      final verReq = partsReq[0].split('.').map(int.parse).toList();
+      final verCurrent = partsCurrent[0]
+          .split('.')
+          .map((s) => int.tryParse(s) ?? 0)
+          .toList();
+      final verTarget = partsTarget[0]
+          .split('.')
+          .map((s) => int.tryParse(s) ?? 0)
+          .toList();
 
-      for (int i = 0; i < 3; i++) {
-        if (verCurrent[i] < verReq[i]) return true;
-        if (verCurrent[i] > verReq[i]) return false;
+      final maxParts = verCurrent.length > verTarget.length
+          ? verCurrent.length
+          : verTarget.length;
+      final numParts = maxParts > 3 ? maxParts : 3;
+
+      for (int i = 0; i < numParts; i++) {
+        final c = i < verCurrent.length ? verCurrent[i] : 0;
+        final t = i < verTarget.length ? verTarget[i] : 0;
+        if (c < t) return true;
+        if (c > t) return false;
       }
 
-      if (partsCurrent.length > 1 && partsReq.length > 1) {
-        final buildCurrent = int.parse(partsCurrent[1]);
-        final buildReq = int.parse(partsReq[1]);
-        return buildCurrent < buildReq;
-      }
-      return false;
+      final buildCurrent = partsCurrent.length > 1
+          ? int.tryParse(partsCurrent[1]) ?? 0
+          : 0;
+      final buildTarget = partsTarget.length > 1
+          ? int.tryParse(partsTarget[1]) ?? 0
+          : 0;
+      return buildCurrent < buildTarget;
     } catch (_) {
       return false;
     }
