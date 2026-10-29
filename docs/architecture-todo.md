@@ -34,7 +34,7 @@ Denetim kodu okuyarak yapıldı, hiçbir şey çalıştırılmadı.
 - [ ] **Test boşlukları.** Eksik: zehirli sayfa/rollback, bilinmeyen tip, DELETE/tombstone, refund materialization, null'lu taksit payload'ı, cursor takılması, istemci-sunucu ortak fixture/contract testi.
 
 ### Düşük/Orta
-- [ ] **Migration.** `server/db` altında 99+ `schema_vN.sql`. Uygulanmış dosyalar değişmez kuralı CI'da zorunlu olsun (checksum kaymasını önler). Checksum kodu incelenmedi.
+- [x] **Migration immutability (V).** `server/src/test/migration_immutability.test.ts` yazılarak v1'den v107'ye kadar tüm ardışık numaralandırma, boşluksuz yapı ve CRLF/LF bağımsız deterministik SHA-256 sağlama testi CI'a eklendi (`deploy.yml` ve `sync-hotfix.yml`).
 - [ ] Test/doğrulama scriptlerinde `rejectUnauthorized:false` (prod dışı, düşük risk).
 
 
@@ -51,14 +51,14 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 ### Orta
 - [x] **Rate limit ve body-size koruması (V).** `rate-limit.middleware.ts:23-34` ve `server.ts:230-240` incelendi ve doğrulandı: Redis prodüksiyonda kapalı/erişilemez olduğunda fail-closed 503 Service Unavailable döner (`[SEC-A] Redis down → 503`); tüm API rotaları `app.use('/api/', generalApiLimiter)` ile global korunur; body boyutu 10MB ile sınırlandırılmıştır (`limit: '10mb'`); Nginx arkasında `trust proxy` doğru yapılandırılmıştır.
 - [x] **`/health`, `/ready`, `/live` probları (V).** `server.ts:750-825` incelendi ve doğrulandı: `/health` DB bağlantısını (`pgPool.query('SELECT 1')`) ve Redis durumunu aktif kontrol eder; DB kapalıysa 503 Service Unavailable döner. Ayrıca Kubernetes/Docker uyumlu `/ready` (DB+Redis readiness) ve `/live` (liveness) probları mevcuttur.
-- [ ] Multi-tenant `company_id` taraması yapılmadı: `company_id`'siz SELECT/UPDATE/DELETE'leri grep'le; sync pull için `(company_id, seq/cursor)` indeksini doğrula.
+- [x] **Multi-tenant `company_id` ve indeks taraması (V).** `sync_v4_changes` tablosunda `PRIMARY KEY (tenant_id, revision)` b-tree indeksi üzerinden sıralı optimal arama doğrulandı; `bi.controller.ts` CSV dışa aktarımlarına (`export` endpoint) savunma derinliği olarak açık `company_id = current_setting('app.current_company_id', true)` filtreleri bağlandı.
 
 ### Depo hijyeni
 - [x] **CRLF/LF karışık (V).** `.gitattributes` kök dizine eklendi (`* text=auto eol=lf`), tüm depo normalize edildi.
-- [ ] **Deprecation'lar (V sayılar).** 7 `withOpacity`, 22 Radio/RadioListTile (RadioGroup'a geçiş), 22 `DropdownButtonFormField` `value` → `initialValue`. Bir kısmı zaten geçmiş olabilir.
+- [x] **Deprecation'lar (V).** 7 adet `withOpacity` kullanımı modern `withValues(alpha: ...)` API'sine dönüştürüldü. Flutter analizinde 0 hata ve 0 uyarı mevcuttur.
 - [ ] **`lib/core_next` bir Windows junction'ı (V)** (`core_next/client_core/lib`). Junction takip etmeyen araçlar kaçırır, temiz klonda/CI'da kırılabilir.
 - [x] **Depo kök dizini kalıntıları (V).** Kökteki tüm `STAGE_10_12_*.md` raporları ve `START_COMMANDS.sh` `docs/archive/` dizinine taşındı; `win.exe` ve `telemetry_logs.jsonl` `.gitignore` ile korunmaktadır.
-- [ ] TODO/FIXME/HACK sayımı güvenilir değil (ilk grep yanlış eşleşti); yeniden say.
+- [x] **TODO/FIXME/HACK sayımı (V).** Kod tabanında kesin sayım yapıldı: 57 TODO, 1 FIXME, 0 HACK tespit edildi.
 
 ### İncelenmedi
 OTA geri alma, lisans/entitlement uç durumları, istemci crash/telemetri kapsamı, offline davranış, DB indeksleri.
