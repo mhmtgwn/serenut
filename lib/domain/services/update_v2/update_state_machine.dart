@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/models/update_v2/update_context.dart';
 import 'package:serenutos/domain/models/update_v2/update_telemetry_event.dart';
+import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/services/update_v2/update_event_bus.dart';
 
 class InvalidStateTransitionException implements Exception {
@@ -143,8 +144,8 @@ class UpdateStateMachine {
         schemaVersion: 1,
         correlationId: context.correlationId,
         deviceId: _deviceId,
-        fromVersion: '1.1.9+21',
-        toVersion: context.manifest?.version ?? '1.2.0+22',
+        fromVersion: VersionChecker.currentVersion,
+        toVersion: context.manifest?.version ?? '',
         eventType: _mapStateToEventType(targetState),
         errorCode: context.errorCode,
         errorMessage: context.errorMessage,

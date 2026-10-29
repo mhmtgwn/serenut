@@ -95,7 +95,7 @@ class CoreAppDatabase {
           // Eşzamanlı yazma/okuma kilitlemelerini önlemek için WAL modu
           try {
             await db.rawQuery('PRAGMA journal_mode = WAL;');
-            await db.execute('PRAGMA synchronous = NORMAL;');
+            await db.execute('PRAGMA synchronous = FULL;');
             await db.execute('PRAGMA busy_timeout = 30000;');
           } catch (_) {
             // Bellek içi veya özel platform fallback

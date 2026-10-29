@@ -607,7 +607,7 @@ class DatabaseManager {
           await db.execute('PRAGMA foreign_keys = ON');
           try {
             await db.rawQuery('PRAGMA journal_mode = WAL');
-            await db.execute('PRAGMA synchronous = NORMAL');
+            await db.execute('PRAGMA synchronous = FULL');
           } catch (_) {
             // Device doesn't support WAL — fall back silently
           }
@@ -744,7 +744,7 @@ class DatabaseManager {
               await db.execute('PRAGMA foreign_keys = ON');
               try {
                 await db.rawQuery('PRAGMA journal_mode = WAL');
-                await db.execute('PRAGMA synchronous = NORMAL');
+                await db.execute('PRAGMA synchronous = FULL');
               } catch (_) {
                 // Ignored: fallback or safe default applied
               }
