@@ -132,6 +132,12 @@ router.post("/push", async (req, res) => {
       "SELECT pg_advisory_xact_lock(hashtext($1), hashtext('operational-reset'))",
       [user.company_id],
     );
+    // Serialize all concurrent pushes within the same tenant to guarantee that
+    // revisions commit in strictly monotonic sequential order with zero commit gaps.
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtext($1), hashtext('tenant-push-order'))",
+      [user.company_id],
+    );
     await client.query(
       "UPDATE device_activations SET last_seen_at = NOW(), updated_at = NOW() WHERE id = $1",
       [deviceActivationId],
