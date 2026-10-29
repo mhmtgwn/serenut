@@ -12,6 +12,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
+import 'package:serenutos/presentation/controllers/installment_controller.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
@@ -747,6 +748,17 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         }
       }
 
+      ref.invalidate(customerDetailProvider(widget.customerId));
+      ref.invalidate(customerBalanceDetailsProvider(widget.customerId));
+      ref.invalidate(customerTransactionsProvider(widget.customerId));
+      ref.invalidate(customerInstallmentsProvider(widget.customerId));
+      ref.invalidate(customerInstallmentPlansProvider(widget.customerId));
+      ref.invalidate(customersControllerProvider);
+      ref.invalidate(collectionCustomersControllerProvider);
+      ref.invalidate(salesCustomersControllerProvider);
+      ref.invalidate(ordersCustomersControllerProvider);
+      ref.invalidate(customerBalanceSummaryProvider);
+      ref.invalidate(customerLookupMapProvider);
       ref.invalidate(dashboardProvider);
       if (mounted) {
         if (context.canPop()) {

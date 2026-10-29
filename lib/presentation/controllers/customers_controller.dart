@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/presentation/controllers/installment_controller.dart';
 import 'package:serenutos/domain/services/pagination_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/audit_provider.dart';
@@ -256,6 +257,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
     ref.invalidate(customerDetailProvider(customerId));
+    ref.invalidate(customerInstallmentsProvider(customerId));
+    ref.invalidate(customerInstallmentPlansProvider(customerId));
 
     // Refresh customers list
     state = const AsyncValue.loading();
@@ -296,6 +299,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
     ref.invalidate(customerDetailProvider(customerId));
+    ref.invalidate(customerInstallmentsProvider(customerId));
+    ref.invalidate(customerInstallmentPlansProvider(customerId));
     await refresh();
     _invalidateAll();
   }
@@ -311,6 +316,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
   void _invalidateAll() {
     Future.microtask(() {
       ref.invalidateSelf();
+      ref.invalidate(customersControllerProvider);
       ref.invalidate(salesCustomersControllerProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);

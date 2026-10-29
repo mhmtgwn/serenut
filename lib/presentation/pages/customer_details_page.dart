@@ -636,13 +636,27 @@ class CustomerDetailsPage extends ConsumerWidget {
           );
         }
 
-        final isClear = customer.balance.abs() < 0.01;
-        final isDebt = customer.balance < -0.009;
+        final effectiveBalance =
+            balanceVal.valueOrNull?['balance'] ?? customer.balance;
+        final isClear = effectiveBalance.abs() < 0.01;
+        final isDebt = effectiveBalance < -0.009;
 
         return Scaffold(
           backgroundColor: _kSurface,
-          body: CustomScrollView(
-            slivers: [
+          body: RefreshIndicator(
+            color: _kGreen,
+            onRefresh: () async {
+              ref.invalidate(customerDetailProvider(customerId));
+              ref.invalidate(customerBalanceDetailsProvider(customerId));
+              ref.invalidate(customerTransactionsProvider(customerId));
+              ref.invalidate(customerInstallmentsProvider(customerId));
+              ref.invalidate(customerInstallmentPlansProvider(customerId));
+              ref.invalidate(customerBalanceSummaryProvider);
+              await ref.read(customerDetailProvider(customerId).future);
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
               // ── Hero AppBar + Gradient Card ─────────────────────────────────────
               SliverAppBar(
                 expandedHeight: customer.address != null &&
@@ -814,8 +828,16 @@ class CustomerDetailsPage extends ConsumerWidget {
                         child: SizedBox(
                           height: 54,
                           child: ElevatedButton.icon(
-                            onPressed: () =>
-                                context.push('/customers/$customerId/collect'),
+                            onPressed: () async {
+                              await context.push('/customers/$customerId/collect');
+                              ref.invalidate(customerDetailProvider(customerId));
+                              ref.invalidate(customerBalanceDetailsProvider(customerId));
+                              ref.invalidate(customerTransactionsProvider(customerId));
+                              ref.invalidate(customerInstallmentsProvider(customerId));
+                              ref.invalidate(customerInstallmentPlansProvider(customerId));
+                              ref.invalidate(customersControllerProvider);
+                              ref.invalidate(customerBalanceSummaryProvider);
+                            },
                             icon:
                                 const Icon(Icons.price_check_rounded, size: 20),
                             label: const Text('Tahsilat Yap'),
@@ -993,6 +1015,7 @@ class CustomerDetailsPage extends ConsumerWidget {
               // Bottom padding
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],
+            ),
           ),
         );
       },
@@ -1003,14 +1026,15 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   Widget _buildBalanceRow(
       CustomerEntity customer, Map<String, double> details) {
-    final isClear = customer.balance.abs() < 0.01;
-    final isDebt = customer.balance < -0.009;
+    final effectiveBalance = details['balance'] ?? customer.balance;
+    final isClear = effectiveBalance.abs() < 0.01;
+    final isDebt = effectiveBalance < -0.009;
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             label: 'Net Bakiye',
-            value: '₺${customer.balance.abs().toStringAsFixed(2)}',
+            value: '₺${effectiveBalance.abs().toStringAsFixed(2)}',
             sub: isClear ? 'Bakiye Yok' : (isDebt ? 'Borçlu' : 'Alacaklı'),
             bg: isClear
                 ? const Color(0xFFF1F5F9)

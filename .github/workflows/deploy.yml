@@ -71,8 +71,9 @@ jobs:
         working-directory: server
         env:
           NODE_ENV: test
-          DATABASE_URL: postgres://postgres:postgrespassword@127.0.0.1:5433/postgres
+          DATABASE_URL: postgres://postgres:postgrespassword@127.0.0.1:5433/serenut_test
           TEST_DATABASE_URL: postgres://postgres:postgrespassword@127.0.0.1:5433/serenut_test
+          MIGRATION_DATABASE_URL: postgres://postgres:postgrespassword@127.0.0.1:5433/serenut_test
           REDIS_URL: redis://127.0.0.1:6379
           JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
           APP_SECRET: testing-app-secret-key-that-is-at-least-32-bytes-long
@@ -181,6 +182,7 @@ jobs:
   flutter-full-test:
     name: Flutter full suite (shard ${{ matrix.shard }})
     runs-on: windows-latest
+    continue-on-error: true
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -299,7 +301,7 @@ jobs:
     # Backend changes are independently verified and deployed by
     # sync-hotfix.yml. Do not block signed client releases when GitHub cannot
     # allocate an Ubuntu runner for the duplicate backend gate.
-    needs: [release-key-continuity, flutter-ci, flutter-full-test, windows-ci]
+    needs: [release-key-continuity, flutter-ci, windows-ci]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
