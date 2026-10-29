@@ -277,6 +277,18 @@ router.post("/push", async (req, res) => {
       };
       // The domain write and the durable replication record are atomic. Never
       // acknowledge a mutation that cannot be materialized for another device.
+      const sanitizedPayload = (typeof mutation.payload === 'object' && mutation.payload !== null)
+        ? { ...mutation.payload }
+        : {};
+      if (
+        (mutation.entity_type === 'financial_transaction' ||
+         mutation.entity_type === 'sale' ||
+         mutation.entity_type === 'order') &&
+        (sanitizedPayload.customer_id === null || sanitizedPayload.customer_id === undefined)
+      ) {
+        sanitizedPayload.customer_id = '';
+      }
+
       await applyDomainMutation(client, user.company_id, domainMutation, user.id);
       const inserted = await client.query(
         `INSERT INTO sync_v4_changes (tenant_id, mutation_id, device_id, device_activation_id, entity_type, entity_id, operation, payload)
@@ -291,7 +303,7 @@ router.post("/push", async (req, res) => {
           mutation.entity_type,
           mutation.entity_id,
           effectiveOperation,
-          JSON.stringify(mutation.payload),
+          JSON.stringify(sanitizedPayload),
         ],
       );
       if (inserted.rowCount) {
@@ -308,7 +320,7 @@ router.post("/push", async (req, res) => {
             mutation.entity_type,
             mutation.entity_id,
             effectiveOperation === "DELETE",
-            JSON.stringify(mutation.payload),
+            JSON.stringify(sanitizedPayload),
             revision,
           ],
         );
@@ -440,10 +452,28 @@ router.get("/pull", async (req, res) => {
          FROM sync_v4_changes WHERE tenant_id = $1 AND revision > $2 ORDER BY revision ASC LIMIT $3`,
       [user.company_id, cursor, limit],
     );
+    const changes = result.rows.map((row: any) => {
+      if (
+        (row.entity_type === 'financial_transaction' ||
+         row.entity_type === 'sale' ||
+         row.entity_type === 'order') &&
+        row.payload &&
+        (row.payload.customer_id === null || row.payload.customer_id === undefined)
+      ) {
+        return {
+          ...row,
+          payload: {
+            ...row.payload,
+            customer_id: '',
+          },
+        };
+      }
+      return row;
+    });
     return res.json({
-      changes: result.rows,
-      next_cursor: result.rows.length
-        ? Number(result.rows.at(-1).revision)
+      changes,
+      next_cursor: changes.length
+        ? Number(changes.at(-1).revision)
         : cursor,
     });
   } finally {

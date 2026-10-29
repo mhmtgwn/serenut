@@ -731,7 +731,7 @@ class CoreRefundUseCase {
       final finPayload = {
         'id': 'tx-ref-$refundId',
         'type': 'refund',
-        'customer_id': customerId,
+        'customer_id': customerId ?? '',
         'amount': refundTotal.toLira(),
         'paid_amount': MoneyCents(cashRefundCents).toLira(),
         'debt_amount': MoneyCents(debtRefundCents).toLira(),

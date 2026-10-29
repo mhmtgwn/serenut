@@ -751,7 +751,7 @@ router.get('/invoices', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 // ── 7. BULUT YEDEKLERI (Cloud Backups) ───────────────────────────────────────
-const BACKUP_DIR = process.env.NODE_ENV === 'production' ? '/var/backups/serenut' : path.join(__dirname, '../../../backups');
+const BACKUP_DIR = process.env.BACKUP_DIR || (process.env.NODE_ENV === 'production' && fs.existsSync('/var/backups/serenut') ? '/var/backups/serenut' : path.join(process.cwd(), 'backups'));
 
 router.get('/backups', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
@@ -761,7 +761,12 @@ router.get('/backups', async (req: AuthenticatedRequest, res: Response) => {
 
   try {
     if (!fs.existsSync(BACKUP_DIR)) {
-      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      try {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      } catch (mkdirErr) {
+        logger.warn('Could not create backup directory, returning empty list:', mkdirErr);
+        return res.json([]);
+      }
     }
     const files = fs.readdirSync(BACKUP_DIR);
     const backups = files
