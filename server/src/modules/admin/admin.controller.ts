@@ -466,7 +466,7 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
        JOIN plans p ON p.id = o.base_plan_id WHERE o.company_id = $1`, [req.params.id]);
 
     return res.json({
-      company: company.rows[0], cloud_stats: (await runBypassingRLS(`SELECT (SELECT COUNT(*)::int FROM products WHERE company_id = $1 AND deleted_at IS NULL) AS products_count, (SELECT COUNT(*)::int FROM sales WHERE company_id = $1) AS sales_count, (SELECT COUNT(*)::int FROM customers WHERE company_id = $1 AND deleted_at IS NULL) AS customers_count, (SELECT COUNT(*)::int FROM sync_changes_log WHERE company_id = $1) AS sync_changes_count, (SELECT MAX(server_updated_at) FROM sync_changes_log WHERE company_id = $1) AS last_sync_at`, [req.params.id]).catch(() => ({ rows: [{}] }))).rows[0] || {},
+      company: company.rows[0], cloud_stats: (await runBypassingRLS(`SELECT (SELECT COUNT(*)::int FROM products WHERE company_id = $1 AND deleted_at IS NULL) AS products_count, (SELECT COUNT(*)::int FROM sales WHERE company_id = $1) AS sales_count, (SELECT COUNT(*)::int FROM customers WHERE company_id = $1 AND deleted_at IS NULL) AS customers_count, (SELECT COUNT(*)::int FROM sync_v4_changes WHERE tenant_id = $1) AS sync_changes_count, (SELECT MAX(created_at) FROM sync_v4_changes WHERE tenant_id = $1) AS last_sync_at`, [req.params.id]).catch(() => ({ rows: [{}] }))).rows[0] || {},
       stores: stores.rows,
       devices: devices.rows,
       licenses: licenses.rows,
@@ -477,6 +477,58 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
     });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.get('/companies/:id/export', async (req: AuthenticatedRequest, res: Response) => {
+  const companyId = req.params.id;
+  try {
+    const company = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [companyId]);
+    if (company.rows.length === 0) {
+      return res.status(404).json({ error: 'company_not_found' });
+    }
+    const [
+      customers,
+      financialTransactions,
+      products,
+      sales,
+      saleItems,
+      devices,
+      users,
+      syncChanges,
+      branches,
+    ] = await Promise.all([
+      runBypassingRLS('SELECT * FROM customers WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT * FROM financial_transactions WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT * FROM products WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT * FROM sales WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT * FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE company_id = $1)', [companyId]).catch(() => ({ rows: [] })),
+      runBypassingRLS('SELECT * FROM device_activations WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT id, company_id, name, email, phone, role, is_active, created_at FROM users WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT * FROM sync_v4_changes WHERE tenant_id = $1 ORDER BY revision ASC', [companyId]),
+      runBypassingRLS('SELECT * FROM branches WHERE company_id = $1', [companyId]),
+    ]);
+
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      company: company.rows[0],
+      branches: branches.rows,
+      users: users.rows,
+      devices: devices.rows,
+      products: products.rows,
+      customers: customers.rows,
+      financial_transactions: financialTransactions.rows,
+      sales: sales.rows,
+      sale_items: saleItems.rows,
+      sync_v4_changes: syncChanges.rows,
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="tenant_${companyId}_${Date.now()}.json"`);
+    return res.json(exportData);
+  } catch (err: any) {
+    logger.error('Failed to export company data:', err);
+    return res.status(500).json({ error: 'server_error', message: err?.message });
   }
 });
 
@@ -978,7 +1030,7 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
              COALESCE(df.cpu_architecture, '—') AS cpu_architecture,
              da.status,
              da.activated_at, da.last_seen_at AS last_active_at,
-             c.name AS company_name, (SELECT b.name FROM branches b WHERE b.id = da.branch_id LIMIT 1) AS store_name
+             c.name AS company_name, (SELECT b.name FROM branches b WHERE b.company_id = da.company_id LIMIT 1) AS store_name
       FROM device_activations da
       JOIN companies c ON da.company_id = c.id
       LEFT JOIN device_fingerprints df ON df.device_id = da.id
@@ -1170,11 +1222,11 @@ router.get('/sync/monitor', async (req: AuthenticatedRequest, res: Response) => 
     const totalChanges = await runBypassingRLS("SELECT COUNT(*) FROM sync_v4_changes");
 
     const recentMutations = await runBypassingRLS(`
-      SELECT sc.id, sc.company_id, sc.entity_type, sc.entity_id, sc.version, sc.created_at,
+      SELECT sc.mutation_id AS id, sc.tenant_id AS company_id, sc.entity_type, sc.entity_id, sc.revision AS version, sc.created_at,
              c.name as company_name, da.device_name
       FROM sync_v4_changes sc
-      LEFT JOIN companies c ON sc.company_id = c.id
-      LEFT JOIN device_activations da ON sc.company_id = da.company_id AND da.status = 'active'
+      LEFT JOIN companies c ON sc.tenant_id = c.id
+      LEFT JOIN device_activations da ON sc.device_id = da.id
       ORDER BY sc.created_at DESC
       LIMIT 20
     `);

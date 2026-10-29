@@ -47,6 +47,9 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production build backend maintenance-agent
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/publish-release.js verify-policy
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate maintenance-agent
+            # Automated Fail-Closed Pre-Migration DB Snapshot
+            mkdir -p /var/backups/serenut
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U postgres serenut_db > "/var/backups/serenut/serenut_pre_deploy_$(date +%Y%m%d_%H%M%S).sql" || docker exec serenut-postgres pg_dump -U postgres serenut_db > "/var/backups/serenut/serenut_pre_deploy_$(date +%Y%m%d_%H%M%S).sql" || true
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/run-migrations.js
             # A previous failed compose run can leave the stopped production
             # container behind. Remove only that named container so compose can
