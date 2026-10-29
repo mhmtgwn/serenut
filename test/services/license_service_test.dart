@@ -198,6 +198,27 @@ void main() {
       expect(licenseService.checkLicenseStatus(), 'expired');
     });
 
+    test('checkLicenseStatus enforces max offline heartbeat grace limit',
+        () async {
+      final uuid = licenseService.getDeviceUuid();
+      final futureExpiry = DateTime.now().add(const Duration(days: 60));
+      final token = generateLicenseTokenHelper(
+        merchantId: 'M123',
+        allowedDevices: [uuid],
+        expiryDate: futureExpiry,
+      );
+      await licenseService.saveLicenseToken(token);
+      expect(licenseService.checkLicenseStatus(), 'valid');
+
+      // Simulate 15 days without successful heartbeat (exceeds maxOfflineDays of 14)
+      final staleHeartbeat =
+          DateTime.now().toUtc().subtract(const Duration(days: 15));
+      await prefs.setString(
+          'last_heartbeat_success', staleHeartbeat.toIso8601String());
+
+      expect(licenseService.checkLicenseStatus(), 'offline_expired');
+    });
+
     test('checkClockIntegrity detects system time travel / tempering',
         () async {
       final uuid = licenseService.getDeviceUuid();

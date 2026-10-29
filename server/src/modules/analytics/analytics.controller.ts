@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pgPool } from '../../config/database';
+import { getDbClient, runTenantScoped } from '../../config/database';
 import { AuthService } from '../auth/auth.service';
 
 const router = Router();
@@ -11,7 +11,7 @@ router.post('/crash', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'missing_error_message', message: 'Hata detayı belirtilmelidir.' });
   }
 
-  const client = await pgPool.connect();
+  const client = await getDbClient();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -78,7 +78,8 @@ router.post('/audit', async (req: Request, res: Response) => {
     const auditId = crypto.randomUUID ? crypto.randomUUID() : `aud-${Date.now()}`;
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
 
-    await pgPool.query(
+    await runTenantScoped(
+      user.company_id,
       `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [

@@ -2,7 +2,7 @@
 // Serenut OS — Remote Config Express Controller (Sprint 8)
 
 import { Router, Response } from 'express';
-import { pgPool } from '../../config/database';
+import { runBypassingRLS } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { logger } from '../../config/logger';
 
@@ -23,7 +23,7 @@ const router = Router();
  */
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const queryRes = await pgPool.query(
+    const queryRes = await runBypassingRLS(
       "SELECT value FROM remote_configs WHERE key = 'global_config' LIMIT 1"
     );
 

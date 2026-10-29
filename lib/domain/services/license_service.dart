@@ -94,6 +94,10 @@ class LicenseService {
   static const String _licenseTokenKey = 'license_token';
   static const String _lastSystemTimeKey = 'last_system_time';
   static const String _maxTimestampSeenKey = 'max_timestamp_seen';
+  static const String _lastHeartbeatSuccessKey = 'last_heartbeat_success';
+
+  /// Maximum allowable continuous offline usage without server heartbeat validation
+  static const int maxOfflineDays = 14;
 
   static const String _configuredRsaModulus = String.fromEnvironment(
     'LICENSE_RSA_MODULUS',
@@ -138,7 +142,6 @@ class LicenseService {
           'business_name': '',
           'business_phone': '',
           'business_address': '',
-          'created_at': DateTime.now().toIso8601String(),
         });
       }
     } catch (e) {
@@ -252,6 +255,7 @@ class LicenseService {
         await _prefs.setString('activated_license_key', licenseKey);
       }
       _cachedLicenseToken = tokenStr.trim();
+      await _prefs.setString(_lastHeartbeatSuccessKey, DateTime.now().toUtc().toIso8601String());
       await _prefs.setString(_licenseTokenKey, tokenStr.trim());
       await _setSettingsValue('license_token', tokenStr.trim());
       return true;
@@ -514,6 +518,15 @@ class LicenseService {
       final graceEnd = info.expiryDate.add(const Duration(days: 7));
       if (now.isAfter(graceEnd)) {
         return 'expired';
+      }
+    }
+
+    final lastHeartbeatStr = _prefs.getString(_lastHeartbeatSuccessKey);
+    if (lastHeartbeatStr != null) {
+      final lastHeartbeat = DateTime.tryParse(lastHeartbeatStr);
+      if (lastHeartbeat != null &&
+          now.toUtc().difference(lastHeartbeat).inDays > maxOfflineDays) {
+        return 'offline_expired';
       }
     }
 

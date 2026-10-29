@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { runTenantScoped } from '../../config/database';
 
 const router = Router();
 
@@ -10,7 +10,8 @@ router.use(authenticateUser);
 router.get('/me', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const resUser = await pgPool.query(
+    const resUser = await runTenantScoped(
+      user.company_id,
       'SELECT id, name, email, is_active, last_login_at, created_at FROM users WHERE id = $1',
       [user.id]
     );
@@ -37,7 +38,8 @@ router.patch('/me', async (req: AuthenticatedRequest, res: Response) => {
   }
   try {
     const trimmed = name.trim();
-    const updateRes = await pgPool.query(
+    const updateRes = await runTenantScoped(
+      user.company_id,
       'UPDATE users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, email, is_active, updated_at',
       [trimmed, user.id]
     );
@@ -59,7 +61,8 @@ router.patch('/me', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/sessions', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const sessionsRes = await pgPool.query(
+    const sessionsRes = await runTenantScoped(
+      user.company_id,
       `SELECT id, ip_address, user_agent, created_at, expires_at, is_revoked 
        FROM sessions 
        WHERE user_id = $1 AND is_revoked = FALSE AND expires_at > CURRENT_TIMESTAMP
@@ -79,7 +82,8 @@ router.delete('/sessions/:id', async (req: AuthenticatedRequest, res: Response) 
   const { id } = req.params;
 
   try {
-    const result = await pgPool.query(
+    const result = await runTenantScoped(
+      user.company_id,
       'UPDATE sessions SET is_revoked = TRUE WHERE id = $1 AND user_id = $2 AND is_revoked = FALSE',
       [id, user.id]
     );

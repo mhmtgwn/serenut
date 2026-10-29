@@ -3,8 +3,9 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { pgPool } from '../../config/database';
+import { runBypassingRLS } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { logger } from '../../config/logger';
 import {
   storeProductImage,
   resolveProductImagePath,
@@ -33,7 +34,7 @@ async function authenticateImageUpload(req: Request, res: Response, next: NextFu
   // 2. Try Peer Token verification (used by POS terminals during LAN/cloud background image push)
   if (peerToken && peerToken.length === 64) {
     try {
-      const companies = await pgPool.query('SELECT id FROM companies WHERE is_active = true');
+      const companies = await runBypassingRLS('SELECT id FROM companies WHERE is_active = true');
       const matched = companies.rows.some((row: { id: string }) => {
         const expected = crypto
           .createHash('sha256')
@@ -44,8 +45,8 @@ async function authenticateImageUpload(req: Request, res: Response, next: NextFu
       if (matched) {
         return next();
       }
-    } catch {
-      // Continue to 401
+    } catch (err) {
+      logger.warn('Failed to verify peer token against companies', { error: err });
     }
   }
 

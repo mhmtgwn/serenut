@@ -170,3 +170,92 @@ if (redisUrl) {
 }
 
 export { redisClient };
+
+
+/**
+ * Executes a callback within a managed database client scoped to a tenant.
+ * Automatically acquires connection, sets up RLS transaction, commits or rolls back, and releases.
+ */
+export async function runWithTenantContext<T>(
+  companyId: string,
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Executes a single SQL query scoped to a tenant.
+ */
+export async function runTenantScoped(
+  companyId: string,
+  sql: string,
+  params: any[] = [],
+): Promise<any> {
+  return runWithTenantContext(companyId, async (client) => {
+    return client.query(sql, params);
+  });
+}
+
+/**
+ * Executes a SQL query bypassing RLS with sysadmin/platform privileges.
+ */
+export async function runBypassingRLS(
+  sql: string,
+  params: any[] = [],
+): Promise<any> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const result = await client.query(sql, params);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+
+/**
+ * Executes a callback within a managed transaction bypassing RLS.
+ */
+export async function runTransactional<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+
+/**
+ * Acquires a checked-out PostgreSQL client with wrapped monitoring and context hooks.
+ */
+export async function getDbClient(): Promise<PoolClient> {
+  return pgPool.connect();
+}

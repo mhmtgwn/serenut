@@ -50,7 +50,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 
 ### Orta
 - [ ] Rate limit var (V, `rate-limit.middleware.ts`, Redis). Redis kapalıyken güvenli mi (T), global limiter ve body-size limiti doğrulanmadı.
-- [ ] `/health` var (V) ama DB/Redis kontrol ediyor mu bilinmiyor; sadece 200 dönüyorsa readiness değil.
+- [x] **`/health`, `/ready`, `/live` probları (V).** `server.ts:750-825` incelendi ve doğrulandı: `/health` DB bağlantısını (`pgPool.query('SELECT 1')`) ve Redis durumunu aktif kontrol eder; DB kapalıysa 503 Service Unavailable döner. Ayrıca Kubernetes/Docker uyumlu `/ready` (DB+Redis readiness) ve `/live` (liveness) probları mevcuttur.
 - [ ] Multi-tenant `company_id` taraması yapılmadı: `company_id`'siz SELECT/UPDATE/DELETE'leri grep'le; sync pull için `(company_id, seq/cursor)` indeksini doğrula.
 
 ### Depo hijyeni
@@ -77,14 +77,14 @@ Kod okunarak yapıldı. (V) = okuyarak doğrulandı, (T) = grep/tahmin. Aşağı
 ### Orta
 - [x] **Refresh yarışı ve token güvenliği (V).** `auth.service.ts` içinde oturum yenileme sorgusuna `FOR UPDATE` satır kilidi eklendi; aynı refresh token ile yapılan paralel isteklerde çift oturum oluşması engellendi.
 - [x] **Giriş zamanlaması ve JWT algoritma sabitlemesi (V).** `auth.service.ts` içinde kullanıcı bulunamadığında `DUMMY_BCRYPT_HASH` karşılaştırması çalıştırılarak kullanıcı varlığı/yokluğu arasındaki yanıt süresi farkı (timing attack / account enumeration) eşitlendi; `jwt.verify` içinde `algorithms: ['HS256']` sabitlendi.
-- [ ] **Offline lisans atlatılabiliyor (V).** `license_service.dart:369-435, 496-521`: saat geri alma tespiti SharedPreferences ve düz `settings` satırında; prefs silinip satır düzenlenirse sıfırlanıyor, sonra `DateTime.now()` ile kontrol (:512). İmzalı token'da maksimum offline süre/heartbeat yok, offline iken `token_version` iptali kontrol edilmiyor; token `expiry_date`+7 gün geçerli. → Monoton filigranı OS güvenli depolamada tut, N günde bir sunucu heartbeat zorunlu kıl.
+- [x] **Offline lisans atlatılabiliyor (V).** `LicenseService` içine 14 günlük maksimum çevrimdışı toleransı (`maxOfflineDays = 14`) ve `last_heartbeat_success` filigranı entegre edildi; aktivasyon ve başarılı heartbeat anında mühürlenir. 14 günden uzun süre sunucu ile iletişim kurmayan istemcilerde `offline_expired` devreye girerek heartbeat yenilemesi zorunlu kılınır. SQLite operasyonel tablolarındaki (`sales`, `orders`, `financial_transactions`) `MAX(created_at)` veritabanı filigranı ile saat geri alma girişimleri engellenmiştir.
 - [x] **Güç kesintisinde satış kaybı (V).** `database_provider.dart` ve `CoreAppDatabase` içinde WAL modunda `PRAGMA synchronous = FULL` devreye alındı. Ani elektrik kesintilerinde fsync garantisi sağlanarak kasiyerin onayladığı satış ve outbox kayıtlarının disk tamponunda kaybolması önlendi.
 - [x] **Çökme sonrası outbox sıfırlanıyor (V).** `CrashRecoveryManager.recoverInterruptedSyncJobs` güncellendi: FAILED kayıtları PENDING'e çekerek sonsuz deneme üreten zehirli döngü kaldırıldı; attempts >= 5 olan satırlar doğrudan DEAD_LETTER durumuna alınarak izole edilir; sadece elektrik kesintisinde `SENDING` aşamasında kalan işler attempts sayacı korunarak PENDING'e çekilir. Global hata yakalama ise `ErrorBoundary.install()` ile tüm Flutter, Async Zone ve Isolate hataları için telemetri ve Sentry'ye bağlıdır.
 - [x] **Güncelleme telemetrisi yanlış (V).** `update_state_machine.dart` içindeki sabit `'1.1.9+21'` ve `'1.2.0+22'` kaldırılarak `VersionChecker.currentVersion` ve dinamik `context.manifest.version` bağlandı.
 
 ### Düşük / not
-- [ ] Push bilerek `requireActiveEntitlement` dışında (`:78`): süresi dolmuş kiracı sonsuza dek push edebilir. Bilinçli ise belgele.
-- [ ] `idx_sync_v4_changes_pull` (`schema_v52:15`) gereksiz; PK (tenant_id,revision) yeterli.
+- [x] **Push rotasının `requireActiveEntitlement` muafiyeti (V).** `sync-v4.routes.ts:80-87` bilinçli mimari karardır ve belgelenmiştir: Lisans süresi dolsa dahi istemcide çevrimdışı birikmiş yerel işlemlerin (satış, tahsilat, kasa) veri kaybı yaşanmadan buluta aktarılabilmesi için `/push` uç noktası `authenticateUser` + device check zorunluluğu altında muaf tutulmuştur. Pull ve diğer rotalar ise `requireActiveEntitlement` ile korunur.
+- [x] **`idx_sync_v4_changes_pull` (`schema_v52:15`) gereksiz indeks.** `schema_v107.sql` ile `DROP INDEX IF EXISTS idx_sync_v4_changes_pull` uygulandı. `PRIMARY KEY (tenant_id, revision)` zaten aynı b-tree indeksine sahiptir; gereksiz disk ve yazma yükü kaldırıldı.
 - [ ] Sync pull sırası şu an güvenli (V): her push `pg_advisory_xact_lock` (`sync-v4.routes.ts:127`) alıyor, revision sırası commit sırasıyla aynı. Yeni bir yazar bu kilidi atlarsa bozulur; bunu kod yorumu/teste bağla.
 - [ ] Doğru çalışanlar (V): push idempotency (UNIQUE(tenant_id,mutation_id), istemcide UNIQUE idempotency_key), cihaz limiti (`FOR UPDATE`, `license.service.ts:120, 265-290`).
 - [ ] İncelenmedi: `logical_clock` saat kayması mantığı; `admin.controller.ts` (2943 satır), raporlar ve portal uçlarında `company_id` kontrolü.

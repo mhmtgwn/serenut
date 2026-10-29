@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
-import { pgPool } from '../../config/database';
+import { runBypassingRLS as runBypassingRls } from '../../config/database';
 import { logger } from '../../config/logger';
 import {
   authenticateUser,
@@ -21,21 +21,7 @@ import {
 
 const router = Router();
 
-async function runBypassingRls(sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const result = await client.query(sql, params);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
+
 
 function requireWhatsAppManager(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const roles = req.user?.roles || [];

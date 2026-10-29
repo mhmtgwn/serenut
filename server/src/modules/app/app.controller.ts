@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requirePortalAccess } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { runTenantScoped } from '../../config/database';
 import {
   filterNavByEntitlements,
   resolveLandingModuleId,
@@ -15,7 +15,8 @@ router.use(requirePortalAccess);
 router.get('/bootstrap', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const companyRes = await pgPool.query(
+    const companyRes = await runTenantScoped(
+      user.company_id,
       `SELECT id, name, business_code, status, owner_name
        FROM companies
        WHERE id = $1

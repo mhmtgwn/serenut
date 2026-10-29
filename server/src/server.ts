@@ -521,7 +521,7 @@ app.post('/api/v1/telemetry/visit', express.text({ type: ['application/json', 't
   try {
     let body: any = {};
     if (typeof req.body === 'string') {
-      try { body = JSON.parse(req.body); } catch (_) {}
+      try { body = JSON.parse(req.body); } catch (_) { body = {}; }
     } else if (req.body && typeof req.body === 'object') {
       body = req.body;
     }
@@ -550,7 +550,7 @@ app.post('/api/v1/telemetry/visit', express.text({ type: ['application/json', 't
         });
       }
     }
-  } catch (_) {}
+  } catch (err) { logger.debug('Telemetry beacon error', { error: err }); }
   res.status(204).end();
 });
 
@@ -559,7 +559,7 @@ app.post('/api/v1/telemetry/dwell', express.text({ type: ['application/json', 't
   try {
     let body: any = {};
     if (typeof req.body === 'string') {
-      try { body = JSON.parse(req.body); } catch (_) {}
+      try { body = JSON.parse(req.body); } catch (_) { body = {}; }
     } else if (req.body && typeof req.body === 'object') {
       body = req.body;
     }
@@ -572,7 +572,7 @@ app.post('/api/v1/telemetry/dwell', express.text({ type: ['application/json', 't
         updateVisitDwellTime(sessionId, normPath, duration, scroll).catch(() => {});
       });
     }
-  } catch (_) {}
+  } catch (err) { logger.debug('Telemetry beacon error', { error: err }); }
   res.status(204).end();
 });
 
@@ -581,7 +581,7 @@ app.post('/api/v1/telemetry/event', express.text({ type: ['application/json', 't
   try {
     let body: any = {};
     if (typeof req.body === 'string') {
-      try { body = JSON.parse(req.body); } catch (_) {}
+      try { body = JSON.parse(req.body); } catch (_) { body = {}; }
     } else if (req.body && typeof req.body === 'object') {
       body = req.body;
     }
@@ -605,7 +605,7 @@ app.post('/api/v1/telemetry/event', express.text({ type: ['application/json', 't
         });
       }
     }
-  } catch (_) {}
+  } catch (err) { logger.debug('Telemetry beacon error', { error: err }); }
   res.status(204).end();
 });
 

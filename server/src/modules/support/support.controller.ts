@@ -11,7 +11,7 @@ import { Router, Response } from 'express';
 import { Webhook } from 'svix';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { SupportService } from './support.service';
-import { pgPool } from '../../config/database';
+import { runBypassingRLS } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import { MailService } from '../mail/mail.service';
@@ -364,7 +364,7 @@ router.patch('/tickets/:id/status', async (req: AuthenticatedRequest, res: Respo
     if (status !== 'closed') {
       return res.status(403).json(createError('AUTH005', 'Müşteriler yalnızca kendi biletlerini kapatabilir.'));
     }
-    const ticketCheck = await pgPool.query(
+    const ticketCheck = await runBypassingRLS(
       `SELECT company_id FROM support_tickets WHERE id = $1`,
       [id]
     );

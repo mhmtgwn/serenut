@@ -1,26 +1,9 @@
 import { Router, Response } from 'express';
-import { pgPool } from '../../config/database';
+import { runWithTenantContext } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { logger } from '../../config/logger';
 
 const router = Router();
-
-// ── SQL TRANSACTION HELPER FOR TENANT CONTEXT ──────────────────────────────
-async function runWithTenantContext(companyId: string, fn: (client: any) => Promise<any>) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
-    const result = await fn(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
 
 /**
  * @openapi

@@ -1,17 +1,103 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Lightweight anonymous pageview telemetry
+  // ── PROFESYONEL TELEMETRİ & DÖNÜŞÜM ANALİTİĞİ MOTORU ───────────────────────
   try {
-    const pingPayload = JSON.stringify({
+    let sid = sessionStorage.getItem('serenut_sid');
+    if (!sid) {
+      sid = 's_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      sessionStorage.setItem('serenut_sid', sid);
+    }
+    const pageStartTime = Date.now();
+    let maxScroll = 0;
+
+    const getScrollDepth = () => {
+      const h = document.documentElement;
+      const b = document.body;
+      const st = 'scrollTop';
+      const sh = 'scrollHeight';
+      const pct = Math.round(((h[st] || b[st]) / ((h[sh] || b[sh]) - h.clientHeight)) * 100);
+      return isNaN(pct) ? 0 : Math.min(Math.max(pct, 0), 100);
+    };
+
+    window.addEventListener('scroll', () => {
+      const currentScroll = getScrollDepth();
+      if (currentScroll > maxScroll) maxScroll = currentScroll;
+    }, { passive: true });
+
+    const sendTelemetry = (endpoint, payload) => {
+      const data = JSON.stringify(payload);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(endpoint, data);
+      } else {
+        fetch(endpoint, { method: 'POST', body: data, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+      }
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const visitPayload = {
+      session_id: sid,
       path: window.location.pathname,
       referrer: document.referrer || '',
-      utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+      utm_source: urlParams.get('utm_source') || '',
+      utm_medium: urlParams.get('utm_medium') || '',
+      utm_campaign: urlParams.get('utm_campaign') || '',
       screen: window.innerWidth <= 768 ? 'Mobil' : 'Masaüstü'
+    };
+    sendTelemetry('/api/v1/telemetry/visit', visitPayload);
+
+    const flushDwellTime = () => {
+      const durationSeconds = Math.round((Date.now() - pageStartTime) / 1000);
+      if (durationSeconds >= 1) {
+        sendTelemetry('/api/v1/telemetry/dwell', {
+          session_id: sid,
+          path: window.location.pathname,
+          duration: durationSeconds,
+          scroll_depth: maxScroll
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushDwellTime();
     });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/v1/telemetry/visit', pingPayload);
-    } else {
-      fetch('/api/v1/telemetry/visit', { method: 'POST', body: pingPayload, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
-    }
+    window.addEventListener('pagehide', flushDwellTime);
+
+    // Otomatik CTA & Dönüşüm Tıklama Takibi
+    document.addEventListener('click', (e) => {
+      const target = e.target && e.target.closest('a, button');
+      if (!target) return;
+      const href = (target.getAttribute('href') || '').toLowerCase();
+      const text = (target.innerText || target.getAttribute('aria-label') || '').trim().slice(0, 50);
+
+      let eventName = null;
+      let category = 'cta';
+
+      if (href.includes('/download/windows') || href.includes('.exe')) {
+        eventName = 'download_windows_click';
+        category = 'conversion';
+      } else if (href.includes('/download/android') || href.includes('.apk')) {
+        eventName = 'download_android_click';
+        category = 'conversion';
+      } else if (href.includes('wa.me') || href.includes('whatsapp')) {
+        eventName = 'whatsapp_click';
+        category = 'lead';
+      } else if (href.includes('/register') || href.includes('/login')) {
+        eventName = 'auth_nav_click';
+      } else if (href.includes('/plans') || href.includes('plan')) {
+        eventName = 'plan_view_click';
+      } else if (target.dataset && target.dataset.track) {
+        eventName = target.dataset.track;
+      }
+
+      if (eventName) {
+        sendTelemetry('/api/v1/telemetry/event', {
+          session_id: sid,
+          path: window.location.pathname,
+          event: eventName,
+          category,
+          label: text || href
+        });
+      }
+    }, { capture: true });
   } catch (_) {}
 
   // Show the product lockup briefly once per browsing session. This is a

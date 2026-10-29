@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+﻿import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
 import { pgPool, redisClient } from '../../config/database';
 import os from 'os';
@@ -2947,7 +2947,33 @@ router.post('/payment-methods/:id/test', async (req: AuthenticatedRequest, res: 
 
 router.get('/traffic-funnel', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    await runBypassingRLS(`CREATE TABLE IF NOT EXISTS web_page_visits (id BIGSERIAL PRIMARY KEY, page_path VARCHAR(120) NOT NULL, visitor_hash VARCHAR(64) NOT NULL, traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş', device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+    await runBypassingRLS(`
+      CREATE TABLE IF NOT EXISTS web_page_visits (
+        id BIGSERIAL PRIMARY KEY,
+        page_path VARCHAR(120) NOT NULL,
+        visitor_hash VARCHAR(64) NOT NULL,
+        traffic_source VARCHAR(60) NOT NULL DEFAULT 'Direkt Giriş',
+        device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü',
+        session_id VARCHAR(64),
+        utm_source VARCHAR(80),
+        utm_medium VARCHAR(80),
+        utm_campaign VARCHAR(100),
+        duration_seconds INT NOT NULL DEFAULT 0,
+        max_scroll_pct INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS web_analytics_events (
+        id BIGSERIAL PRIMARY KEY,
+        session_id VARCHAR(64) NOT NULL,
+        visitor_hash VARCHAR(64) NOT NULL,
+        event_name VARCHAR(60) NOT NULL,
+        event_category VARCHAR(40) NOT NULL DEFAULT 'interaction',
+        event_label VARCHAR(150),
+        page_path VARCHAR(120) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
     const summaryRes = await runBypassingRLS(`
       SELECT
         COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= CURRENT_DATE)::int AS visitors_today,
@@ -2958,7 +2984,9 @@ router.get('/traffic-funnel', async (_req: AuthenticatedRequest, res: Response) 
         COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path = '/register' AND created_at >= NOW() - INTERVAL '30 days')::int AS register_views_30d,
         COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path IN ('/download/windows', '/download/android') AND created_at >= NOW() - INTERVAL '30 days')::int AS downloads_30d,
         COUNT(*) FILTER (WHERE page_path = '/download/windows' AND created_at >= NOW() - INTERVAL '30 days')::int AS windows_downloads_30d,
-        COUNT(*) FILTER (WHERE page_path = '/download/android' AND created_at >= NOW() - INTERVAL '30 days')::int AS android_downloads_30d
+        COUNT(*) FILTER (WHERE page_path = '/download/android' AND created_at >= NOW() - INTERVAL '30 days')::int AS android_downloads_30d,
+        COALESCE(ROUND(AVG(duration_seconds) FILTER (WHERE duration_seconds > 0 AND created_at >= NOW() - INTERVAL '30 days')), 0)::int AS avg_dwell_seconds,
+        COALESCE(ROUND(AVG(max_scroll_pct) FILTER (WHERE max_scroll_pct > 0 AND created_at >= NOW() - INTERVAL '30 days')), 0)::int AS avg_scroll_pct
       FROM web_page_visits
     `);
     const conversionDbRes = await runBypassingRLS(`
@@ -2972,20 +3000,44 @@ router.get('/traffic-funnel', async (_req: AuthenticatedRequest, res: Response) 
       GROUP BY traffic_source ORDER BY visitors DESC
     `);
     const pagesRes = await runBypassingRLS(`
-      SELECT page_path, COUNT(DISTINCT visitor_hash)::int AS visitors, COUNT(*)::int AS views
+      SELECT page_path, COUNT(DISTINCT visitor_hash)::int AS visitors, COUNT(*)::int AS views,
+             COALESCE(ROUND(AVG(duration_seconds) FILTER (WHERE duration_seconds > 0)), 0)::int AS avg_seconds,
+             COALESCE(ROUND(AVG(max_scroll_pct) FILTER (WHERE max_scroll_pct > 0)), 0)::int AS avg_scroll
       FROM web_page_visits WHERE created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY page_path ORDER BY views DESC LIMIT 8
+      GROUP BY page_path ORDER BY views DESC LIMIT 10
     `);
     const devicesRes = await runBypassingRLS(`
       SELECT device_type, COUNT(DISTINCT visitor_hash)::int AS visitors
       FROM web_page_visits WHERE created_at >= NOW() - INTERVAL '30 days'
       GROUP BY device_type ORDER BY visitors DESC
     `);
+    const eventsRes = await runBypassingRLS(`
+      SELECT event_name, event_category, COUNT(*)::int AS total_events, COUNT(DISTINCT visitor_hash)::int AS unique_visitors
+      FROM web_analytics_events WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY event_name, event_category ORDER BY total_events DESC LIMIT 15
+    `);
+    const campaignsRes = await runBypassingRLS(`
+      SELECT COALESCE(utm_source, 'Bilinmiyor') AS utm_source,
+             COALESCE(utm_medium, '-') AS utm_medium,
+             COALESCE(utm_campaign, '-') AS utm_campaign,
+             COUNT(DISTINCT visitor_hash)::int AS visitors,
+             COUNT(*)::int AS views
+      FROM web_page_visits
+      WHERE created_at >= NOW() - INTERVAL '30 days' AND (utm_source IS NOT NULL OR utm_campaign IS NOT NULL)
+      GROUP BY utm_source, utm_medium, utm_campaign ORDER BY visitors DESC LIMIT 10
+    `);
+    const recentActivityRes = await runBypassingRLS(`
+      SELECT page_path, traffic_source, device_type, duration_seconds, max_scroll_pct, created_at
+      FROM web_page_visits ORDER BY id DESC LIMIT 20
+    `);
     return res.json({
       summary: { ...(summaryRes.rows[0] || {}), ...(conversionDbRes.rows[0] || {}) },
       sources: sourcesRes.rows,
       top_pages: pagesRes.rows,
       devices: devicesRes.rows,
+      events: eventsRes.rows,
+      campaigns: campaignsRes.rows,
+      recent_activity: recentActivityRes.rows,
     });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });

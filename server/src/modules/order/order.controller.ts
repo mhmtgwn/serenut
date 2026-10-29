@@ -12,7 +12,7 @@ import {
   AuthenticatedRequest,
   requireActiveEntitlement,
 } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { getDbClient } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import crypto from 'crypto';
@@ -100,7 +100,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
   }
 
-  const client = await pgPool.connect();
+  const client = await getDbClient();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -297,7 +297,7 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(400).json({ error: { code: 'IDEMPOTENCY_REQUIRED', message: 'İade için idempotency-key zorunludur.' } });
   }
 
-  const client = await pgPool.connect();
+  const client = await getDbClient();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");

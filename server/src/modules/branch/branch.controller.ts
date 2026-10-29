@@ -13,7 +13,7 @@ import {
   AuthenticatedRequest,
   requireActiveEntitlement,
 } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { getDbClient, runTenantScoped } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import crypto from 'crypto';
 
@@ -35,7 +35,8 @@ router.use(requireActiveEntitlement);
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await pgPool.query(
+    const result = await runTenantScoped(
+      req.user!.company_id,
       `SELECT id, name, address, phone, is_active, created_at, updated_at
        FROM branches WHERE company_id = $1 ORDER BY name ASC`,
       [req.user!.company_id]
@@ -90,7 +91,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
 
   const id = `br-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   const storeId = `store-${crypto.randomUUID()}`;
-  const client = await pgPool.connect();
+  const client = await getDbClient();
 
   try {
     await client.query('BEGIN');
@@ -180,7 +181,7 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
   updates.push(`updated_at = CURRENT_TIMESTAMP`);
   values.push(id, user.company_id);
 
-  const client = await pgPool.connect();
+  const client = await getDbClient();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -241,7 +242,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
   const { id } = req.params;
 
-  const client = await pgPool.connect();
+  const client = await getDbClient();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
