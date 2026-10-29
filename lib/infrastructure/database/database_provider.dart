@@ -130,7 +130,16 @@ class DatabaseManager {
   /// Get database instance (lazy initialization with mutex concurrency guard)
   Future<Database> getDatabase() async {
     if (_database != null && _database!.isOpen) {
-      return _database!;
+      // In SQLite / sqflite, if the native database connection was closed or invalidated,
+      // the Dart wrapper's `isOpen` may still be true. Verify that the connection is truly active.
+      try {
+        await _database!.rawQuery('SELECT 1');
+        return _database!;
+      } catch (e) {
+        debugPrint(
+            '[DatabaseManager] ⚠️ Stale or closed connection detected ($e). Reopening...');
+        _database = null;
+      }
     }
     if (_initFuture != null) {
       return await _initFuture!;

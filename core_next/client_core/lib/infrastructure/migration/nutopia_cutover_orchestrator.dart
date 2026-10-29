@@ -65,7 +65,13 @@ class NutopiaCutoverExecutionOptions {
   /// Otomatik olarak yerel işletim sistemi üzerindeki aktif canlı Nutopia DB yolunu (%APPDATA%...\serenut_pos.db) çözer.
   /// 16 Ekim snapshot yedeği yerine gerçek canlı kaynak yolunu sağlar.
   static Future<String> resolveDefaultLiveLegacyDbPath() async {
-    final basePath = await getDatabasesPath();
+    var basePath = await getDatabasesPath();
+    if (!kIsWeb && Platform.isWindows) {
+      final subDir = p.join(basePath, 'databases');
+      if (Directory(subDir).existsSync()) {
+        basePath = subDir;
+      }
+    }
     return p.join(basePath, 'serenut_pos.db');
   }
 }

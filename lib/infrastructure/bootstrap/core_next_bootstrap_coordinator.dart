@@ -288,7 +288,8 @@ class CoreNextBootstrapCoordinator {
   /// Hedef Core Next veritabanını açar veya temin eder
   Future<Database> _getTargetDatabase() async {
     if (_customTargetDb != null) return _customTargetDb!;
-    final dbPath = p.join(await getDatabasesPath(), 'serenut_core_v2.db');
+    final dbPath = DatabaseManager.overrideCoreNextDatabasePath ??
+        await DatabaseManager.instance.getCoreNextDatabasePath();
     return openDatabase(
       dbPath,
       version: 3,
@@ -526,7 +527,7 @@ class CoreNextBootstrapCoordinator {
         if (!vacuumSucceeded) {
           final legacyPath = _customLegacyFilePath ??
               DatabaseManager.overrideDatabasePath ??
-              p.join(await getDatabasesPath(), 'serenut_pos.db');
+              await DatabaseManager.instance.getLegacyDatabasePath();
           final srcFile = File(legacyPath);
           if (await srcFile.exists()) {
             await srcFile.copy(backupFilePath);

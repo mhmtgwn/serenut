@@ -115,6 +115,20 @@ class IntegrityCheckService {
         logBuffer
             .writeln('✅ Security Check: Ledger bypass flag is disabled: PASS');
       }
+
+      // Verify essential configuration exists in SQLite settings (single source of truth)
+      final pinRows =
+          await db.query('settings', columns: ['admin_pin_code'], limit: 1);
+      final adminPin = pinRows.isNotEmpty
+          ? pinRows.first['admin_pin_code'] as String?
+          : null;
+      if (adminPin == null || adminPin.isEmpty) {
+        // Warning level only
+        logBuffer.writeln(
+            '⚠️ Warning: Admin PIN config is not set (first launch onboarding state)');
+      } else {
+        logBuffer.writeln('✅ Config Verification: PASS');
+      }
     } catch (e) {
       dbHealthy = false;
       issues.add('Could not open or read database: $e');
@@ -134,21 +148,6 @@ class IntegrityCheckService {
       if (!Directory(cacheDir.path).existsSync()) {
         fsHealthy = false;
         issues.add('Temporary cache directory is missing');
-      }
-
-      // Verify essential configuration exists in SQLite settings (single source of truth)
-      final diagnosticsDb = await DatabaseManager.instance.getDatabase();
-      final pinRows = await diagnosticsDb.query('settings',
-          columns: ['admin_pin_code'], limit: 1);
-      final adminPin = pinRows.isNotEmpty
-          ? pinRows.first['admin_pin_code'] as String?
-          : null;
-      if (adminPin == null || adminPin.isEmpty) {
-        // Warning level only
-        logBuffer.writeln(
-            '⚠️ Warning: Admin PIN config is not set (first launch onboarding state)');
-      } else {
-        logBuffer.writeln('✅ Config Verification: PASS');
       }
     } catch (e) {
       fsHealthy = false;
@@ -232,6 +231,10 @@ class IntegrityCheckService {
       final tempPath = '$dbPath.repair_bak';
       final tempFile = File(tempPath);
       if (await tempFile.exists()) await tempFile.delete();
+
+      // Ensure active connection is cleanly closed so SQLite handles do not block file replacement
+      await DatabaseManager.instance.close();
+
       if (await dbFile.exists()) {
         await dbFile.copy(tempPath);
       }
@@ -246,7 +249,8 @@ class IntegrityCheckService {
           await walSource.copy('$dbPath-wal');
         }
 
-        // Geri yüklenen dosyayı hızlı doğrula
+        // Geri yüklenen dosyayı temiz bağlantı üzerinden hızlı doğrula
+        DatabaseManager.instance.reset();
         final db = await DatabaseManager.instance.getDatabase();
         final res = await db.rawQuery('PRAGMA integrity_check');
         if (res.isEmpty || res.first.values.first != 'ok') {
@@ -261,9 +265,11 @@ class IntegrityCheckService {
       } catch (e) {
         debugPrint(
             '[IntegrityCheckService] Repair başarısız, rollback yapılıyor: $e');
+        await DatabaseManager.instance.close();
         // Rollback: temp backup'ı geri yükle
         if (await dbFile.exists()) await dbFile.delete();
         if (await tempFile.exists()) await tempFile.rename(dbPath);
+        DatabaseManager.instance.reset();
         return false;
       }
     } catch (e) {

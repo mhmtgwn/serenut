@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'schema_definitions.dart';
@@ -52,7 +53,14 @@ class CoreAppDatabase {
     if (inMemoryOrCustomPath != null) {
       path = inMemoryOrCustomPath;
     } else {
-      final databasesPath = await getDatabasesPath();
+      var databasesPath = await getDatabasesPath();
+      if (!kIsWeb && Platform.isWindows) {
+        final subDir = p.join(databasesPath, 'databases');
+        if (Directory(subDir).existsSync() ||
+            !File(p.join(databasesPath, dbName)).existsSync()) {
+          databasesPath = subDir;
+        }
+      }
       path = p.join(databasesPath, dbName);
     }
 

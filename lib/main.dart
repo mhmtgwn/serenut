@@ -118,22 +118,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _runIntegrityDiagnostics();
-    // Warm up global background providers once on startup
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.read(eventPublisherProvider);
-      ref.read(syncProvider);
-      ref.read(telemetryBridgeProvider);
-      ref.read(smsNotificationHandlerProvider);
-      ref.read(smsGatewayServiceProvider);
-      unawaited(_checkAutoDebtReminders());
-      // Pre-warm primary POS tab controllers in background so navigation to Satış, Ürünler, Müşteriler, Siparişler is instant (0ms delay)
-      ref.read(salesProductsControllerProvider);
-      ref.read(productsControllerProvider);
-      ref.read(customersControllerProvider);
-      ref.read(ordersControllerProvider);
-      ref.read(productInventorySummaryProvider);
-    });
+  }
+
+  bool _backgroundServicesWarmedUp = false;
+
+  void _warmUpBackgroundServices() {
+    if (!mounted || _backgroundServicesWarmedUp) return;
+    _backgroundServicesWarmedUp = true;
+    ref.read(eventPublisherProvider);
+    ref.read(syncProvider);
+    ref.read(telemetryBridgeProvider);
+    ref.read(smsNotificationHandlerProvider);
+    ref.read(smsGatewayServiceProvider);
+    unawaited(_checkAutoDebtReminders());
+    // Pre-warm primary POS tab controllers in background so navigation to Satış, Ürünler, Müşteriler, Siparişler is instant (0ms delay)
+    ref.read(salesProductsControllerProvider);
+    ref.read(productsControllerProvider);
+    ref.read(customersControllerProvider);
+    ref.read(ordersControllerProvider);
+    ref.read(productInventorySummaryProvider);
   }
 
   Future<void> _checkAutoDebtReminders() async {
@@ -201,6 +204,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         _checkingIntegrity = false;
       });
     }
+    _warmUpBackgroundServices();
     _checkVersion();
     _updateCheckTimer = Timer.periodic(
       const Duration(minutes: 15),
@@ -215,6 +219,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   void _retryStartupChecks() {
+    DatabaseManager.instance.reset();
     setState(() {
       _integrityError = null;
       _integrityRefCode = null;
