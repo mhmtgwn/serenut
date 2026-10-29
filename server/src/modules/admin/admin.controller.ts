@@ -504,7 +504,7 @@ router.get('/companies/:id/export', async (req: AuthenticatedRequest, res: Respo
       runBypassingRLS('SELECT * FROM sales WHERE company_id = $1', [companyId]),
       runBypassingRLS('SELECT * FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE company_id = $1)', [companyId]).catch(() => ({ rows: [] })),
       runBypassingRLS('SELECT * FROM device_activations WHERE company_id = $1', [companyId]),
-      runBypassingRLS('SELECT id, company_id, name, email, phone, role, is_active, created_at FROM users WHERE company_id = $1', [companyId]),
+      runBypassingRLS('SELECT id, company_id, name, email, is_active, created_at FROM users WHERE company_id = $1', [companyId]),
       runBypassingRLS('SELECT * FROM sync_v4_changes WHERE tenant_id = $1 ORDER BY revision ASC', [companyId]),
       runBypassingRLS('SELECT * FROM branches WHERE company_id = $1', [companyId]),
     ]);
