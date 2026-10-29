@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import '../../core_next/client_core/lib/infrastructure/database/app_database.dart';
+import '../../core_next/client_core/lib/infrastructure/database/app_database.dart' hide IncompatibleDatabaseSchemaException;
 import '../../core_next/client_core/lib/infrastructure/migration/migration_bridge_engine.dart';
 import '../../core_next/client_core/lib/infrastructure/database/dual_database_routing_coordinator.dart';
 import '../../core_next/client_core/lib/infrastructure/database/database_routing_resolver.dart';

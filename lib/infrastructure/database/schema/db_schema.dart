@@ -29,7 +29,7 @@ class DatabaseSchema {
           WHEN type = 'sale' THEN paid_amount
           WHEN type = 'payment' THEN amount
           WHEN type = 'collection' THEN amount
-          WHEN type = 'refund' THEN amount
+          WHEN type = 'refund' AND paid_amount = 0 THEN amount
           WHEN type = 'cancellation' THEN -paid_amount
           ELSE 0
         END AS credit

@@ -24,7 +24,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
-import '../../core_next/client_core/lib/infrastructure/database/app_database.dart';
+import '../../core_next/client_core/lib/infrastructure/database/app_database.dart' hide IncompatibleDatabaseSchemaException;
 import '../../core_next/client_core/lib/infrastructure/database/database_routing_resolver.dart';
 import '../../core_next/client_core/lib/infrastructure/database/dual_database_routing_coordinator.dart';
 import '../../core_next/client_core/lib/infrastructure/database/schema_definitions.dart';

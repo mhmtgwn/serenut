@@ -8,6 +8,7 @@ import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/bootstrap/app_bootstrap.dart';
 import 'package:serenutos/infrastructure/bootstrap/core_next_bootstrap_coordinator.dart';
