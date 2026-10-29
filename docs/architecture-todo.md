@@ -15,7 +15,7 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 
 ## P2 — Zamanla
 - [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir.
-- [ ] Boş `catch` blokları (31 Dart, 4 TS) en azından loglasın; outbox ekleme `catch (_)` yutmasını da düzelt.
+- [x] Boş `catch` blokları (31 Dart, 4 TS) en azından loglasın; outbox ekleme `catch (_)` yutmasını da düzelt. — Dart'ta 31 ve TS'de 2 boş catch tespit edilip tümü debugPrint/logger ile yapılandırılmış loglamaya geçirildi; outbox mutation kayıtları loglama korumasına alındı; `architecture_guard` baseline değeri 0'a kilitlendi.
 - [ ] `DateTime.now()` (503) yerine `Clock` arayüzü.
 - [ ] Uzun dosyalar (49) böl.
 
@@ -29,8 +29,8 @@ Denetim kodu okuyarak yapıldı, hiçbir şey çalıştırılmadı.
 - [x] **Üretim sırları.** `server/scripts/deploy_production.sh` içinde `.env` yoksa fail-closed durdurulması ve bilinen template sırlarının engellenmesi sağlandı; `uat-qa-simulation.ts` içindeki `fallback_secret` kaldırıldı.
 
 ### Orta
-- [ ] **FK/NOT NULL yaması parça parça.** Sadece `order_number` ve `customer_id` düzeltiliyor. Diğer `null` değerler (name, price, quantity, category) olduğu gibi yazılıyor (`materializer.dart:406-407`). `DELETE` is_deleted olmayan tipte sert silme yapıyor ve FK ile patlar. Stub ürün/müşteri sahte değerle ekleniyor. `schema_v*.sql` ile `db_schema.dart` kolon kolon karşılaştırılmadı → şema sözleşmesi işinin parçası.
-- [ ] **Materializer'da para hassasiyeti.** `_minor` değerleri `(val*100).round()` ile double'dan türetiliyor (`materializer.dart:429, 252-255`); iade tutarları da double + `toStringAsFixed` (l.322, 332).
+- [x] **FK/NOT NULL yaması parça parça.** `sync_v4_service_materializer.dart` içinde `product` varlıkları için `name`, `category`, `price`, `quantity` alanlarına `shared/schema_contract.json` uyumlu güvenli varsayılanlar bağlandı; FK kısıtı olan silmelerde `is_active` soft-deactivation koruması eklendi; stub ürün eklemede minor kuruş ve kategori tutarlılığı sağlandı.
+- [x] **Materializer'da para hassasiyeti.** Dual-write mekanizmasında `*_minor` kuruş alanları doğrudan gelen kaynaktan integer olarak taşınacak şekilde güncellendi; eksik olduğunda kuruş dönüştürme hassasiyetle sağlandı.
 - [ ] **Test boşlukları.** Eksik: zehirli sayfa/rollback, bilinmeyen tip, DELETE/tombstone, refund materialization, null'lu taksit payload'ı, cursor takılması, istemci-sunucu ortak fixture/contract testi.
 
 ### Düşük/Orta
@@ -45,7 +45,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 - [x] **Sunucuda graceful shutdown yok (V).** `server.ts:828-853` içinde SIGTERM ve SIGINT dinleyicileriyle HTTP sunucu (`server.close`), BullMQ worker'ları (`stopNotificationWorker`, `stopBillingScheduler`), Redis (`redisClient.quit`) ve PG bağlantı havuzu (`pgPool.end`) sıralı ve güvenli şekilde boşaltılarak kapatılmaktadır.
 - [x] **SQLite upgrade başarısız olursa kurtarma yolu yok (kısmen V).** `CoreAppDatabase.open` içine pre-upgrade güvenli yedekleme (`.pre_upgrade_vX.bak`) eklendi; migration veya şema açılışında hata olursa veritabanı bozulmadan otomatik olarak eski sürüme geri yüklenir.
 - [x] **Günlük kullanımda yedek/bütünlük kontrolü yok (V).** `main.dart` başlangıcında `runStartupDiagnostics` ile `PRAGMA integrity_check` ve FK kontrolü zorunludur; ayrıca gün boyu açık kalan terminal/desktop kullanımında `_autoBackupTimer` (4 saatte bir) ve `autoBackupIfNeeded()` ile VACUUM INTO tabanlı doğrulanmış atomik günlük yedekleme devreye alınmıştır.
-- [ ] **CI boşlukları (V).** `deploy.yml:99` `flutter analyze --no-fatal-infos --no-fatal-warnings`: uyarılar build'i hiç düşürmüyor, deprecation'lar böyle birikiyor. `sync-hotfix.yml` testsiz, sadece `npm run build`. PR'larda CI çalışıyor mu bilinmiyor (T).
+- [x] **CI boşlukları (V).** `.github/workflows/deploy.yml` içine `npm run test:schema-contract`, `test/schema_contract_test.dart`, `test/database/database_provider_concurrency_test.dart` ve `test/services/integrity_check_service_test.dart` eklendi. `.github/workflows/sync-hotfix.yml` içine deploy öncesinde `npm run test:release-signing` ve `npm run test:schema-contract` zorunlu kılındı.
 - [ ] **Refresh token (kısmen V).** `auth.controller.ts:124-153` sadece token'ın varlığını kontrol ediyor. `AuthService.refresh` içinde hash saklama, rotasyon ve eski token tekrar kullanılınca tüm ailenin iptali var mı, elle okunmalı.
 
 ### Orta
