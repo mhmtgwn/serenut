@@ -80,7 +80,18 @@ extension SyncV4Materializer on SyncV4Service {
         }
         await db.update(table, tombstone, where: 'id = ?', whereArgs: [id]);
       } else {
-        await db.delete(table, where: 'id = ?', whereArgs: [id]);
+        try {
+          await db.delete(table, where: 'id = ?', whereArgs: [id]);
+        } on DatabaseException catch (e) {
+          // If hard delete violates foreign keys, soft deactivate if supported
+          if (columns.contains('is_active')) {
+            await db.update(table, {'is_active': 0, 'is_synced': 1},
+                where: 'id = ?', whereArgs: [id]);
+          } else {
+            debugPrint('[SyncV4] Cannot delete record ($table, id: $id) due to FK: $e');
+            rethrow;
+          }
+        }
       }
       return;
     }
@@ -138,6 +149,23 @@ extension SyncV4Materializer on SyncV4Service {
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
+    if (type == 'product') {
+      if (row['name'] == null ||
+          (row['name'] is String && (row['name'] as String).trim().isEmpty)) {
+        row['name'] = 'Ürün ($id)';
+      }
+      if (row['category'] == null ||
+          (row['category'] is String &&
+              (row['category'] as String).trim().isEmpty)) {
+        row['category'] = 'Genel';
+      }
+      if (row['price'] == null) {
+        row['price'] = 0.0;
+      }
+      if (row['quantity'] == null) {
+        row['quantity'] = 0;
+      }
+    }
     if ((type == 'sale' || type == 'order') &&
         (row['customer_id'] == null ||
             row['customer_id'].toString().trim().isEmpty)) {
@@ -240,6 +268,10 @@ extension SyncV4Materializer on SyncV4Service {
         if (existingProd.isEmpty) {
           final now = DateTime.now().toUtc().toIso8601String();
           final prodName = (source['product_name'] as String?)?.trim();
+          final unitPrice = _syncDouble(source['unit_price']);
+          final unitPriceMinor = source['unit_price_minor'] != null
+              ? _syncInt(source['unit_price_minor'])
+              : (unitPrice * 100).round();
           await db.insert(
             'products',
             {
@@ -247,7 +279,9 @@ extension SyncV4Materializer on SyncV4Service {
               'name': prodName?.isNotEmpty == true
                   ? prodName!
                   : 'Ürün ($productId)',
-              'price': _syncDouble(source['unit_price']),
+              'price': unitPrice,
+              'price_minor': unitPriceMinor,
+              'cost_minor': 0,
               'quantity': 0,
               'category': 'Genel',
               'created_at': now,
@@ -260,20 +294,30 @@ extension SyncV4Materializer on SyncV4Service {
 
         final quantity = _syncDouble(source['quantity']);
         final unitPrice = _syncDouble(source['unit_price']);
+        final unitPriceMinor = source['unit_price_minor'] != null
+            ? _syncInt(source['unit_price_minor'])
+            : (unitPrice * 100).round();
+        final subtotal = source['subtotal'] != null
+            ? _syncDouble(source['subtotal'])
+            : quantity * unitPrice;
+        final subtotalMinor = source['subtotal_minor'] != null
+            ? _syncInt(source['subtotal_minor'])
+            : ((quantity * unitPrice) * 100).round();
         await db.insert(
             itemTable,
             {
               'id': source['id'] ?? 'sync-$id-$productId-$index',
               parentColumn: id,
               'product_id': productId,
-              'product_name': source['product_name'],
+              'product_name':
+                  (source['product_name'] as String?)?.trim().isNotEmpty == true
+                      ? (source['product_name'] as String).trim()
+                      : 'Ürün ($productId)',
               'quantity': quantity,
               'unit_price': unitPrice,
-              if (type == 'sale')
-                'unit_price_minor': (unitPrice * 100).round(),
-              if (type == 'sale') 'subtotal': quantity * unitPrice,
-              if (type == 'sale')
-                'subtotal_minor': ((quantity * unitPrice) * 100).round(),
+              if (type == 'sale') 'unit_price_minor': unitPriceMinor,
+              if (type == 'sale') 'subtotal': subtotal,
+              if (type == 'sale') 'subtotal_minor': subtotalMinor,
               'created_at': source['created_at'] ??
                   DateTime.now().toUtc().toIso8601String(),
             },
@@ -467,10 +511,14 @@ extension SyncV4Materializer on SyncV4Service {
     // Dual-write: Populate *_minor currency columns if local schema contains them
     for (final col in columns) {
       if (col.endsWith('_minor') && row[col] == null) {
-        final baseName = col.substring(0, col.length - 6);
-        if (source.containsKey(baseName) && source[baseName] != null) {
-          final val = _syncDouble(source[baseName]);
-          row[col] = (val * 100).round();
+        if (source.containsKey(col) && source[col] != null) {
+          row[col] = _syncInt(source[col]);
+        } else {
+          final baseName = col.substring(0, col.length - 6);
+          if (source.containsKey(baseName) && source[baseName] != null) {
+            final val = _syncDouble(source[baseName]);
+            row[col] = (val * 100).round();
+          }
         }
       }
     }
