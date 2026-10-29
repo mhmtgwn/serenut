@@ -61,6 +61,8 @@ jobs:
         working-directory: server
       - run: npm run test:schema-contract
         working-directory: server
+      - run: npm run test:migrations
+        working-directory: server
       - name: Create isolated acceptance database
         env:
           PGPASSWORD: postgrespassword

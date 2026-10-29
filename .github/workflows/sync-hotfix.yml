@@ -30,6 +30,8 @@ jobs:
         working-directory: server
       - run: npm run test:schema-contract
         working-directory: server
+      - run: npm run test:migrations
+        working-directory: server
       - name: Deploy sync backend and migrations
         uses: appleboy/ssh-action@v1.2.0
         env:

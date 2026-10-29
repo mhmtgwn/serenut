@@ -436,7 +436,7 @@ router.get('/export', authenticateUser, async (req: AuthenticatedRequest, res: R
     const csvContent = await runWithTenantContext(user.company_id, async (client) => {
       if (type === 'products') {
         const prodRes = await client.query(`
-          SELECT name, category, quantity, price FROM products WHERE is_deleted = FALSE
+          SELECT name, category, quantity, price FROM products WHERE company_id = current_setting('app.current_company_id', true) AND is_deleted = FALSE
         `);
         let csv = 'Product Name,Category,Quantity,Price\n';
         for (const row of prodRes.rows) {
@@ -445,7 +445,7 @@ router.get('/export', authenticateUser, async (req: AuthenticatedRequest, res: R
         return csv;
       } else if (type === 'debtors') {
         const debtRes = await client.query(`
-          SELECT name, phone, balance FROM customers WHERE balance > 0 AND is_deleted = FALSE
+          SELECT name, phone, balance FROM customers WHERE company_id = current_setting('app.current_company_id', true) AND balance > 0 AND is_deleted = FALSE
         `);
         let csv = 'Customer Name,Phone,Debt Balance\n';
         for (const row of debtRes.rows) {
@@ -455,7 +455,7 @@ router.get('/export', authenticateUser, async (req: AuthenticatedRequest, res: R
       } else {
         // Default sales log
         const salesRes = await client.query(`
-          SELECT id, total_amount, paid_amount, payment_method, created_at FROM sales WHERE is_deleted = FALSE ORDER BY created_at DESC LIMIT 500
+          SELECT id, total_amount, paid_amount, payment_method, created_at FROM sales WHERE company_id = current_setting('app.current_company_id', true) AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 500
         `);
         let csv = 'Sale ID,Total Amount,Paid Amount,Payment Method,Created At\n';
         for (const row of salesRes.rows) {

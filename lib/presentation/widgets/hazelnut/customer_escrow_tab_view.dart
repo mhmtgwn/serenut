@@ -261,7 +261,7 @@ class CustomerEscrowTabView extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: _kGreenLight,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _kGreen.withOpacity(0.3)),
+                          border: Border.all(color: _kGreen.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -488,7 +488,7 @@ class CustomerEscrowTabView extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: _kGreenLight,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _kGreen.withOpacity(0.3)),
+                          border: Border.all(color: _kGreen.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           children: [

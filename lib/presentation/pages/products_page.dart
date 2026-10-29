@@ -331,7 +331,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                         color: _activeTabIndex == 0 ? Colors.white : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: _activeTabIndex == 0
-                            ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))]
                             : null,
                       ),
                       child: Row(
@@ -364,7 +364,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
                         color: _activeTabIndex == 1 ? Colors.white : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: _activeTabIndex == 1
-                            ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))]
                             : null,
                       ),
                       child: Row(
