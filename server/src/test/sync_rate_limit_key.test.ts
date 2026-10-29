@@ -27,3 +27,4 @@ assert.equal(
   'company-2:device-a',
 );
 console.log('✅ Sync rate-limit keys are isolated by tenant and device.');
+process.exit(0);

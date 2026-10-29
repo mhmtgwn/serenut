@@ -286,7 +286,6 @@ extension SyncV4Materializer on SyncV4Service {
                   : 'Ürün ($productId)',
               'price': unitPrice,
               'price_minor': unitPriceMinor,
-              'cost_minor': 0,
               'quantity': 0,
               'category': 'Genel',
               'created_at': now,

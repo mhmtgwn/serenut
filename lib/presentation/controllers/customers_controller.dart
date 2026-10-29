@@ -316,7 +316,6 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
   void _invalidateAll() {
     Future.microtask(() {
       ref.invalidateSelf();
-      ref.invalidate(customersControllerProvider);
       ref.invalidate(salesCustomersControllerProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);
