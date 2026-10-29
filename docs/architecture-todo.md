@@ -9,7 +9,7 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 
 ## P1 — Sonraki sürümler
 - [ ] Para alanlarını kuruş (`*_minor` int) olarak bitir; `REAL`/`double` para alanlarını kaldır (guard: 43 kolon / 253 alan).
-- [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir (`architecture_guard`: 9'dan 8'e düşürüldü, `sqlite_customer_repository.dart` doğrudan `v_financial_ledger` kullanımına bağlandı).
+- [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir (`architecture_guard`: 9'dan 7'ye düşürüldü, `sqlite_customer_repository.dart` ve `database_provider.dart` doğrudan `DatabaseSchema.createViews` / `v_financial_ledger` kullanımına bağlandı).
 - [ ] Sunucuda doğrudan `pg pool` kullanımını (115 yer) tek veri erişim katmanına (tenant/RLS bağlamı zorunlu) topla.
 - [x] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — `_applyChangeBatchWithQuarantine` ve `sync_quarantine_v4` ile uygulandı.
 
@@ -44,7 +44,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 ### Yüksek
 - [x] **Sunucuda graceful shutdown yok (V).** `server.ts:828-853` içinde SIGTERM ve SIGINT dinleyicileriyle HTTP sunucu (`server.close`), BullMQ worker'ları (`stopNotificationWorker`, `stopBillingScheduler`), Redis (`redisClient.quit`) ve PG bağlantı havuzu (`pgPool.end`) sıralı ve güvenli şekilde boşaltılarak kapatılmaktadır.
 - [x] **SQLite upgrade başarısız olursa kurtarma yolu yok (kısmen V).** `CoreAppDatabase.open` içine pre-upgrade güvenli yedekleme (`.pre_upgrade_vX.bak`) eklendi; migration veya şema açılışında hata olursa veritabanı bozulmadan otomatik olarak eski sürüme geri yüklenir.
-- [ ] **Günlük kullanımda yedek/bütünlük kontrolü yok (V).** `PRAGMA integrity_check` ~10 yerde ama hepsi migration/cutover kapısında. Normal açılışta kontrol ve zamanlanmış yerel yedek yok.
+- [x] **Günlük kullanımda yedek/bütünlük kontrolü yok (V).** `main.dart` başlangıcında `runStartupDiagnostics` ile `PRAGMA integrity_check` ve FK kontrolü zorunludur; ayrıca gün boyu açık kalan terminal/desktop kullanımında `_autoBackupTimer` (4 saatte bir) ve `autoBackupIfNeeded()` ile VACUUM INTO tabanlı doğrulanmış atomik günlük yedekleme devreye alınmıştır.
 - [ ] **CI boşlukları (V).** `deploy.yml:99` `flutter analyze --no-fatal-infos --no-fatal-warnings`: uyarılar build'i hiç düşürmüyor, deprecation'lar böyle birikiyor. `sync-hotfix.yml` testsiz, sadece `npm run build`. PR'larda CI çalışıyor mu bilinmiyor (T).
 - [ ] **Refresh token (kısmen V).** `auth.controller.ts:124-153` sadece token'ın varlığını kontrol ediyor. `AuthService.refresh` içinde hash saklama, rotasyon ve eski token tekrar kullanılınca tüm ailenin iptali var mı, elle okunmalı.
 
@@ -57,7 +57,7 @@ Sınırlı grep taraması; derin kod okuması yapılmadı. (V) = grep/dosya okum
 - [x] **CRLF/LF karışık (V).** `.gitattributes` kök dizine eklendi (`* text=auto eol=lf`), tüm depo normalize edildi.
 - [ ] **Deprecation'lar (V sayılar).** 7 `withOpacity`, 22 Radio/RadioListTile (RadioGroup'a geçiş), 22 `DropdownButtonFormField` `value` → `initialValue`. Bir kısmı zaten geçmiş olabilir.
 - [ ] **`lib/core_next` bir Windows junction'ı (V)** (`core_next/client_core/lib`). Junction takip etmeyen araçlar kaçırır, temiz klonda/CI'da kırılabilir.
-- [ ] Kökte ~100 `STAGE_10_12_*.md` raporu, `win.exe` (9MB), `telemetry_logs.jsonl`, `START_COMMANDS.sh` var; git'te takipli mi bakılmadı (T). → raporları `docs/archive`'e taşı, gerisini `.gitignore`'a ekle.
+- [x] **Depo kök dizini kalıntıları (V).** Kökteki tüm `STAGE_10_12_*.md` raporları ve `START_COMMANDS.sh` `docs/archive/` dizinine taşındı; `win.exe` ve `telemetry_logs.jsonl` `.gitignore` ile korunmaktadır.
 - [ ] TODO/FIXME/HACK sayımı güvenilir değil (ilk grep yanlış eşleşti); yeniden say.
 
 ### İncelenmedi

@@ -5,6 +5,63 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/infrastructure/database/product_search_index.dart';
 
 class DatabaseSchema {
+  /// Canonical database views for financial ledger and customer balances (Single source of truth)
+  static Future<void> createViews(DatabaseExecutor db) async {
+    await db.execute('DROP VIEW IF EXISTS v_financial_ledger;');
+    await db.execute('''
+      CREATE VIEW v_financial_ledger AS
+      SELECT 
+        id,
+        type,
+        customer_id,
+        amount,
+        paid_amount,
+        debt_amount,
+        reference_id,
+        created_at,
+        CASE 
+          WHEN type = 'sale' THEN amount
+          WHEN type = 'manual_debt' THEN amount
+          WHEN type = 'cancellation' THEN -amount
+          ELSE 0
+        END AS debit,
+        CASE 
+          WHEN type = 'sale' THEN paid_amount
+          WHEN type = 'payment' THEN amount
+          WHEN type = 'collection' THEN amount
+          WHEN type = 'refund' THEN amount
+          WHEN type = 'cancellation' THEN -paid_amount
+          ELSE 0
+        END AS credit
+      FROM financial_transactions
+      WHERE (COALESCE(is_deleted, 0) = 0) AND deleted_at IS NULL;
+    ''');
+
+    await db.execute('DROP VIEW IF EXISTS v_customer_ledger_effect;');
+    await db.execute('''
+      CREATE VIEW v_customer_ledger_effect AS
+      SELECT 
+        id,
+        customer_id,
+        type,
+        amount,
+        paid_amount,
+        debt_amount,
+        reference_id,
+        created_at,
+        is_deleted,
+        CASE 
+          WHEN COALESCE(is_deleted, 0) != 0 OR deleted_at IS NOT NULL THEN 0.0
+          WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+          WHEN type IN ('payment', 'collection') THEN paid_amount
+          WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
+          WHEN type = 'refund' AND paid_amount = 0 THEN amount
+          ELSE 0.0
+        END AS balance_effect
+      FROM financial_transactions;
+    ''');
+  }
+
   static Future<void> createTables(Database db) async {
     // Users table
     await db.execute('''
@@ -372,58 +429,8 @@ class DatabaseSchema {
       )
     ''');
 
-    // Create financial ledger view
-    await db.execute('''
-      CREATE VIEW IF NOT EXISTS v_financial_ledger AS
-      SELECT 
-        id,
-        type,
-        customer_id,
-        amount,
-        paid_amount,
-        debt_amount,
-        reference_id,
-        created_at,
-        CASE 
-          WHEN type = 'sale' THEN amount
-          WHEN type = 'cancellation' THEN -amount
-          ELSE 0
-        END AS debit,
-        CASE 
-          WHEN type = 'sale' THEN paid_amount
-          WHEN type = 'payment' THEN amount
-          WHEN type = 'collection' THEN amount
-          WHEN type = 'refund' THEN amount
-          WHEN type = 'cancellation' THEN -paid_amount
-          ELSE 0
-        END AS credit
-      FROM financial_transactions
-      WHERE (COALESCE(is_deleted, 0) = 0) AND deleted_at IS NULL
-    ''');
-
-    // Canonical customer ledger effect view (Single source of truth for balance calculation)
-    await db.execute('''
-      CREATE VIEW IF NOT EXISTS v_customer_ledger_effect AS
-      SELECT 
-        id,
-        customer_id,
-        type,
-        amount,
-        paid_amount,
-        debt_amount,
-        reference_id,
-        created_at,
-        is_deleted,
-        CASE 
-          WHEN COALESCE(is_deleted, 0) != 0 OR deleted_at IS NOT NULL THEN 0.0
-          WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
-          WHEN type IN ('payment', 'collection') THEN paid_amount
-          WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
-          WHEN type = 'refund' AND paid_amount = 0 THEN amount
-          ELSE 0.0
-        END AS balance_effect
-      FROM financial_transactions;
-    ''');
+    // Create financial ledger views (Single source of truth)
+    await createViews(db);
 
     // Create settings table
     await db.execute('''

@@ -107,6 +107,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   String? _signature;
   int? _fileSizeBytes;
   Timer? _updateCheckTimer;
+  Timer? _autoBackupTimer;
   bool _updateCheckRunning = false;
   bool _updateDialogVisible = false;
   String? _lastPromptedVersion;
@@ -157,6 +158,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _updateCheckTimer?.cancel();
+    _autoBackupTimer?.cancel();
     // Bekleyen onay talebi varsa güvenli biçimde reddet (postpone)
     final pendingConsent = ref.read(coreNextConsentRequestProvider);
     if (pendingConsent != null && !pendingConsent.completer.isCompleted) {
@@ -204,6 +206,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       (_) => unawaited(_checkForLiveUpdate()),
     );
     _triggerAutoBackup();
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = Timer.periodic(
+      const Duration(hours: 4),
+      (_) => _triggerAutoBackup(),
+    );
   }
 
   void _retryStartupChecks() {
@@ -218,8 +225,17 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   void _triggerAutoBackup() {
-    ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e) {
+    ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e, st) {
       debugPrint('Otomatik yedekleme hatası: $e');
+      try {
+        TelemetryService().logError(
+          e is Exception ? e : Exception(e.toString()),
+          st is StackTrace ? st : StackTrace.current,
+          context: 'auto_backup_failure',
+        );
+      } catch (_) {
+        // Telemetri log hatası kritik akışı bozmaz
+      }
     });
   }
 

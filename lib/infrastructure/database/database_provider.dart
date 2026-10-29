@@ -687,59 +687,7 @@ class DatabaseManager {
 
       // Recreate views to make sure they are up-to-date with any schema changes/fixes
       try {
-        await db.execute('DROP VIEW IF EXISTS v_financial_ledger');
-        await db.execute('''
-          CREATE VIEW v_financial_ledger AS
-          SELECT 
-            id,
-            type,
-            customer_id,
-            amount,
-            paid_amount,
-            debt_amount,
-            reference_id,
-            created_at,
-            CASE 
-              WHEN type = 'sale' THEN amount
-              WHEN type = 'manual_debt' THEN amount
-              WHEN type = 'cancellation' THEN -amount
-              ELSE 0
-            END AS debit,
-            CASE 
-              WHEN type = 'sale' THEN paid_amount
-              WHEN type = 'payment' THEN amount
-              WHEN type = 'collection' THEN amount
-              WHEN type = 'refund' THEN amount
-              WHEN type = 'cancellation' THEN -paid_amount
-              ELSE 0
-            END AS credit
-          FROM financial_transactions
-          WHERE (COALESCE(is_deleted, 0) = 0) AND deleted_at IS NULL
-        ''');
-
-        await db.execute('DROP VIEW IF EXISTS v_customer_ledger_effect');
-        await db.execute('''
-          CREATE VIEW v_customer_ledger_effect AS
-          SELECT 
-            id,
-            customer_id,
-            type,
-            amount,
-            paid_amount,
-            debt_amount,
-            reference_id,
-            created_at,
-            is_deleted,
-            CASE 
-              WHEN COALESCE(is_deleted, 0) != 0 OR deleted_at IS NOT NULL THEN 0.0
-              WHEN type IN ('sale', 'manual_debt') THEN -(CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
-              WHEN type IN ('payment', 'collection') THEN paid_amount
-              WHEN type = 'cancellation' THEN (CASE WHEN debt_amount > 0 THEN debt_amount ELSE (amount - paid_amount) END)
-              WHEN type = 'refund' AND paid_amount = 0 THEN amount
-              ELSE 0.0
-            END AS balance_effect
-          FROM financial_transactions;
-        ''');
+        await DatabaseSchema.createViews(db);
       } catch (_) {
         // View might fail if table does not exist in initial configuration
       }

@@ -4,7 +4,7 @@
   "metrics": {
     "money_real_columns": 43,
     "money_double_fields": 253,
-    "balance_formula_copies": 8,
+    "balance_formula_copies": 7,
     "ledger_bypass_toggles": 0,
     "hardcoded_data_repair_ids": 0,
     "ui_imports_database": 5,

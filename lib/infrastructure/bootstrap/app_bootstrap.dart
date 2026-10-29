@@ -398,7 +398,11 @@ class AppBootstrap {
               ref.read(coreNextMigrationProgressProvider.notifier).state = progress;
             },
           );
-          if (!result.isSuccess) {
+          if (result.isSuccess) {
+            final prefs = ref.read(sharedPreferencesProvider);
+            await prefs.setBool('core_next_pilot_enabled', true);
+            debugPrint('[AppBootstrap] 🎉 Core Next migration ve mutabakat başarıyla tamamlandı, pilot aktif edildi.');
+          } else {
             debugPrint('[AppBootstrap] ⚠️ Core Next koordinasyonu başarısız: ${result.errorMessage}. Legacy akış korunuyor.');
           }
         }

@@ -16,6 +16,8 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/migration/safe_rollback_coordinator.dart';
 import 'package:serenutos/infrastructure/migration/cutoff_maintenance_lock.dart';
 import 'package:serenutos/infrastructure/bootstrap/pilot_cutover_gate.dart';
+import 'package:serenutos/core_next/infrastructure/database/app_database.dart';
+import 'package:serenutos/core_next/infrastructure/migration/migration_bridge_engine.dart';
 
 /// Core Next Migration Yaşam Döngüsü Durumları
 enum CoreNextMigrationState {
@@ -988,8 +990,23 @@ class CoreNextBootstrapCoordinator {
   }
 }
 
-/// Core Next Migration Runner Provider (Varsayılan: null — Cutover henüz aktif değildir)
-final coreNextMigrationRunnerProvider = Provider<CoreNextMigrationRunner?>((ref) => null);
+/// Core Next Migration Runner Provider
+final coreNextMigrationRunnerProvider = Provider<CoreNextMigrationRunner?>((ref) {
+  return ({
+    required Database legacyDb,
+    required Database targetDb,
+    String? legacyFilePath,
+    bool fullScope = false,
+  }) async {
+    final coreAppDb = CoreAppDatabase(targetDb);
+    final engine = MigrationBridgeEngine(coreAppDb);
+    return await engine.migrateFromLegacy(
+      legacyDb,
+      legacyFilePath: legacyFilePath,
+      fullScope: fullScope,
+    );
+  };
+});
 
 /// Core Next Rollback Guard Provider (Varsayılan: null)
 final coreNextRollbackGuardProvider = Provider<CoreNextRollbackGuard?>((ref) => null);
