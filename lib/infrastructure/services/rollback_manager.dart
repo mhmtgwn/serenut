@@ -151,7 +151,9 @@ class RollbackManager {
       try {
         final db = await DatabaseManager.instance.getDatabase();
         await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[RollbackManager] WAL checkpoint non-fatal: $e');
+      }
 
       final String dbPath = join(await getDatabasesPath(), 'serenut_pos.db');
       final dbFile = File(dbPath);
@@ -188,7 +190,9 @@ class RollbackManager {
       try {
         final db = await DatabaseManager.instance.getDatabase();
         await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[RollbackManager] WAL checkpoint before rollback non-fatal: $e');
+      }
       await DatabaseManager.instance.close();
 
       // 1. Rollback sqlite databases

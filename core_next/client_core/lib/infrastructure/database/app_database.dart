@@ -37,7 +37,9 @@ class CoreAppDatabase {
       } finally {
         await raf.close();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreAppDatabase] Could not read SQLite user_version header: $e');
+    }
     return 0;
   }
 

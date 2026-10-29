@@ -353,7 +353,9 @@ class LicenseService {
               maxFound = dt;
             }
           }
-        } catch (_) {}
+        } catch (tableErr) {
+          debugPrint('[LicenseService] checkTable failed for $tableName: $tableErr');
+        }
       }
 
       await checkTable('sales', 'created_at');

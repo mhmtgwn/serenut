@@ -222,7 +222,9 @@ class DualDatabaseRoutingCoordinator {
                     conflictAlgorithm: ConflictAlgorithm.replace,
                   );
                 }
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('[DualDbRouting] Legacy cursor migration skipped: $e');
+              }
             }
 
             final pullWorker = SyncV4PullWorker(

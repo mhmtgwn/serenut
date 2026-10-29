@@ -341,7 +341,23 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
     if (!success) {
       return res.status(400).json({ error: 'invalid_token', message: 'Geçersiz veya süresi dolmuş token.' });
     }
-    if (success && success.email) { try { const loginData = await AuthService.login(success.email, newPassword, req.ip || req.socket.remoteAddress || undefined, req.headers['user-agent'] || undefined); return res.json({ success: true, ...loginData, message: 'Şifreniz başarıyla güncellendi ve giriş yapıldı.' }); } catch (_) {} }
+    if (success && success.email) {
+      try {
+        const loginData = await AuthService.login(
+          success.email,
+          newPassword,
+          req.ip || req.socket.remoteAddress || undefined,
+          req.headers['user-agent'] || undefined
+        );
+        return res.json({
+          success: true,
+          ...loginData,
+          message: 'Şifreniz başarıyla güncellendi ve giriş yapıldı.',
+        });
+      } catch (loginErr) {
+        logger.warn('Auto-login after password reset skipped:', loginErr);
+      }
+    }
     return res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
     if ((err as Error).message === 'weak_password') {

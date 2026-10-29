@@ -482,7 +482,9 @@ class CoreNextCustomerRepository implements ICustomerRepository {
         mutation.toDbRow(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextCustomerRepo] insert customer mutation error: $e');
+    }
 
     return 1;
   }
@@ -539,7 +541,9 @@ class CoreNextCustomerRepository implements ICustomerRepository {
         mutation.toDbRow(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextCustomerRepo] insert customer mutation error: $e');
+    }
 
     return count;
   }
@@ -572,7 +576,9 @@ class CoreNextCustomerRepository implements ICustomerRepository {
         mutation.toDbRow(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextCustomerRepo] insert customer mutation error: $e');
+    }
 
     return count;
   }

@@ -63,7 +63,9 @@ class BackupService implements IBackupService {
       // Fallback: WAL checkpoint TRUNCATE ve dosya kopyalama
       try {
         await activeDb.execute('PRAGMA wal_checkpoint(TRUNCATE)');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[BackupService] wal_checkpoint(TRUNCATE) non-fatal error: $e');
+      }
 
       final srcFile = File(sourcePath);
       if (!await srcFile.exists()) {
@@ -305,7 +307,9 @@ class BackupService implements IBackupService {
           if (await tmp.exists()) {
             await tmp.delete();
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[BackupService] Cleanup temp file error: $e');
+        }
       }
     }
   }
@@ -522,7 +526,9 @@ class BackupService implements IBackupService {
         notes: 'Veritabanı (${isCoreNextBackup ? "Core Next" : "Legacy"}) yedekten geri yüklendi: ${basename(backupPath)}',
         timestamp: DateTime.now(),
       ));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[BackupService] Telemetry audit log error after restore: $e');
+    }
 
     return true;
     } finally {

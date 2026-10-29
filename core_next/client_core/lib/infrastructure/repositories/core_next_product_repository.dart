@@ -217,7 +217,9 @@ class CoreNextProductRepository implements IProductRepository {
         mutation.toDbRow(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextProductRepo] insert product mutation error: $e');
+    }
 
     return count;
   }
@@ -257,7 +259,9 @@ class CoreNextProductRepository implements IProductRepository {
         mutation.toDbRow(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextProductRepo] insert product mutation error: $e');
+    }
 
     return count;
   }

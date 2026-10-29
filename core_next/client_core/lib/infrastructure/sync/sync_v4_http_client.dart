@@ -186,7 +186,9 @@ class SyncV4HttpClient {
           if (refreshed) {
             return await action();
           }
-        } catch (_) {}
+        } catch (refreshErr) {
+          debugPrint('[SyncHttpClient] Token refresh failed: $refreshErr');
+        }
       }
       rethrow;
     } on TimeoutException {

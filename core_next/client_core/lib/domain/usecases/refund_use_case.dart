@@ -169,7 +169,9 @@ class CoreRefundUseCase {
             try {
               existingPayload = jsonDecode(refSyncRow.first['payload_json'] as String) as Map<String, dynamic>;
               existingOriginalSaleId = existingPayload['reference_id'] as String?;
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[RefundUseCase] payload_json decode failed: $e');
+            }
           }
 
           if (existingOriginalSaleId != null && existingOriginalSaleId != request.originalSaleId) {

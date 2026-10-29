@@ -852,7 +852,9 @@ class EndOfDayRepository {
                 splitCash = (breakdown['cash_applied'] ?? breakdown['cash_tendered'] as num?)?.toDouble() ?? 0.0;
                 splitCard = (breakdown['card'] as num?)?.toDouble() ?? 0.0;
               }
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[EndOfDayRepo] Payment breakdown json parse error: $e');
+            }
           }
         } else if (_isCard(method)) {
           splitCash = 0.0;
@@ -920,7 +922,9 @@ class EndOfDayRepository {
             ));
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[EndOfDayRepo] Cash transactions query fallback error: $e');
+      }
     }
 
     return _TransactionsDataResult(
@@ -1288,7 +1292,9 @@ class EndOfDayRepository {
         effectiveTerminalId = prefs.getString('installation_id') ??
             prefs.getString('device_id') ??
             prefs.getString('terminal_id');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[EndOfDayRepo] SharedPreferences terminal_id read error: $e');
+      }
     }
     final countId = (effectiveTerminalId != null && effectiveTerminalId.isNotEmpty)
         ? 'count_${effectiveTerminalId}_$date'

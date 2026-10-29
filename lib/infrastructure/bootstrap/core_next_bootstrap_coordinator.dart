@@ -297,7 +297,9 @@ class CoreNextBootstrapCoordinator {
         await db.execute('PRAGMA foreign_keys = ON;');
         try {
           await db.rawQuery('PRAGMA journal_mode = WAL;');
-        } catch (_) {}
+        } catch (walErr) {
+          debugPrint('[CoreNextBootstrap] WAL pragma non-critical error: $walErr');
+        }
       },
     );
   }

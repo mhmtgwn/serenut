@@ -30,7 +30,9 @@ class TelemetryUploadService {
           _writeQueue = _writeQueue.then((_) async {
             try {
               await _recordMetricInternal(name, value, metadata: metadata);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[TelemetryUpload] Zone record metric error: $e');
+            }
           });
         });
       });

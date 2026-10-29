@@ -425,7 +425,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           await inventory.increaseStock(_inventoryItems(order.items));
           final orderRepo = await ref.read(orderRepositoryProvider.future);
           await orderRepo.delete(order.id);
-        } catch (_) {}
+        } catch (rollbackErr) {
+          debugPrint('[OrdersController] Compensating rollback error: $rollbackErr');
+        }
         rethrow;
       }
     }
@@ -698,7 +700,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       Future.delayed(const Duration(milliseconds: 500), () {
         try {
           syncNotifier.triggerSync().ignore();
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[OrdersController] triggerSync error: $e');
+        }
       });
 
       // If active filter no longer matches new status, smoothly filter from in-memory state
@@ -955,7 +959,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         Future.delayed(const Duration(milliseconds: 500), () {
           try {
             syncNotifier.triggerSync().ignore();
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('[OrdersController] triggerSync batch error: $e');
+          }
         });
         if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != targetStatus) {
           final current = state.valueOrNull;

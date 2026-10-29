@@ -215,7 +215,9 @@ class TelemetryService {
           Future<void>.delayed(Duration.zero, () async {
             try {
               await callback(telemetryEvent);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[TelemetryService] Callback error: $e');
+            }
           });
         });
       } else {
@@ -237,7 +239,9 @@ class TelemetryService {
           Future<void>.delayed(Duration.zero, () async {
             try {
               await criticalCallback(telemetryEvent);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[TelemetryService] Critical callback error: $e');
+            }
           });
         });
       } else {

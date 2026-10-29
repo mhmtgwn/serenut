@@ -536,7 +536,9 @@ class CoreNextFinancialTransactionRepository
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CoreNextFinancialTransactionRepo] insert mutation error: $e');
+    }
 
     return 1;
   }

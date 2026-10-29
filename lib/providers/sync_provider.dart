@@ -134,7 +134,9 @@ final coreNextSyncExecutorProvider = Provider<CoreNextSyncExecutor?>((ref) {
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SyncProvider] Legacy sync cursor carryover error: $e');
+      }
     }
 
     final pullWorker = SyncV4PullWorker(

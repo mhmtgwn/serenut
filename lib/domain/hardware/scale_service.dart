@@ -213,18 +213,26 @@ class SerialScaleAdapter implements IScaleAdapter {
   Future<void> disconnect() async {
     try {
       await _subscription?.cancel();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ScaleService] Subscription cancel error: $e');
+    }
     _subscription = null;
     try {
       _reader?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ScaleService] Reader close error: $e');
+    }
     _reader = null;
     try {
       _port?.close();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ScaleService] Port close error: $e');
+    }
     try {
       _port?.dispose();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ScaleService] Port dispose error: $e');
+    }
     _port = null;
     _state = HardwareConnectionState.disconnected;
   }

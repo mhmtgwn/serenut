@@ -15,7 +15,9 @@ function resolveUnicodeFont(): string | null {
   for (const candidate of FONT_CANDIDATES) {
     try {
       if (fs.existsSync(candidate)) return candidate;
-    } catch (_) {}
+    } catch (fontErr) {
+      continue;
+    }
   }
   return null;
 }
