@@ -47,48 +47,52 @@ class CrashRecoveryManager {
 
   /// Crash sonras\u0131 yar\u0131da kalan sync i\u015flemlerini kurtarır.
   ///
-  /// Strateji: sync_outbox_v4 tablosunda FAILED durumunda s\u0131k\u0131\u015f\u0131p kalm\u0131\u015f
-  /// sat\u0131rlar PENDING'e s\u0131f\u0131rlan\u0131r; bu sayede sync engine bunlar\u0131 yeniden
-  /// göndermeye \u00e7al\u0131\u015f\u0131r. failed_push_log tablosu \u00f6zel yap\u0131s\u0131 nedeniyle bu
-  /// i\u015flem i\u00e7in uygun de\u011fildir (payload/entity_type sütunu yok).
+  /// Strateji: Çökme anında 'SENDING' durumunda takılı kalmış outbox satırları
+  /// 'PENDING' durumuna geri alınır; ancak 'attempts' sayacı sıfırlanmaz ve 5 denemeyi
+  /// aşmış zehirli kayıtlar (poison pills) doğrudan 'DEAD_LETTER' durumuna çekilir.
+  /// 'DEAD_LETTER' veya 'CONFLICT' durumundaki kayıtlar asla canlandırılmaz.
   Future<int> recoverInterruptedSyncJobs() async {
     int replayed = 0;
     try {
       final db = await DatabaseManager.instance.getDatabase();
 
-      // sync_outbox_v4'te FAILED veya \u00e7ok uzun s\u00fcre PENDING kalm\u0131\u015f sat\u0131rlar\u0131
-      // bul (birden fazla deneme yap\u0131lm\u0131\u015f ama hi\u00e7 tamamlanmam\u0131\u015f).
-      final List<Map<String, dynamic>> stuckEntries = await db.query(
+      // 1. Attempts ceiling: 5 veya daha fazla başarısız denemesi olan satırları
+      // DEAD_LETTER durumuna alarak sonsuz döngüleri engelle.
+      await db.rawUpdate('''
+        UPDATE sync_outbox_v4
+        SET state = 'DEAD_LETTER'
+        WHERE attempts >= 5 AND state IN ('PENDING', 'SENDING', 'REJECTED', 'FAILED')
+      ''');
+
+      // 2. Çökme veya elektrik kesintisi anında 'SENDING' durumunda kalmış satırları
+      // 'PENDING' durumuna al, ancak attempts sayacını koru (asla sıfırlama).
+      final stuckSending = await db.query(
         'sync_outbox_v4',
-        where: "state IN ('FAILED', 'PENDING') AND attempts > 0",
+        where: "state = 'SENDING' AND attempts < 5",
       );
 
-      if (stuckEntries.isNotEmpty) {
+      if (stuckSending.isNotEmpty) {
         debugPrint(
-            '[CrashRecovery] ${stuckEntries.length} yar\u0131da kalm\u0131\u015f outbox sat\u0131r\u0131 bulundu. PENDING\u2019e s\u0131f\u0131rlan\u0131yor...');
+            '[CrashRecovery] ${stuckSending.length} yarıda kalmış (SENDING) outbox satırı bulundu. PENDING durumuna alınıyor...');
         await db.update(
           'sync_outbox_v4',
-          {
-            'state': 'PENDING',
-            'attempts': 0,
-          },
-          where: "state IN ('FAILED', 'PENDING') AND attempts > 0",
+          {'state': 'PENDING'},
+          where: "state = 'SENDING' AND attempts < 5",
         );
-        replayed = stuckEntries.length;
+        replayed = stuckSending.length;
       }
 
-      // failed_push_log'daki \u00e7\u00f6z\u00fcmlenmemi\u015f kay\u0131tlar\u0131 raporla (schema s\u0131n\u0131rlamas\u0131
-      // nedeniyle direkt replay yap\u0131lm\u0131yor, ancak op say\u0131s\u0131 loglan\u0131yor).
+      // failed_push_log'daki çözümlenmemiş kayıtları raporla
       final pendingPushLogs = await db.rawQuery(
         'SELECT COUNT(*) as cnt FROM failed_push_log WHERE resolved = 0',
       );
       final pendingCount = (pendingPushLogs.first['cnt'] as int?) ?? 0;
       if (pendingCount > 0) {
         debugPrint(
-            '[CrashRecovery] failed_push_log\u2019da $pendingCount \u00e7\u00f6z\u00fcmlenmemi\u015f hata kayd\u0131 var.');
+            '[CrashRecovery] failed_push_log’da $pendingCount çözümlenmemiş hata kaydı var.');
       }
     } catch (e) {
-      debugPrint('[CrashRecovery] Kurtarma i\u015flemi hata verdi: $e');
+      debugPrint('[CrashRecovery] Kurtarma işlemi hata verdi: $e');
     }
     return replayed;
   }

@@ -379,6 +379,7 @@ void main() {
         customLegacyFilePath: legacyDbPath,
         customBackupDirectory: backupDirPath,
         prefs: prefs,
+        autonomousMode: true,
       );
 
       final container = ProviderContainer(
@@ -415,6 +416,7 @@ void main() {
         customLegacyFilePath: legacyDbPath,
         customBackupDirectory: backupDirPath,
         prefs: prefs,
+        autonomousMode: true,
         migrationRunner: ({required legacyDb, required targetDb, legacyFilePath, fullScope = true}) async {
           return MigrationBridgeEngine(coreDb).migrateFromLegacy(
             legacyDb,
@@ -513,6 +515,7 @@ void main() {
         customLegacyFilePath: legacyDbPath,
         customBackupDirectory: backupDirPath,
         prefs: prefs,
+        autonomousMode: true,
         migrationRunner: ({required legacyDb, required targetDb, legacyFilePath, fullScope = true}) async {
           return MigrationBridgeEngine(coreDb).migrateFromLegacy(
             legacyDb,
