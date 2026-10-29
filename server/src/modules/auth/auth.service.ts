@@ -31,6 +31,8 @@ const LOCK_TIME_MS = Number(process.env.LOGIN_LOCK_MINUTES || 5) * 60 * 1000;
 
 // SHA-256 hex hash is always exactly 64 chars — used to detect legacy hashes
 const SHA256_HEX_LENGTH = 64;
+// Dummy bcrypt hash to equalize timing on non-existent user lookups (mitigates user enumeration)
+const DUMMY_BCRYPT_HASH = '$2b$12$e8Y7Yx4YwL9Zf1V4gqfLse9TqL5bS5H1IqK8YvL6M9R4V2Q7Z2R2e';
 
 export interface UserPayload {
   jti?: string; // JWT unique ID claim
@@ -96,6 +98,8 @@ export class AuthService {
       );
 
       if (userRes.rows.length === 0) {
+        // Equalize response timing via dummy bcrypt comparison to prevent user enumeration
+        await bcrypt.compare(passwordPlain, DUMMY_BCRYPT_HASH);
         throw new Error('invalid_credentials');
       }
 
@@ -297,7 +301,7 @@ export class AuthService {
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 
       const sessRes = await client.query(
-        'SELECT id, user_id, company_id, is_revoked, expires_at, updated_at, replaced_by FROM sessions WHERE refresh_token = $1',
+        'SELECT id, user_id, company_id, is_revoked, expires_at, updated_at, replaced_by FROM sessions WHERE refresh_token = $1 FOR UPDATE',
         [oldRefreshToken]
       );
 
@@ -574,6 +578,7 @@ export class AuthService {
       return jwt.verify(token, JWT_SECRET!, {
         issuer: JWT_ISSUER,
         audience: JWT_AUDIENCE,
+        algorithms: ['HS256'],
       }) as UserPayload;
     } catch (err) {
       throw new Error('invalid_access_token');

@@ -308,34 +308,163 @@ function enforceSchemaHandshake(req: Request, res: Response, next: NextFunction)
 app.use(enforceSchemaHandshake);
 
 let webVisitsTableReady = false;
-async function recordWebVisit(pagePath: string, visitorHash: string, source: string, device: string) {
+
+interface WebVisitPayload {
+  pagePath: string;
+  visitorHash: string;
+  source: string;
+  device: string;
+  sessionId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  durationSeconds?: number;
+  maxScrollPct?: number;
+}
+
+interface WebEventPayload {
+  sessionId: string;
+  visitorHash: string;
+  eventName: string;
+  eventCategory?: string;
+  eventLabel?: string;
+  pagePath: string;
+}
+
+async function ensureWebAnalyticsTables(client: any) {
+  if (webVisitsTableReady) return;
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS web_page_visits (
+      id BIGSERIAL PRIMARY KEY,
+      page_path VARCHAR(120) NOT NULL,
+      visitor_hash VARCHAR(64) NOT NULL,
+      traffic_source VARCHAR(60) NOT NULL DEFAULT 'Direkt Giriş',
+      device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü',
+      session_id VARCHAR(64),
+      utm_source VARCHAR(80),
+      utm_medium VARCHAR(80),
+      utm_campaign VARCHAR(100),
+      duration_seconds INT NOT NULL DEFAULT 0,
+      max_scroll_pct INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_web_page_visits_created_at ON web_page_visits(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_web_page_visits_session ON web_page_visits(session_id);
+    CREATE INDEX IF NOT EXISTS idx_web_page_visits_visitor ON web_page_visits(visitor_hash);
+
+    CREATE TABLE IF NOT EXISTS web_analytics_events (
+      id BIGSERIAL PRIMARY KEY,
+      session_id VARCHAR(64) NOT NULL,
+      visitor_hash VARCHAR(64) NOT NULL,
+      event_name VARCHAR(60) NOT NULL,
+      event_category VARCHAR(40) NOT NULL DEFAULT 'interaction',
+      event_label VARCHAR(150),
+      page_path VARCHAR(120) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_web_analytics_events_created_at ON web_analytics_events(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_web_analytics_events_name ON web_analytics_events(event_name);
+  `);
+  // Ensure backward compatible schema evolution
+  await client.query(`
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS session_id VARCHAR(64);
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS utm_source VARCHAR(80);
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS utm_medium VARCHAR(80);
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS utm_campaign VARCHAR(100);
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS duration_seconds INT NOT NULL DEFAULT 0;
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS max_scroll_pct INT NOT NULL DEFAULT 0;
+    ALTER TABLE web_page_visits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  `).catch(() => {});
+  webVisitsTableReady = true;
+}
+
+async function recordWebVisit(data: WebVisitPayload) {
   let client;
   try {
     client = await pgPool.connect();
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
-    if (!webVisitsTableReady) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS web_page_visits (
-          id BIGSERIAL PRIMARY KEY,
-          page_path VARCHAR(120) NOT NULL,
-          visitor_hash VARCHAR(64) NOT NULL,
-          traffic_source VARCHAR(40) NOT NULL DEFAULT 'Direkt Giriş',
-          device_type VARCHAR(20) NOT NULL DEFAULT 'Masaüstü',
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-      await client.query(`CREATE INDEX IF NOT EXISTS idx_web_page_visits_created_at ON web_page_visits(created_at DESC)`);
-      webVisitsTableReady = true;
-    }
+    await ensureWebAnalyticsTables(client);
     await client.query(
-      `INSERT INTO web_page_visits (page_path, visitor_hash, traffic_source, device_type) VALUES ($1, $2, $3, $4)`,
-      [pagePath, visitorHash, source, device]
+      `INSERT INTO web_page_visits (
+        page_path, visitor_hash, traffic_source, device_type,
+        session_id, utm_source, utm_medium, utm_campaign,
+        duration_seconds, max_scroll_pct
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        data.pagePath,
+        data.visitorHash,
+        data.source,
+        data.device,
+        data.sessionId || null,
+        data.utmSource || null,
+        data.utmMedium || null,
+        data.utmCampaign || null,
+        data.durationSeconds || 0,
+        data.maxScrollPct || 0,
+      ]
     );
     await client.query('COMMIT');
   } catch (err: any) {
     if (client) await client.query('ROLLBACK').catch(() => {});
-    logger.warn('Web visit telemetry record failed', { error: err?.message, pagePath });
+    logger.warn('Web visit telemetry record failed', { error: err?.message, pagePath: data.pagePath });
+  } finally {
+    if (client) client.release();
+  }
+}
+
+async function updateVisitDwellTime(sessionId: string, pagePath: string, durationSeconds: number, scrollPct: number) {
+  let client;
+  try {
+    client = await pgPool.connect();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    await ensureWebAnalyticsTables(client);
+    await client.query(
+      `UPDATE web_page_visits
+       SET duration_seconds = GREATEST(duration_seconds, $1),
+           max_scroll_pct = GREATEST(max_scroll_pct, $2),
+           updated_at = NOW()
+       WHERE id = (
+         SELECT id FROM web_page_visits
+         WHERE session_id = $3 AND page_path = $4
+         ORDER BY id DESC LIMIT 1
+       )`,
+      [durationSeconds, scrollPct, sessionId, pagePath]
+    );
+    await client.query('COMMIT');
+  } catch (err: any) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+  } finally {
+    if (client) client.release();
+  }
+}
+
+async function recordWebEvent(data: WebEventPayload) {
+  let client;
+  try {
+    client = await pgPool.connect();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    await ensureWebAnalyticsTables(client);
+    await client.query(
+      `INSERT INTO web_analytics_events (
+        session_id, visitor_hash, event_name, event_category, event_label, page_path
+      ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        data.sessionId,
+        data.visitorHash,
+        data.eventName,
+        data.eventCategory || 'interaction',
+        data.eventLabel || null,
+        data.pagePath,
+      ]
+    );
+    await client.query('COMMIT');
+  } catch (err: any) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    logger.warn('Web analytics event record failed', { error: err?.message, event: data.eventName });
   } finally {
     if (client) client.release();
   }
@@ -367,8 +496,19 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
         const ref = String(req.headers['referer'] || req.query.utm_source || '').toLowerCase();
         const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
         const device = /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
+        const utmSource = req.query.utm_source ? String(req.query.utm_source).slice(0, 80) : undefined;
+        const utmMedium = req.query.utm_medium ? String(req.query.utm_medium).slice(0, 80) : undefined;
+        const utmCampaign = req.query.utm_campaign ? String(req.query.utm_campaign).slice(0, 100) : undefined;
         setImmediate(() => {
-          recordWebVisit(normPath, visitorHash, source, device).catch(() => {});
+          recordWebVisit({
+            pagePath: normPath,
+            visitorHash,
+            source,
+            device,
+            utmSource,
+            utmMedium,
+            utmCampaign,
+          }).catch(() => {});
         });
       }
     }
@@ -395,7 +535,73 @@ app.post('/api/v1/telemetry/visit', express.text({ type: ['application/json', 't
         const source = /google|bing|yandex|duckduckgo/.test(ref) ? 'Arama Motoru (Google)' : /instagram|facebook|t\.co|twitter|linkedin|youtube|tiktok|wa\.me|whatsapp/.test(ref) ? 'Sosyal Medya' : (!ref || ref.includes('serenut.')) ? 'Direkt Giriş' : 'Diğer Yönlendirme';
         const device = body.screen === 'Mobil' || /mobile|android|iphone|ipad/i.test(ua) ? 'Mobil' : 'Masaüstü';
         setImmediate(() => {
-          recordWebVisit(normPath, visitorHash, source, device).catch(() => {});
+          recordWebVisit({
+            pagePath: normPath,
+            visitorHash,
+            source,
+            device,
+            sessionId: body.session_id ? String(body.session_id).slice(0, 64) : undefined,
+            utmSource: body.utm_source ? String(body.utm_source).slice(0, 80) : undefined,
+            utmMedium: body.utm_medium ? String(body.utm_medium).slice(0, 80) : undefined,
+            utmCampaign: body.utm_campaign ? String(body.utm_campaign).slice(0, 100) : undefined,
+            durationSeconds: typeof body.duration === 'number' ? Math.min(Math.max(body.duration, 0), 7200) : 0,
+            maxScrollPct: typeof body.scroll_depth === 'number' ? Math.min(Math.max(body.scroll_depth, 0), 100) : 0,
+          }).catch(() => {});
+        });
+      }
+    }
+  } catch (_) {}
+  res.status(204).end();
+});
+
+// Beacon / Dwell & Heartbeat Update Endpoint
+app.post('/api/v1/telemetry/dwell', express.text({ type: ['application/json', 'text/plain'] }), (req: Request, res: Response) => {
+  try {
+    let body: any = {};
+    if (typeof req.body === 'string') {
+      try { body = JSON.parse(req.body); } catch (_) {}
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body;
+    }
+    const sessionId = body.session_id ? String(body.session_id).slice(0, 64) : '';
+    const normPath = normalizeTrackedPath(body.path || req.headers['referer'] || '/');
+    const duration = typeof body.duration === 'number' ? Math.min(Math.max(body.duration, 0), 7200) : 0;
+    const scroll = typeof body.scroll_depth === 'number' ? Math.min(Math.max(body.scroll_depth, 0), 100) : 0;
+    if (sessionId && normPath && (duration > 0 || scroll > 0)) {
+      setImmediate(() => {
+        updateVisitDwellTime(sessionId, normPath, duration, scroll).catch(() => {});
+      });
+    }
+  } catch (_) {}
+  res.status(204).end();
+});
+
+// Beacon / Interaction Event Ping Endpoint
+app.post('/api/v1/telemetry/event', express.text({ type: ['application/json', 'text/plain'] }), (req: Request, res: Response) => {
+  try {
+    let body: any = {};
+    if (typeof req.body === 'string') {
+      try { body = JSON.parse(req.body); } catch (_) {}
+    } else if (req.body && typeof req.body === 'object') {
+      body = req.body;
+    }
+    const eventName = body.event ? String(body.event).slice(0, 60) : '';
+    const sessionId = body.session_id ? String(body.session_id).slice(0, 64) : '';
+    const normPath = normalizeTrackedPath(body.path || req.headers['referer'] || '/');
+    if (eventName && sessionId && normPath) {
+      const ua = String(req.headers['user-agent'] || '');
+      if (ua && !/bot|crawl|spider|slurp|curl|wget|headless/i.test(ua)) {
+        const dayKey = new Date().toISOString().slice(0, 10);
+        const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+        setImmediate(() => {
+          recordWebEvent({
+            sessionId,
+            visitorHash,
+            eventName,
+            eventCategory: body.category ? String(body.category).slice(0, 40) : 'interaction',
+            eventLabel: body.label ? String(body.label).slice(0, 150) : undefined,
+            pagePath: normPath,
+          }).catch(() => {});
         });
       }
     }
