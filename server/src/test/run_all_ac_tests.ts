@@ -62,7 +62,7 @@ function runTest(filename: string): Promise<{ success: boolean; output: string }
     const filePath = path.join(__dirname, filename);
     console.log(`⏳ Running ${filename}...`);
     
-    exec(`npx ts-node "${filePath}"`, { env: process.env }, (error, stdout, stderr) => {
+    exec(`npx --yes ts-node "${filePath}"`, { env: process.env }, (error, stdout, stderr) => {
       const output = stdout + stderr;
       if (error) {
         resolve({ success: false, output });

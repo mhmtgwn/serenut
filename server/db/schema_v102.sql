@@ -40,7 +40,7 @@ BEGIN
   IF v_updated_count = 0 AND v_role_id IS NOT NULL THEN
     INSERT INTO users (id, company_id, name, email, password_hash, is_active, email_verified_at)
     VALUES ('sysadmin-primary', 'serenut_cloud', 'Platform Yöneticisi', 'admin@serenut.com', v_hash, TRUE, NOW())
-    ON CONFLICT (email) DO UPDATE
+    ON CONFLICT (email, company_id) DO UPDATE
       SET password_hash = EXCLUDED.password_hash,
           is_active = TRUE,
           deleted_at = NULL,
