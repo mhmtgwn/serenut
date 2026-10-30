@@ -177,6 +177,13 @@ class _OrdersPageState extends ConsumerState<OrdersPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(syncProvider, (prev, next) {
+      if (prev?.status == SyncStatus.syncing && next.status != SyncStatus.syncing) {
+        _refreshCounts();
+        ref.read(ordersControllerProvider.notifier).refresh();
+      }
+    });
+
     ref.listen(ordersControllerProvider, (_, next) {
       if (next.hasValue) {
         _refreshCounts();

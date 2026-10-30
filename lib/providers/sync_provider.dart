@@ -23,6 +23,7 @@ import 'package:serenutos/presentation/controllers/order_details_controller.dart
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
@@ -524,6 +525,8 @@ class SyncNotifier extends StateNotifier<SyncState>
           _ref.invalidate(ordersCustomersControllerProvider);
           _ref.invalidate(ordersProductsControllerProvider);
           _ref.invalidate(customerLookupMapProvider);
+          _ref.invalidate(dashboardProvider);
+          _ref.invalidate(dashboardRepositoryProvider);
         }
 
         if (invalidateAll ||
@@ -537,6 +540,7 @@ class SyncNotifier extends StateNotifier<SyncState>
           _ref.invalidate(todayRevenueProvider);
           _ref.invalidate(reportRepositoryProvider);
           _ref.invalidate(dashboardRepositoryProvider);
+          _ref.invalidate(dashboardProvider);
         }
       }
 

@@ -109,6 +109,14 @@ extension SyncV4Recovery on SyncV4Service {
   /// any unsynced local rows so both PC and mobile devices converge completely.
   Future<void> _recoverUnsyncedAndRejectedEntities(Database db) async {
     await DatabaseManager.retryOnLock(() async {
+      // Re-enable any dead-lettered or rejected orders/sales so cross-device sync catches up completely
+      await db.rawUpdate('''
+        UPDATE sync_outbox_v4
+           SET state = 'PENDING', attempts = 0
+         WHERE entity_type IN ('order', 'sale')
+           AND state IN ('REJECTED', 'DEAD_LETTER')
+      ''');
+
       await db.rawUpdate('''
         UPDATE sync_outbox_v4
            SET state = 'DEAD_LETTER'

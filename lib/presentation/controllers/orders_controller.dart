@@ -301,9 +301,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
     ref.invalidate(productsControllerProvider);
     ref.invalidate(dashboardProvider);
-    Future.delayed(const Duration(milliseconds: 500), () {
-      ref.read(syncProvider.notifier).triggerSync().ignore();
-    });
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
 
     // In-memory prepend for instantaneous 0ms UI update
     final current = state.valueOrNull ?? [];
@@ -705,15 +703,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             context: 'orders_controller', level: LogLevel.warning);
       }));
 
-      // Non-blocking background sync trigger
-      final syncNotifier = ref.read(syncProvider.notifier);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        try {
-          syncNotifier.triggerSync().ignore();
-        } catch (e) {
-          debugPrint('[OrdersController] triggerSync error: $e');
-        }
-      });
+      // Immediate non-blocking background sync trigger
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
 
       // If active filter no longer matches new status, smoothly filter from in-memory state
       if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != status) {
@@ -979,14 +970,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           ref.invalidate(customerBalanceDetailsProvider(custId));
         }
         ref.invalidate(customerBalanceSummaryProvider);
-        final syncNotifier = ref.read(syncProvider.notifier);
-        Future.delayed(const Duration(milliseconds: 500), () {
-          try {
-            syncNotifier.triggerSync().ignore();
-          } catch (e) {
-            debugPrint('[OrdersController] triggerSync batch error: $e');
-          }
-        });
+        unawaited(ref.read(syncProvider.notifier).triggerSync());
         if (_statusFilter != null && _statusFilter != 'all' && _statusFilter != targetStatus) {
           final current = state.valueOrNull;
           if (current != null) {

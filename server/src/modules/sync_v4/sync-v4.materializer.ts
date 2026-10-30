@@ -444,8 +444,8 @@ export async function upsertOrder(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const customerId = stringValue(payload, "customer_id");
-  if (!customerId) throw new Error("invalid_mutation");
+  const rawCustomerId = stringValue(payload, "customer_id");
+  const customerId = rawCustomerId || `walkin_${companyId}`;
   const rawOrderNumber = stringValue(payload, "order_number");
   const orderNumber = rawOrderNumber || `SYNC-${id}`;
   const items = Array.isArray(payload.items) ? payload.items : [];
@@ -455,7 +455,7 @@ export async function upsertOrder(
     `INSERT INTO customers (id, company_id, name, status, is_deleted, created_at, updated_at)
      VALUES ($1, $2, $3, 'active', false, NOW(), NOW())
      ON CONFLICT (id) DO NOTHING`,
-    [customerId, companyId, stringValue(payload, "customer_name") || `Müşteri (${customerId})`],
+    [customerId, companyId, stringValue(payload, "customer_name") || (rawCustomerId ? `Müşteri (${customerId})` : "Genel Müşteri")],
   );
 
   await client.query(
@@ -499,21 +499,23 @@ export async function upsertOrder(
     );
   }
 
-  await client.query("DELETE FROM customer_order_items WHERE order_id = $1 AND company_id = $2", [id, companyId]);
-  for (let index = 0; index < items.length; index++) {
-    const item = items[index];
-    if (!item || typeof item !== "object") throw new Error("invalid_mutation");
-    const row = item as Record<string, unknown>;
-    const productId = stringValue(row, "product_id");
-    if (!productId) throw new Error("invalid_mutation");
+  if (items.length > 0) {
+    await client.query("DELETE FROM customer_order_items WHERE order_id = $1 AND company_id = $2", [id, companyId]);
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+      if (!item || typeof item !== "object") throw new Error("invalid_mutation");
+      const row = item as Record<string, unknown>;
+      const productId = stringValue(row, "product_id");
+      if (!productId) throw new Error("invalid_mutation");
 
-    await client.query(
-      `INSERT INTO customer_order_items (id, order_id, product_id, product_name, quantity, unit_price, company_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
-      [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
-        stringValue(row, "product_name") || null, numberValue(row, "quantity"),
-        numberValue(row, "unit_price"), companyId, isoDateValue(row, "created_at")],
-    );
+      await client.query(
+        `INSERT INTO customer_order_items (id, order_id, product_id, product_name, quantity, unit_price, company_id, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
+        [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
+          stringValue(row, "product_name") || null, numberValue(row, "quantity"),
+          numberValue(row, "unit_price"), companyId, isoDateValue(row, "created_at")],
+      );
+    }
   }
 }
 

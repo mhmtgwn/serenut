@@ -268,13 +268,6 @@ router.post("/push", async (req, res) => {
         entity.rows[0]?.is_deleted === true && !explicitlyReactivatesDeletedProduct
           ? "DELETE"
           : mutation.operation;
-      const domainMutation: SyncMutation = {
-        entity_type: mutation.entity_type,
-        entity_id: mutation.entity_id,
-        operation: effectiveOperation,
-        payload: mutation.payload,
-        base_revision: mutation.base_revision,
-      };
       // The domain write and the durable replication record are atomic. Never
       // acknowledge a mutation that cannot be materialized for another device.
       const sanitizedPayload = (typeof mutation.payload === 'object' && mutation.payload !== null)
@@ -288,6 +281,13 @@ router.post("/push", async (req, res) => {
       ) {
         sanitizedPayload.customer_id = '';
       }
+      const domainMutation: SyncMutation = {
+        entity_type: mutation.entity_type,
+        entity_id: mutation.entity_id,
+        operation: effectiveOperation,
+        payload: sanitizedPayload,
+        base_revision: mutation.base_revision,
+      };
 
       await applyDomainMutation(client, user.company_id, domainMutation, user.id);
       const inserted = await client.query(
