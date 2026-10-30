@@ -8,7 +8,6 @@ process.env.NODE_ENV = 'test';
 
 import { exec } from 'child_process';
 import path from 'path';
-import fs from 'fs';
 import { assertSafeTestEnvironment } from '../config/test-db-guard';
 
 // ---------------------------------------------------------
@@ -63,8 +62,15 @@ function runTest(filename: string): Promise<{ success: boolean; output: string }
     const filePath = path.join(__dirname, filename);
     console.log(`⏳ Running ${filename}...`);
     
-    const tsNodeBin = path.resolve(__dirname, '../../node_modules/.bin/ts-node');
-    const cmd = fs.existsSync(tsNodeBin) ? `"${tsNodeBin}" "${filePath}"` : `npx --yes ts-node "${filePath}"`;
+    let tsNodeDist = '';
+    try {
+      tsNodeDist = require.resolve('ts-node/dist/bin.js', { paths: [path.resolve(__dirname, '../..')] });
+    } catch {
+      tsNodeDist = '';
+    }
+    const cmd = tsNodeDist
+      ? `"${process.execPath}" "${tsNodeDist}" "${filePath}"`
+      : `npx --yes ts-node "${filePath}"`;
     exec(cmd, { env: process.env, cwd: path.resolve(__dirname, '../..'), timeout: 45000 }, (error, stdout, stderr) => {
       const output = stdout + stderr;
       if (error) {

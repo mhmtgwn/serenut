@@ -1,489 +1,67 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Değirmen Hizmetleri — Nutopia Fındık Değirmeni</title>
-  <meta name="description" content="Fındık kırma 40₺/kg, kavurma 70₺/kg, zar soyma, ezme 130₺/kg, paketleme hizmetleri. Ormanlı / Kdz. Ereğli. Şehit ailelerine %20 indirim. 0538 028 82 02">
-  <link rel="canonical" href="https://nutopiano.com/degirmen">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
-  <style>
-    .machine-photo-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-top: 48px;
-    }
-    .mcard {
-      border: 1.5px solid var(--line);
-      border-radius: var(--r-md);
-      overflow: hidden;
-      background: var(--white);
-      transition: var(--t);
-    }
-    .mcard:hover { border-color: var(--gold); box-shadow: var(--shadow-md); transform: translateY(-3px); }
-    .mcard img {
-      width: 100%; height: 210px;
-      object-fit: cover; display: block;
-      background: var(--light);
-    }
-    .mcard-placeholder {
-      width: 100%; height: 210px;
-      background: linear-gradient(135deg, var(--light) 0%, var(--green-soft) 100%);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .mcard-body { padding: 16px 18px 18px; }
-    .mcard-name {
-      font-family: var(--font-serif);
-      font-size: 1.1rem; font-weight: 700;
-      color: var(--green); margin-bottom: 5px;
-      letter-spacing: -.015em;
-    }
-    .mcard-desc { font-size: .85rem; color: var(--muted); line-height: 1.65; }
-
-    /* Fiyat listesi */
-    .price-table {
-      width: 100%;
-      border-collapse: collapse;
-      border: 1.5px solid var(--line);
-      border-radius: var(--r-md);
-      overflow: hidden;
-      font-size: .95rem;
-    }
-    .price-table thead { background: var(--green); color: var(--white); }
-    .price-table thead th {
-      padding: 16px 20px;
-      text-align: left;
-      font-family: var(--font-serif);
-      font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: -.01em;
-    }
-    .price-table thead th:last-child { text-align: right; }
-    .price-table tbody tr { border-bottom: 1px solid var(--line-light); }
-    .price-table tbody tr:last-child { border-bottom: none; }
-    .price-table tbody tr:hover { background: var(--off-white); }
-    .price-table td { padding: 15px 20px; color: var(--ink); }
-    .price-table td:first-child { font-weight: 600; color: var(--green); }
-    .price-table td:last-child {
-      text-align: right;
-      font-family: var(--font-serif);
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--gold-dark);
-    }
-    .price-table tr.combo-row td {
-      background: var(--green);
-      color: rgba(255,255,255,.85);
-      font-weight: 500;
-    }
-    .price-table tr.combo-row td:first-child { color: var(--gold-light); font-weight: 600; }
-    .price-table tr.combo-row td:last-child { color: var(--gold-light); }
-
-    @media (max-width: 860px) {
-      .machine-photo-row { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 520px) {
-      .machine-photo-row { grid-template-columns: 1fr; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fındık Kırma, Kavurma, Ezme Fiyatları — Kdz. Ereğli Fındık Değirmeni | Nutopia</title>
+<meta name="description" content="Ormanlı / Kdz. Ereğli fındık değirmeni fiyat listesi: kırma 40 ₺/kg, kavurma, ezme 130 ₺/kg. Minimum miktar yok. Ücret hesaplayıcı ile maliyetinizi görün.">
+<link rel="canonical" href="https://nutopiano.com/degirmen">
+<link rel="icon" href="/images/nutopia-logo.png">
+<link rel="stylesheet" href="/style.css">
 </head>
-<body>
-
+<body data-page="degirmen">
 <div id="site-header"></div>
+<main id="main">
+<section class="page-hero"><div class="container">
+  <p class="eyebrow">Değirmen hizmetleri</p><h1>Fındığınız size ait, işlemesi bize emanet</h1>
+  <p class="lead">Bahçenizdeki fındığı getirin; kırma, kavurma, zar soyma ve ezme işlemlerini ihtiyacınıza göre yapalım. Minimum miktar sınırı yok.</p>
+</div></section>
 
-<main>
+<section class="section" style="padding-top:16px"><div class="container grid g2" style="align-items:start">
+  <div class="calc">
+    <h2 style="font-size:1.5rem;margin-bottom:16px">Ücret hesaplayıcı</h2>
+    <div class="field"><label for="calcKg">Kabuklu fındık miktarı (kg)</label><input type="number" id="calcKg" min="1" step="1" value="50" inputmode="decimal"></div>
+    <div class="field"><label for="calcService">Hizmet</label><select id="calcService"></select></div>
+    <div class="field"><label class="check"><input type="checkbox" id="calcGazi"> Şehit yakını / gaziyim (%20 indirim, belge doğrulamasıyla)</label></div>
+    <div class="result" id="calcOut" aria-live="polite"></div>
+    <p class="small muted" style="margin:10px 0 14px">Ücret, getirdiğiniz kabuklu fındık kilosu üzerinden hesaplanır. İç fındık verimi ortalama %50'dir; gerçek değer fındığın kalitesine göre değişir.</p>
+    <a class="btn btn-wa btn-block" id="calcWa" target="_blank" rel="noopener" href="#">Bu hesapla randevu al</a>
+  </div>
+  <div>
+    <h2 style="font-size:1.5rem;margin-bottom:16px">Fiyat listesi</h2>
+    <table class="prices"><thead><tr><th>Hizmet</th><th>Fiyat</th></tr></thead><tbody>
+      <tr><td>Kırma</td><td>40 ₺/kg</td></tr><tr><td>Kavurma</td><td>70 ₺/kg</td></tr><tr><td>Fındık ezmesi</td><td>130 ₺/kg</td></tr>
+      <tr><td>Paketleme (1 kg vakum)</td><td>20 ₺/kg</td></tr><tr><td>Kırma + kavurma</td><td>65 ₺/kg</td></tr>
+      <tr><td>Kırma + kavurma + 1 kg vakum</td><td>70 ₺/kg</td></tr><tr><td>Kırma + kavurma + 500 g vakum</td><td>80 ₺/kg</td></tr>
+      <tr><td>Kırma + kavurma + 250 g vakum</td><td>90 ₺/kg</td></tr>
+    </tbody></table>
+    <div class="notice" style="margin-top:16px">🎖️ Şehit ailelerine ve gazilere tüm hizmetlerde %20 indirim.</div>
+  </div>
+</div></section>
 
-  <!-- ---- SAYFA HERO ---- -->
-  <section class="page-hero" aria-labelledby="page-title">
-    <div class="container home-hero-container">
-      <div>
-        <div class="eyebrow">Fındık İşleme Hizmetleri</div>
-        <h1 class="page-hero-title" id="page-title">
-          Fındığınızı Getirin,<br>Biz İşleyelim.
-        </h1>
-        <p class="page-hero-desc">
-          Kırma, kavurma, zar soyma, ezme ve paketleme. Her adımı ayrı ayrı ya da kombine olarak yaptırabilirsiniz.
-        </p>
-        <div class="page-hero-actions">
-          <a class="btn btn-gold btn-lg" href="#hesaplayici">
-            🧮 Maliyet Hesapla
-          </a>
-          <a class="btn btn-outline-light btn-lg" href="#fiyatlar">Fiyat Listesi</a>
-        </div>
-      </div>
-      <div class="home-hero-showcase">
-        <div class="home-hero-frame">
-          <img src="/images/nutopia-degirmen-ziyaret.png" alt="Nutopia Fındık Değirmeni Ormanlı Üretim Alanı" loading="eager">
-          <div class="home-hero-tag">
-            <div>
-              <div class="home-hero-tag-title">Ormanlı Değirmenimiz</div>
-              <div class="home-hero-tag-sub">Fındığınız gözünüzün önünde, hijyenle işlenir</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+<section class="section alt"><div class="container">
+  <div class="section-head"><p class="eyebrow">Ekipman</p><h2>Dört makine, eksiksiz işleme</h2></div>
+  <div class="grid g4">
+    <div class="card"><img class="cover" src="/images/makine-kirma.png" alt="Fındık kırma makinesi" loading="lazy"><div class="card-body"><h3>Kırma</h3><p class="muted">Kabuklu fındığı sağlam, iri iç fındığa ayırır.</p></div></div>
+    <div class="card"><img class="cover" src="/images/makine-kavurma.png" alt="Fındık kavurma makinesi" loading="lazy"><div class="card-body"><h3>Kavurma</h3><p class="muted">Sıcaklık ve süre kontrolüyle homojen kavurma.</p></div></div>
+    <div class="card"><img class="cover" src="/images/makine-zar-soyma.png" alt="Fındık zar soyma makinesi" loading="lazy"><div class="card-body"><h3>Zar soyma</h3><p class="muted">Kavrulmuş fındığın ince zarını temizler.</p></div></div>
+    <div class="card"><img class="cover" src="/images/makine-ezme.png" alt="Fındık ezmesi makinesi" loading="lazy"><div class="card-body"><h3>Ezme</h3><p class="muted">Soğuk öğütme ile saf, ipeksi ezme; aroma ve yağ korunur.</p></div></div>
+  </div>
+</div></section>
 
-  <!-- ---- MAKİNELER ---- -->
-  <section class="section section-white" aria-labelledby="machines-title">
-    <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">Değirmen Ekipmanları</div>
-        <h2 class="section-title" id="machines-title">4 Makinemiz, Eksiksiz Süreç.</h2>
-        <p class="section-desc">
-          Kırma'dan ezmeye her adım için profesyonel ekipmanımız hazır.
-          Fındığınızı ihtiyacınıza göre tek adımda veya tüm süreçten geçirerek teslim alabilirsiniz.
-        </p>
-      </div>
+<section class="section"><div class="container" style="max-width:780px">
+  <div class="section-head"><p class="eyebrow">Sık sorulanlar</p><h2>Merak edilenler</h2></div>
+  <details><summary>Randevu gerekli mi?</summary><p>Yoğun sezonda bekleme olmaması için önceden WhatsApp'tan haber vermenizi öneririz; ancak doğrudan da uğrayabilirsiniz.</p></details>
+  <details><summary>Fındığımı nasıl getirmeliyim?</summary><p>Çuvallı veya dökme olarak getirebilirsiniz. Tesis önünde araçların rahatça yanaşabileceği geniş indirme alanı vardır.</p></details>
+  <details><summary>İşlem sürerken orada olabilir miyim?</summary><p>Evet. Kırma, kavurma ve ezme süreçlerini yerinde izleyebilirsiniz.</p></details>
+  <details><summary>Ücret nasıl hesaplanır?</summary><p>Getirdiğiniz kabuklu fındığın kilosu üzerinden, yukarıdaki liste fiyatlarıyla hesaplanır.</p></details>
+</div></section>
 
-      <div class="machine-photo-row">
-
-        <div class="mcard">
-          <img src="/images/makine-kirma.png?v=2" alt="Fındık kırma makinesi — Nutopia" loading="lazy">
-          <div class="mcard-body">
-            <div class="mcard-name">Kırma Makinesi</div>
-            <p class="mcard-desc">Kabuklu fındığı iç fındığa ayırır. Çekirdek sağlam çıkar, yüksek verim sağlar.</p>
-          </div>
-        </div>
-
-        <div class="mcard">
-          <img src="/images/makine-kavurma.png?v=2" alt="Fındık kavurma makinesi — Nutopia" loading="lazy">
-          <div class="mcard-body">
-            <div class="mcard-name">Kavurma Makinesi</div>
-            <p class="mcard-desc">Hassas sıcaklık ve süre kontrolü. Hafif, orta veya koyu kavurma tercihine göre ayarlanır.</p>
-          </div>
-        </div>
-
-        <div class="mcard">
-          <img src="/images/makine-zar-soyma.png?v=2" alt="Fındık zar soyma makinesi — Nutopia" loading="lazy">
-          <div class="mcard-body">
-            <div class="mcard-name">Zar Soyma Makinesi</div>
-            <p class="mcard-desc">Kavrulmuş fındığın ince zarını soyar. Temiz, homojen ve pürüzsüz iç fındık elde edilir.</p>
-          </div>
-        </div>
-
-        <div class="mcard">
-          <img src="/images/makine-ezme.png?v=2" alt="Fındık ezmesi makinesi — Nutopia" loading="lazy">
-          <div class="mcard-body">
-            <div class="mcard-name">Fındık Ezmesi Makinesi</div>
-            <p class="mcard-desc">Kavrulmuş fındığı soğuk öğüterek saf ve ipeksi fındık ezmesine dönüştürür. Doğal aroması ve yağı tam korunur.</p>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- ---- SÜRECİ ADIMLAR ---- -->
-  <section class="section section-light" aria-labelledby="steps-title">
-    <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">Hizmet Akışı</div>
-        <h2 class="section-title" id="steps-title">Kabuklu Fındıktan<br>Hazır Ürüne.</h2>
-        <p class="section-desc">
-          Her adım ayrı ayrı ya da kombine olarak yaptırılabilir. Sadece kırma mı istiyorsunuz? Sadece kavurma mı? Hepsi mümkün.
-        </p>
-      </div>
-
-      <div class="steps-list" role="list">
-
-        <article class="step-row" role="listitem">
-          <div class="step-num-big" aria-hidden="true">01</div>
-          <div class="step-body">
-            <h3>Fındık Kırma</h3>
-            <p>Kabuklu fındık teslim alınır. Kırma makinesinde kabuk ve iç fındık ayrılır. Çekirdek mümkün olduğunca sağlam şekilde elde edilir. Gerekirse ayıklama ve sınıflandırma yapılır.</p>
-          </div>
-          <span class="step-tag">40 ₺/kg</span>
-        </article>
-
-        <article class="step-row" role="listitem">
-          <div class="step-num-big" aria-hidden="true">02</div>
-          <div class="step-body">
-            <h3>Kavurma</h3>
-            <p>İç fındık kavurma işleminden geçirilir. Kavurma derecesi ve süresi ürünün istenen aromasına göre belirlenir. Hafif, orta ve koyu kavurma seçenekleri mevcuttur. İşlemin ardından soğutma yapılır.</p>
-          </div>
-          <span class="step-tag">70 ₺/kg</span>
-        </article>
-
-        <article class="step-row" role="listitem">
-          <div class="step-num-big" aria-hidden="true">03</div>
-          <div class="step-body">
-            <h3>Zar Soyma</h3>
-            <p>Kavrulmuş fındığın üzerindeki ince kahverengi zar zar soyma makinesiyle temizlenir. Ezme ve krema yapımı için tercih edilen bir ön işlem adımıdır.</p>
-          </div>
-          <span class="step-tag">Fiyat için sorun</span>
-        </article>
-
-        <article class="step-row" role="listitem">
-          <div class="step-num-big" aria-hidden="true">04</div>
-          <div class="step-body">
-            <h3>Ezme</h3>
-            <p>Kavrulmuş fındık öğütme makinesinde işlenerek saf fındık ezmesine dönüştürülür. Fındığın doğal yağı ve aroması korunur. Sade %100 fındık ezmesi yapılabilir ya da Nutopiano reçeteleri uygulanabilir.</p>
-          </div>
-          <span class="step-tag">130 ₺/kg</span>
-        </article>
-
-        <article class="step-row" role="listitem">
-          <div class="step-num-big" aria-hidden="true">05</div>
-          <div class="step-body">
-            <h3>Paketleme & Vakum</h3>
-            <p>İşlenmiş fındık istenirse doğrudan müşteriye teslim edilir. İstenirse 250g, 500g veya 1 kg hava almaz vakumlu paketlerde tazeliği mühürlenir.</p>
-          </div>
-          <span class="step-tag">20 ₺/kg (1 kg)</span>
-        </article>
-
-      </div>
-
-      <!-- Vakumlu Paketleme Görsel Kutusu -->
-      <div style="margin-top: 32px; background: var(--white); border: 1.5px solid var(--line); border-radius: var(--r-md); overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; align-items: center; box-shadow: var(--shadow-sm);">
-        <img src="/images/nutopiano-vakumlu-paketler.png" alt="Vakumlu Fındık Paketleri" style="width: 100%; height: 260px; object-fit: cover; display: block;" loading="lazy">
-        <div style="padding: 28px 32px;">
-          <div class="eyebrow" style="margin-bottom: 8px;">Tazelik Garantisi</div>
-          <h3 style="font-family: var(--font-serif); font-size: 1.35rem; color: var(--green); margin-bottom: 10px;">Hava Almaz Vakumlu Ambalaj</h3>
-          <p style="font-size: .92rem; color: var(--muted); line-height: 1.7; margin: 0 0 16px 0;">Kavrulan ve işlenen fındıklarınız 250g, 500g veya 1 kg özel vakumlu paketlerde kapatılarak aylarca ilk günkü çıtırlığını ve nefis kokusunu muhafaza eder.</p>
-          <span style="font-size: .85rem; font-weight: 700; color: var(--gold-dark);">20 ₺'den başlayan paketleme seçenekleri</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- ---- FİYAT LİSTESİ ---- -->
-  <section class="section section-white" id="fiyatlar" aria-labelledby="prices-title">
-    <div class="container" style="max-width: 820px;">
-      <div class="section-head">
-        <div class="eyebrow">Zonguldak Fındık Değirmenleri Fiyat Listesi</div>
-        <h2 class="section-title" id="prices-title">Şeffaf Fiyatlandırma.</h2>
-      </div>
-
-      <table class="price-table">
-        <thead>
-          <tr>
-            <th>Hizmet</th>
-            <th style="text-align:right;">Fiyat</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Kırma</td>
-            <td>40 ₺/kg</td>
-          </tr>
-          <tr>
-            <td>Kavurma</td>
-            <td>70 ₺/kg</td>
-          </tr>
-          <tr>
-            <td>Fındık Ezmesi</td>
-            <td>130 ₺/kg</td>
-          </tr>
-          <tr>
-            <td>Paketleme (1 kg vakum)</td>
-            <td>20 ₺/kg</td>
-          </tr>
-          <tr class="combo-row">
-            <td>Kırma + Kavurma</td>
-            <td>65 ₺/kg</td>
-          </tr>
-          <tr class="combo-row">
-            <td>Kırma + Kavurma + 1 kg Vakum</td>
-            <td>70 ₺/kg</td>
-          </tr>
-          <tr class="combo-row">
-            <td>Kırma + Kavurma + 500g Vakum</td>
-            <td>80 ₺/kg</td>
-          </tr>
-          <tr class="combo-row">
-            <td>Kırma + Kavurma + 250g Vakum</td>
-            <td>90 ₺/kg</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- İndirim Notu -->
-      <div class="sehit-gazi-banner">
-        <img src="/images/nutopia-sehit-gazi.png" alt="Türkiye Harp Malulü Gaziler Şehit Dul ve Yetimleri Derneği" loading="lazy">
-        <div>
-          <p style="font-size: .95rem; color: var(--green); font-weight: 700; line-height: 1.5; margin: 0 0 4px 0;">
-            🎖️ Şehit aileleri ve gazilerimize tüm ürün ve hizmetlerde %20 indirim uygulanmaktadır.
-          </p>
-          <p style="font-size: .85rem; color: var(--muted); line-height: 1.5; margin: 0;">
-            Türkiye Harp Malulü Gaziler Şehit Dul ve Yetimleri Derneği iş birliği ve sonsuz minnetimizle.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ---- İNTERAKTİF HESAPLAYICI ---- -->
-  <section class="section section-white" id="hesaplayici" aria-labelledby="calc-title">
-    <div class="container">
-      <div class="section-head section-head-center">
-        <div class="eyebrow">Akıllı Hesaplayıcı</div>
-        <h2 class="section-title" id="calc-title">İşleme Maliyeti & Mahsul Hesapla.</h2>
-        <p class="section-desc">
-          Fındık miktarınızı ve istediğiniz hizmeti seçin; tahmini iç fındık veriminizi ve işleme ücretinizi anında görün.
-        </p>
-      </div>
-
-      <div class="milling-calc">
-        <div class="calc-grid">
-          <div class="calc-field-group">
-            <div>
-              <div class="calc-label">
-                <span>Mahsul Miktarı (Kabuklu Fındık):</span>
-                <strong id="calcWeightVal" style="font-size: 1.15rem; color: var(--green);">50 kg</strong>
-              </div>
-              <input type="range" id="calcWeightSlider" class="calc-range" min="10" max="1000" step="5" value="50" style="margin-top: 8px;">
-              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted-light); margin-top: 4px;">
-                <span>10 kg (Minimum)</span>
-                <span>500 kg</span>
-                <span>1.000 kg (1 Ton)</span>
-              </div>
-            </div>
-
-            <div>
-              <div class="calc-label" style="margin-bottom: 8px;">Hizmet Türü Seçin:</div>
-              <div class="calc-radio-group">
-                <div class="calc-radio-card" data-unit-price="40" data-yield="0.5">
-                  <div>
-                    <div class="calc-radio-title">Yalnızca Kırma</div>
-                    <div style="font-size: 0.74rem; color: var(--muted);">Kabuklu fındığı temiz iç fındığa ayırma</div>
-                  </div>
-                  <div class="calc-radio-price">40 ₺/kg</div>
-                </div>
-
-                <div class="calc-radio-card" data-unit-price="65" data-yield="0.5">
-                  <div>
-                    <div class="calc-radio-title">Kırma + Kavurma</div>
-                    <div style="font-size: 0.74rem; color: var(--muted);">Kırma ve homojen fırın kavurma</div>
-                  </div>
-                  <div class="calc-radio-price">65 ₺/kg</div>
-                </div>
-
-                <div class="calc-radio-card active" data-unit-price="70" data-yield="0.5">
-                  <div>
-                    <div class="calc-radio-title">Kırma + Kavurma + 1 kg Vakum Paket</div>
-                    <div style="font-size: 0.74rem; color: var(--muted);">En çok tercih edilen tam korumalı paket</div>
-                  </div>
-                  <div class="calc-radio-price">70 ₺/kg</div>
-                </div>
-
-                <div class="calc-radio-card" data-unit-price="130" data-yield="0.48">
-                  <div>
-                    <div class="calc-radio-title">Kavurma + Taş Değirmende Fındık Ezmesi</div>
-                    <div style="font-size: 0.74rem; color: var(--muted);">İpeksi, katkısız saf kavanozluk ezme</div>
-                  </div>
-                  <div class="calc-radio-price">130 ₺/kg</div>
-                </div>
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; background: var(--green-soft); padding: 12px 16px; border-radius: var(--r-sm); border: 1px solid rgba(22,138,82,0.2);">
-              <input type="checkbox" id="calcSehitGaziCheck" style="width: 18px; height: 18px; accent-color: var(--green); cursor: pointer;">
-              <label for="calcSehitGaziCheck" style="font-size: 0.84rem; font-weight: 600; color: var(--green); cursor: pointer;">
-                🎖️ Şehit Ailesi veya Gazi İndirimi (%20)
-              </label>
-            </div>
-          </div>
-
-          <div class="calc-summary-box">
-            <div>
-              <div style="font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700; color: var(--white); margin-bottom: 16px;">
-                Hesaplama Özeti
-              </div>
-
-              <div class="calc-stat-row">
-                <span>Tahmini İç Fındık / Ezme Verimi:</span>
-                <strong id="calcEstYield" style="color: var(--gold-light);">~25 kg</strong>
-              </div>
-
-              <div class="calc-stat-row">
-                <span>Standart Liste Bedeli:</span>
-                <span id="calcSubtotalDisp">₺3.500</span>
-              </div>
-
-              <div class="calc-stat-row" style="border-bottom: none;">
-                <span style="font-size: 0.95rem; font-weight: 600;">Net Ödenecek Tutar:</span>
-              </div>
-              <div class="calc-total-stat" id="calcTotalDisp">₺3.500</div>
-              <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 4px;">
-                * Tahmini iç fındık %50 randıman ortalamasına göredir.
-              </div>
-            </div>
-
-            <div style="margin-top: 24px;">
-              <a href="#" id="calcWaBookBtn" class="btn btn-gold btn-lg" style="width: 100%;" target="_blank" rel="noopener noreferrer">
-                Bu Hesaplama ile Randevu Al →
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- ---- FINDIK SIZE AİT ---- -->
-  <section class="section section-light" aria-labelledby="service-story-title">
-    <div class="container">
-      <div class="degirmen-split">
-        <div>
-          <div class="section-head" style="margin-bottom: 24px;">
-            <div class="eyebrow">Değirmen Hizmeti Anlayışı</div>
-            <h2 class="section-title" id="service-story-title">Fındığınız Size Ait,<br>İşlemesi Bize Emanet.</h2>
-          </div>
-          <div style="font-size: 1.05rem; color: var(--muted); line-height: 1.85;">
-            <p style="margin-bottom: 16px;">Bahçenizden topladığınız fındığı yalnızca toptan satmak zorunda değilsiniz.</p>
-            <p style="margin-bottom: 16px;">Fındığınızı Nutopia Fındık Değirmeni'ne getirerek kırdırabilir, kavrattırabilir, zar soyturabilir veya ezme haline getirebilirsiniz.</p>
-            <p style="margin-bottom: 24px;">Fındığınızın nasıl işleneceğine <strong style="color: var(--green);">birlikte karar verelim.</strong></p>
-          </div>
-          <div style="padding: 20px 24px; background: var(--white); border: 1.5px solid var(--line); border-radius: var(--r-sm); border-left: 3px solid var(--gold);">
-            <p style="font-size: .92rem; color: var(--muted); line-height: 1.72; margin: 0;">
-              <strong style="color: var(--ink);">Minimum miktar sınırı yok.</strong> Küçük miktarlardan büyük partilere kadar her hacmi titizlikle işliyoruz.
-            </p>
-          </div>
-        </div>
-        <div>
-          <div style="border-radius: var(--r-md); overflow: hidden; border: 1.5px solid var(--line); background: var(--white); box-shadow: var(--shadow-md);">
-            <img src="/images/nutopia-kirma-afis.png" alt="Nutopia Fındık Kırma, Kavurma ve İşleme Hizmeti" style="width: 100%; height: 360px; object-fit: cover; display: block;" loading="lazy">
-            <div style="padding: 16px 20px;">
-              <div style="font-family: var(--font-serif); font-weight: 700; color: var(--green); font-size: 1rem;">Geleneksel Emek & Ustalık</div>
-              <p style="font-size: .82rem; color: var(--muted); line-height: 1.5; margin: 4px 0 0 0;">Her çuval fındık, üreticisinin emeğine yaraşır özenle işlenir.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ---- CTA ---- -->
-  <section class="cta-strip" aria-label="İletişim çağrısı">
-    <div class="container">
-      <div class="cta-strip-inner">
-        <div class="cta-strip-copy">
-          <div class="eyebrow">Hizmet Almaya Hazır mısınız?</div>
-          <h2>Fındığınızı getirin, biz işleyelim.</h2>
-        </div>
-        <div class="cta-strip-btns">
-          <a class="btn btn-gold btn-lg" href="https://wa.me/905380288202?text=Merhaba%2C%20fındık%20işleme%20hizmeti%20hakkında%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer">WhatsApp'tan Yaz</a>
-          <a class="btn btn-outline-light btn-lg" href="tel:05380288202">0538 028 82 02</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
+<section class="cta"><div class="container"><h2>Fındığınızı getirin, biz işleyelim</h2><p>Ormanlı / Kdz. Ereğli — Hatipoğulları Alanı, D:1 No:6/B</p>
+  <div class="btn-row"><a class="btn btn-wa" target="_blank" rel="noopener" href="https://wa.me/905380288202?text=Merhaba%2C%20de%C4%9Firmen%20hizmeti%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum.">WhatsApp'tan yaz</a><a class="btn btn-ghost" href="/iletisim">Konum ve iletişim</a></div></div></section>
 </main>
-
 <div id="site-footer"></div>
-<script src="/components.js"></script>
+<script src="/data.js"></script><script src="/app.js"></script>
 </body>
 </html>
+

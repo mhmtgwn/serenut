@@ -1003,7 +1003,12 @@ class CustomerDetailsPage extends ConsumerWidget {
                         (context, idx) {
                           final month = months[idx];
                           final items = grouped[month]!;
-                          return _buildMonthGroup(month, items);
+                          return _buildMonthGroup(
+                            month,
+                            items,
+                            allTxns: txns,
+                            effectiveBalance: effectiveBalance,
+                          );
                         },
                         childCount: months.length,
                       ),
@@ -1050,9 +1055,9 @@ class CustomerDetailsPage extends ConsumerWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _StatCard(
-            label: 'Toplam İşlem',
+            label: 'Toplam Alışveriş',
             value: '₺${(details['totalDebt'] ?? 0).toStringAsFixed(2)}',
-            sub: 'Alışveriş & Borç',
+            sub: 'Alışveriş Tutarı',
             bg: _kAmberLight,
             fg: _kAmber,
             icon: Icons.shopping_bag_outlined,
@@ -1909,7 +1914,11 @@ Hayırlı günler dileriz.
   }
 
   Widget _buildMonthGroup(
-      String month, List<FinancialTransactionEntity> items) {
+    String month,
+    List<FinancialTransactionEntity> items, {
+    List<FinancialTransactionEntity>? allTxns,
+    double effectiveBalance = 0.0,
+  }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
@@ -1935,7 +1944,11 @@ Hayırlı günler dileriz.
             child: Column(
               children: [
                 for (int i = 0; i < items.length; i++) ...[
-                  _TransactionRow(txn: items[i]),
+                  _TransactionRow(
+                    txn: items[i],
+                    allTxns: allTxns,
+                    effectiveBalance: effectiveBalance,
+                  ),
                   if (i < items.length - 1)
                     const Divider(height: 1, indent: 56, endIndent: 16),
                 ],
@@ -2184,7 +2197,14 @@ class _StatCard extends StatelessWidget {
 
 class _TransactionRow extends ConsumerWidget {
   final FinancialTransactionEntity txn;
-  const _TransactionRow({required this.txn});
+  final List<FinancialTransactionEntity>? allTxns;
+  final double effectiveBalance;
+
+  const _TransactionRow({
+    required this.txn,
+    this.allTxns,
+    this.effectiveBalance = 0.0,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2198,6 +2218,44 @@ class _TransactionRow extends ConsumerWidget {
         isCancellation ||
         isRefundToBalance;
     final itemsVal = ref.watch(transactionItemsProvider(txn));
+
+    double remainingDebt = txn.debtAmount;
+    bool isSaleFullyPaid = false;
+
+    if (txn.type == 'sale') {
+      if (isCashSale || effectiveBalance >= -0.009) {
+        remainingDebt = 0.0;
+        isSaleFullyPaid = true;
+      } else {
+        final saleRef = txn.referenceId?.trim();
+        double linkedPayments = 0.0;
+        if (allTxns != null) {
+          for (final t in allTxns!) {
+            if (t.type == 'payment' || t.type == 'collection') {
+              final refId = t.referenceId?.trim();
+              if (refId != null &&
+                  refId.isNotEmpty &&
+                  (refId == saleRef || refId == txn.id)) {
+                linkedPayments += t.paidAmount > 0 ? t.paidAmount : t.amount;
+              }
+            }
+          }
+        }
+        final totalPaidOnSale = txn.paidAmount + linkedPayments;
+        final calcRemaining = txn.amount - totalPaidOnSale;
+        if (calcRemaining <= 0.009) {
+          remainingDebt = 0.0;
+          isSaleFullyPaid = true;
+        } else {
+          final customerDebt = effectiveBalance.abs();
+          remainingDebt = calcRemaining < customerDebt ? calcRemaining : customerDebt;
+          if (remainingDebt <= 0.009) {
+            remainingDebt = 0.0;
+            isSaleFullyPaid = true;
+          }
+        }
+      }
+    }
 
     final String sign;
     final Color amountColor;
@@ -2235,6 +2293,14 @@ class _TransactionRow extends ConsumerWidget {
     if (isCashSale) {
       subText = 'Peşin Ödendi';
       subTextColor = _kGreenDark;
+    } else if (txn.type == 'sale' && isSaleFullyPaid) {
+      subText = 'Ödendi';
+      subTextColor = _kGreenDark;
+    } else if (txn.type == 'sale' &&
+        remainingDebt < txn.debtAmount - 0.009 &&
+        remainingDebt > 0.009) {
+      subText = 'Kalan: ₺${remainingDebt.toStringAsFixed(2)}';
+      subTextColor = _kAmber;
     } else if (isCancellation) {
       subText = 'Borç İptal Edildi';
       subTextColor = _kGreenDark;
@@ -2244,9 +2310,18 @@ class _TransactionRow extends ConsumerWidget {
     } else if (isCashRefund) {
       subText = 'Nakit İade';
       subTextColor = _kAmber;
+    } else if (effectiveBalance >= -0.009 && txn.debtAmount > 0) {
+      subText = 'Ödendi';
+      subTextColor = _kGreenDark;
     } else if (txn.debtAmount > 0) {
-      subText = 'Kalan Borç: ₺${txn.debtAmount.toStringAsFixed(2)}';
-      subTextColor = _kRed.withValues(alpha: 0.8);
+      final displayDebt = txn.type == 'sale' ? remainingDebt : txn.debtAmount;
+      if (displayDebt > 0.009) {
+        subText = 'Kalan Borç: ₺${displayDebt.toStringAsFixed(2)}';
+        subTextColor = _kRed.withValues(alpha: 0.8);
+      } else {
+        subText = 'Ödendi';
+        subTextColor = _kGreenDark;
+      }
     }
 
     return Padding(

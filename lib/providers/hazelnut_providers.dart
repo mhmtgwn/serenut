@@ -24,6 +24,11 @@ final warehouseMovementsProvider = FutureProvider.autoDispose.family<List<Wareho
   return repo.getWarehouseMovements(warehouseId);
 });
 
+final warehouseEscrowsProvider = FutureProvider.autoDispose.family<List<CustomerHazelnutEscrowEntity>, String>((ref, warehouseId) async {
+  final repo = ref.watch(hazelnutRepositoryProvider);
+  return repo.getWarehouseEscrows(warehouseId);
+});
+
 final customerEscrowsProvider = FutureProvider.autoDispose.family<List<CustomerHazelnutEscrowEntity>, String>((ref, customerId) async {
   final repo = ref.watch(hazelnutRepositoryProvider);
   return repo.getCustomerEscrows(customerId);

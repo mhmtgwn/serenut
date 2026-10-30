@@ -358,8 +358,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           container.invalidate(_orderPaymentInfoProvider(orderRef.id));
           await container.read(customersControllerProvider.notifier).refresh();
           if (customerId.isNotEmpty) {
+            container.invalidate(customerDetailProvider(customerId));
             container.invalidate(customerTransactionsProvider(customerId));
             container.invalidate(customerBalanceDetailsProvider(customerId));
+            container.invalidate(customerBalanceSummaryProvider);
           }
 
           if (printReceiptNeeded) {

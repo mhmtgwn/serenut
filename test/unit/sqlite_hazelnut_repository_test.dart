@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:serenutos/domain/models/hazelnut_models.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/database/schema/db_schema.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_hazelnut_repository.dart';
@@ -20,6 +21,7 @@ void main() {
       CREATE TABLE customers (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        phone TEXT,
         balance REAL NOT NULL DEFAULT 0,
         balance_minor INTEGER NOT NULL DEFAULT 0,
         is_active INTEGER NOT NULL DEFAULT 1,
@@ -67,6 +69,7 @@ void main() {
     await db.insert('customers', {
       'id': 'cust-1',
       'name': 'Hasan Çiftçi',
+      'phone': '05551234567',
       'balance': -5000.0, // 5000 TL borcu var
       'balance_minor': -500000,
       'is_active': 1,
@@ -176,6 +179,104 @@ void main() {
       final wh = await repo.getWarehouseById('wh-main');
       expect(wh!.currentStockKg, 500.0);
       expect(wh.averageRendiment, 51.0); // Randıman değişmez
+    });
+
+    test('getWarehouseEscrows returns active escrows enriched with customer name', () async {
+      await repo.addEscrowBatch(
+        customerId: 'cust-1',
+        warehouseId: 'wh-main',
+        grossKg: 1000.0,
+        sackCount: 0,
+        manualTareKg: 0,
+        rendiment: 50.0,
+      );
+
+      final escrows = await repo.getWarehouseEscrows('wh-main');
+      expect(escrows.length, 1);
+      expect(escrows.first.customerName, 'Hasan Çiftçi');
+      expect(escrows.first.remainingKg, 1000.0);
+    });
+
+    test('transferBetweenWarehouses transfers stock and recalculates target weighted rendiment', () async {
+      // 1. Create a second warehouse
+      const wh2Id = 'wh-silo-2';
+      await repo.saveWarehouse(
+        WarehouseEntity(
+          id: wh2Id,
+          name: 'Silo 2',
+          location: 'Alt Tesis',
+          capacityKg: 50000,
+          currentStockKg: 1000.0,
+          averageRendiment: 50.0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      final createdWh2 = await repo.getWarehouseById(wh2Id);
+      expect(createdWh2 != null, true);
+
+      // 2. Add 2000 kg at 53 randıman to wh-main
+      await repo.addEscrowBatch(
+        customerId: 'cust-1',
+        warehouseId: 'wh-main',
+        grossKg: 2000.0,
+        sackCount: 0,
+        manualTareKg: 0,
+        rendiment: 53.0,
+      );
+
+      // 3. Transfer 1000 kg from wh-main (53 R) to wh-silo-2 (already has 1000 kg @ 50 R)
+      // New wh-silo-2 stock = 2000 kg.
+      // New rendiment = (1000 * 50 + 1000 * 53) / 2000 = 103000 / 2000 = 51.5 R.
+      await repo.transferBetweenWarehouses(
+        sourceWarehouseId: 'wh-main',
+        targetWarehouseId: 'wh-silo-2',
+        quantityKg: 1000.0,
+        description: 'Silo aktarımı',
+      );
+
+      final updatedSource = await repo.getWarehouseById('wh-main');
+      expect(updatedSource!.currentStockKg, 1000.0);
+
+      final updatedTarget = await repo.getWarehouseById('wh-silo-2');
+      expect(updatedTarget!.currentStockKg, 2000.0);
+      expect(updatedTarget.averageRendiment, 51.5);
+
+      final targetMovements = await repo.getWarehouseMovements('wh-silo-2');
+      expect(targetMovements.any((m) => m.movementType == 'TRANSFER_IN'), true);
+    });
+
+    test('deleteWarehouse guards against non-zero stock and deletes safely when empty', () async {
+      // Save empty warehouse
+      const emptyWhId = 'wh-to-delete';
+      await repo.saveWarehouse(
+        WarehouseEntity(
+          id: emptyWhId,
+          name: 'Geçici Depo',
+          capacityKg: 10000,
+          currentStockKg: 0.0,
+          averageRendiment: 50.0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      // Can delete when empty
+      await repo.deleteWarehouse(emptyWhId);
+      final activeWarehouses = await repo.getWarehouses();
+      expect(activeWarehouses.any((w) => w.id == emptyWhId), false);
+
+      // Now try to delete wh-main which has stock - expect StateError
+      await repo.addEscrowBatch(
+        customerId: 'cust-1',
+        warehouseId: 'wh-main',
+        grossKg: 500.0,
+        sackCount: 0,
+        manualTareKg: 0,
+        rendiment: 50.0,
+      );
+
+      expect(repo.deleteWarehouse('wh-main'), throwsA(isA<StateError>()));
     });
   });
 }

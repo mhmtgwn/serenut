@@ -636,8 +636,10 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
         // Invalidate balance/transaction providers to refresh UI state immediately
         ref.invalidate(customersControllerProvider);
+        ref.invalidate(customerDetailProvider(order.customerId));
         ref.invalidate(customerTransactionsProvider(order.customerId));
         ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+        ref.invalidate(customerBalanceSummaryProvider);
         ref.invalidate(productsControllerProvider);
       } else {
         await _repository.updateStatus(id, status);
@@ -678,6 +680,14 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             note: order.notes,
           ));
         }
+      }
+
+      if (order.customerId.isNotEmpty) {
+        ref.invalidate(customersControllerProvider);
+        ref.invalidate(customerDetailProvider(order.customerId));
+        ref.invalidate(customerTransactionsProvider(order.customerId));
+        ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+        ref.invalidate(customerBalanceSummaryProvider);
       }
 
       ref.invalidate(dashboardProvider);
@@ -854,9 +864,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       ref.invalidate(dashboardProvider);
       ref.invalidate(customersControllerProvider);
       for (final custId in affectedCustomerIds) {
+        ref.invalidate(customerDetailProvider(custId));
         ref.invalidate(customerTransactionsProvider(custId));
         ref.invalidate(customerBalanceDetailsProvider(custId));
       }
+      ref.invalidate(customerBalanceSummaryProvider);
       await refresh();
       unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
@@ -955,6 +967,18 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
       if (updatedCount > 0) {
         ref.invalidate(dashboardProvider);
+        ref.invalidate(customersControllerProvider);
+        final currentForInvalidate = state.valueOrNull ?? [];
+        final affectedCustomerIds = currentForInvalidate
+            .where((o) => idSet.contains(o.id) && o.customerId.isNotEmpty)
+            .map((o) => o.customerId)
+            .toSet();
+        for (final custId in affectedCustomerIds) {
+          ref.invalidate(customerDetailProvider(custId));
+          ref.invalidate(customerTransactionsProvider(custId));
+          ref.invalidate(customerBalanceDetailsProvider(custId));
+        }
+        ref.invalidate(customerBalanceSummaryProvider);
         final syncNotifier = ref.read(syncProvider.notifier);
         Future.delayed(const Duration(milliseconds: 500), () {
           try {

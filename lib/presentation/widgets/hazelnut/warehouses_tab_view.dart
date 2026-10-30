@@ -1,12 +1,15 @@
 // lib/presentation/widgets/hazelnut/warehouses_tab_view.dart
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/hazelnut_models.dart';
+import 'package:serenutos/presentation/controllers/hazelnut_controller.dart';
 import 'package:serenutos/presentation/pages/warehouse_details_page.dart';
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
+import 'package:serenutos/presentation/widgets/hazelnut/warehouse_dialogs.dart';
 import 'package:serenutos/providers/hazelnut_providers.dart';
 
 const _kGreen = POSColors.green;
@@ -97,7 +100,7 @@ class WarehousesTabView extends ConsumerWidget {
 
                         setDialogState(() => saving = true);
                         try {
-                          final now = DateTime.now();
+                          final now = clock.now();
                           final newWh = WarehouseEntity(
                             id: const Uuid().v4(),
                             name: name,
@@ -108,8 +111,7 @@ class WarehousesTabView extends ConsumerWidget {
                             createdAt: now,
                             updatedAt: now,
                           );
-                          await ref.read(hazelnutRepositoryProvider).saveWarehouse(newWh);
-                          ref.invalidate(warehousesProvider);
+                          await ref.read(hazelnutControllerProvider).saveWarehouse(newWh);
 
                           if (ctx.mounted) Navigator.pop(ctx);
                           AppNotificationHost.show(
@@ -331,7 +333,7 @@ class WarehousesTabView extends ConsumerWidget {
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   side: const BorderSide(color: _kGreen),
                 ),
                 icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: _kGreenDark),
@@ -343,6 +345,67 @@ class WarehousesTabView extends ConsumerWidget {
                     ),
                   );
                 },
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: _kTextSecondary),
+                tooltip: 'İşlemler',
+                padding: EdgeInsets.zero,
+                onSelected: (val) {
+                  switch (val) {
+                    case 'edit':
+                      WarehouseDialogs.showEditWarehouseDialog(context, ref, wh);
+                      break;
+                    case 'transfer':
+                      WarehouseDialogs.showTransferDialog(context, ref, wh);
+                      break;
+                    case 'dispatch':
+                      WarehouseDialogs.showDispatchDialog(context, ref, wh);
+                      break;
+                    case 'delete':
+                      WarehouseDialogs.showDeleteWarehouseDialog(context, ref, wh);
+                      break;
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.edit_outlined, size: 18),
+                      title: Text('Depoyu Düzenle'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'transfer',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.swap_horiz_rounded, size: 18, color: Colors.blue),
+                      title: Text('Transfer Yap'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'dispatch',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.arrow_upward_rounded, size: 18, color: POSColors.red),
+                      title: Text('Mal Çıkışı'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.delete_outline_rounded, size: 18, color: POSColors.red),
+                      title: Text('Depoyu Sil', style: TextStyle(color: POSColors.red)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

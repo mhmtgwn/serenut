@@ -275,6 +275,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       if (widget.order.customerId.isNotEmpty) {
         ref.invalidate(customerDetailProvider(widget.order.customerId));
         ref.invalidate(customerTransactionsProvider(widget.order.customerId));
+        ref.invalidate(customerBalanceDetailsProvider(widget.order.customerId));
+        ref.invalidate(customerBalanceSummaryProvider);
       }
 
       // 3. Fiş yazdırma (isteğe bağlı)

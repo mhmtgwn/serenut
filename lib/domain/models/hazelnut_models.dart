@@ -88,6 +88,8 @@ class CustomerHazelnutEscrowEntity {
   final String customerId;
   final String warehouseId;
   final String? warehouseName;
+  final String? customerName;
+  final String? customerPhone;
   final String? receiptNo;
   final double grossKg;
   final int sackCount;
@@ -107,6 +109,8 @@ class CustomerHazelnutEscrowEntity {
     required this.customerId,
     required this.warehouseId,
     this.warehouseName,
+    this.customerName,
+    this.customerPhone,
     this.receiptNo,
     required this.grossKg,
     this.sackCount = 0,
@@ -127,6 +131,8 @@ class CustomerHazelnutEscrowEntity {
     String? customerId,
     String? warehouseId,
     String? warehouseName,
+    String? customerName,
+    String? customerPhone,
     String? receiptNo,
     double? grossKg,
     int? sackCount,
@@ -146,6 +152,8 @@ class CustomerHazelnutEscrowEntity {
       customerId: customerId ?? this.customerId,
       warehouseId: warehouseId ?? this.warehouseId,
       warehouseName: warehouseName ?? this.warehouseName,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
       receiptNo: receiptNo ?? this.receiptNo,
       grossKg: grossKg ?? this.grossKg,
       sackCount: sackCount ?? this.sackCount,
@@ -189,6 +197,8 @@ class CustomerHazelnutEscrowEntity {
       customerId: map['customer_id'] as String,
       warehouseId: map['warehouse_id'] as String,
       warehouseName: map['warehouse_name'] as String?,
+      customerName: map['customer_name'] as String?,
+      customerPhone: map['customer_phone'] as String?,
       receiptNo: map['receipt_no'] as String?,
       grossKg: (map['gross_kg'] as num?)?.toDouble() ?? 0.0,
       sackCount: (map['sack_count'] as num?)?.toInt() ?? 0,

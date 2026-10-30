@@ -1,5 +1,6 @@
 // lib/infrastructure/repositories/sqlite_hazelnut_repository.dart
 import 'dart:convert';
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -45,6 +46,15 @@ abstract class IHazelnutRepository {
     String? referenceId,
     String? createdBy,
   });
+  Future<WarehouseHazelnutMovementEntity> transferBetweenWarehouses({
+    required String sourceWarehouseId,
+    required String targetWarehouseId,
+    required double quantityKg,
+    String? description,
+    String? createdBy,
+  });
+  Future<void> deleteWarehouse(String warehouseId);
+  Future<List<CustomerHazelnutEscrowEntity>> getWarehouseEscrows(String warehouseId);
 }
 
 class SqliteHazelnutRepository implements IHazelnutRepository {
@@ -181,7 +191,7 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
         incomingRendiment: rendiment,
       );
       final newWarehouseStock = wh.currentStockKg + netKg;
-      final now = DateTime.now();
+      final now = clock.now();
       final nowIso = now.toIso8601String();
 
       // 1. Depo stok ve randımanını güncelle
@@ -314,7 +324,7 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
 
       final newRemaining = escrow.remainingKg - cutKg;
       final newStatus = newRemaining <= 0.01 ? 'closed' : 'partially_cut';
-      final now = DateTime.now();
+      final now = clock.now();
       final nowIso = now.toIso8601String();
 
       // 1. Emanet partisini güncelle
@@ -480,7 +490,7 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
       }
 
       final newStock = wh.currentStockKg - quantityKg;
-      final now = DateTime.now();
+      final now = clock.now();
       final nowIso = now.toIso8601String();
 
       // Depo stoğunu düş (çıkışta ortalama randıman değişmez)
@@ -534,6 +544,226 @@ class SqliteHazelnutRepository implements IHazelnutRepository {
       }
 
       return movement;
+    });
+  }
+
+  @override
+  Future<List<CustomerHazelnutEscrowEntity>> getWarehouseEscrows(String warehouseId) async {
+    final rows = await _gateway.rawQuery('''
+      SELECT e.*, w.name AS warehouse_name, c.name AS customer_name, c.phone AS customer_phone
+      FROM customer_hazelnut_escrow e
+      LEFT JOIN warehouses w ON e.warehouse_id = w.id
+      LEFT JOIN customers c ON e.customer_id = c.id
+      WHERE e.warehouse_id = ? AND e.remaining_kg > 0
+      ORDER BY e.created_at DESC
+    ''', [warehouseId]);
+    return rows.map((r) => CustomerHazelnutEscrowEntity.fromMap(r)).toList();
+  }
+
+  @override
+  Future<WarehouseHazelnutMovementEntity> transferBetweenWarehouses({
+    required String sourceWarehouseId,
+    required String targetWarehouseId,
+    required double quantityKg,
+    String? description,
+    String? createdBy,
+  }) async {
+    if (sourceWarehouseId == targetWarehouseId) {
+      throw ArgumentError('Kaynak depo ile hedef depo aynı olamaz.');
+    }
+    if (quantityKg <= 0) {
+      throw ArgumentError('Transfer miktarı sıfırdan büyük olmalıdır.');
+    }
+
+    return await _gateway.transaction(() async {
+      final sourceWh = await getWarehouseById(sourceWarehouseId);
+      if (sourceWh == null) {
+        throw StateError('Kaynak depo bulunamadı (ID: $sourceWarehouseId).');
+      }
+
+      final targetWh = await getWarehouseById(targetWarehouseId);
+      if (targetWh == null) {
+        throw StateError('Hedef depo bulunamadı (ID: $targetWarehouseId).');
+      }
+
+      if (quantityKg > sourceWh.currentStockKg) {
+        throw ArgumentError(
+          'Transfer miktarı (${quantityKg.toStringAsFixed(1)} kg), '
+          'kaynak depodaki mevcut stoktan (${sourceWh.currentStockKg.toStringAsFixed(1)} kg) fazla olamaz.',
+        );
+      }
+
+      final now = clock.now();
+      final nowIso = now.toIso8601String();
+
+      // 1. Kaynak depo stok düşümü (randıman sabit kalır)
+      final newSourceStock = sourceWh.currentStockKg - quantityKg;
+      await _gateway.update(
+        'warehouses',
+        {
+          'current_stock_kg': newSourceStock,
+          'updated_at': nowIso,
+        },
+        where: 'id = ?',
+        whereArgs: [sourceWarehouseId],
+      );
+
+      // 2. Hedef depo stok artışı ve ağırlıklı randıman hesabı
+      final newTargetStock = targetWh.currentStockKg + quantityKg;
+      final newTargetRendiment = targetWh.currentStockKg <= 0
+          ? sourceWh.averageRendiment
+          : ((targetWh.currentStockKg * targetWh.averageRendiment) +
+                  (quantityKg * sourceWh.averageRendiment)) /
+              newTargetStock;
+
+      await _gateway.update(
+        'warehouses',
+        {
+          'current_stock_kg': newTargetStock,
+          'average_rendiment': newTargetRendiment,
+          'updated_at': nowIso,
+        },
+        where: 'id = ?',
+        whereArgs: [targetWarehouseId],
+      );
+
+      // 3. Kaynak depo çıkış hareketi (TRANSFER_OUT)
+      final outMovementId = _uuid.v4();
+      final outDesc = description?.trim().isNotEmpty == true
+          ? '${targetWh.name} deposuna transfer: ${description!.trim()}'
+          : '${targetWh.name} deposuna transfer';
+      final outMovement = WarehouseHazelnutMovementEntity(
+        id: outMovementId,
+        warehouseId: sourceWarehouseId,
+        movementType: 'TRANSFER_OUT',
+        quantityKg: quantityKg,
+        rendiment: sourceWh.averageRendiment,
+        balanceKgAfter: newSourceStock,
+        averageRendimentAfter: sourceWh.averageRendiment,
+        referenceId: targetWarehouseId,
+        description: outDesc,
+        createdBy: createdBy,
+        createdAt: now,
+      );
+      await _gateway.insert('warehouse_hazelnut_movements', outMovement.toMap());
+
+      // 4. Hedef depo giriş hareketi (TRANSFER_IN)
+      final inMovementId = _uuid.v4();
+      final inDesc = description?.trim().isNotEmpty == true
+          ? '${sourceWh.name} deposundan transfer: ${description!.trim()}'
+          : '${sourceWh.name} deposundan transfer';
+      final inMovement = WarehouseHazelnutMovementEntity(
+        id: inMovementId,
+        warehouseId: targetWarehouseId,
+        movementType: 'TRANSFER_IN',
+        quantityKg: quantityKg,
+        rendiment: sourceWh.averageRendiment,
+        balanceKgAfter: newTargetStock,
+        averageRendimentAfter: newTargetRendiment,
+        referenceId: sourceWarehouseId,
+        description: inDesc,
+        createdBy: createdBy,
+        createdAt: now,
+      );
+      await _gateway.insert('warehouse_hazelnut_movements', inMovement.toMap());
+
+      try {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse',
+          entityId: sourceWarehouseId,
+          operation: 'UPSERT',
+          payload: {
+            'id': sourceWarehouseId,
+            'current_stock_kg': newSourceStock,
+            'updated_at': nowIso,
+          },
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse',
+          entityId: targetWarehouseId,
+          operation: 'UPSERT',
+          payload: {
+            'id': targetWarehouseId,
+            'current_stock_kg': newTargetStock,
+            'average_rendiment': newTargetRendiment,
+            'updated_at': nowIso,
+          },
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse_hazelnut_movement',
+          entityId: outMovementId,
+          operation: 'UPSERT',
+          payload: outMovement.toMap(),
+        );
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse_hazelnut_movement',
+          entityId: inMovementId,
+          operation: 'UPSERT',
+          payload: inMovement.toMap(),
+        );
+      } catch (e) {
+        debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+      }
+
+      return outMovement;
+    });
+  }
+
+  @override
+  Future<void> deleteWarehouse(String warehouseId) async {
+    return await _gateway.transaction(() async {
+      final wh = await getWarehouseById(warehouseId);
+      if (wh == null) {
+        throw StateError('Silinecek depo bulunamadı (ID: $warehouseId).');
+      }
+
+      if (wh.currentStockKg > 0.001) {
+        throw StateError(
+          'Bu depoda halen ${wh.currentStockKg.toStringAsFixed(1)} kg stok bulunmaktadır. '
+          'Depoyu silmeden önce mal çıkışı yapmalı veya fındığı başka depoya transfer etmelisiniz.',
+        );
+      }
+
+      final activeEscrows = await _gateway.query(
+        'customer_hazelnut_escrow',
+        where: 'warehouse_id = ? AND remaining_kg > 0',
+        whereArgs: [warehouseId],
+        limit: 1,
+      );
+      if (activeEscrows.isNotEmpty) {
+        throw StateError('Bu depoya bağlı aktif müşteri emaneti bulunmaktadır. Depo silinemez.');
+      }
+
+      final nowIso = clock.now().toIso8601String();
+      await _gateway.update(
+        'warehouses',
+        {
+          'is_active': 0,
+          'updated_at': nowIso,
+        },
+        where: 'id = ?',
+        whereArgs: [warehouseId],
+      );
+
+      try {
+        await SyncOutboxV4.enqueue(
+          _gateway,
+          entityType: 'warehouse',
+          entityId: warehouseId,
+          operation: 'DELETE',
+          payload: {
+            'id': warehouseId,
+            'is_active': 0,
+            'updated_at': nowIso,
+          },
+        );
+      } catch (e) {
+        debugPrint('[HazelnutRepo] Outbox enqueue skipped: $e');
+      }
     });
   }
 }
