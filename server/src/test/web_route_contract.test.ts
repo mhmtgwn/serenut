@@ -182,7 +182,7 @@ async function run() {
   console.log('Web route contract passed.');
 }
 
-run().catch((error) => {
+run().then(() => process.exit(0)).catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });

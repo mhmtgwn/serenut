@@ -177,7 +177,8 @@ export async function applyDomainMutation(
         `INSERT INTO products (id, company_id, name, description, price, purchase_price, quantity, min_stock, brand, unit, shelf_code, category, sku, vat, image_path, status, is_deleted, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18::timestamptz,NOW()),NOW())
          ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description,
-           price=EXCLUDED.price, purchase_price=EXCLUDED.purchase_price, quantity=products.quantity,
+           price=EXCLUDED.price, purchase_price=EXCLUDED.purchase_price,
+           quantity = CASE WHEN products.quantity = 0 AND EXCLUDED.quantity > 0 THEN EXCLUDED.quantity ELSE products.quantity END,
            min_stock=EXCLUDED.min_stock, brand=EXCLUDED.brand, unit=EXCLUDED.unit,
            shelf_code=EXCLUDED.shelf_code, category=EXCLUDED.category, sku=EXCLUDED.sku,
            vat=EXCLUDED.vat, image_path=EXCLUDED.image_path, status=EXCLUDED.status,

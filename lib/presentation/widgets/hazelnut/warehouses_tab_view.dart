@@ -1,4 +1,5 @@
 // lib/presentation/widgets/hazelnut/warehouses_tab_view.dart
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -99,7 +100,7 @@ class WarehousesTabView extends ConsumerWidget {
 
                         setDialogState(() => saving = true);
                         try {
-                          final now = DateTime.now();
+                          final now = clock.now();
                           final newWh = WarehouseEntity(
                             id: const Uuid().v4(),
                             name: name,

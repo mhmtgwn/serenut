@@ -136,7 +136,7 @@ async function run(): Promise<void> {
     assert.ok(employeeRequest.claimCode && !employeeRequest.requiresSecondApproval);
     const employeeClaim = await PasswordRecoveryService.claimAdminRequest(employeeRequest.requestId, employeeRequest.claimCode!);
     assert.ok(employeeClaim?.resetToken);
-    assert.equal(await PasswordRecoveryService.resetPassword(employeeClaim!.resetToken, 'EmployeeNew!456'), true);
+    assert.ok(await PasswordRecoveryService.resetPassword(employeeClaim!.resetToken, 'EmployeeNew!456'));
 
     const blockedRequest = await PasswordRecoveryService.createAdminAssistedRequest({
       targetUserId: 'blocked-employee', actorId: 'owner-user', actorCompanyId: 'recovery-company', actorRoles: ['owner'],
@@ -170,7 +170,7 @@ async function run(): Promise<void> {
     const approved = await PasswordRecoveryService.approveSysadminRequest(sysadminRequest.requestId, 'sysadmin-b');
     const adminClaim = await PasswordRecoveryService.claimAdminRequest(sysadminRequest.requestId, approved.claimCode);
     assert.ok(adminClaim?.resetToken);
-    assert.equal(await PasswordRecoveryService.resetPassword(adminClaim!.resetToken, 'AdminNewPass!456'), true);
+    assert.ok(await PasswordRecoveryService.resetPassword(adminClaim!.resetToken, 'AdminNewPass!456'));
 
     const events = await client.query('SELECT event_type FROM password_security_events');
     assert.ok(events.rowCount && events.rowCount >= 8, 'Recovery lifecycle must be auditable');

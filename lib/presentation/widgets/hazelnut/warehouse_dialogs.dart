@@ -1,4 +1,5 @@
 // lib/presentation/widgets/hazelnut/warehouse_dialogs.dart
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -155,7 +156,7 @@ class WarehouseDialogs {
                             name: name,
                             location: loc.isNotEmpty ? loc : null,
                             capacityKg: cap,
-                            updatedAt: DateTime.now(),
+                            updatedAt: clock.now(),
                           );
 
                           await ref.read(hazelnutControllerProvider).saveWarehouse(updated);
