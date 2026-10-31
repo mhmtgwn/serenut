@@ -4,7 +4,7 @@
 
 import { Router, Response } from 'express';
 import os from 'os';
-import { pgPool } from '../../config/database';
+import { telemetryRepository } from './telemetry.repository';
 import { authenticateUser, AuthenticatedRequest, requirePermission, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { logger } from '../../config/logger';
 
@@ -18,79 +18,15 @@ router.post('/upload', async (req: AuthenticatedRequest, res: Response) => {
   const metrics = Array.isArray(req.body?.metrics) ? req.body.metrics.slice(0, 100) : [];
   if (metrics.length === 0) return res.status(400).json({ error: 'empty_metrics' });
 
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    for (const metric of metrics) {
-      const name = String(metric.metric_name || '').slice(0, 120);
-      if (!/^[a-z0-9_.-]+$/i.test(name)) continue;
-      const value = Number(metric.metric_value);
-      const occurredAt = new Date(metric.timestamp);
-      if (!Number.isFinite(value) || Number.isNaN(occurredAt.getTime())) continue;
-
-      let metadata: Record<string, unknown> = {};
-      try {
-        const parsed = typeof metric.metadata === 'string'
-          ? JSON.parse(metric.metadata || '{}')
-          : metric.metadata;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
-      } catch (err) {
-        logger.debug('Malformed telemetry metadata payload skipped', { err });
-      }
-
-      // Never persist credentials accidentally supplied by a client.
-      for (const key of ['token', 'access_token', 'refresh_token', 'password', 'authorization']) {
-        delete metadata[key];
-      }
-
-      await client.query(`
-        INSERT INTO client_telemetry_events
-          (company_id, user_id, metric_name, metric_value, occurred_at, metadata, ip_address, user_agent)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [
-        user.company_id, user.id, name, value, occurredAt.toISOString(),
-        JSON.stringify(metadata), req.ip || null,
-        String(req.headers['user-agent'] || 'unknown').slice(0, 500)
-      ]);
-
-      if (name === 'audit_event' && typeof metadata.record_hash === 'string') {
-        await client.query(`
-          INSERT INTO audit_logs
-            (id, company_id, user_id, user_name, action, entity_type,
-             entity_id, old_values, new_values, ip_address, user_agent,
-             device_id, previous_hash, record_hash, created_at)
-          VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-          ON CONFLICT DO NOTHING
-        `, [
-          String(metadata.id || `audit-${Date.now()}`),
-          user.company_id,
-          user.id,
-          String(user.name || metadata.user_name || 'Kullanıcı').slice(0, 150),
-          String(metadata.event_type || 'unknown').slice(0, 150),
-          String(metadata.entity_type || 'unknown').slice(0, 120),
-          metadata.entity_id ? String(metadata.entity_id).slice(0, 255) : null,
-          metadata.old_value ? JSON.stringify(metadata.old_value) : null,
-          metadata.new_value ? JSON.stringify(metadata.new_value) : null,
-          req.ip || null,
-          String(req.headers['user-agent'] || 'unknown').slice(0, 500),
-          metadata.device_id ? String(metadata.device_id).slice(0, 255) : null,
-          metadata.previous_hash ? String(metadata.previous_hash).slice(0, 64) : null,
-          String(metadata.record_hash).slice(0, 64),
-          occurredAt.toISOString(),
-        ]);
-      }
-    }
-    await client.query('COMMIT');
-    return res.json({ success: true, accepted: metrics.length });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    logger.error('Client telemetry upload failed:', err);
-    return res.status(500).json({ error: 'server_error' });
-  } finally {
-    client.release();
-  }
+  const accepted = await telemetryRepository.uploadMetrics({
+      companyId: user.company_id,
+      userId: user.id,
+      userName: user.name,
+      metrics,
+      ip: req.ip || null,
+      userAgent: String(req.headers['user-agent'] || 'unknown'),
+    });
+    return res.json({ success: true, accepted });
 });
 
 router.get('/client-events', requirePermission('telemetry.view'), async (req: AuthenticatedRequest, res: Response) => {
@@ -114,37 +50,8 @@ router.get('/client-events', requirePermission('telemetry.view'), async (req: Au
   }
 });
 
-async function runBypassingRLS(sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
+const runBypassingRLS = telemetryRepository.runBypassingRLS.bind(telemetryRepository);
+const runWithTenantContext = telemetryRepository.runWithTenantContext.bind(telemetryRepository);
 
 /**
  * Write a secure, un-erasable Audit Log entry
@@ -198,7 +105,7 @@ router.get('/health-status', requirePermission('telemetry.view'), async (req: Au
     const memUsagePct = ((totalMem - freeMem) / totalMem) * 100;
     
     // 2. Database active connections pool
-    const activeConns = pgPool.waitingCount + pgPool.totalCount;
+    const activeConns = telemetryRepository.getActiveDbPoolCount();
 
     // 3. Queue metrics (bypass RLS to check overall/own queue statistics)
     const queueStats = await runBypassingRLS(`

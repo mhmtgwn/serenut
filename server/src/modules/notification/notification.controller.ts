@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { pgPool, redisClient } from '../../config/database';
+import { notificationRepository } from './notification.repository';
 import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
@@ -31,82 +31,9 @@ const requireSmsHistoryAccess = (
 router.use(authenticateUser);
 router.use(requireActiveEntitlementForMutations);
 
-async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-async function runBypassingRLS(sql: string, params: any[] = []) {
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const res = await client.query(sql, params);
-    await client.query('COMMIT');
-    return res;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Helper to check if company has sufficient notification credits.
- */
-async function hasSufficientCredits(companyId: string, channel: string): Promise<boolean> {
-  let creditCol = 'sms_credits';
-  if (channel === 'whatsapp') creditCol = 'whatsapp_credits';
-  if (channel === 'email') creditCol = 'email_credits';
-
-  const cacheKey = `notif_credits:${companyId}:${channel}`;
-  if (redisClient && redisClient.isOpen) {
-    try {
-      const cached = await redisClient.get(cacheKey);
-      if (cached !== null) {
-        return parseInt(cached, 10) > 0;
-      }
-    } catch (err) {
-      logger.error('Redis credits get error:', err);
-    }
-  }
-
-  const creditsRes = await runBypassingRLS(
-    `SELECT ${creditCol} FROM company_notification_credits WHERE company_id = $1`,
-    [companyId]
-  );
-
-  if (creditsRes.rows.length === 0) {
-    // If no credit record exists, seed initial credits (100 SMS, 50 WhatsApp, 1000 email)
-    await runBypassingRLS(
-      `INSERT INTO company_notification_credits (company_id) VALUES ($1)`,
-      [companyId]
-    );
-    if (redisClient && redisClient.isOpen) {
-      const val = channel === 'sms' ? 100 : channel === 'whatsapp' ? 50 : 1000;
-      await redisClient.setEx(cacheKey, 60, String(val));
-    }
-    return true;
-  }
-
-  const credits = creditsRes.rows[0][creditCol];
-  if (redisClient && redisClient.isOpen) {
-    await redisClient.setEx(cacheKey, 60, String(credits));
-  }
-  return credits > 0;
-}
+const runWithTenantContext = notificationRepository.runWithTenantContext.bind(notificationRepository);
+const runBypassingRLS = notificationRepository.runBypassingRLS.bind(notificationRepository);
+const hasSufficientCredits = notificationRepository.hasSufficientCredits.bind(notificationRepository);
 
 /**
  * @openapi
@@ -291,60 +218,15 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
   const user = req.user!;
   const deviceId = String(req.body.device_id || '');
   const limit = Math.min(Math.max(Number(req.body.limit || 20), 1), 50);
-  const client = await pgPool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    const gateway = await client.query(
-      `UPDATE company_sms_gateways g SET last_poll_at = NOW()
-       FROM device_activations d
-       WHERE g.company_id = $1::varchar AND g.device_activation_id = d.id AND d.device_hash = $2::varchar
-       RETURNING g.device_activation_id`,
-      [user.company_id, deviceId]
-    );
-    if (gateway.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'not_primary_sms_gateway' });
+    const result = await notificationRepository.pollSmsGateway(user.company_id, deviceId, limit);
+    if (!result.success) {
+      return res.status(403).json({ error: result.error });
     }
-    await client.query(
-      `UPDATE notification_queue
-       SET status = 'retrying', error_message = 'sms_gateway_interrupted',
-           retry_count = retry_count + 1, gateway_updated_at = NOW()
-       WHERE company_id = $1 AND channel = 'sms'
-         AND status IN ('delivered_to_device', 'sending')
-         AND gateway_updated_at < NOW() - INTERVAL '5 minutes'`,
-      [user.company_id]
-    );
-    await client.query(
-      `UPDATE notification_queue SET status = 'failed', error_message = 'sms_gateway_timeout', gateway_updated_at = NOW()
-          WHERE company_id = $1::varchar AND channel = 'sms' AND status IN ('queued','pending','retrying')
-         AND created_at < NOW() - INTERVAL '24 hours'`,
-      [user.company_id]
-    );
-    const gatewayActivationId = gateway.rows[0].device_activation_id;
-    const jobs = await client.query(
-      `WITH selected AS (
-         SELECT id FROM notification_queue
-         WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
-           AND COALESCE(scheduled_at, created_at) <= NOW()
-           AND created_at >= NOW() - INTERVAL '24 hours'
-          ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT $3::integer
-       )
-       UPDATE notification_queue q
-        SET status = 'delivered_to_device', gateway_device_id = $2::varchar,
-           gateway_claimed_at = NOW(), gateway_updated_at = NOW()
-       FROM selected WHERE q.id = selected.id
-       RETURNING q.id, q.recipient, q.body, q.client_message_id, q.created_at`,
-      [user.company_id, gatewayActivationId, limit]
-    );
-    await client.query('COMMIT');
-    return res.json({ messages: jobs.rows });
+    return res.json({ messages: result.messages || [] });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
     logger.error('SMS gateway poll failed', err);
     return res.status(500).json({ error: 'server_error' });
-  } finally {
-    client.release();
   }
 });
 
@@ -543,52 +425,14 @@ router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notificat
       return res.json({ success: true, queued_count: 0, message: 'Seçilen grupta uygun alıcı bulunamadı.' });
     }
 
-    // 3. Batch insert queue entries using transaction bypassing RLS for bulk write efficiency
-    const client = await pgPool.connect();
-    let queuedCount = 0;
-
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-      for (const rec of recipients) {
-        // Enforce credit check per record
-        const hasCredit = await hasSufficientCredits(user.company_id, channel);
-        const creditCol = channel === 'sms' ? 'sms_credits' : channel === 'whatsapp' ? 'whatsapp_credits' : 'email_credits';
-        const remRes = await client.query(`SELECT ${creditCol} AS rem FROM company_notification_credits WHERE company_id = $1`, [user.company_id]);
-        const remCredits = remRes.rows.length > 0 ? Number(remRes.rows[0].rem || 0) : 100;
-        if (!hasCredit || queuedCount >= remCredits) {
-          logger.warn(`Campaign aborted midway for company ${user.company_id} due to out of credits.`);
-          break;
-        }
-
-        const recipientAddr = channel === 'email' ? rec.email : rec.phone;
-        if (!recipientAddr) continue; // Skip if no address contact exists
-
-        // Parse template
-        const resolvedBody = TemplateParserService.parse(templateBody, {
-          customer: rec.name,
-          store: 'Serenut OS'
-        });
-
-        const id = `notif-camp-${Date.now()}-${Math.floor(Math.random()*10000)}`;
-
-        await client.query(`
-          INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, created_by_user_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [id, user.company_id, channel, recipientAddr, templateTitle || null, resolvedBody, user.id]);
-
-        queuedCount++;
-      }
-
-      await client.query('COMMIT');
-      dispatchNotificationOutboxBatch().catch(() => {});
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    const queuedCount = await notificationRepository.enqueueCampaignRecipients({
+      companyId: user.company_id,
+      userId: user.id,
+      channel,
+      recipients,
+      templateTitle,
+      templateBody,
+    });
 
     return res.json({ success: true, queued_count: queuedCount, message: `${queuedCount} adet kampanya mesajı başarıyla kuyruğa eklendi.` });
   } catch (err) {

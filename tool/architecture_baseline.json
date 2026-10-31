@@ -10,7 +10,7 @@
     "ui_imports_database": 0,
     "ui_direct_repository_service": 0,
     "database_manager_singleton": 1,
-    "server_pgpool_in_controllers": 87,
+    "server_pgpool_in_controllers": 78,
     "empty_catch_dart": 0,
     "empty_catch_ts": 0,
     "datetime_now": 499
