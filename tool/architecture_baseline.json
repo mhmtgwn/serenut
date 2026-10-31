@@ -8,7 +8,7 @@
     "ledger_bypass_toggles": 0,
     "hardcoded_data_repair_ids": 0,
     "ui_imports_database": 0,
-    "ui_direct_repository_service": 42,
+    "ui_direct_repository_service": 39,
     "database_manager_singleton": 1,
     "server_pgpool_in_controllers": 97,
     "empty_catch_dart": 0,

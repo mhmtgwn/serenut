@@ -7,9 +7,9 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/hazelnut_models.dart';
 import 'package:serenutos/domain/services/hazelnut_calculator.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 import 'package:serenutos/providers/hazelnut_providers.dart';
+import 'package:serenutos/presentation/controllers/hazelnut_controller.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -39,24 +39,8 @@ class CustomerEscrowTabView extends ConsumerWidget {
     final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final repo = ref.read(hazelnutRepositoryProvider);
-    var warehouses = await repo.getWarehouses();
-    if (warehouses.isEmpty) {
-      final defaultWh = WarehouseEntity(
-        id: 'wh-main',
-        name: 'Ana Depo (Silo 1)',
-        location: 'Merkez',
-        capacityKg: 50000.0,
-        currentStockKg: 0.0,
-        averageRendiment: 50.0,
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await repo.saveWarehouse(defaultWh);
-      ref.invalidate(warehousesProvider);
-      warehouses = [defaultWh];
-    }
+    final hazelnutCtrl = ref.read(hazelnutControllerProvider);
+    var warehouses = await hazelnutCtrl.getWarehouses();
 
     String selectedWarehouseId = warehouses.first.id;
     var saving = false;
@@ -153,7 +137,7 @@ class CustomerEscrowTabView extends ConsumerWidget {
                                             createdAt: now,
                                             updatedAt: now,
                                           );
-                                          await repo.saveWarehouse(newWh);
+                                          await hazelnutCtrl.saveWarehouse(newWh);
                                           ref.invalidate(warehousesProvider);
                                           if (subCtx.mounted) Navigator.pop(subCtx, newWh);
                                         },
@@ -163,7 +147,7 @@ class CustomerEscrowTabView extends ConsumerWidget {
                                   ),
                                 );
                                 if (created != null) {
-                                  final freshWhs = await repo.getWarehouses();
+                                  final freshWhs = await hazelnutCtrl.getWarehouses();
                                   setDialogState(() {
                                     warehouses = freshWhs;
                                     selectedWarehouseId = created.id;
@@ -322,8 +306,8 @@ class CustomerEscrowTabView extends ConsumerWidget {
 
                         setDialogState(() => saving = true);
                         try {
-                          final repo = ref.read(hazelnutRepositoryProvider);
-                          final escrow = await repo.addEscrowBatch(
+                          final hazelnutCtrl = ref.read(hazelnutControllerProvider);
+                          final escrow = await hazelnutCtrl.addEscrowBatch(
                             customerId: customer.id,
                             warehouseId: selectedWarehouseId,
                             receiptNo: receiptVal.isNotEmpty ? receiptVal : null,
@@ -333,11 +317,6 @@ class CustomerEscrowTabView extends ConsumerWidget {
                             rendiment: rendimentVal,
                             notes: notesVal.isNotEmpty ? notesVal : null,
                           );
-
-                          ref.invalidate(customerEscrowsProvider(customer.id));
-                          ref.invalidate(warehousesProvider);
-                          ref.invalidate(warehouseDetailProvider(selectedWarehouseId));
-                          ref.invalidate(warehouseMovementsProvider(selectedWarehouseId));
 
                           if (ctx.mounted) Navigator.pop(ctx);
                           AppNotificationHost.show(
@@ -586,21 +565,16 @@ class CustomerEscrowTabView extends ConsumerWidget {
 
                         setDialogState(() => saving = true);
                         try {
-                          final repo = ref.read(hazelnutRepositoryProvider);
-                          final cutResult = await repo.cutEscrowPrice(
+                          final hazelnutCtrl = ref.read(hazelnutControllerProvider);
+                          final cutResult = await hazelnutCtrl.cutEscrowPrice(
                             escrowId: escrow.id,
+                            customerId: customer.id,
                             cutKg: cutKgVal,
                             basePrice50: base50Val,
                             settlementType: settlementType,
                             customerName: customer.name,
                             notes: notesVal.isNotEmpty ? notesVal : null,
                           );
-
-                          // Invalidate all related providers so customer ledger and escrows refresh
-                          ref.invalidate(customerEscrowsProvider(customer.id));
-                          ref.invalidate(customerDetailProvider(customer.id));
-                          ref.invalidate(customerTransactionsProvider(customer.id));
-                          ref.invalidate(customerBalanceDetailsProvider(customer.id));
 
                           if (ctx.mounted) Navigator.pop(ctx);
                           AppNotificationHost.show(
