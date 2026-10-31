@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/presentation/widgets/pos_filter_bar.dart';
