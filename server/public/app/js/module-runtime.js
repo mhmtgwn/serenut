@@ -777,11 +777,174 @@ const loaders = {
   'platform-overview': async () => {
     const [d,companies,transfers,sysHealth,intel,traffic]=await Promise.all([apiFetch('/admin/dashboard/commercial'),apiFetch('/admin/companies'),apiFetch('/billing/admin/pending-transfers'),apiFetch('/admin/dashboard').catch(()=>({})),apiFetch('/admin/billing/intel').catch(()=>({})),apiFetch('/admin/traffic-funnel').catch(()=>({}))]);const s=d.summary||{};const subs=d.subscriptions||{};const sys=sysHealth?.system||{};const expiring=d.expiringCompanies||[];const tf=traffic.summary||{};const tfSources=(traffic.sources||[]).map(x=>`${esc(x.source)}: <b>${esc(x.visitors)}</b>`).join(' · ')||'Henüz veri toplanıyor';const tfDevices=(traffic.devices||[]).map(x=>`${esc(x.device_type)}: <b>${esc(x.visitors)}</b>`).join(' · ')||'—';
     const recent=[...companies].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,6);
-    set(`<div class="admin-welcome"><div><span>CANLI OPERASYON MERKEZİ · BUGÜN ${esc(s.todaySignups||0)} YENİ KAYIT · ${esc(tf.visitors_today||0)} SİTE ZİYARETÇİSİ</span><h3>Bugün kontrol etmeniz gerekenler</h3><p>Bekleyen havaleler, süresi yaklaşan abonelikler, site ziyaretçi hunisi ve sunucu durumu tek ekranda.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary admin-jump" data-target="platform-billing">${esc(s.pendingTransfers||0)} havaleyi incele</button><button class="btn btn-secondary admin-jump" data-target="platform-maintenance" style="background:rgba(255,255,255,.15)!important;color:#fff!important;border-color:rgba(255,255,255,.3)!important">Sunucu: Disk %${esc(sys.diskUsage||0)} · RAM %${esc(sys.ramUsage||0)}</button></div></div><div class="metrics-grid admin-primary-metrics">${metric('Toplam Firma',s.totalCustomers||0)}${metric('Aktif Abonelik',subs.active||0)}${metric('Denemedeki Firma',s.trialUsers||0)}${metric('Aylık Sabit Gelir (MRR)',money(intel.mrr||0))}${metric('30 Günlük Tahsilat',money(s.monthlyRevenue||0))}${metric('Riskli / Geciken',money(intel.at_risk_revenue||0))}</div><div class="customer-create-panel" style="padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div><h4 style="margin:0">🌐 Site Ziyaretçi & Müşteri Dönüşüm Hunisi (Son 30 Gün)</h4><small style="color:var(--text-muted)">Kaynaklar: ${tfSources} &nbsp;|&nbsp; Cihazlar: ${tfDevices}</small></div><span class="status-badge status-active">Bugün: ${esc(tf.visitors_today||0)} Tekil Ziyaretçi (${esc(tf.pageviews_today||0)} sayfa)</span></div><div class="metrics-grid" style="margin:0">${metric('1. Site Ziyaretçisi (30G)',`${tf.visitors_30d||0} kişi (${tf.pageviews_30d||0} görüntüleme)`)}${metric('2. Plan / İndirme İnceleyen',`${tf.interested_30d||0} kişi`)}${metric('3. Kayıt Sayfası → Kayıt Olan',`${tf.register_views_30d||0} görüntüleme → ${tf.signups_30d||0} firma`)}${metric('4. Uygulama İndiren & Cihaz Açan',`Win: ${tf.windows_downloads_30d||0} · And: ${tf.android_downloads_30d||0} → ${tf.activated_companies_30d||0} aktif firma`)}</div></div><div class="admin-columns"><section><div class="section-heading"><h3>Bekleyen Havale Bildirimleri</h3><button class="text-action admin-jump" data-target="platform-billing">Tümünü gör →</button></div>${table([{label:'Firma',render:r=>esc(r.company_name||r.company_id)},{label:'Tutar',render:r=>esc(money(r.amount))},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Hızlı İşlem',render:r=>`<div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm overview-approve-transfer" data-invoice="${esc(r.invoice_id)}">Onayla</button><button class="btn btn-danger btn-sm overview-reject-transfer" data-invoice="${esc(r.invoice_id)}">Reddet</button></div>`}],transfers.slice(0,5))}</section><section><div class="section-heading"><h3>Süresi Yaklaşan / Biten Firmalar (14 Gün)</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör →</button></div>${table([{label:'Firma',render:r=>`<strong>${esc(r.name)}</strong><small>${esc(r.plan_name||'Paket')}</small>`},{label:'Bitiş',render:r=>{const diff=Math.ceil((new Date(r.valid_until).getTime()-Date.now())/86400000);return `${esc(date(r.valid_until))} <small>(${diff<0?'Süresi doldu':`${diff} gün`})</small>`;}},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm overview-open-company" data-id="${esc(r.id)}">Süre Uzat / Yönet</button>`}],expiring)}</section></div><div class="section-heading spaced"><h3>Son Kayıt Olan Firmalar</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör →</button></div>${table([{label:'Firma',key:'name'},{label:'Paket',render:r=>esc(r.plan_name||'Deneme')},{label:'İletişim',render:r=>esc(r.email||r.phone||'—')},{label:'Durum',render:r=>badge(r.status)},{label:'Kayıt',render:r=>esc(date(r.created_at))},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm overview-open-company" data-id="${esc(r.id)}">Yönet</button>`}],recent)}<div class="attention-strip" style="justify-content:space-between;flex-wrap:wrap;margin-top:14px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><strong>${esc(s.noLicense||0)}</strong><span>lisansı olmayan firma</span><strong>${esc(s.expiringLicenses||0)}</strong><span>14 gün içinde süresi bitecek firma</span></div><div style="font-size:12px;color:#52615a">PostgreSQL: <b>${esc(sys.database||'aktif')}</b> · Redis: <b>${esc(sys.redis||'aktif')}</b> · CPU: <b>%${esc(sys.cpuUsage||0)}</b></div></div>`);
+    set(`<div class="admin-welcome"><div><span>CANLI OPERASYON MERKEZİ · BUGÜN ${esc(s.todaySignups||0)} YENİ KAYIT · ${esc(tf.visitors_today||0)} SİTE ZİYARETÇİSİ</span><h3>Bugün kontrol etmeniz gerekenler</h3><p>Bekleyen havaleler, süresi yaklaşan abonelikler, site ziyaretçi hunisi ve sunucu durumu tek ekranda.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary admin-jump" data-target="platform-billing">${esc(s.pendingTransfers||0)} havaleyi incele</button><button class="btn btn-secondary admin-jump" data-target="platform-traffic">🌐 Web Trafiği (${esc(tf.visitors_today||0)} Ziyaretçi)</button><button class="btn btn-secondary admin-jump" data-target="platform-maintenance" style="background:rgba(255,255,255,.15)!important;color:#fff!important;border-color:rgba(255,255,255,.3)!important">Sunucu: Disk %${esc(sys.diskUsage||0)} · RAM %${esc(sys.ramUsage||0)}</button></div></div><div class="metrics-grid admin-primary-metrics">${metric('Toplam Firma',s.totalCustomers||0)}${metric('Aktif Abonelik',subs.active||0)}${metric('Denemedeki Firma',s.trialUsers||0)}${metric('Aylık Sabit Gelir (MRR)',money(intel.mrr||0))}${metric('30 Günlük Tahsilat',money(s.monthlyRevenue||0))}${metric('Riskli / Geciken',money(intel.at_risk_revenue||0))}</div><div class="customer-create-panel" style="padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div><h4 style="margin:0">🌐 Site Ziyaretçi & Müşteri Dönüşüm Hunisi (Son 30 Gün)</h4><small style="color:var(--text-muted)">Kaynaklar: ${tfSources} &nbsp;|&nbsp; Cihazlar: ${tfDevices}</small></div><div style="display:flex;gap:8px;align-items:center"><span class="status-badge status-active">Bugün: ${esc(tf.visitors_today||0)} Tekil Ziyaretçi (${esc(tf.pageviews_today||0)} sayfa)</span><button class="btn btn-secondary btn-sm admin-jump" data-target="platform-traffic">Detaylı Trafik Analitiği →</button></div></div><div class="metrics-grid" style="margin:0">${metric('1. Site Ziyaretçisi (30G)',`${tf.visitors_30d||0} kişi (${tf.pageviews_30d||0} görüntüleme)`)}${metric('2. Plan / İndirme İnceleyen',`${tf.interested_30d||0} kişi`)}${metric('3. Kayıt Sayfası → Kayıt Olan',`${tf.register_views_30d||0} görüntüleme → ${tf.signups_30d||0} firma`)}${metric('4. Uygulama İndiren & Cihaz Açan',`Win: ${tf.windows_downloads_30d||0} · And: ${tf.android_downloads_30d||0} → ${tf.activated_companies_30d||0} aktif firma`)}</div></div><div class="admin-columns"><section><div class="section-heading"><h3>Bekleyen Havale Bildirimleri</h3><button class="text-action admin-jump" data-target="platform-billing">Tümünü gör →</button></div>${table([{label:'Firma',render:r=>esc(r.company_name||r.company_id)},{label:'Tutar',render:r=>esc(money(r.amount))},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Hızlı İşlem',render:r=>`<div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm overview-approve-transfer" data-invoice="${esc(r.invoice_id)}">Onayla</button><button class="btn btn-danger btn-sm overview-reject-transfer" data-invoice="${esc(r.invoice_id)}">Reddet</button></div>`}],transfers.slice(0,5))}</section><section><div class="section-heading"><h3>Süresi Yaklaşan / Biten Firmalar (14 Gün)</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör →</button></div>${table([{label:'Firma',render:r=>`<strong>${esc(r.name)}</strong><small>${esc(r.plan_name||'Paket')}</small>`},{label:'Bitiş',render:r=>{const diff=Math.ceil((new Date(r.valid_until).getTime()-Date.now())/86400000);return `${esc(date(r.valid_until))} <small>(${diff<0?'Süresi doldu':`${diff} gün`})</small>`;}},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm overview-open-company" data-id="${esc(r.id)}">Süre Uzat / Yönet</button>`}],expiring)}</section></div><div class="section-heading spaced"><h3>Son Kayıt Olan Firmalar</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör →</button></div>${table([{label:'Firma',key:'name'},{label:'Paket',render:r=>esc(r.plan_name||'Deneme')},{label:'İletişim',render:r=>esc(r.email||r.phone||'—')},{label:'Durum',render:r=>badge(r.status)},{label:'Kayıt',render:r=>esc(date(r.created_at))},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm overview-open-company" data-id="${esc(r.id)}">Yönet</button>`}],recent)}<div class="attention-strip" style="justify-content:space-between;flex-wrap:wrap;margin-top:14px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><strong>${esc(s.noLicense||0)}</strong><span>lisansı olmayan firma</span><strong>${esc(s.expiringLicenses||0)}</strong><span>14 gün içinde süresi bitecek firma</span></div><div style="font-size:12px;color:#52615a">PostgreSQL: <b>${esc(sys.database||'aktif')}</b> · Redis: <b>${esc(sys.redis||'aktif')}</b> · CPU: <b>%${esc(sys.cpuUsage||0)}</b></div></div>`);
     document.querySelectorAll('.admin-jump').forEach(b=>b.onclick=()=>window.selectAppModule?window.selectAppModule(b.dataset.target):document.querySelector(`[data-module-id="${CSS.escape(b.dataset.target)}"]`)?.click());
     document.querySelectorAll('.overview-open-company').forEach(b=>b.onclick=()=>{window._openCompanyDetailId=b.dataset.id;if(window.selectAppModule)window.selectAppModule('platform-companies');});
     document.querySelectorAll('.overview-approve-transfer').forEach(b=>b.onclick=async()=>{if(!confirm('Ödeme banka hareketiyle doğrulandı mı? Bu işlem aboneliği hemen aktifleştirir.'))return;b.disabled=true;try{const result=await apiFetch(`/billing/admin/invoices/${encodeURIComponent(b.dataset.invoice)}/approve-payment`,{method:'PUT'});notice(`Ödeme onaylandı. Lisans geçerlilik tarihi: ${date(result.license_valid_until)}`);await loaders['platform-overview']();}catch(x){notice(x.message);b.disabled=false}});
     document.querySelectorAll('.overview-reject-transfer').forEach(b=>b.onclick=async()=>{const note=prompt('Havale red gerekçesi:');if(!note)return;b.disabled=true;try{await apiFetch(`/billing/admin/invoices/${encodeURIComponent(b.dataset.invoice)}/reject-payment`,{method:'PUT',body:{note}});notice('Havale bildirimi reddedildi.');await loaders['platform-overview']();}catch(x){notice(x.message);b.disabled=false}});
+  },
+  'platform-traffic': async () => {
+    const traffic = await apiFetch('/admin/traffic-funnel').catch(() => ({}));
+    const s = traffic.summary || {};
+    const sources = traffic.sources || [];
+    const devices = traffic.devices || [];
+    const topPages = traffic.top_pages || [];
+    const events = traffic.events || [];
+    const campaigns = traffic.campaigns || [];
+    const recent = traffic.recent_activity || [];
+
+    const totalDownloads = Number(s.windows_downloads_30d || 0) + Number(s.android_downloads_30d || 0);
+    const visitors30d = Number(s.visitors_30d || 0);
+    const interested30d = Number(s.interested_30d || 0);
+    const signups30d = Number(s.signups_30d || 0);
+    const activated30d = Number(s.activated_companies_30d || 0);
+
+    const pct = (num, denom) => denom > 0 ? Math.round((num / denom) * 100) : 0;
+
+    const funnelSteps = [
+      { step: '1. Web Ziyaretçisi', count: visitors30d, pct: 100, desc: 'Son 30 günde serenut.com gelen tekil kişi' },
+      { step: '2. Plan / İndirme İnceleyen', count: interested30d, pct: pct(interested30d, visitors30d), desc: 'Fiyat planlarını ve indirme sayfasını gezenler' },
+      { step: '3. Uygulama İndiren', count: totalDownloads, pct: pct(totalDownloads, visitors30d), desc: `Win: ${s.windows_downloads_30d || 0} · And: ${s.android_downloads_30d || 0}` },
+      { step: '4. Kayıt Olan Firma', count: signups30d, pct: pct(signups30d, visitors30d), desc: 'Sisteme yeni kayıt açan işletmeler' },
+      { step: '5. Cihazını Açan Aktif Firma', count: activated30d, pct: pct(activated30d, visitors30d), desc: 'En az bir POS cihazı aktifleştiren firma' }
+    ];
+
+    set(`
+      <div class="section-heading">
+        <div>
+          <h3>🌐 Web Trafik & Ziyaretçi Analitiği</h3>
+          <p>serenut.com ziyaretçi akışı, pazarlama kaynakları, okuma süreleri ve indirme dönüşüm hunisi.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="status-badge status-active">● Canlı Telemetri Aktif</span>
+          <button class="btn btn-secondary btn-sm" id="traffic-refresh-btn">Yenile</button>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        ${metric('Bugün Tekil Ziyaretçi', `${s.visitors_today || 0} kişi`)}
+        ${metric('Bugün Sayfa Gösterimi', `${s.pageviews_today || 0} sayfa`)}
+        ${metric('Son 30 Gün Ziyaretçi', `${s.visitors_30d || 0} tekil (${s.pageviews_30d || 0} sayfa)`)}
+        ${metric('Ort. Sayfada Kalma', `${s.avg_dwell_seconds || 0} saniye`)}
+        ${metric('Ort. Okuma / Kaydırma', `%${s.avg_scroll_pct || 0}`)}
+        ${metric('Toplam İndirme (30G)', `Win: ${s.windows_downloads_30d || 0} · And: ${s.android_downloads_30d || 0}`)}
+      </div>
+
+      <!-- DÖNÜŞÜM HUNİSİ (FUNNEL) -->
+      <section class="customer-create-panel" style="padding:18px 20px;margin-bottom:18px">
+        <h4 style="margin:0 0 14px 0">🎯 Web Ziyaretçi → Müşteri Dönüşüm Hunisi</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+          ${funnelSteps.map(f => `
+            <div style="background:#f8faf9;border:1px solid #e2e8e4;border-radius:8px;padding:12px">
+              <span style="font-size:11px;font-weight:700;color:#52615a">${esc(f.step)}</span>
+              <div style="font-size:20px;font-weight:800;color:#151b18;margin:4px 0">${esc(f.count)} <small style="font-size:12px;color:#0b714d">(%${f.pct})</small></div>
+              <div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">
+                <div style="background:#10b981;height:100%;width:${Math.min(f.pct, 100)}%"></div>
+              </div>
+              <small style="color:#718078;font-size:11px">${esc(f.desc)}</small>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+
+      <!-- TRAFİK KAYNAKLARI & CİHAZ TÜRÜ -->
+      <div class="admin-columns" style="margin-bottom:18px">
+        <section>
+          <div class="section-heading">
+            <h3>Trafik Kaynakları (Son 30 Gün)</h3>
+          </div>
+          ${table([
+            { label: 'Kaynak', render: r => `<strong>${esc(r.source || 'Bilinmiyor')}</strong>` },
+            { label: 'Tekil Ziyaretçi', render: r => esc(r.visitors || 0) },
+            { label: 'Sayfa Görüntüleme', render: r => esc(r.views || 0) },
+            { label: 'Payı', render: r => `%${pct(r.visitors, visitors30d)}` }
+          ], sources)}
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <h3>Cihaz ve Platform Dağılımı</h3>
+          </div>
+          <div style="display:grid;gap:12px;margin-top:8px">
+            ${devices.map(d => {
+              const dPct = pct(d.visitors, visitors30d);
+              const icon = String(d.device_type).toLowerCase().includes('mobil') ? '📱' : '💻';
+              return `
+                <div style="background:#fff;border:1px solid #e2e8e4;border-radius:8px;padding:14px">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                    <strong>${icon} ${esc(d.device_type || 'Bilinmiyor')}</strong>
+                    <span><b>${esc(d.visitors || 0)}</b> ziyaretçi (%${dPct})</span>
+                  </div>
+                  <div style="background:#e5e7eb;border-radius:4px;height:8px;overflow:hidden">
+                    <div style="background:#3b82f6;height:100%;width:${Math.min(dPct, 100)}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('') || '<div class="state-panel">Henüz cihaz verisi toplanmadı.</div>'}
+          </div>
+        </section>
+      </div>
+
+      <!-- EN ÇOK GEZİLEN SAYFALAR & BUTON TIKLAMALARI -->
+      <div class="admin-columns" style="margin-bottom:18px">
+        <section>
+          <div class="section-heading">
+            <h3>En Çok Okunan / Gezilen Sayfalar</h3>
+          </div>
+          ${table([
+            { label: 'Sayfa', render: r => `<code>${esc(r.page_path)}</code>` },
+            { label: 'Ziyaretçi', render: r => esc(r.visitors || 0) },
+            { label: 'Görüntüleme', render: r => esc(r.views || 0) },
+            { label: 'Ort. Süre', render: r => `${esc(r.avg_seconds || 0)} sn` },
+            { label: 'Kaydırma', render: r => `%${esc(r.avg_scroll || 0)}` }
+          ], topPages)}
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <h3>Kritik Buton & Etkileşim Olayları</h3>
+          </div>
+          ${table([
+            { label: 'Olay', render: r => `<strong>${esc(r.event_name)}</strong><small>${esc(r.event_category || 'etkileşim')}</small>` },
+            { label: 'Toplam Tıklama', render: r => esc(r.total_events || 0) },
+            { label: 'Tekil Kişi', render: r => esc(r.unique_visitors || 0) }
+          ], events)}
+        </section>
+      </div>
+
+      <!-- PAZARLAMA KAMPANYALARI (UTM) -->
+      ${campaigns.length ? `
+        <section style="margin-bottom:18px">
+          <div class="section-heading">
+            <h3>Pazarlama Kampanyaları (UTM Parametreleri)</h3>
+          </div>
+          ${table([
+            { label: 'Kaynak (utm_source)', render: r => `<strong>${esc(r.utm_source)}</strong>` },
+            { label: 'Mecra (utm_medium)', render: r => esc(r.utm_medium) },
+            { label: 'Kampanya Adı (utm_campaign)', render: r => esc(r.utm_campaign) },
+            { label: 'Ziyaretçi', render: r => esc(r.visitors || 0) },
+            { label: 'Görüntüleme', render: r => esc(r.views || 0) }
+          ], campaigns)}
+        </section>
+      ` : ''}
+
+      <!-- CANLI SON ZİYARETÇİ AKIŞI -->
+      <section>
+        <div class="section-heading">
+          <h3>Canlı Ziyaretçi Akışı (Son 20 İşlem)</h3>
+        </div>
+        ${table([
+          { label: 'Sayfa', render: r => `<code>${esc(r.page_path)}</code>` },
+          { label: 'Kaynak', render: r => esc(r.traffic_source || 'Direkt') },
+          { label: 'Cihaz', render: r => esc(r.device_type || 'Masaüstü') },
+          { label: 'Süre / Kaydırma', render: r => `${esc(r.duration_seconds || 0)} sn · %${esc(r.max_scroll_pct || 0)}` },
+          { label: 'Zaman', render: r => esc(date(r.created_at, true)) }
+        ], recent)}
+      </section>
+    `);
+
+    const refreshBtn = document.getElementById('traffic-refresh-btn');
+    if (refreshBtn) refreshBtn.onclick = () => loaders['platform-traffic']();
   },
   'platform-companies': async () => {
     const rows=await apiFetch('/admin/companies');const activeFilter=window._companySegmentFilter||'all';const isExpiring=r=>{if(!r.valid_until)return false;const diff=(new Date(r.valid_until).getTime()-Date.now())/86400000;return diff<=14;};const filteredRows=rows.filter(r=>activeFilter==='all'?true:activeFilter==='active'?r.status==='active'&&r.subscription_status==='active':activeFilter==='trial'?['trial','trialing'].includes(r.subscription_status):activeFilter==='expiring'?isExpiring(r):r.status==='suspended');set(`<div class="metrics-grid">${metric('Toplam Firma',rows.length)}${metric('Aktif Firma',rows.filter(x=>x.status==='active').length)}${metric('Denemede',rows.filter(x=>['trial','trialing'].includes(x.subscription_status)).length)}${metric('Süresi Yaklaşan / Biten',rows.filter(isExpiring).length)}</div><details class="admin-create-panel"><summary>+ Yeni Firma ve Yönetici Hesabı Oluştur</summary><form class="admin-form-grid" id="create-company"><label>Firma ünvanı<input id="company-name" required placeholder="Örn. Serenut Gıda"></label><label>TC / VKN<input id="company-tax" required placeholder="10 veya 11 hane"></label><label>E-posta<input id="company-email" type="email" placeholder="firma@ornek.com"></label><label>Telefon<input id="company-phone" placeholder="05xx xxx xx xx"></label><label>Vergi Dairesi<input id="company-tax-office" placeholder="İsteğe bağlı"></label><hr style="grid-column:1/-1;border:0;border-top:1px solid #dfe6e1;margin:4px 0"><label style="grid-column:1/-1;color:#0b714d;font-size:.72rem;letter-spacing:.06em">ADMİN KULLANICI (İsteğe bağlı)</label><label>Yönetici Ad Soyad<input id="company-admin-name" placeholder="Ahmet Yılmaz"></label><label>Yönetici E-posta<input id="company-admin-email" type="email" placeholder="ahmet@firma.com"></label><button class="btn btn-primary">Firmayı Oluştur</button></form></details><div class="toolbar" style="margin:12px 0;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="display:flex;gap:6px;flex-wrap:wrap">${[['all','Tümü'],['active','Aktif Abonelik'],['trial','Denemede'],['expiring','Süresi Yaklaşan/Biten'],['suspended','Askıda']].map(([id,label])=>`<button type="button" class="btn btn-secondary btn-sm company-segment-btn ${activeFilter===id?'active':''}" data-segment="${id}">${label}</button>`).join('')}</div><input id="filter-platform-companies" data-table-filter placeholder="Firma adı, VKN, e-posta veya telefon ile filtrele…" style="max-width:340px"></div>${table([{label:'Firma',render:r=>`<strong>${esc(r.name)}</strong><small>VKN: ${esc(r.tax_number&&!String(r.tax_number).startsWith('PENDING-')?r.tax_number:'Belirtilmedi')}</small>`},{label:'İletişim',render:r=>esc(r.email||r.phone||'—')},{label:'Paket & Abonelik',render:r=>`<div><strong>${esc(r.plan_name||'Deneme')}</strong><div>${badge(tr(r.subscription_status||'none'))}</div></div>`},{label:'Bitiş / Kalan Süre',render:r=>{if(!r.valid_until)return '—';const diff=Math.ceil((new Date(r.valid_until).getTime()-Date.now())/86400000);return `<div>${esc(date(r.valid_until))}<small>${diff<0?'Süresi doldu':`${diff} gün kaldı`}</small></div>`;}},{label:'Şube / Cihaz Kotası',render:r=>`<span>${esc(r.store_count||0)}/${esc(r.store_limit||1)} Şube · ${esc(r.device_count||0)}/${esc(r.device_limit||1)} Cihaz</span>`},{label:'Durum',render:r=>badge(r.status)},{label:'İşlem',render:r=>`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary btn-sm company-detail" data-id="${esc(r.id)}">Yönet</button><button class="btn btn-secondary btn-sm company-toggle" data-id="${esc(r.id)}" data-status="${esc(r.status)}">${r.status==='active'?'Askıya Al':'Aktifleştir'}</button></div>`}],filteredRows)}`);document.querySelectorAll('.company-segment-btn').forEach(btn=>btn.onclick=()=>{window._companySegmentFilter=btn.dataset.segment;loaders['platform-companies']();});

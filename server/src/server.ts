@@ -473,7 +473,8 @@ async function recordWebEvent(data: WebEventPayload) {
 const trackedPublicPaths = new Set([
   '/', '/plans', '/downloads', '/platform',
   '/contact', '/register', '/login',
-  '/download/windows', '/download/android'
+  '/download/windows', '/download/android',
+  '/privacy', '/kvkk', '/terms', '/data-deletion'
 ]);
 
 function normalizeTrackedPath(rawPath: string): string | null {
@@ -689,12 +690,54 @@ app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
   res.redirect(301, '/app/');
 });
 
-// Short & Clean Download Links
+// Short & Clean Download Links with Telemetry Tracking
 app.get('/download/windows', (req, res) => {
+  const ua = String(req.headers['user-agent'] || '');
+  if (ua && !/bot|crawl|spider|slurp|curl|wget/i.test(ua)) {
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+    setImmediate(() => {
+      recordWebVisit({
+        pagePath: '/download/windows',
+        visitorHash,
+        source: 'Doğrudan İndirme Linki',
+        device: 'Masaüstü'
+      }).catch(() => {});
+      recordWebEvent({
+        sessionId: 'dl_' + Date.now().toString(36),
+        visitorHash,
+        eventName: 'download_windows_file',
+        eventCategory: 'conversion',
+        eventLabel: 'Windows Kurulum Paketi İndirildi',
+        pagePath: '/download/windows'
+      }).catch(() => {});
+    });
+  }
   req.url = '/download/windows/latest';
   return updateRouter(req, res, () => res.sendStatus(404));
 });
 app.get('/download/android', (req, res) => {
+  const ua = String(req.headers['user-agent'] || '');
+  if (ua && !/bot|crawl|spider|slurp|curl|wget/i.test(ua)) {
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const visitorHash = crypto.createHash('sha256').update(`${req.ip || '0.0.0.0'}|${ua.slice(0, 120)}|${dayKey}`).digest('hex').slice(0, 32);
+    setImmediate(() => {
+      recordWebVisit({
+        pagePath: '/download/android',
+        visitorHash,
+        source: 'Doğrudan İndirme Linki',
+        device: 'Mobil'
+      }).catch(() => {});
+      recordWebEvent({
+        sessionId: 'dl_' + Date.now().toString(36),
+        visitorHash,
+        eventName: 'download_android_file',
+        eventCategory: 'conversion',
+        eventLabel: 'Android APK Paketi İndirildi',
+        pagePath: '/download/android'
+      }).catch(() => {});
+    });
+  }
   req.url = '/download/android/latest';
   return updateRouter(req, res, () => res.sendStatus(404));
 });

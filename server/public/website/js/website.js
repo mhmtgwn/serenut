@@ -25,11 +25,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sendTelemetry = (endpoint, payload) => {
       const data = JSON.stringify(payload);
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(endpoint, data);
-      } else {
-        fetch(endpoint, { method: 'POST', body: data, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
-      }
+      try {
+        if (navigator.sendBeacon) {
+          const blob = new Blob([data], { type: 'application/json' });
+          if (navigator.sendBeacon(endpoint, blob)) return;
+        }
+      } catch (_) {}
+      fetch(endpoint, {
+        method: 'POST',
+        body: data,
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true
+      }).catch(() => {});
     };
 
     const urlParams = new URLSearchParams(window.location.search);

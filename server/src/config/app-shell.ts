@@ -158,6 +158,17 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-traffic',
+    label: 'Web Trafiği & Analitik',
+    subtabLabel: 'Web Ziyaretçi & Dönüşüm Analitiği',
+    section: 'overview',
+    href: '/app/#platform-traffic',
+    description: 'Web sitesi tekil ziyaretçileri, kaynak dağılımı, indirme hunisi ve sayfa etkileşimleri.',
+    module: 'admin',
+    moduleTab: 'traffic',
+    roles: ['sysadmin']
+  },
+  {
     id: 'platform-companies',
     label: 'Firmalar',
     subtabLabel: 'Firmalar (CRM)',

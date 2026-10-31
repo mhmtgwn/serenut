@@ -2997,15 +2997,39 @@ router.get('/traffic-funnel', async (_req: AuthenticatedRequest, res: Response) 
     `);
     const summaryRes = await runBypassingRLS(`
       SELECT
-        COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= CURRENT_DATE)::int AS visitors_today,
-        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)::int AS pageviews_today,
+        COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Istanbul'))::int AS visitors_today,
+        COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'Europe/Istanbul'))::int AS pageviews_today,
         COUNT(DISTINCT visitor_hash) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS visitors_30d,
         COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS pageviews_30d,
-        COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path IN ('/plans', '/downloads') AND created_at >= NOW() - INTERVAL '30 days')::int AS interested_30d,
+        (
+          SELECT COUNT(DISTINCT visitor_hash)::int FROM (
+            SELECT visitor_hash FROM web_page_visits WHERE page_path IN ('/plans', '/downloads', '/fiyatlar') AND created_at >= NOW() - INTERVAL '30 days'
+            UNION
+            SELECT visitor_hash FROM web_analytics_events WHERE event_name IN ('plan_view_click', 'pricing_click') AND created_at >= NOW() - INTERVAL '30 days'
+          ) i
+        ) AS interested_30d,
         COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path = '/register' AND created_at >= NOW() - INTERVAL '30 days')::int AS register_views_30d,
-        COUNT(DISTINCT visitor_hash) FILTER (WHERE page_path IN ('/download/windows', '/download/android') AND created_at >= NOW() - INTERVAL '30 days')::int AS downloads_30d,
-        COUNT(*) FILTER (WHERE page_path = '/download/windows' AND created_at >= NOW() - INTERVAL '30 days')::int AS windows_downloads_30d,
-        COUNT(*) FILTER (WHERE page_path = '/download/android' AND created_at >= NOW() - INTERVAL '30 days')::int AS android_downloads_30d,
+        (
+          SELECT COUNT(DISTINCT visitor_hash)::int FROM (
+            SELECT visitor_hash FROM web_page_visits WHERE page_path IN ('/download/windows', '/download/android') AND created_at >= NOW() - INTERVAL '30 days'
+            UNION
+            SELECT visitor_hash FROM web_analytics_events WHERE event_name ILIKE '%download%' AND created_at >= NOW() - INTERVAL '30 days'
+          ) d
+        ) AS downloads_30d,
+        (
+          SELECT COUNT(*)::int FROM (
+            SELECT id FROM web_page_visits WHERE page_path ILIKE '%download/windows%' AND created_at >= NOW() - INTERVAL '30 days'
+            UNION ALL
+            SELECT id FROM web_analytics_events WHERE event_name ILIKE '%windows%' AND created_at >= NOW() - INTERVAL '30 days'
+          ) w
+        ) AS windows_downloads_30d,
+        (
+          SELECT COUNT(*)::int FROM (
+            SELECT id FROM web_page_visits WHERE page_path ILIKE '%download/android%' AND created_at >= NOW() - INTERVAL '30 days'
+            UNION ALL
+            SELECT id FROM web_analytics_events WHERE event_name ILIKE '%android%' AND created_at >= NOW() - INTERVAL '30 days'
+          ) a
+        ) AS android_downloads_30d,
         COALESCE(ROUND(AVG(duration_seconds) FILTER (WHERE duration_seconds > 0 AND created_at >= NOW() - INTERVAL '30 days')), 0)::int AS avg_dwell_seconds,
         COALESCE(ROUND(AVG(max_scroll_pct) FILTER (WHERE max_scroll_pct > 0 AND created_at >= NOW() - INTERVAL '30 days')), 0)::int AS avg_scroll_pct
       FROM web_page_visits
