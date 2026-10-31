@@ -5,7 +5,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/infrastructure/migration/cutoff_maintenance_lock.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/database_provider.dart';
 
 /// Reaktif Merkezi Bakım ve Kesim Kilidi Afişi
@@ -19,8 +18,7 @@ class CutoffMaintenanceBannerWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final maintenanceAsync = ref.watch(cutoffMaintenanceStateProvider);
-    final fallbackState = DatabaseManager.cutoffMaintenanceLock?.state ??
-        const CutoffMaintenanceState();
+    final fallbackState = currentCutoffMaintenanceState();
 
     return maintenanceAsync.when(
       data: (state) => _buildBannerContent(context, state),

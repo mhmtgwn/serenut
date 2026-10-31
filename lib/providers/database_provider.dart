@@ -165,3 +165,19 @@ final cutoffMaintenanceStateProvider =
   yield lock.state;
   yield* lock.stateStream;
 });
+
+/// Synchronous check if write operations are permitted under current maintenance state
+bool isCutoffMaintenanceWritePermitted() {
+  final lock = DatabaseManager.cutoffMaintenanceLock;
+  return lock == null || lock.state.isWritePermitted;
+}
+
+/// Asserts write permission under cutoff maintenance lock
+void assertCutoffMaintenanceWritePermitted({String operation = 'write'}) {
+  DatabaseManager.cutoffMaintenanceLock?.assertWritePermitted(operation: operation);
+}
+
+/// Fallback / current synchronous state of CutoffMaintenanceLock
+CutoffMaintenanceState currentCutoffMaintenanceState() {
+  return DatabaseManager.cutoffMaintenanceLock?.state ?? const CutoffMaintenanceState();
+}

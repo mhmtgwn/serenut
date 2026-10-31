@@ -19,7 +19,6 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
   final productRepo = await ref.watch(productRepositoryProvider.future);
@@ -166,10 +165,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       try {
-        final cutoff = DatabaseManager.cutoffMaintenanceLock;
-        if (cutoff != null && !cutoff.state.isWritePermitted) {
-          cutoff.assertWritePermitted(operation: 'SalesController.createSale');
-        }
+        assertCutoffMaintenanceWritePermitted(operation: 'SalesController.createSale');
 
         final currentUser = ref.read(currentUserProvider);
         final cashierName = currentUser?.name ?? 'Kasiyer';
@@ -250,10 +246,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final cutoff = DatabaseManager.cutoffMaintenanceLock;
-      if (cutoff != null && !cutoff.state.isWritePermitted) {
-        cutoff.assertWritePermitted(operation: 'SalesController.returnItems');
-      }
+      assertCutoffMaintenanceWritePermitted(operation: 'SalesController.returnItems');
       final sale = await _saleRepository.findById(saleId);
       final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
       if (isCoreNextEnabled) {
@@ -315,10 +308,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final cutoff = DatabaseManager.cutoffMaintenanceLock;
-      if (cutoff != null && !cutoff.state.isWritePermitted) {
-        cutoff.assertWritePermitted(operation: 'SalesController.recordPartialPayment');
-      }
+      assertCutoffMaintenanceWritePermitted(operation: 'SalesController.recordPartialPayment');
       final isCoreNextEnabled = ref.read(coreNextSalesEngineEnabledProvider);
       if (isCoreNextEnabled) {
         throw UnsupportedError(

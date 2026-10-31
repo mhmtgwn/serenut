@@ -18,7 +18,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/sales/catalog_panel.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
@@ -49,8 +49,7 @@ class SalesPage extends ConsumerStatefulWidget {
 class _SalesPageState extends ConsumerState<SalesPage>
     with BarcodeScannerMixin<SalesPage> {
   bool _ensureSalesActionPermitted([String actionDescription = 'Sepet işlemi']) {
-    final maintenance = DatabaseManager.cutoffMaintenanceLock;
-    if (maintenance != null && !maintenance.state.isWritePermitted) {
+    if (!isCutoffMaintenanceWritePermitted()) {
       _showErrorSnackBar('Sistem Bakım Modunda: $actionDescription geçici olarak durduruldu.');
       return false;
     }
