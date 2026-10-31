@@ -26,7 +26,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'package:excel/excel.dart' hide Border;
 import 'package:go_router/go_router.dart';
-import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/audit_controller.dart';
 import 'package:serenutos/presentation/controllers/backup_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -502,8 +502,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
       );
 
       try {
-        final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logSystemAction(
+        final auditCtrl = ref.read(auditControllerProvider);
+        await auditCtrl.logSystemAction(
           'database_reset',
           'Sıfırlama Tipi: $resetType',
           approvedByUserId: approvedByUserId,
@@ -648,8 +648,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           builder: (_) => const Center(child: CircularProgressIndicator()),
         );
         try {
-          final auditService = await ref.read(auditServiceProvider.future);
-          await auditService.logSystemAction(
+          final auditCtrl = ref.read(auditControllerProvider);
+          await auditCtrl.logSystemAction(
             'product_catalog_reset',
             'Firma kapsamındaki ürün kataloğu tüm cihazlarda temizlendi.',
             approvedByUserId: approvedByUserId,

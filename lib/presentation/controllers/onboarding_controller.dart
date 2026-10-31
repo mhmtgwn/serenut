@@ -128,6 +128,11 @@ class OnboardingController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.data(null);
     return recoveryCodes;
   }
+
+  Future<void> performBootstrapSync(void Function(double progress, String status) onProgress) async {
+    final bootstrapService = _ref.read(bootstrapSyncServiceProvider);
+    await bootstrapService.runBootstrap(onProgress);
+  }
 }
 
 final onboardingControllerProvider =

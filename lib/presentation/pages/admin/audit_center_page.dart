@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
-import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/audit_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
@@ -52,14 +52,14 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
     try {
-      final repo = ref.read(auditRepositoryProvider);
-      final integrityVerified = await repo.verifyIntegrity();
+      final auditCtrl = ref.read(auditControllerProvider);
+      final integrityVerified = await auditCtrl.verifyIntegrity();
       List<AuditEvent> loadedEvents;
 
       if (_searchQuery.isNotEmpty) {
-        loadedEvents = await repo.search(_searchQuery);
+        loadedEvents = await auditCtrl.search(_searchQuery);
       } else {
-        loadedEvents = await repo.getEvents(
+        loadedEvents = await auditCtrl.getEvents(
           eventType: _selectedType == 'Tümü' ? null : _selectedType,
           fromDate: _selectedDateRange?.start,
           toDate: _selectedDateRange?.end.add(const Duration(days: 1)),

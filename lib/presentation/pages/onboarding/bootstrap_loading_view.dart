@@ -3,8 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../providers/service_providers.dart';
-import '../../../providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/onboarding_controller.dart';
+import 'package:serenutos/presentation/controllers/audit_controller.dart';
+
 import '../../widgets/branded_splash_screen.dart';
 
 class BootstrapLoadingView extends ConsumerStatefulWidget {
@@ -39,8 +40,8 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
     });
 
     try {
-      final bootstrapService = ref.read(bootstrapSyncServiceProvider);
-      await bootstrapService.runBootstrap((progress, statusText) {
+      final onboardingCtrl = ref.read(onboardingControllerProvider.notifier);
+      await onboardingCtrl.performBootstrapSync((progress, statusText) {
         if (mounted) {
           setState(() {
             _progress = progress;
@@ -59,8 +60,8 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
     } catch (e, st) {
       // Log bootstrap failure to audit trail for telemetry / support diagnostics
       try {
-        final audit = await ref.read(auditServiceProvider.future);
-        await audit.logEvent(
+        final auditCtrl = ref.read(auditControllerProvider);
+        await auditCtrl.logEvent(
           eventType: 'bootstrap_sync_failed',
           entityType: 'system',
           entityId: 'bootstrap',

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
-import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/audit_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
@@ -208,8 +208,8 @@ class CatalogSettingsPage extends ConsumerWidget {
     ref.invalidate(productsControllerProvider);
     ref.invalidate(productCategoriesProvider);
     ref.invalidate(productInventorySummaryProvider);
-    final audit = await ref.read(auditServiceProvider.future);
-    await audit.logEvent(
+    final auditCtrl = ref.read(auditControllerProvider);
+    await auditCtrl.logEvent(
       eventType: original == null ? 'category_created' : 'category_updated',
       entityType: 'product_category',
       entityId: newName,
