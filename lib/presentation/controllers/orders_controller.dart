@@ -1076,6 +1076,19 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await refresh();
     unawaited(ref.read(syncProvider.notifier).triggerSync());
   }
+
+  Future<OrderEntity?> findOrderById(String id) async {
+    final repo = await ref.read(orderRepositoryProvider.future);
+    return await repo.findById(id);
+  }
+
+  Future<OrderEntity?> findOrderByIdOrQuery(String query) async {
+    final repo = await ref.read(orderRepositoryProvider.future);
+    final direct = await repo.findById(query);
+    if (direct != null) return direct;
+    final filtered = await repo.findFiltered(searchQuery: query, limit: 1);
+    return filtered.firstOrNull;
+  }
 }
 
 final ordersControllerProvider =

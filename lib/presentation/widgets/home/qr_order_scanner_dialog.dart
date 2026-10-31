@@ -13,7 +13,9 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/pages/order_details_page.dart';
 import 'package:serenutos/presentation/pages/sale_details_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
-import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/sales_controller.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -150,11 +152,8 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
       }
 
       // ── 4. Ürün Barkodu Kontrolü (Satış ekranına yönlendirme) ──
-      final productRepo = await ref.read(productRepositoryProvider.future);
-      final products =
-          await productRepo.findFiltered(searchQuery: clean, limit: 1);
-      if (products.isNotEmpty) {
-        final product = products.first;
+      final product = await ref.read(productsControllerProvider.notifier).findProductByIdOrBarcode(clean);
+      if (product != null) {
         if (!mounted) return;
         Navigator.pop(context);
         AppNotificationHost.show(
@@ -198,8 +197,7 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
 
   Future<OrderEntity?> _findOrderById(String id) async {
     try {
-      final orderRepo = await ref.read(orderRepositoryProvider.future);
-      return await orderRepo.findById(id);
+      return await ref.read(ordersControllerProvider.notifier).findOrderById(id);
     } catch (_) {
       return null;
     }
@@ -207,15 +205,7 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
 
   Future<OrderEntity?> _findOrderByIdOrQuery(String query) async {
     try {
-      final orderRepo = await ref.read(orderRepositoryProvider.future);
-      // 1. Doğrudan ID ile ara
-      final direct = await orderRepo.findById(query);
-      if (direct != null) return direct;
-
-      // 2. Filtreli ara (Sipariş no veya ID kısmi eşleşmesi)
-      final filtered =
-          await orderRepo.findFiltered(searchQuery: query, limit: 1);
-      if (filtered.isNotEmpty) return filtered.first;
+      return await ref.read(ordersControllerProvider.notifier).findOrderByIdOrQuery(query);
     } catch (_) {
       // Ignored: fallback or safe default applied
     }
@@ -224,8 +214,7 @@ class _QrOrderScannerDialogState extends ConsumerState<QrOrderScannerDialog> {
 
   Future<SaleEntity?> _findSaleById(String id) async {
     try {
-      final saleRepo = await ref.read(saleRepositoryProvider.future);
-      return await saleRepo.findById(id);
+      return await ref.read(salesControllerProvider.notifier).findSaleById(id);
     } catch (_) {
       return null;
     }

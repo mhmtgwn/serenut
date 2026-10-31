@@ -361,6 +361,11 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       return _saleRepository.findAll();
     });
   }
+
+  Future<SaleEntity?> findSaleById(String id) async {
+    final repo = await ref.read(saleRepositoryProvider.future);
+    return await repo.findById(id);
+  }
 }
 
 final salesControllerProvider =
