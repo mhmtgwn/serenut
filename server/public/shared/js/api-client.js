@@ -63,6 +63,8 @@ export function setAuthToken(token) {
   try {
     sessionStorage.setItem('app_token', token);
     localStorage.setItem('app_token', token);
+    sessionStorage.setItem('access_token', token);
+    localStorage.setItem('access_token', token);
   } catch (_) {}
 }
 
@@ -78,7 +80,7 @@ export function clearAuthSession() {
       body: JSON.stringify({ refresh_token: refreshToken })
     }).catch(() => {});
   }
-  const keys = ['app_token', 'app_profile', 'app_refresh_token', 'portal_token', 'portal_profile', 'admin_token', 'admin_profile', 'selected_plan_id', 'selected_billing_period', 'pending_download_release_id'];
+  const keys = ['app_token', 'app_profile', 'app_refresh_token', 'portal_token', 'portal_profile', 'admin_token', 'admin_profile', 'selected_plan_id', 'selected_billing_period', 'pending_download_release_id', 'access_token'];
   keys.forEach((key) => {
     try {
       sessionStorage.removeItem(key);

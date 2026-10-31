@@ -127,17 +127,146 @@ document.addEventListener('DOMContentLoaded', () => {
   const icon = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"></path></svg>`;
   const icons = { product:icon('M4 6h16M4 12h16M4 18h10'), plans:icon('M4 4h16v16H4zM8 9h8M8 13h5'), download:icon('M12 3v12m0 0 5-5m-5 5-5-5M5 21h14'), contact:icon('M4 5h16v14H4zM4 7l8 6 8-6') };
   const escapeHtml = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let profile = null;
-  const hasToken = Boolean(sessionStorage.getItem('access_token') || localStorage.getItem('access_token'));
-  try { if (hasToken) profile = JSON.parse(sessionStorage.getItem('app_profile') || localStorage.getItem('app_profile') || 'null'); } catch (_) {}
-  const accountWidget = profile
-    ? `<a class="account-widget is-authenticated" href="/app/?flow=panel"><span class="account-avatar">${escapeHtml((profile.full_name||profile.name||profile.email||'S').slice(0,1).toUpperCase())}</span><span><strong>${escapeHtml(profile.full_name||profile.name||'Hesabım')}</strong><small>Panele git</small></span></a>`
-    : `<div class="auth-launcher" aria-label="Hesap işlemleri"><a href="/login">Giriş yap</a><a href="/register?flow=account">Kayıt ol</a></div>`;
+  const getStoredToken = () =>
+    sessionStorage.getItem('app_token') ||
+    localStorage.getItem('app_token') ||
+    sessionStorage.getItem('admin_token') ||
+    localStorage.getItem('admin_token') ||
+    sessionStorage.getItem('portal_token') ||
+    localStorage.getItem('portal_token') ||
+    sessionStorage.getItem('access_token') ||
+    localStorage.getItem('access_token') || '';
+
+  const getStoredProfile = () => {
+    try {
+      const raw = sessionStorage.getItem('app_profile') ||
+                  localStorage.getItem('app_profile') ||
+                  sessionStorage.getItem('admin_profile') ||
+                  localStorage.getItem('admin_profile') ||
+                  sessionStorage.getItem('portal_profile') ||
+                  localStorage.getItem('portal_profile');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const clearWebsiteSession = () => {
+    const refreshToken = sessionStorage.getItem('app_refresh_token') || localStorage.getItem('app_refresh_token');
+    if (refreshToken) {
+      fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      }).catch(() => {});
+    }
+    const keys = [
+      'app_token', 'app_profile', 'app_refresh_token',
+      'portal_token', 'portal_profile',
+      'admin_token', 'admin_profile',
+      'access_token', 'token', 'user'
+    ];
+    keys.forEach((key) => {
+      try {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      } catch (_) {}
+    });
+  };
+
+  const buildAccountWidget = (prof, hasAuth) => {
+    if (!hasAuth) {
+      return `<div class="auth-launcher" aria-label="Hesap işlemleri"><a href="/login">Giriş yap</a><a href="/register?flow=account">Kayıt ol</a></div>`;
+    }
+    const name = prof?.full_name || prof?.name || prof?.company_name || prof?.email || 'Hesabım';
+    const initial = (name || 'S').trim().slice(0, 1).toUpperCase();
+    const isSysadmin = Array.isArray(prof?.roles) && prof.roles.includes('sysadmin');
+    const panelUrl = (isSysadmin && !sessionStorage.getItem('app_token') && !localStorage.getItem('app_token'))
+      ? '/admin'
+      : '/app/?flow=panel';
+
+    return `<div class="account-group"><a class="account-widget is-authenticated" href="${panelUrl}" title="${escapeHtml(name)} — Yönetim Paneli"><span class="account-avatar">${escapeHtml(initial)}</span><span><strong>${escapeHtml(name)}</strong><small>Panele git →</small></span></a><button type="button" class="site-logout-btn" id="site-logout-trigger" title="Oturumu Kapat">Çıkış</button></div>`;
+  };
+
+  const updateLandingPageCta = (prof, hasAuth) => {
+    if (!hasAuth) return;
+    const name = prof?.full_name || prof?.name || prof?.company_name || 'Hesabım';
+    const isSysadmin = Array.isArray(prof?.roles) && prof.roles.includes('sysadmin');
+    const panelUrl = (isSysadmin && !sessionStorage.getItem('app_token') && !localStorage.getItem('app_token'))
+      ? '/admin'
+      : '/app/?flow=panel';
+
+    const heroActions = document.querySelector('.hero-actions');
+    if (heroActions) {
+      heroActions.innerHTML = `
+        <a class="btn btn-primary" href="${panelUrl}">Yönetim Paneline Git →</a>
+        <a class="btn btn-secondary" href="/downloads">Uygulamayı İndir</a>
+      `;
+    }
+
+    const ctaActions = document.querySelector('.cta-actions');
+    if (ctaActions) {
+      const ctaBox = ctaActions.closest('.cta-box');
+      if (ctaBox) {
+        const eyebrow = ctaBox.querySelector('.eyebrow');
+        if (eyebrow) {
+          eyebrow.textContent = `Aktif oturum: ${escapeHtml(name)}`;
+        }
+      }
+      ctaActions.innerHTML = `
+        <a class="btn btn-primary" href="${panelUrl}">Yönetim Paneline Git →</a>
+        <a class="btn btn-secondary" href="/downloads">Uygulamayı İndir</a>
+      `;
+    }
+  };
+
+  let token = getStoredToken();
+  let profile = getStoredProfile();
+  let hasToken = Boolean(token || profile);
+  if (hasToken && !profile) {
+    profile = { name: 'Hesabım' };
+  }
+  const accountWidget = buildAccountWidget(profile, hasToken);
   const navigationLinks = `<a href="/platform" ${currentPath==='/platform'?'aria-current="page"':''}>${icons.product}<span>Ürün</span></a><a href="/plans" ${currentPath==='/plans'?'aria-current="page"':''}>${icons.plans}<span>Planlar</span></a><a href="/downloads" ${currentPath==='/downloads'?'aria-current="page"':''}>${icons.download}<span>İndir</span></a><a href="/contact" ${currentPath==='/contact'?'aria-current="page"':''}>${icons.contact}<span>İletişim</span></a>`;
   const headerMarkup = `<div class="container header-row"><a class="brand" href="/">Serenut</a><nav class="desktop-nav" aria-label="Ana navigasyon">${navigationLinks}</nav><div class="header-actions">${accountWidget}</div><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Ana menüyü aç" aria-expanded="false" aria-controls="mobile-panel"><span>Menü</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button></div><div class="mobile-panel app-hidden" id="mobile-panel"><nav class="mobile-nav container" aria-label="Mobil navigasyon">${navigationLinks}<div class="mobile-account">${accountWidget}</div></nav></div>`;
   let siteHeader = document.getElementById('site-header');
   if (!siteHeader) { siteHeader = document.createElement('header'); siteHeader.id='site-header'; siteHeader.className='site-header'; document.body.prepend(siteHeader); }
   siteHeader.innerHTML = headerMarkup;
+  updateLandingPageCta(profile, hasToken);
+
+  if (token) {
+    fetch('/api/v1/users/me', {
+      headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
+    }).then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        const freshUser = data.user || data;
+        if (freshUser && (freshUser.id || freshUser.name)) {
+          profile = freshUser;
+          try {
+            sessionStorage.setItem('app_profile', JSON.stringify(freshUser));
+            localStorage.setItem('app_profile', JSON.stringify(freshUser));
+          } catch (_) {}
+          const freshWidget = buildAccountWidget(freshUser, true);
+          const actHeader = siteHeader.querySelector('.header-actions');
+          if (actHeader) actHeader.innerHTML = freshWidget;
+          const mobAcc = siteHeader.querySelector('.mobile-account');
+          if (mobAcc) mobAcc.innerHTML = freshWidget;
+          updateLandingPageCta(freshUser, true);
+        }
+      } else if (res.status === 401 || res.status === 403) {
+        clearWebsiteSession();
+        token = '';
+        profile = null;
+        hasToken = false;
+        const guestWidget = buildAccountWidget(null, false);
+        const actHeader = siteHeader.querySelector('.header-actions');
+        if (actHeader) actHeader.innerHTML = guestWidget;
+        const mobAcc = siteHeader.querySelector('.mobile-account');
+        if (mobAcc) mobAcc.innerHTML = guestWidget;
+      }
+    }).catch(() => {});
+  }
   let siteFooter = document.querySelector('.site-footer');
   if (!siteFooter) { siteFooter = document.createElement('footer'); siteFooter.className='site-footer'; document.body.append(siteFooter); }
   siteFooter.innerHTML = `<div class="container"><div class="footer-grid"><div><a class="footer-brand" href="/">Serenut</a><p class="footer-intro">Satış, canlı tartım, fiziksel POS doğrulaması, yazıcı, sipariş, stok ve müşteri yönetimini bir araya getiren işletme sistemi.</p></div><div class="footer-column"><strong>Ürün</strong><a href="/platform">Özellikler</a><a href="/platform#hardware">Donanım</a><a href="/plans">Planlar</a><a href="/downloads">Uygulamayı indir</a></div><div class="footer-column"><strong>Destek</strong><a href="/contact">İletişim</a><a href="/login">Müşteri paneli</a><a href="/register?flow=account">Ücretsiz hesap</a></div><div class="footer-column"><strong>Yasal</strong><a href="/privacy">Gizlilik</a><a href="/kvkk">KVKK</a><a href="/terms">Kullanım koşulları</a></div></div><div class="footer-bottom"><span>© 2026 Serenut. Tüm hakları saklıdır.</span><span>Türkiye'de geliştirildi.</span></div></div>`;
@@ -215,6 +344,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', (event) => {
+    const logoutBtn = event.target && event.target.closest('#site-logout-trigger');
+    if (logoutBtn) {
+      event.preventDefault();
+      clearWebsiteSession();
+      window.location.reload();
+      return;
+    }
     if (!header?.contains(event.target)) closeMenu();
   });
 
