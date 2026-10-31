@@ -17,7 +17,7 @@ import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
-import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/controllers/order_details_controller.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -241,27 +241,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
     if (!mounted || widget.existingOrder == null) return;
     final order = widget.existingOrder!;
     try {
-      final repo =
-          await ref.read(financialTransactionRepositoryProvider.future);
+      final paymentInfo = await ref.read(orderPaymentInfoProvider(order.id).future);
       if (!mounted) return;
-      final transactions = await repo.getByReferenceId(order.id);
-      if (!mounted) return;
-      FinancialTransactionEntity? orderTx =
-          transactions.where((t) => t.type == 'sale').firstOrNull;
-
-      // Fallback if not found by referenceId
-      if (orderTx == null && order.customerId.isNotEmpty) {
-        final custTransactions = await repo.getByCustomerId(order.customerId);
-        if (!mounted) return;
-        orderTx = custTransactions
-            .where((t) => t.referenceId == order.id && t.type == 'sale')
-            .firstOrNull;
-      }
+      final orderTx = paymentInfo['saleTx'] as FinancialTransactionEntity?;
+      final totalPaid = (paymentInfo['totalPaid'] as num?)?.toDouble() ?? 0.0;
       if (mounted && orderTx != null) {
-        final subsequentPaid = transactions
-            .where((t) => t.type == 'payment' || t.type == 'collection')
-            .fold<double>(0.0, (sum, t) => sum + t.paidAmount);
-        final totalPaid = orderTx.paidAmount + subsequentPaid;
         final total = orderTx.amount;
         final debt = (total - totalPaid).clamp(0.0, double.infinity);
 
