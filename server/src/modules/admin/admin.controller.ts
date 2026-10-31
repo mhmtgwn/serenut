@@ -1,4 +1,4 @@
-﻿import { Router, Response } from 'express';
+import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
 import { pgPool, redisClient } from '../../config/database';
 import os from 'os';
@@ -1354,8 +1354,13 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
     const pendingTransfers = await runBypassingRLS("SELECT COUNT(*) FROM bank_transfer_notifications WHERE status = 'pending_review'");
     
     const expiringLicenses = await runBypassingRLS(`
-      SELECT COUNT(*) FROM license_entitlements WHERE valid_until BETWEEN NOW() AND NOW() + INTERVAL '14 days'
-      AND status IN ('active', 'trial', 'grace')
+      SELECT COUNT(*) FROM (
+        SELECT DISTINCT ON (company_id) valid_until, status
+        FROM license_entitlements
+        WHERE status IN ('active', 'trial', 'grace')
+        ORDER BY company_id, valid_until DESC
+      ) latest
+      WHERE latest.valid_until BETWEEN NOW() AND NOW() + INTERVAL '14 days'
     `);
 
     const todaySignups = await runBypassingRLS(`
@@ -1394,7 +1399,23 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
         pendingTransfers: parseInt(pendingTransfers.rows[0].count, 10)
       },
       subscriptions: subReport,
-      expiringCompanies: (await runBypassingRLS(`SELECT c.id, c.name, c.phone, c.email, le.valid_until, le.status, COALESCE(p.name, 'Paket') AS plan_name FROM license_entitlements le JOIN companies c ON c.id = le.company_id LEFT JOIN plans p ON p.id = le.plan_id WHERE c.status != 'archived' AND le.valid_until BETWEEN NOW() - INTERVAL '7 days' AND NOW() + INTERVAL '14 days' ORDER BY le.valid_until ASC LIMIT 8`)).rows
+      expiringCompanies: (await runBypassingRLS(`
+        WITH latest_entitlements AS (
+          SELECT DISTINCT ON (company_id)
+                 id, company_id, plan_id, status, valid_until
+          FROM license_entitlements
+          WHERE status IN ('active', 'trial', 'grace')
+          ORDER BY company_id, valid_until DESC
+        )
+        SELECT c.id, c.name, c.phone, c.email, le.valid_until, le.status, COALESCE(p.name, 'Paket') AS plan_name 
+        FROM latest_entitlements le 
+        JOIN companies c ON c.id = le.company_id 
+        LEFT JOIN plans p ON p.id = le.plan_id 
+        WHERE c.status != 'archived' 
+          AND le.valid_until BETWEEN NOW() - INTERVAL '7 days' AND NOW() + INTERVAL '14 days' 
+        ORDER BY le.valid_until ASC 
+        LIMIT 8
+      `)).rows
     });
   } catch (err) {
     console.error('Commercial dashboard error:', err);
