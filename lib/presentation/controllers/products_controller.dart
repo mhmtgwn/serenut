@@ -263,6 +263,36 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       return _paginationService?.items ?? [];
     });
   }
+
+  Future<ProductEntity?> findProductByIdOrBarcode(String query) async {
+    final repo = await ref.read(productRepositoryProvider.future);
+    final byId = await repo.findById(query);
+    if (byId != null) return byId;
+    final byBarcode = await repo.getByBarcode(query);
+    if (byBarcode != null) return byBarcode;
+    final searchResults = await repo.searchByName(query);
+    return searchResults.firstOrNull;
+  }
+
+  Future<void> updateCategoryProducts({
+    required String oldCategory,
+    required String newCategory,
+    int? vatRate,
+  }) async {
+    final repo = await ref.read(productRepositoryProvider.future);
+    final products = await repo.findAll();
+    for (final product in products.where(
+      (item) => item.category.toLowerCase() == oldCategory.toLowerCase(),
+    )) {
+      await repo.update(product.copyWith(
+        category: newCategory,
+        vat: vatRate,
+      ));
+    }
+    ref.invalidate(productsControllerProvider);
+    ref.invalidate(productCategoriesProvider);
+    ref.invalidate(productInventorySummaryProvider);
+  }
 }
 
 final productsControllerProvider =

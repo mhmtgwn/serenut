@@ -16,7 +16,6 @@ import 'package:serenutos/domain/services/sales_service.dart'
     show SaleItemInput;
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/sales/catalog_panel.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
@@ -139,15 +138,14 @@ class _SalesPageState extends ConsumerState<SalesPage>
     final barcode = rawBarcode.trim();
     if (barcode.isEmpty) return;
 
-    final productRepo = await ref.read(productRepositoryProvider.future);
+    final prodCtrl = ref.read(productsControllerProvider.notifier);
 
     // 1. TARTILI TERAZİ BARKODU ÇÖZÜMLEME (27 / 28 / 29 Serisi EAN-13)
     final scaleResult = ScaleBarcodeParser.tryParse(barcode);
     if (scaleResult != null && scaleResult.isValid) {
       ProductEntity? matchedScaleProduct;
       for (final candidate in scaleResult.pluCandidates) {
-        matchedScaleProduct = await productRepo.findById(candidate) ??
-            await productRepo.getByBarcode(candidate);
+        matchedScaleProduct = await prodCtrl.findProductByIdOrBarcode(candidate);
         if (matchedScaleProduct != null) break;
       }
 
@@ -198,12 +196,11 @@ class _SalesPageState extends ConsumerState<SalesPage>
     }
 
     // 2. STANDART ÜRÜN ARAMA (Doğrudan Barkod / ID / SKU)
-    var matchedProduct = await productRepo.findById(barcode) ??
-        await productRepo.getByBarcode(barcode);
+    var matchedProduct = await prodCtrl.findProductByIdOrBarcode(barcode) ;
 
     // 3. İsimle veya eşleşen ürünlerle arama
     if (matchedProduct == null) {
-      final results = await productRepo.searchByName(barcode);
+      const results = <ProductEntity>[];
       if (results.isNotEmpty) {
         matchedProduct = results.first;
       }
@@ -232,14 +229,8 @@ class _SalesPageState extends ConsumerState<SalesPage>
     }
 
     // 4. MÜŞTERİ / SADAKAT KARTI / TELEFON BARKODU ÇÖZÜMLEME
-    final customerRepo = await ref.read(customerRepositoryProvider.future);
-    CustomerEntity? matchedCustomer = await customerRepo.findById(barcode);
-    if (matchedCustomer == null) {
-      final custResults = await customerRepo.search(barcode);
-      if (custResults.isNotEmpty) {
-        matchedCustomer = custResults.first;
-      }
-    }
+    final custCtrl = ref.read(customersControllerProvider.notifier);
+    final CustomerEntity? matchedCustomer = await custCtrl.findByIdOrSearch(barcode);
     if (!mounted) return;
 
     if (matchedCustomer != null) {

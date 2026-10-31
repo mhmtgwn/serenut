@@ -6,7 +6,6 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/audit_provider.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
@@ -193,17 +192,12 @@ class CatalogSettingsPage extends ConsumerWidget {
       updated.add(entry);
     }
 
-    final repository = await ref.read(productRepositoryProvider.future);
     if (oldName != null && oldName.toLowerCase() != newName.toLowerCase()) {
-      final products = await repository.findAll();
-      for (final product in products.where(
-        (item) => item.category.toLowerCase() == oldName.toLowerCase(),
-      )) {
-        await repository.update(product.copyWith(
-          category: newName,
-          vat: rate,
-        ));
-      }
+      await ref.read(productsControllerProvider.notifier).updateCategoryProducts(
+        oldCategory: oldName,
+        newCategory: newName,
+        vatRate: rate,
+      );
     }
     final settings = ref.read(settingsNotifierProvider).value;
     if (settings != null) {

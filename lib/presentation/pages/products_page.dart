@@ -12,7 +12,6 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
@@ -92,16 +91,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage>
 
     // 2. Fetch from DB directly to open details page
     try {
-      final repository = await ref.read(productRepositoryProvider.future);
-      var matched = await repository.findById(cleanBarcode);
-
-      if (matched == null) {
-        // Try searching by name/exact matches
-        final results = await repository.searchByName(cleanBarcode);
-        if (results.isNotEmpty) {
-          matched = results.first;
-        }
-      }
+      final prodCtrl = ref.read(productsControllerProvider.notifier);
+      final matched = await prodCtrl.findProductByIdOrBarcode(cleanBarcode);
 
       if (matched != null && mounted) {
         context.push('/products/edit/${matched.id}', extra: matched);

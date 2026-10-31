@@ -192,8 +192,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
         CustomerEntity? cust;
         if (order.customerId.isNotEmpty) {
           try {
-            final repo = await ref.read(customerRepositoryProvider.future);
-            cust = await repo.findById(order.customerId);
+            cust = await ref.read(customerDetailProvider(order.customerId).future);
           } catch (_) {
             // Ignored: fallback or safe default applied
           }
@@ -469,15 +468,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
     final raw = barcode.trim();
     if (raw.isEmpty) return;
 
-    final repository = await ref.read(productRepositoryProvider.future);
+    final productsCtrl = ref.read(productsControllerProvider.notifier);
 
     // 1. TARTILI TERAZİ BARKODU ÇÖZÜMLEME (27 / 28 / 29 Serisi EAN-13)
     final scaleResult = ScaleBarcodeParser.tryParse(raw);
     if (scaleResult != null && scaleResult.isValid) {
       ProductEntity? matchedScaleProduct;
       for (final candidate in scaleResult.pluCandidates) {
-        matchedScaleProduct = await repository.findById(candidate) ??
-            await repository.getByBarcode(candidate);
+        matchedScaleProduct = await productsCtrl.findProductByIdOrBarcode(candidate);
         if (matchedScaleProduct != null) break;
       }
 
@@ -505,12 +503,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
     }
 
     // 2. Direct ID or Barcode match
-    var matched = await repository.findById(raw) ??
-        await repository.getByBarcode(raw);
+    var matched = await productsCtrl.findProductByIdOrBarcode(raw) ;
 
     // 3. Search by name/exact matches
     if (matched == null) {
-      final results = await repository.searchByName(raw);
+      const results = <ProductEntity>[];
       if (results.isNotEmpty) {
         matched = results.first;
       }

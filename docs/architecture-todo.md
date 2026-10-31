@@ -8,13 +8,13 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 - [x] Geçiş envanteri: hangi tablolar CoreNext katmanından, hangileri eski `db_schema.dart` katmanından çalışıyor; kalan işi çıkar. — Detaylı tablo/repo eşleşme envanteri ve kalan 5 iş paketi `docs/core_next_transition_inventory.md` dokümanına çıkarıldı.
 
 ## P1 — Sonraki sürümler
-- [ ] Para alanlarını kuruş (`*_minor` int) olarak bitir; `REAL`/`double` para alanlarını kaldır (guard: 43 kolon / 253 alan).
+- [ ] Para alanlarını kuruş (`*_minor` int) olarak bitir; `REAL`/`double` para alanlarını kaldır (guard: 43 kolon / 251 alan).
 - [ ] Tek bakiye servisi; 9 kopya bakiye formülünü birleştir (`architecture_guard`: 9'dan 7'ye düşürüldü, `sqlite_customer_repository.dart` ve `database_provider.dart` doğrudan `DatabaseSchema.createViews` / `v_financial_ledger` kullanımına bağlandı).
 - [ ] Sunucuda doğrudan `pg pool` kullanımını (115 yer) tek veri erişim katmanına (tenant/RLS bağlamı zorunlu) topla.
 - [x] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — `_applyChangeBatchWithQuarantine` ve `sync_quarantine_v4` ile uygulandı.
 
 ## P2 — Zamanla
-- [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir. — `architecture_guard` baseline değeri 62 -> 58 -> 53 -> 42 -> 39 -> 35 -> 31'e düşürüldü; settings, backup (`BackupController`), license (`licenseStatusProvider`), auth/user management (`UserManagementController`), fındık emanet işlemleri (`HazelnutController`), GİB e-Arşiv fatura işlemleri (`GibInvoiceController`) ve katalog içe/dışa aktarım (`DatasetImportController`) doğrudan UI bağımlılıklarından ayrıştırıldı.
+- [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir. — `architecture_guard` baseline değeri 62 -> 58 -> 53 -> 42 -> 39 -> 35 -> 31 -> 23'e düşürüldü; settings, backup (`BackupController`), license (`licenseStatusProvider`), auth/user management (`UserManagementController`), fındık emanet işlemleri (`HazelnutController`), GİB e-Arşiv fatura işlemleri (`GibInvoiceController`), katalog içe/dışa aktarım (`DatasetImportController`), barkod/ürün/müşteri aramaları (`ProductsController`, `CustomersController`) ve sipariş ödeme bilgileri (`orderPaymentInfoProvider`) doğrudan UI bağımlılıklarından ayrıştırıldı.
 - [x] Sunum katmanı veritabanını doğrudan import etmemeli (`ui_imports_database`). — `orders_controller`, `sales_controller`, `sales_flow_controller`, `sales_page` ve `cutoff_maintenance_banner_widget` içindeki doğrudan `infrastructure/database/database_provider.dart` importları temizlendi; bakım/kesim durumu `lib/providers/database_provider.dart` üzerinden reaktif sağlayıcılara bağlandı; `architecture_guard` baseline değeri 5'ten 0'a kilitlendi.
 - [x] Boş `catch` blokları (31 Dart, 4 TS) en azından loglasın; outbox ekleme `catch (_)` yutmasını da düzelt. — Dart'ta 31 ve TS'de 2 boş catch tespit edilip tümü debugPrint/logger ile yapılandırılmış loglamaya geçirildi; outbox mutation kayıtları loglama korumasına alındı; `architecture_guard` baseline değeri 0'a kilitlendi.
 - [ ] `DateTime.now()` (503) yerine `Clock` arayüzü.

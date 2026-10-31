@@ -391,48 +391,22 @@ extension _OrderInfoCardMixin on OrderDetailsPage {
   Future<void> _handleDelivery(
       BuildContext context, WidgetRef ref, OrderEntity order) async {
     final container = ProviderScope.containerOf(context);
-    final txRepo =
-        await ref.read(financialTransactionRepositoryProvider.future);
-    var txs = await txRepo.getByReferenceId(order.id);
-    if (txs.isEmpty && order.customerId.isNotEmpty) {
-      txs = await txRepo.getByCustomerId(order.customerId);
-    }
-    FinancialTransactionEntity? saleTx;
-    double totalPaid = 0.0;
-    for (final t in txs) {
-      if (t.referenceId == order.id) {
-        if (t.type == 'sale') {
-          saleTx = t;
-          totalPaid += t.paidAmount;
-        } else if (t.type == 'payment' || t.type == 'collection') {
-          totalPaid += t.paidAmount;
-        }
-      }
-    }
-
-    final double totalAmount = saleTx?.amount ?? order.totalAmount;
+    final paymentInfo = await ref.read(orderPaymentInfoProvider(order.id).future);
+    final saleTx = paymentInfo['saleTx'] as FinancialTransactionEntity?;
+    final totalPaid = (paymentInfo['totalPaid'] as num?)?.toDouble() ?? 0.0;
+    final totalAmount = saleTx?.amount ?? order.totalAmount;
     final double rawRemainingDebt =
         (totalAmount - totalPaid).clamp(0.0, double.infinity);
 
     // Müşterinin cari hesap durumunu kontrol et
     double remainingDebt = rawRemainingDebt;
-    final customerId = order.customerId.isNotEmpty
-        ? order.customerId
-        : (saleTx?.customerId ?? '');
-    if (customerId.isNotEmpty) {
-      try {
-        final custRepo = await ref.read(customerRepositoryProvider.future);
-        final cust = await custRepo.findById(customerId);
-        if (cust != null) {
-          if (cust.balance >= -0.01) {
-            remainingDebt = 0.0;
-          } else {
-            final double customerTotalDebt = cust.balance.abs();
-            remainingDebt = math.min(rawRemainingDebt, customerTotalDebt);
-          }
-        }
-      } catch (_) {
-        // Ignored: fallback or safe default applied
+    final customerBalance = (paymentInfo['customerBalance'] as num?)?.toDouble();
+    if (customerBalance != null) {
+      if (customerBalance >= -0.01) {
+        remainingDebt = 0.0;
+      } else {
+        final double customerTotalDebt = customerBalance.abs();
+        remainingDebt = math.min(rawRemainingDebt, customerTotalDebt);
       }
     }
 

@@ -313,6 +313,14 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     });
   }
 
+  Future<CustomerEntity?> findByIdOrSearch(String query) async {
+    final repo = await ref.read(customerRepositoryProvider.future);
+    final byId = await repo.findById(query);
+    if (byId != null) return byId;
+    final results = await repo.search(query);
+    return results.firstOrNull;
+  }
+
   void _invalidateAll() {
     Future.microtask(() {
       ref.invalidateSelf();
