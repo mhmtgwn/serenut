@@ -9,7 +9,7 @@
 
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { tenantRepository } from './tenant.repository';
 import { createError } from '../../config/error-codes';
 import multer from 'multer';
 import { decodeDataImage, publicLogoUrl, storeCompanyLogo } from './company-logo.service';
@@ -66,17 +66,11 @@ router.post('/company/logo', logoUpload.single('logo'), async (req: Authenticate
 router.get('/company', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const compRes = await pgPool.query(
-      `SELECT id, name, tax_number, tax_office, phone, email, address, status,
-              owner_name, type, city, district, currency, logo_url,
-              version, created_at, updated_at
-       FROM companies WHERE id = $1`,
-      [user.company_id]
-    );
-    if (compRes.rows.length === 0) {
+    const company = await tenantRepository.getCompanyProfile(user.company_id);
+    if (!company) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şirket bulunamadı.' } });
     }
-    return res.json(compRes.rows[0]);
+    return res.json(company);
   } catch (err) {
     console.error('Fetch company error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Şirket bilgisi alınamadı.' } });
@@ -130,12 +124,10 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
 
   try {
     // 1. Fetch current server version
-    const currentRes = await pgPool.query('SELECT version FROM companies WHERE id = $1', [user.company_id]);
-    if (currentRes.rows.length === 0) {
+    const currentServerVersion = await tenantRepository.getCompanyVersion(user.company_id);
+    if (currentServerVersion === null) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şirket bulunamadı.' } });
     }
-
-    const currentServerVersion = currentRes.rows[0].version;
 
     // 2. Exact version equality check (if not forced and expected_version is provided)
     const isForce = force === true || expected_version === undefined || expected_version === null;
@@ -174,15 +166,12 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     if (tax_number !== undefined) {
       const cleanTax = tax_number ? String(tax_number).trim() : null;
       if (cleanTax) {
-        const dupCheck = await pgPool.query(
-          'SELECT id FROM companies WHERE tax_number = $1 AND id != $2 LIMIT 1',
-          [cleanTax, user.company_id]
-        );
-        if (dupCheck.rows.length > 0) {
+        const existing = await tenantRepository.findCompanyByTaxNumberExcept(cleanTax, user.company_id);
+        if (existing) {
           logger.warn('Company PATCH tax number conflict; keeping original company tax number', {
             company_id: user.company_id,
             cleanTax,
-            existing_company_id: dupCheck.rows[0].id,
+            existing_company_id: existing.id,
           });
           // Do not overwrite with duplicate tax number; retain existing company tax number
         } else {
@@ -230,12 +219,12 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // 3. Update atomically using version filter if not forced
-    const updateRes = await pgPool.query(
+    const updated = await tenantRepository.updateCompany(
       `UPDATE companies SET ${updates.join(', ')} ${whereClause} RETURNING *`,
       values
     );
 
-    if (updateRes.rowCount === 0) {
+    if (!updated) {
       logger.warn('Company PATCH conflict: row not found or version mismatch', {
         company_id: user.company_id,
         isForce,
@@ -249,7 +238,7 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    return res.json(updateRes.rows[0]);
+    return res.json(updated);
   } catch (err: any) {
     if (err?.code === '23505') {
       return res.status(409).json({
@@ -270,16 +259,11 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/companies/current', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const compRes = await pgPool.query(
-      `SELECT id, name, tax_number, tax_office, phone, email, address, logo_url, status,
-              owner_name, type, city, district, currency, created_at
-       FROM companies WHERE id = $1`,
-      [user.company_id]
-    );
-    if (compRes.rows.length === 0) {
+    const company = await tenantRepository.getCompanyCurrentLegacy(user.company_id);
+    if (!company) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şirket bulunamadı.' } });
     }
-    return res.json(compRes.rows[0]);
+    return res.json(company);
   } catch (err) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR' } });
   }
@@ -289,14 +273,8 @@ router.get('/companies/current', async (req: AuthenticatedRequest, res: Response
 router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const storesRes = await pgPool.query(
-      `SELECT id, name, address, created_at FROM branches WHERE company_id = $1 AND is_active = TRUE
-       UNION ALL
-       SELECT id, name, address, created_at FROM stores WHERE company_id = $1 AND NOT EXISTS (SELECT 1 FROM branches WHERE company_id = $1)
-       ORDER BY name ASC`,
-      [user.company_id]
-    );
-    return res.json(storesRes.rows);
+    const stores = await tenantRepository.getStores(user.company_id);
+    return res.json(stores);
   } catch (err) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR' } });
   }
@@ -306,18 +284,8 @@ router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const devicesRes = await pgPool.query(
-      `SELECT activation.id, activation.device_hash, activation.device_name AS name,
-              activation.platform, activation.status, activation.last_seen_at,
-              activation.activated_at AS created_at, runtime.current_version,
-              runtime.channel, runtime.last_reported_at
-       FROM device_activations activation
-       LEFT JOIN device_runtime_state runtime ON runtime.device_activation_id = activation.id
-       WHERE activation.company_id = $1
-       ORDER BY activation.last_seen_at DESC NULLS LAST, activation.activated_at DESC`,
-      [user.company_id]
-    );
-    return res.json(devicesRes.rows);
+    const devices = await tenantRepository.getDevices(user.company_id);
+    return res.json(devices);
   } catch (err) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR' } });
   }

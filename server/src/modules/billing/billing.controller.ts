@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { pgPool, redisClient } from '../../config/database';
+import { redisClient } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requirePermission, requireRole } from '../../middleware/auth.middleware';
 import { IyzicoService, loadIyzicoConfig } from './iyzico.service';
 import { logger } from '../../config/logger';
 import { webhookLimiter } from '../../middleware/rate-limit.middleware';
 
 if (process.env.NODE_ENV !== 'test') {
-  loadIyzicoConfig(pgPool).catch(err => {
+  loadIyzicoConfig().catch(err => {
     logger.warn('Failed to load iyzico config at startup:', err);
   });
 }
@@ -69,22 +69,28 @@ router.get('/plans', async (req, res: Response) => {
 });
 
 router.post('/quotes', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
-  const client = await pgPool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const quote = await BillingDomainService.createQuote(
-      client, req.user!.company_id, String(req.body?.plan_id || ''), req.body?.billing_period,
-    );
-    await client.query('COMMIT');
+    const quote = await BillingDomainService.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      try {
+        const q = await BillingDomainService.createQuote(
+          client, req.user!.company_id, String(req.body?.plan_id || ''), req.body?.billing_period,
+        );
+        await client.query('COMMIT');
+        return q;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
+    });
     return res.status(201).json({ quote_id: quote.quoteId, plan_id: quote.planId,
       plan_name: quote.planName, billing_period: quote.period, amount: quote.amount,
       currency: quote.currency, expires_at: quote.expiresAt.toISOString() });
   } catch (error: any) {
-    await client.query('ROLLBACK').catch(() => {});
     return res.status(error?.message === 'plan_not_found' ? 404 : 400)
       .json({ error: error?.message || 'quote_failed' });
-  } finally { client.release(); }
+  }
 });
 
 router.get('/effective-plans', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
@@ -170,79 +176,79 @@ router.post('/request-bank-transfer', authenticateUser, requirePermission('billi
   if (legal_acceptance !== true || pre_information_version !== '2026-08-09' || distance_sales_version !== '2026-08-09') {
     return res.status(400).json({ error: 'legal_acceptance_required', message: 'Ön bilgilendirme ve mesafeli satış koşullarını onaylamanız gerekir.' });
   }
-  const client = await pgPool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const payload = await BillingDomainService.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-    const quote = await BillingDomainService.lockQuote(client, user.company_id, quote_id);
+      const quote = await BillingDomainService.lockQuote(client, user.company_id, quote_id);
 
-    const bankRes = await client.query('SELECT * FROM payment_bank_accounts WHERE id = $1 AND is_active = TRUE', [bank_account_id]);
-    if (bankRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'bank_account_not_found' });
-    }
-    const bank = bankRes.rows[0];
+      const bankRes = await client.query('SELECT * FROM payment_bank_accounts WHERE id = $1 AND is_active = TRUE', [bank_account_id]);
+      if (bankRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error('bank_account_not_found');
+      }
+      const bank = bankRes.rows[0];
 
-    const now = new Date();
-    const periodEnd = BillingDomainService.addPeriod(now, quote.period);
-    const finalPriceStr = quote.amount.toFixed(2);
+      const now = new Date();
+      const periodEnd = BillingDomainService.addPeriod(now, quote.period);
+      const finalPriceStr = quote.amount.toFixed(2);
 
-    // Create pending invoice
-    const invoiceId = BillingDomainService.opaqueId('inv');
-    const invoiceNum = await BillingDomainService.nextInvoiceNumber(client);
-    await client.query(
-      `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
-       VALUES ($1,$2,$3,'pending',$4,NOW() + INTERVAL '48 hours',$5,$6)`,
-      [invoiceId, user.company_id, quote.amount, periodEnd, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
-    );
-    await client.query(
-      `INSERT INTO billing_legal_acceptances
-       (id,user_id,company_id,quote_id,invoice_id,channel,pre_information_version,distance_sales_version,ip_address,user_agent)
-       VALUES($1,$2,$3,$4,$5,'bank_transfer',$6,$7,$8,$9)`,
-      [BillingDomainService.opaqueId('bla'), user.id, user.company_id, quote.quoteId, invoiceId,
-       pre_information_version, distance_sales_version, req.ip || null, req.headers['user-agent'] || null],
-    );
+      // Create pending invoice
+      const invoiceId = BillingDomainService.opaqueId('inv');
+      const invoiceNum = await BillingDomainService.nextInvoiceNumber(client);
+      await client.query(
+        `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
+         VALUES ($1,$2,$3,'pending',$4,NOW() + INTERVAL '48 hours',$5,$6)`,
+        [invoiceId, user.company_id, quote.amount, periodEnd, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
+      );
+      await client.query(
+        `INSERT INTO billing_legal_acceptances
+         (id,user_id,company_id,quote_id,invoice_id,channel,pre_information_version,distance_sales_version,ip_address,user_agent)
+         VALUES($1,$2,$3,$4,$5,'bank_transfer',$6,$7,$8,$9)`,
+        [BillingDomainService.opaqueId('bla'), user.id, user.company_id, quote.quoteId, invoiceId,
+         pre_information_version, distance_sales_version, req.ip || null, req.headers['user-agent'] || null],
+      );
 
-    // Generate unique reference code: SRNTT-YYYYMMDD-XXXX
-    const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randPart = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const referenceCode = `SRNTT-${datePart}-${randPart}`;
+      // Generate unique reference code: SRNTT-YYYYMMDD-XXXX
+      const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const randPart = crypto.randomBytes(2).toString('hex').toUpperCase();
+      const referenceCode = `SRNTT-${datePart}-${randPart}`;
 
-    // Create bank transfer notification
-    const notifId = BillingDomainService.opaqueId('btn');
-    await client.query(
-      `INSERT INTO bank_transfer_notifications (id, invoice_id, company_id, bank_account_id, reference_code, status)
-       VALUES ($1,$2,$3,$4,$5,'pending')`,
-      [notifId, invoiceId, user.company_id, bank_account_id, referenceCode]
-    );
-    await BillingDomainService.consumeQuote(client, quote.quoteId, invoiceId);
+      // Create bank transfer notification
+      const notifId = BillingDomainService.opaqueId('btn');
+      await client.query(
+        `INSERT INTO bank_transfer_notifications (id, invoice_id, company_id, bank_account_id, reference_code, status)
+         VALUES ($1,$2,$3,$4,$5,'pending')`,
+        [notifId, invoiceId, user.company_id, bank_account_id, referenceCode]
+      );
+      await BillingDomainService.consumeQuote(client, quote.quoteId, invoiceId);
 
-    await client.query('COMMIT');
+      await client.query('COMMIT');
 
-    return res.status(201).json({
-      reference_code: referenceCode,
-      invoice_id: invoiceId,
-      bank: {
-        bank_name: bank.bank_name,
-        account_holder: bank.account_holder,
-        iban: bank.iban,
-        branch_name: bank.branch_name,
-        instructions: bank.instructions,
-      },
-      amount: finalPriceStr,
-      currency: quote.currency,
-      billing_period: quote.period,
-      period_end: periodEnd.toISOString(),
-      message: `Lütfen havale açıklama alanına referans kodunuzu yazın: ${referenceCode}`,
+      return {
+        reference_code: referenceCode,
+        invoice_id: invoiceId,
+        bank: {
+          bank_name: bank.bank_name,
+          account_holder: bank.account_holder,
+          iban: bank.iban,
+          branch_name: bank.branch_name,
+          instructions: bank.instructions,
+        },
+        amount: finalPriceStr,
+        currency: quote.currency,
+        billing_period: quote.period,
+        period_end: periodEnd.toISOString(),
+        message: `Lütfen havale açıklama alanına referans kodunuzu yazın: ${referenceCode}`,
+      };
     });
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    return res.status(201).json(payload);
+  } catch (err: any) {
     logger.error('Error creating bank transfer request:', err);
-    if ((err as Error).message === 'plan_not_found') return res.status(404).json({ error: 'plan_not_found' });
+    if (err?.message === 'plan_not_found') return res.status(404).json({ error: 'plan_not_found' });
+    if (err?.message === 'bank_account_not_found') return res.status(404).json({ error: 'bank_account_not_found' });
     return res.status(500).json({ error: 'server_error' });
-  } finally {
-    client.release();
   }
 });
 
@@ -381,21 +387,26 @@ router.get('/subscription', authenticateUser, async (req: AuthenticatedRequest, 
  *       - bearerAuth: []
  */
 router.post('/reactivate', authenticateUser, requireRole('owner'), async (req: AuthenticatedRequest, res: Response) => {
-  const client = await pgPool.connect();
   try {
     const companyId = req.user!.company_id;
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls='true'");
-    await CommercialLifecycleService.setAutoRenewal(client, {
-      companyId, actorId: req.user!.id, enabled: true,
+    await BillingDomainService.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls='true'");
+      try {
+        await CommercialLifecycleService.setAutoRenewal(client, {
+          companyId, actorId: req.user!.id, enabled: true,
+        });
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
     });
-    await client.query('COMMIT');
     res.json({ message: 'Subscription reactivated successfully' });
   } catch (error: any) {
-    await client.query('ROLLBACK').catch(() => undefined);
     logger.error('Error reactivating subscription:', error);
     res.status(error.message === 'active_subscription_not_found' ? 404 : 500).json({ error: error.message });
-  } finally { client.release(); }
+  }
 });
 
 const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
@@ -418,13 +429,13 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    const billingClient = await pgPool.connect();
-    let quote;
-    let invoiceId: string;
-    try {
+    let quote: any;
+    let invoiceId: string = '';
+    await BillingDomainService.withClient(async (billingClient) => {
       await billingClient.query('BEGIN');
       await billingClient.query("SET LOCAL app.bypass_rls = 'true'");
-      quote = await BillingDomainService.lockQuote(billingClient, user.company_id, quoteId);
+      try {
+        quote = await BillingDomainService.lockQuote(billingClient, user.company_id, quoteId);
       invoiceId = BillingDomainService.opaqueId('inv');
       const invoiceNum = await BillingDomainService.nextInvoiceNumber(billingClient);
       await billingClient.query(
@@ -444,9 +455,8 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
     } catch (billingError) {
       await billingClient.query('ROLLBACK').catch(() => {});
       throw billingError;
-    } finally {
-      billingClient.release();
     }
+  });
     const finalPriceStr = quote.amount.toFixed(2);
 
     // Fetch company info for billing
@@ -633,23 +643,6 @@ router.get('/invoices/:id/pdf', authenticateUser, async (req: AuthenticatedReque
   }
 });
 
-router.post('/reactivate', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
-  const user = req.user!;
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls='true'");
-    await CommercialLifecycleService.setAutoRenewal(client, {
-      companyId: user.company_id, actorId: user.id, enabled: true,
-    });
-    await client.query('COMMIT');
-    return res.json({ success: true, message: 'Otomatik abonelik yenilemesi tekrar aktifleştirildi.' });
-  } catch (err: any) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    return res.status(err.message === 'active_subscription_not_found' ? 404 : 500).json({ error: err.message });
-  } finally { client.release(); }
-});
-
 router.get('/invoices/:id/pdf-legacy-unused', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
@@ -692,19 +685,24 @@ router.get('/invoices/:id/pdf-legacy-unused', authenticateUser, async (req: Auth
  */
 router.post('/cancel', authenticateUser, requireRole('owner'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const client = await pgPool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls='true'");
-    await CommercialLifecycleService.setAutoRenewal(client, {
-      companyId: user.company_id, actorId: user.id, enabled: false,
+    await BillingDomainService.withClient(async (client) => {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls='true'");
+      try {
+        await CommercialLifecycleService.setAutoRenewal(client, {
+          companyId: user.company_id, actorId: user.id, enabled: false,
+        });
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
     });
-    await client.query('COMMIT');
     return res.json({ success: true, message: 'Abonelik yenilemesi iptal edildi. Dönem sonuna kadar kullanım devam edecektir.' });
   } catch (err: any) {
-    await client.query('ROLLBACK').catch(() => undefined);
     return res.status(err.message === 'active_subscription_not_found' ? 404 : 500).json({ error: err.message });
-  } finally { client.release(); }
+  }
 });
 
 /**

@@ -1,3 +1,4 @@
+import { pgPool } from '../../config/database';
 // server/src/modules/billing/iyzico.service.ts
 // Serenut Platform — İyzico Ödeme Geçidi Entegrasyonu
 //
@@ -25,7 +26,7 @@ export let IYZICO_BASE_URL = process.env.IYZICO_BASE_URL || 'https://sandbox-api
 
 import { decryptSecret } from '../../crypto_helper';
 
-export async function loadIyzicoConfig(pool: any) {
+export async function loadIyzicoConfig(pool: any = pgPool) {
   try {
     // 1. Fetch from payment_providers
     const res = await pool.query("SELECT config, secrets FROM payment_providers WHERE id = 'iyzico'");
