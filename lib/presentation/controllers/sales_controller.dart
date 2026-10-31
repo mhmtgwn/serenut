@@ -20,6 +20,9 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
+import 'package:serenutos/domain/models/settings.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+
 
 final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
   final productRepo = await ref.watch(productRepositoryProvider.future);
@@ -375,6 +378,22 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     return ref.read(physicalCardPaymentServiceProvider).authorize(
       amount: amount.toDouble(),
       idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<void> queueSaleReceipt(
+    SaleEntity sale,
+    List<Map<String, dynamic>> items,
+    CustomerEntity? customer,
+    Settings settings, {
+    Map<String, dynamic>? paymentBreakdown,
+  }) async {
+    await ref.read(printingApplicationServiceProvider).queueSaleReceipt(
+      sale,
+      items,
+      customer,
+      settings,
+      paymentBreakdown: paymentBreakdown,
     );
   }
 }

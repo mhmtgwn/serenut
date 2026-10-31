@@ -1,3 +1,4 @@
+import 'package:serenutos/presentation/controllers/onboarding_controller.dart';
 // lib/presentation/pages/onboarding/license_activation_flow.dart
 // Serenut OS — Lisans Aktivasyon Akışı
 // QR kod tarama (gerçek kamera, mobile_scanner), XXXX-XXXX-XXXX-XXXX formatı
@@ -49,79 +50,25 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
     final rawKey = _ctrl.text.replaceAll('-', '').trim().toUpperCase();
 
     try {
-      final apiClient = ref.read(apiClientProvider);
-      final licenseService = ref.read(licenseServiceProvider);
-      final deviceId = licenseService.getDeviceUuid();
+      final result = await ref
+          .read(onboardingControllerProvider.notifier)
+          .activateLicense(rawKey);
 
-      final fingerprintService = ref.read(deviceFingerprintServiceProvider);
-      final fingerprint = await fingerprintService.getFingerprint();
+      if (result.success) {
+        setState(() {
+          _isLoading = false;
+          _successType = result.tier;
+          _expiryDate = result.expiryDate;
+          _supportUntil = _expiryDate;
+        });
 
-      // Get device name fallback
-      final deviceName = AppPlatform.deviceLabel;
-
-      final response = await apiClient.send(
-        'POST',
-        '/api/v1/licenses/activate',
-        body: {
-          'license_key': rawKey,
-          'device_hash': deviceId,
-          'device_name': deviceName,
-          'fingerprint': fingerprint.toJson(),
-        },
-      );
-
-      if (response.isSuccess) {
-        final resJson = response.json;
-        final licenseInfo = resJson['license_info'] as Map<String, dynamic>;
-        final signature = resJson['signature'] as String;
-
-        // Construct canonical client token string by attaching the signature
-        // V2 token: uses device_id; V1 legacy: uses allowed_devices
-        final Map<String, dynamic> localTokenMap = {
-          'merchant_id': licenseInfo['merchant_id'],
-          // V2: device_id takes precedence; V1: fall back to allowed_devices
-          if (licenseInfo.containsKey('device_id'))
-            'device_id': licenseInfo['device_id']
-          else
-            'allowed_devices': licenseInfo['allowed_devices'],
-          'expiry_date': licenseInfo['expiry_date'],
-          'tier': licenseInfo['tier'],
-          'features': licenseInfo['features'],
-          'signature': signature,
-          'token_version': licenseInfo['token_version'] ?? 1,
-          if (licenseInfo.containsKey('device_token_version'))
-            'device_token_version': licenseInfo['device_token_version'],
-        };
-
-        final tokenStr = base64.encode(utf8.encode(json.encode(localTokenMap)));
-        final saved = await licenseService.saveLicenseToken(tokenStr, rawKey);
-
-        if (saved) {
-          licenseService.startHeartbeat(apiClient);
-          final tierStr =
-              (licenseInfo['tier'] as String? ?? 'BASIC').toUpperCase();
-          setState(() {
-            _isLoading = false;
-            _successType = tierStr;
-            _expiryDate = DateTime.parse(licenseInfo['expiry_date'] as String);
-            _supportUntil = _expiryDate; // aligned support limit
-          });
-
-          if (widget.onLicenseActivated != null) {
-            widget.onLicenseActivated!(rawKey, tierStr);
-          }
-        } else {
-          setState(() {
-            _isLoading = false;
-            _errorMsg =
-                'Lisans imza doğrulaması yerelde başarısız oldu. Lütfen sistem yöneticisiyle iletişime geçin.';
-          });
+        if (widget.onLicenseActivated != null) {
+          widget.onLicenseActivated!(rawKey, result.tier ?? 'BASIC');
         }
       } else {
         setState(() {
           _isLoading = false;
-          _errorMsg =
-              'Lisans aktivasyon sunucu hatası. Lütfen anahtarınızı kontrol edin.';
+          _errorMsg = result.error;
         });
       }
     } catch (e) {

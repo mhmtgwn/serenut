@@ -61,8 +61,8 @@ class AboutController {
     UpdateInfo info,
   ) async {
     final releaseManager = _ref.read(releaseManagerServiceProvider);
-    final jwtToken = _ref.read(authServiceProvider).getJwtToken();
-    final deviceId = getLicenseInfo()?.activationId;
+    final jwtToken = _ref.read(apiClientProvider).jwtToken ?? _ref.read(authServiceProvider).getJwtToken();
+    final deviceId = getLicenseInfo()?.activationId ?? _ref.read(deviceManagerProvider).getDeviceId();
 
     return showUpdateDialog(
       context: context,

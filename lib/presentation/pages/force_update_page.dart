@@ -4,9 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:serenutos/config/app_platform.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/presentation/widgets/update_dialog.dart';
+import 'package:serenutos/presentation/controllers/about_controller.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
 class ForceUpdatePage extends ConsumerWidget {
@@ -29,10 +27,6 @@ class ForceUpdatePage extends ConsumerWidget {
 
   Future<void> _startInAppUpdate(BuildContext context, WidgetRef ref) async {
     if (downloadUrl.isEmpty) return;
-    final releaseManager = ref.read(releaseManagerServiceProvider);
-    final platform = AppPlatform.releaseKey;
-    final jwtToken = ref.read(apiClientProvider).jwtToken;
-    final deviceId = ref.read(deviceManagerProvider).getDeviceId();
 
     final updateInfo = UpdateInfo(
       hasUpdate: true,
@@ -46,13 +40,9 @@ class ForceUpdatePage extends ConsumerWidget {
       channel: 'stable',
     );
 
-    await showUpdateDialog(
-      context: context,
-      updateInfo: updateInfo,
-      releaseManager: releaseManager,
-      platform: platform,
-      jwtToken: jwtToken,
-      deviceId: deviceId,
+    await ref.read(aboutControllerProvider).presentReleaseUpdateDialog(
+      context,
+      updateInfo,
     );
   }
 

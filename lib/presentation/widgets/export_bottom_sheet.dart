@@ -9,7 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/document_export_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/presentation/controllers/sms_controller.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -284,7 +284,7 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
       final msg = isDebt
           ? '${widget.customer.name}, mevcut bakiyeniz: ₺${balance.abs().toStringAsFixed(2)} borçludur.'
           : '${widget.customer.name}, mevcut bakiyeniz: ₺${balance.abs().toStringAsFixed(2)} alacaklıdır.';
-      await ref.read(smsServiceProvider).queueSms(widget.customer.phone, msg);
+      await ref.read(smsControllerProvider).queueSms(widget.customer.phone, msg);
 
       if (mounted) {
         Navigator.pop(context);

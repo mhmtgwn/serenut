@@ -1149,7 +1149,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       _error = null;
     });
     try {
-      final devices = await ref.read(sharedHardwareServiceProvider).list();
+      final devices = await ref.refresh(sharedHardwareDevicesProvider.future);
       if (!mounted) return;
       final candidates = devices
           .where((device) => !device.isLocal && device.type == _type)

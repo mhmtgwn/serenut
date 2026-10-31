@@ -1,3 +1,4 @@
+import 'package:serenutos/config/app_platform.dart';
 // lib/presentation/controllers/onboarding_controller.dart
 // Serenut OS — Onboarding Business Logic Controller (Phase 5 Layer Boundary)
 
@@ -132,6 +133,79 @@ class OnboardingController extends StateNotifier<AsyncValue<void>> {
   Future<void> performBootstrapSync(void Function(double progress, String status) onProgress) async {
     final bootstrapService = _ref.read(bootstrapSyncServiceProvider);
     await bootstrapService.runBootstrap(onProgress);
+  }
+
+  Future<({bool success, String? tier, DateTime? expiryDate, String? error})>
+      activateLicense(String rawKey) async {
+    final apiClient = _ref.read(apiClientProvider);
+    final licenseService = _ref.read(licenseServiceProvider);
+    final deviceId = licenseService.getDeviceUuid();
+
+    final fingerprintService = _ref.read(deviceFingerprintServiceProvider);
+    final fingerprint = await fingerprintService.getFingerprint();
+    final deviceName = AppPlatform.deviceLabel;
+
+    final response = await apiClient.send(
+      'POST',
+      '/api/v1/licenses/activate',
+      body: {
+        'license_key': rawKey,
+        'device_hash': deviceId,
+        'device_name': deviceName,
+        'fingerprint': fingerprint.toJson(),
+      },
+    );
+
+    if (!response.isSuccess) {
+      return (
+        success: false,
+        tier: null,
+        expiryDate: null,
+        error: 'Lisans aktivasyon sunucu hatası. Lütfen anahtarınızı kontrol edin.',
+      );
+    }
+
+    final resJson = response.json;
+    final licenseInfo = resJson['license_info'] as Map<String, dynamic>;
+    final signature = resJson['signature'] as String;
+
+    final Map<String, dynamic> localTokenMap = {
+      'merchant_id': licenseInfo['merchant_id'],
+      if (licenseInfo.containsKey('device_id'))
+        'device_id': licenseInfo['device_id']
+      else
+        'allowed_devices': licenseInfo['allowed_devices'],
+      'expiry_date': licenseInfo['expiry_date'],
+      'tier': licenseInfo['tier'],
+      'features': licenseInfo['features'],
+      'signature': signature,
+      'token_version': licenseInfo['token_version'] ?? 1,
+      if (licenseInfo.containsKey('device_token_version'))
+        'device_token_version': licenseInfo['device_token_version'],
+    };
+
+    final tokenStr = base64.encode(utf8.encode(json.encode(localTokenMap)));
+    final saved = await licenseService.saveLicenseToken(tokenStr, rawKey);
+
+    if (saved) {
+      licenseService.startHeartbeat(apiClient);
+      final tierStr =
+          (licenseInfo['tier'] as String? ?? 'BASIC').toUpperCase();
+      return (
+        success: true,
+        tier: tierStr,
+        expiryDate: DateTime.parse(licenseInfo['expiry_date'] as String),
+        error: null,
+      );
+    } else {
+      return (
+        success: false,
+        tier: null,
+        expiryDate: null,
+        error:
+            'Lisans imza doğrulaması yerelde başarısız oldu. Lütfen sistem yöneticisiyle iletişime geçin.',
+      );
+    }
   }
 }
 

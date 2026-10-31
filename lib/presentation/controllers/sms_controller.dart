@@ -191,4 +191,9 @@ class SmsController {
     }
     return sent;
   }
+
+  Future<void> queueSms(String phone, String message) async {
+    final smsService = _ref.read(smsServiceProvider);
+    await smsService.queueSms(phone, message);
+  }
 }

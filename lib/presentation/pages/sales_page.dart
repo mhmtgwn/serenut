@@ -498,7 +498,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
         };
       }).toList();
 
-      await ref.read(printingApplicationServiceProvider).queueSaleReceipt(
+      await ref.read(salesControllerProvider.notifier).queueSaleReceipt(
             sale,
             receiptItems,
             customer,

@@ -12,6 +12,7 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/presentation/controllers/printing_controller.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -94,7 +95,7 @@ class _LabelTemplateEditorPageState
   Future<void> _saveSettings() async {
     setState(() => _isSaving = true);
     try {
-      final repository = ref.read(printingRepositoryProvider);
+      final repository = ref.read(printingControllerProvider);
       final product =
           (await repository.getDesignProfiles(PrintDocumentKind.productLabel))
               .firstWhere((profile) => profile.isDefault);

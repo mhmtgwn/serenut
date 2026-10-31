@@ -6,6 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/models/installment_models.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/domain/models/settings.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
+
 
 /// Active installment plans for a given customer
 final customerInstallmentPlansProvider =
@@ -126,6 +131,61 @@ class InstallmentsNotifier extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
       rethrow;
     }
+  }
+
+  Future<List<CustomerInstallmentEntity>> getInstallmentsForPlan(String planId) {
+    final repo = _ref.read(installmentRepositoryProvider);
+    return repo.getInstallmentsForPlan(planId);
+  }
+
+  Future<void> queueInstallmentPlanReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentPlanEntity plan,
+    required List<CustomerInstallmentEntity> installments,
+    required Settings settings,
+  }) async {
+    await _ref.read(printingApplicationServiceProvider).queueInstallmentPlanReceipt(
+          customer: customer,
+          plan: plan,
+          installments: installments,
+          settings: settings,
+        );
+  }
+
+  Future<void> printPlanReceiptForPlanId({
+    required CustomerEntity customer,
+    required CustomerInstallmentPlanEntity plan,
+  }) async {
+    final planInsts = await getInstallmentsForPlan(plan.id);
+    final settings = await _ref.read(settingsProvider.future);
+    await queueInstallmentPlanReceipt(
+      customer: customer,
+      plan: plan,
+      installments: planInsts,
+      settings: settings,
+    );
+  }
+
+  Future<void> queueInstallmentPaymentReceipt({
+    required CustomerEntity customer,
+    required CustomerInstallmentEntity installment,
+    required num paidAmount,
+    required String paymentMethod,
+    required Settings settings,
+    required int remainingCount,
+    required num remainingDebt,
+    String? nextDueDate,
+  }) async {
+    await _ref.read(printingApplicationServiceProvider).queueInstallmentPaymentReceipt(
+          customer: customer,
+          installment: installment,
+          paidAmount: paidAmount.toDouble(),
+          paymentMethod: paymentMethod,
+          settings: settings,
+          remainingCount: remainingCount,
+          remainingDebt: remainingDebt.toDouble(),
+          nextDueDate: nextDueDate,
+        );
   }
 
   void _invalidateAll(String customerId) {

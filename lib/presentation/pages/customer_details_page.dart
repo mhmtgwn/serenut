@@ -479,18 +479,11 @@ class CustomerDetailsPage extends ConsumerWidget {
 
                             if (printReceipt) {
                               try {
-                                final planInsts = await ref
-                                    .read(installmentRepositoryProvider)
-                                    .getInstallmentsForPlan(plan.id);
-                                final settings =
-                                    await ref.read(settingsProvider.future);
                                 await ref
-                                    .read(printingApplicationServiceProvider)
-                                    .queueInstallmentPlanReceipt(
+                                    .read(installmentsControllerProvider.notifier)
+                                    .printPlanReceiptForPlanId(
                                       customer: customer,
                                       plan: plan,
-                                      installments: planInsts,
-                                      settings: settings,
                                     );
                               } catch (printErr) {
                                 debugPrint(
@@ -1694,7 +1687,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                                 .where((i) => !i.isPaid && SafeMoney.isPositive(i.remainingAmount))
                                 .toList();
                             await ref
-                                .read(printingApplicationServiceProvider)
+                                .read(installmentsControllerProvider.notifier)
                                 .queueInstallmentPaymentReceipt(
                                   customer: customer,
                                   installment: updatedCurrentInst,
@@ -1759,7 +1752,7 @@ class CustomerDetailsPage extends ConsumerWidget {
   ) async {
     try {
       final settings = await ref.read(settingsProvider.future);
-      await ref.read(printingApplicationServiceProvider).queueInstallmentPlanReceipt(
+      await ref.read(installmentsControllerProvider.notifier).queueInstallmentPlanReceipt(
             customer: customer,
             plan: plan,
             installments: planInsts,
