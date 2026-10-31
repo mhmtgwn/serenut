@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:serenutos/providers/dataset_import_provider.dart';
+import 'package:serenutos/presentation/controllers/dataset_import_controller.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -214,16 +214,16 @@ class _CatalogImportWizardPageState
     _startAnalysisClock();
 
     try {
-      final importer = await ref.read(datasetImportServiceProvider.future);
+      final importController = ref.read(datasetImportControllerProvider);
       final parsed = kIsWeb
-          ? await importer.analyzeZip(_fileBytes!, (progress, status) {
+          ? await importController.analyzeZip(_fileBytes!, (progress, status) {
               if (!mounted) return;
               setState(() {
                 _analyzeProgress = progress;
                 _analyzeStatus = status;
               });
             })
-          : await importer.analyzeFile(_filePath!, (progress, status) {
+          : await importController.analyzeFile(_filePath!, (progress, status) {
               if (!mounted) return;
               setState(() {
                 _analyzeProgress = progress;
@@ -262,7 +262,7 @@ class _CatalogImportWizardPageState
     });
 
     try {
-      final importer = await ref.read(datasetImportServiceProvider.future);
+      final importController = ref.read(datasetImportControllerProvider);
       final strategy = ImportStrategy(
         insertNew: _insertNew,
         updateExisting: _updateExisting,
@@ -283,19 +283,8 @@ class _CatalogImportWizardPageState
       }
 
       final result = kIsWeb
-          ? await importer.importFromZip(
-              _fileBytes!,
-              updateProgress,
-              strategy,
-              const {},
-              widget.cloudSource,
-            )
-          : await importer.importFromFile(
-              _filePath!,
-              updateProgress,
-              strategy,
-              widget.cloudSource,
-            );
+          ? await importController.importFromZip(_fileBytes!, updateProgress, strategy, const {}, widget.cloudSource)
+          : await importController.importFromFile(_filePath!, updateProgress, strategy, widget.cloudSource);
 
       // Clear stale product-list filters and every product projection. Merely
       // rebuilding the repository leaves the paginated controller holding its

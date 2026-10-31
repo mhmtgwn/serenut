@@ -27,8 +27,8 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
     _started = true;
 
     try {
-      final importer = await ref.read(datasetImportServiceProvider.future);
-      final zipBytes = await importer.exportToZip((p) {
+      final importController = ref.read(datasetImportControllerProvider);
+      final zipBytes = await importController.exportToZip((p) {
         if (mounted) {
           setState(() {
             progress = p;

@@ -11,7 +11,7 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
-import 'package:serenutos/providers/dataset_import_provider.dart';
+import 'package:serenutos/presentation/controllers/dataset_import_controller.dart';
 import 'package:serenutos/infrastructure/services/file_saver_helper.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';

@@ -45,8 +45,8 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
         throw Exception('Dosya içeriği okunamadı.');
       }
 
-      final importer = await ref.read(datasetImportServiceProvider.future);
-      final result = await importer.importFromZip(bytes, (p, msg) {
+      final importController = ref.read(datasetImportControllerProvider);
+      final result = await importController.importFromZip(bytes, (p, msg) {
         if (mounted) {
           setState(() {
             progress = p;
@@ -63,7 +63,7 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
           resultSummary = result;
         });
       }
-      ref.invalidate(productRepositoryProvider);
+      // Invalidation handled by importController
     } catch (e, stackTrace) {
       debugPrint('❌ CATALOG IMPORT ERROR: $e\n$stackTrace');
       if (mounted) {
