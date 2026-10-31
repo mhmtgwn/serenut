@@ -14,7 +14,8 @@ Kaynak: 2026-10-28 oturumu (`architecture_guard` ölçümleri + sync hatası ana
 - [x] Sync'te hatalı bir değişiklik tüm pull döngüsünü kilitlememeli (dead-letter / karantina) — `_applyChangeBatchWithQuarantine` ve `sync_quarantine_v4` ile uygulandı.
 
 ## P2 — Zamanla
-- [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir.
+- [ ] UI'dan doğrudan repository/servis çağrılarını (64) provider/controller üzerinden geçir. — `architecture_guard` baseline değeri 62'den 58'e düşürüldü; `end_of_day_page`, `products_page`, `sales_page`, `sales_tab`, `cash_out_sheet` ve `order_payment_dialog` sayfalarındaki doğrudan repository çağrıları `settingsNotifierProvider.notifier.loadSettings()` akışına bağlandı.
+- [x] Sunum katmanı veritabanını doğrudan import etmemeli (`ui_imports_database`). — `orders_controller`, `sales_controller`, `sales_flow_controller`, `sales_page` ve `cutoff_maintenance_banner_widget` içindeki doğrudan `infrastructure/database/database_provider.dart` importları temizlendi; bakım/kesim durumu `lib/providers/database_provider.dart` üzerinden reaktif sağlayıcılara bağlandı; `architecture_guard` baseline değeri 5'ten 0'a kilitlendi.
 - [x] Boş `catch` blokları (31 Dart, 4 TS) en azından loglasın; outbox ekleme `catch (_)` yutmasını da düzelt. — Dart'ta 31 ve TS'de 2 boş catch tespit edilip tümü debugPrint/logger ile yapılandırılmış loglamaya geçirildi; outbox mutation kayıtları loglama korumasına alındı; `architecture_guard` baseline değeri 0'a kilitlendi.
 - [ ] `DateTime.now()` (503) yerine `Clock` arayüzü.
 - [ ] Uzun dosyalar (49) böl.
