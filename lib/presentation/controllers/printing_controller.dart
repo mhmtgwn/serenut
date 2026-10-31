@@ -26,3 +26,4 @@ class PrintingController {
     _ref.invalidate(printDesignProfilesProvider(profile.kind));
   }
 }
+

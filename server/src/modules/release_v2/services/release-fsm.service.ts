@@ -1,12 +1,13 @@
 // server/src/modules/release_v2/services/release-fsm.service.ts
 import { Pool } from 'pg';
+import { pgPool } from '../../../config/database';
 import { ReleaseAuditService } from './release-audit.service';
 import crypto from 'crypto';
 
 export class ReleaseFsmService {
   private auditService: ReleaseAuditService;
 
-  constructor(private pool: Pool) {
+  constructor(private pool: Pool = pgPool) {
     this.auditService = new ReleaseAuditService(pool);
   }
 

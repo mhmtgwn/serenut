@@ -1,5 +1,6 @@
 // server/src/modules/release_v2/services/release-registry.service.ts
 import { Pool } from 'pg';
+import { pgPool } from '../../../config/database';
 import crypto from 'crypto';
 import { ReleaseAuditService } from './release-audit.service';
 import { ReleaseManifestDTO, validateReleaseManifestDTO } from '../models/release-manifest.dto';
@@ -17,7 +18,7 @@ function stableJson(value: unknown): string {
 export class ReleaseRegistryService {
   private auditService: ReleaseAuditService;
 
-  constructor(private pool: Pool) {
+  constructor(private pool: Pool = pgPool) {
     this.auditService = new ReleaseAuditService(pool);
   }
 
@@ -175,5 +176,32 @@ export class ReleaseRegistryService {
     } finally {
       client.release();
     }
+  }
+  async getLatestStableManifest(): Promise<{ canonical_manifest_json: string; manifest_signature: string } | null> {
+    const query = `
+      SELECT store.canonical_manifest_json, store.manifest_signature
+      FROM release_manifest_store store
+      JOIN releases r ON r.release_id = store.release_id
+      WHERE r.current_state = 'stable'
+      ORDER BY r.created_at DESC
+      LIMIT 1
+    `;
+    const result = await this.pool.query(query);
+    return result.rows[0] || null;
+  }
+
+  async insertHealthSnapshot(data: {
+    releaseId: string;
+    rolloutPercent: number;
+    devices: number;
+    successRate: number;
+    rollbackRate: number;
+    crashRate: number;
+    healthScore: number;
+  }): Promise<void> {
+    await this.pool.query(`
+      INSERT INTO release_health_snapshots (release_id, rollout_percent, devices, success_rate, rollback_rate, crash_rate, health_score)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [data.releaseId, data.rolloutPercent, data.devices, data.successRate, data.rollbackRate, data.crashRate, data.healthScore]);
   }
 }

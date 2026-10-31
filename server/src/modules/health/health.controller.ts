@@ -3,7 +3,7 @@
 
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { pgPool } from '../../config/database';
+import { healthRepository } from './health.repository';
 import { logger } from '../../config/logger';
 
 const router = Router();
@@ -36,10 +36,11 @@ router.post('/report', authenticateUser, async (req: AuthenticatedRequest, res: 
       return res.status(400).json({ error: 'missing_params', message: 'Eksik parametre gönderildi.' });
     }
 
-    await pgPool.query(
-      `INSERT INTO client_health_reports (company_id, device_id, status, services)
-       VALUES ($1, $2, $3, $4)`,
-      [user.company_id, device_id, status, JSON.stringify(services)]
+    await healthRepository.insertReport(
+      user.company_id,
+      device_id,
+      status,
+      services
     );
 
     return res.json({ success: true });
@@ -66,16 +67,8 @@ router.get('/admin/reports', authenticateUser, async (req: AuthenticatedRequest,
     // Secure isolation constraint: only admins can read all, normal tenants only see their company
     const isAdmin = user.roles.includes('admin') || user.roles.includes('sysadmin') || user.roles.includes('super_admin');
     
-    let queryStr = 'SELECT * FROM client_health_reports ORDER BY reported_at DESC LIMIT 50';
-    let params: any[] = [];
-
-    if (!isAdmin) {
-      queryStr = 'SELECT * FROM client_health_reports WHERE company_id = $1 ORDER BY reported_at DESC LIMIT 50';
-      params = [user.company_id];
-    }
-
-    const queryRes = await pgPool.query(queryStr, params);
-    return res.json(queryRes.rows);
+    const rows = await healthRepository.getRecentReports(isAdmin ? undefined : user.company_id);
+    return res.json(rows);
   } catch (err) {
     logger.error('Failed to retrieve client health reports:', err);
     return res.status(500).json({ error: 'server_error' });

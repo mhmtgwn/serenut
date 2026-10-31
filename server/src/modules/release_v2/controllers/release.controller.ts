@@ -1,15 +1,14 @@
 // server/src/modules/release_v2/controllers/release.controller.ts
 import { Router, Request, Response } from 'express';
-import { pgPool } from '../../../config/database';
 import { ReleaseRegistryService } from '../services/release-registry.service';
 import { ReleaseFsmService } from '../services/release-fsm.service';
 import { ReleaseAuditService } from '../services/release-audit.service';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../../middleware/auth.middleware';
 
 const router = Router();
-const registryService = new ReleaseRegistryService(pgPool);
-const fsmService = new ReleaseFsmService(pgPool);
-const auditService = new ReleaseAuditService(pgPool);
+const registryService = new ReleaseRegistryService();
+const fsmService = new ReleaseFsmService();
+const auditService = new ReleaseAuditService();
 
 // 1. Atomic Release Publish
 router.post('/publish', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
@@ -67,21 +66,13 @@ router.post('/:id/transition', authenticateUser, requireRole('sysadmin'), async 
 router.get('/latest', async (req: Request, res: Response) => {
   try {
     // Query the latest stable release from registry manifest store
-    const query = `
-      SELECT store.canonical_manifest_json, store.manifest_signature
-      FROM release_manifest_store store
-      JOIN releases r ON r.release_id = store.release_id
-      WHERE r.current_state = 'stable'
-      ORDER BY r.created_at DESC
-      LIMIT 1
-    `;
-    const result = await pgPool.query(query);
+    const row = await registryService.getLatestStableManifest();
 
-    if (result.rows.length === 0) {
+    if (!row) {
       return res.status(404).json({ error: 'no_stable_release', message: 'No stable release manifest found.' });
     }
 
-    const { canonical_manifest_json, manifest_signature } = result.rows[0];
+    const { canonical_manifest_json, manifest_signature } = row;
     const manifest = JSON.parse(canonical_manifest_json);
 
     return res.json({
@@ -103,10 +94,15 @@ router.post('/:id/health-snapshot', authenticateUser, requireRole('sysadmin'), a
   }
 
   try {
-    await pgPool.query(`
-      INSERT INTO release_health_snapshots (release_id, rollout_percent, devices, success_rate, rollback_rate, crash_rate, health_score)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [id, rolloutPercent, devices, successRate, rollbackRate, crashRate, healthScore]);
+    await registryService.insertHealthSnapshot({
+      releaseId: id,
+      rolloutPercent,
+      devices,
+      successRate,
+      rollbackRate,
+      crashRate,
+      healthScore,
+    });
 
     return res.json({ success: true });
   } catch (err: any) {

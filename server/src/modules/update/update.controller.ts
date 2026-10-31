@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pgPool } from '../../config/database';
+import { updateRepository, DownloadRelease } from './update.repository';
 import fs from 'fs';
 import path from 'path';
 
@@ -49,11 +49,6 @@ function resolveReleaseFilePath(filePath: string | null): string | null {
   return null;
 }
 
-type DownloadRelease = {
-  file_path: string;
-  version_code: string;
-  sha256_hash: string | null;
-};
 
 async function sendReleaseFile(
   req: Request,
@@ -132,18 +127,11 @@ router.get('/download/:platform/version/:version', async (req: Request, res: Res
     return res.status(400).json({ error: 'invalid_platform' });
   }
   try {
-    const result = await pgPool.query<DownloadRelease>(`
-      SELECT file_path, version_code, sha256_hash
-      FROM app_versions
-      WHERE platform = $1 AND version_code = $2
-        AND status = 'active' AND channel = 'stable'
-        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-      LIMIT 50
-    `, [platform, version]);
-    if (result.rows.length === 0) {
+    const release = await updateRepository.getReleaseByVersion(platform, version);
+    if (!release) {
       return res.status(404).json({ error: 'release_not_found' });
     }
-    return sendReleaseFile(req, res, platform, result.rows[0], true);
+    return sendReleaseFile(req, res, platform, release, true);
   } catch (err) {
     console.error('Versioned public download error:', err);
     return res.status(500).json({ error: 'server_error' });
@@ -159,20 +147,12 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
   }
 
   try {
-    const query = `
-      SELECT file_path, version_code, sha256_hash
-      FROM app_versions
-      WHERE platform = $1 AND status = 'active' AND channel = 'stable'
-        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-      ORDER BY created_at DESC
-      LIMIT 50
-    `;
-    const result = await pgPool.query(query, [platform]);
+    const candidates = await updateRepository.getLatestCandidates(platform);
     let resolvedPath: string | null = null;
     let versionCode = '1.1.9';
 
-    if (result.rows.length > 0 && result.rows[0].file_path) {
-      const sortedCandidates = [...result.rows].sort((a, b) => compareVersions(b.version_code || '0.0.0', a.version_code || '0.0.0'));
+    if (candidates.length > 0 && candidates[0].file_path) {
+      const sortedCandidates = [...candidates].sort((a, b) => compareVersions(b.version_code || '0.0.0', a.version_code || '0.0.0'));
       const release = sortedCandidates.find(r => r.file_path && resolveReleaseFilePath(r.file_path)) || sortedCandidates[0];
       versionCode = release.version_code || versionCode;
       resolvedPath = resolveReleaseFilePath(release.file_path);
@@ -278,14 +258,8 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
 router.get('/latest-metadata', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const query = `
-      SELECT id, version_code, platform, sha256_hash, file_size_bytes, release_notes, created_at, file_path
-      FROM app_versions
-      WHERE status = 'active' AND channel = 'stable'
-        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-    `;
-    const result = await pgPool.query(query);
-    const validRows = result.rows.filter(r => resolveReleaseFilePath(r.file_path) !== null);
+    const rows = await updateRepository.getActiveStableMetadata();
+    const validRows = rows.filter(r => resolveReleaseFilePath(r.file_path) !== null);
 
     const windows = validRows
       .filter(r => r.platform === 'windows')
@@ -313,16 +287,10 @@ router.get('/check', async (req: Request, res: Response) => {
   }
 
   try {
-    const query = `
-      SELECT version_code, platform, download_url, sha256_hash, signature, file_size_bytes, is_mandatory, release_notes, file_path
-      FROM app_versions
-      WHERE platform = $1 AND status = 'active' AND channel = 'stable'
-        AND (SELECT COUNT(*) FROM update_targets ut WHERE ut.release_id = app_versions.id) = 0
-    `;
-    const result = await pgPool.query(query, [platform]);
+    const rows = await updateRepository.getCheckReleases(platform);
     
     // Semantik versiyona göre en büyük sürümü seç
-    const sorted = result.rows
+    const sorted = rows
       .filter(r => resolveReleaseFilePath(r.file_path) !== null)
       .sort((a, b) => compareVersions(b.version_code, a.version_code));
 

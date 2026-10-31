@@ -1,5 +1,6 @@
 // server/src/modules/release_v2/services/release-audit.service.ts
 import { Pool } from 'pg';
+import { pgPool } from '../../../config/database';
 import crypto from 'crypto';
 
 export interface AuditLogEntry {
@@ -23,7 +24,7 @@ function canonicalizeJson(obj: any): string {
 }
 
 export class ReleaseAuditService {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool = pgPool) {}
 
   /**
    * Logs a tamper-evident audit record by chaining hashes with the previous log entry.
