@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/providers/gib_invoice_providers.dart';
+import 'package:serenutos/presentation/controllers/gib_invoice_controller.dart';
 
 import 'package:serenutos/presentation/widgets/app_notification_host.dart';
 
@@ -70,11 +71,11 @@ class _GibSettingsDialogState extends ConsumerState<GibSettingsDialog> {
     });
 
     try {
-      final service = ref.read(gibInvoiceServiceProvider);
+      final controller = ref.read(gibInvoiceControllerProvider);
       // Test modunu geçici olarak client'a yansıt
       ref.read(gibEArsivClientProvider).isTestMode = _isTestMode;
 
-      final success = await service.testConnection(
+      final success = await controller.testConnection(
         username: username,
         password: password,
       );

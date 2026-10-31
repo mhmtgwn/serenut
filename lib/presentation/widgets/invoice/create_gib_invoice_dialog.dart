@@ -10,6 +10,7 @@ import 'package:serenutos/domain/models/gib_invoice_models.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/gib_settings_dialog.dart';
 import 'package:serenutos/providers/gib_invoice_providers.dart';
+import 'package:serenutos/presentation/controllers/gib_invoice_controller.dart';
 
 class CreateGibInvoiceDialog extends ConsumerStatefulWidget {
   final SaleEntity? sale;
@@ -200,7 +201,7 @@ class _CreateGibInvoiceDialogState
     });
 
     try {
-      final service = ref.read(gibInvoiceServiceProvider);
+      final controller = ref.read(gibInvoiceControllerProvider);
       final recipient = GibInvoiceRecipient(
         identifier: _identifierCtrl.text.trim(),
         titleOrName: _nameCtrl.text.trim(),
@@ -214,7 +215,7 @@ class _CreateGibInvoiceDialogState
       );
 
       // Taslağı GİB'e gönder
-      final record = await service.createAndSubmitDraft(
+      final record = await controller.createAndSubmitDraft(
         username: creds.username,
         password: creds.password,
         recipient: recipient,
@@ -228,7 +229,7 @@ class _CreateGibInvoiceDialogState
       );
 
       // GİB SMS Şifresi İste
-      final phone = await service.requestSmsCode(
+      final phone = await controller.requestSmsCode(
         username: creds.username,
         password: creds.password,
       );
@@ -267,7 +268,7 @@ class _CreateGibInvoiceDialogState
     });
 
     try {
-      final service = ref.read(gibInvoiceServiceProvider);
+      final controller = ref.read(gibInvoiceControllerProvider);
       final recipient = GibInvoiceRecipient(
         identifier: _identifierCtrl.text.trim(),
         titleOrName: _nameCtrl.text.trim(),
@@ -287,7 +288,7 @@ class _CreateGibInvoiceDialogState
       );
 
       // Taslağı GİB'e gönder ve yerel depoya pendingSms olarak kaydet
-      final record = await service.createAndSubmitDraft(
+      final record = await controller.createAndSubmitDraft(
         username: creds.username,
         password: creds.password,
         recipient: recipient,
@@ -332,8 +333,8 @@ class _CreateGibInvoiceDialogState
     });
 
     try {
-      final service = ref.read(gibInvoiceServiceProvider);
-      final signedRecord = await service.verifySmsAndSign(
+      final controller = ref.read(gibInvoiceControllerProvider);
+      final signedRecord = await controller.verifySmsAndSign(
         username: creds.username,
         password: creds.password,
         invoiceId: _currentRecord!.id,
