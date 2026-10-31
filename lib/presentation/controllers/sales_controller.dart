@@ -9,6 +9,7 @@ import 'package:serenutos/domain/services/payment_service.dart';
 import 'package:serenutos/domain/services/data_integrity_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
@@ -365,6 +366,16 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
   Future<SaleEntity?> findSaleById(String id) async {
     final repo = await ref.read(saleRepositoryProvider.future);
     return await repo.findById(id);
+  }
+
+  Future<AuthorizedCardPayment?> authorizeCardPayment({
+    required num amount,
+    required String idempotencyKey,
+  }) async {
+    return ref.read(physicalCardPaymentServiceProvider).authorize(
+      amount: amount.toDouble(),
+      idempotencyKey: idempotencyKey,
+    );
   }
 }
 

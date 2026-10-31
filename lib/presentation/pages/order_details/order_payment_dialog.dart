@@ -180,7 +180,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
 
     AuthorizedCardPayment? cardPayment;
     try {
-      final paymentService = await ref.read(paymentServiceProvider.future);
+      final actions = ref.read(orderDetailsActionsProvider);
       final cardAmount = _selectedMethod == 'card'
           ? amount
           : _selectedMethod == 'karma'
@@ -192,7 +192,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
             ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
         if (hasPos) {
           cardPayment =
-              await ref.read(physicalCardPaymentServiceProvider).authorize(
+              await actions.authorizeCardPayment(
                     amount: cardAmount,
                     idempotencyKey:
                         'order-pay-${widget.order.id}-${DateTime.now().millisecondsSinceEpoch}',
@@ -209,7 +209,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
 
       // 1. Ödemeyi finansal sisteme kaydet (Sipariş durumuna DOKUNMAZ)
       if (_selectedMethod == 'cash') {
-        await paymentService.recordPartialPayment(
+        await actions.recordPartialPayment(
           saleId: widget.order.id,
           customerId: widget.order.customerId,
           amount: amount,
@@ -219,7 +219,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
           terminalMetadata: null,
         );
       } else if (_selectedMethod == 'card') {
-        await paymentService.recordPartialPayment(
+        await actions.recordPartialPayment(
           saleId: widget.order.id,
           customerId: widget.order.customerId,
           amount: amount,
@@ -234,7 +234,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
         final kCard = _karmaCard;
 
         if (kCash > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: kCash,
@@ -247,7 +247,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
         }
 
         if (kCard > 0) {
-          await paymentService.recordPartialPayment(
+          await actions.recordPartialPayment(
             saleId: widget.order.id,
             customerId: widget.order.customerId,
             amount: kCard,
@@ -260,7 +260,7 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
       }
 
       if (cardPayment != null) {
-        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
+        await actions.commitCardPayment(
               cardPayment,
               contextId: widget.order.id,
             );

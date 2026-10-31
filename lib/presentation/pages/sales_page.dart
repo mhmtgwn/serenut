@@ -75,7 +75,7 @@ class _SalesPageState extends ConsumerState<SalesPage>
       double amount) async {
     final flow = ref.read(salesFlowProvider);
     try {
-      return await ref.read(physicalCardPaymentServiceProvider).authorize(
+      return await ref.read(salesControllerProvider.notifier).authorizeCardPayment(
             amount: amount,
             idempotencyKey: flow.idempotencyKey.isNotEmpty
                 ? flow.idempotencyKey
