@@ -240,6 +240,24 @@ extension SyncV4Materializer on SyncV4Service {
       await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
       return;
     }
+    if (type == 'order') {
+      final existingOrder = await db.query('orders',
+          columns: ['status', 'actual_delivery_date'],
+          where: 'id = ?',
+          whereArgs: [id],
+          limit: 1);
+      if (existingOrder.isNotEmpty) {
+        final localStatus = existingOrder.first['status']?.toString();
+        final incomingStatus = row['status']?.toString();
+        if (localStatus == 'delivered' && incomingStatus != 'delivered') {
+          row['status'] = 'delivered';
+          if (existingOrder.first['actual_delivery_date'] != null) {
+            row['actual_delivery_date'] =
+                existingOrder.first['actual_delivery_date'];
+          }
+        }
+      }
+    }
     final updated =
         await db.update(table, row, where: 'id = ?', whereArgs: [id]);
     if (updated == 0) {

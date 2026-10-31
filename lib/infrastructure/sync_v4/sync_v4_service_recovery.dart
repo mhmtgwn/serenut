@@ -104,17 +104,68 @@ extension SyncV4Recovery on SyncV4Service {
     await prefs.setBool(SyncV4Service._unsyncedProductRecoveryKey, true);
   }
 
+  Future<void> _reconcileAllOrdersStatusCatchUpOnce(Database db) async {
+    final prefs = await SharedPreferences.getInstance();
+    const catchUpKey = 'v4_order_status_catchup_sync_v3';
+    if (prefs.getBool(catchUpKey) == true) return;
+
+    await db.transaction((txn) async {
+      final localOrders = await txn.rawQuery('''
+        SELECT o.* FROM orders o
+        WHERE o.is_deleted = 0 OR o.is_deleted IS NULL
+        ORDER BY o.created_at DESC
+        LIMIT 500
+      ''');
+
+      for (final row in localOrders) {
+        final id = row['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+
+        final itemRows = await txn.query(
+          'order_items',
+          where: 'order_id = ?',
+          whereArgs: [id],
+        );
+
+        final payload = Map<String, dynamic>.from(row)..['items'] = itemRows;
+
+        await txn.delete(
+          'sync_outbox_v4',
+          where: "entity_type = 'order' AND entity_id = ?",
+          whereArgs: [id],
+        );
+
+        await txn.update(
+          'orders',
+          {'is_synced': 0},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+
+        await SyncOutboxV4.enqueue(
+          txn,
+          entityType: 'order',
+          entityId: id,
+          operation: 'UPSERT',
+          payload: payload,
+        );
+      }
+    });
+
+    await prefs.setBool(catchUpKey, true);
+  }
+
   /// Retries previously rejected outbox mutations across all entity types
   /// (e.g. sales rejected due to discount/stock calculation bugs) and enqueues
   /// any unsynced local rows so both PC and mobile devices converge completely.
   Future<void> _recoverUnsyncedAndRejectedEntities(Database db) async {
     await DatabaseManager.retryOnLock(() async {
-      // Re-enable any dead-lettered or rejected orders/sales so cross-device sync catches up completely
+      // Re-enable any dead-lettered, rejected, or conflicted orders/sales so cross-device sync catches up completely
       await db.rawUpdate('''
         UPDATE sync_outbox_v4
            SET state = 'PENDING', attempts = 0
          WHERE entity_type IN ('order', 'sale')
-           AND state IN ('REJECTED', 'DEAD_LETTER')
+           AND state IN ('REJECTED', 'DEAD_LETTER', 'CONFLICT')
       ''');
 
       await db.rawUpdate('''

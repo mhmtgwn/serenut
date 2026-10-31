@@ -467,10 +467,16 @@ export async function upsertOrder(
          WHEN customer_orders.order_number NOT LIKE 'SYNC-%' AND customer_orders.order_number != '' THEN customer_orders.order_number
          ELSE EXCLUDED.order_number
        END,
-       customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
+       customer_id=EXCLUDED.customer_id,
+       status = CASE 
+         WHEN customer_orders.status = 'delivered' THEN 'delivered'
+         WHEN customer_orders.status = 'cancelled' AND EXCLUDED.status != 'delivered' THEN 'cancelled'
+         ELSE EXCLUDED.status
+       END,
        total_amount=EXCLUDED.total_amount, discount_amount=EXCLUDED.discount_amount,
        expected_delivery_date=EXCLUDED.expected_delivery_date,
-       actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes, is_deleted=false,
+       actual_delivery_date = COALESCE(EXCLUDED.actual_delivery_date, customer_orders.actual_delivery_date),
+       notes=EXCLUDED.notes, is_deleted=false,
        updated_at=NOW() WHERE customer_orders.company_id=EXCLUDED.company_id`,
     [id, companyId, orderNumber, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
       discountAmount,

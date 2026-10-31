@@ -24,6 +24,7 @@ extension SyncV4Orchestration on SyncV4Service {
     }
     await _snapshotPreV4DataOnce(db);
     await _recoverUnsyncedImportedProductsOnce(db);
+    await _reconcileAllOrdersStatusCatchUpOnce(db);
     await _recoverUnsyncedAndRejectedEntities(db);
     await DatabaseManager.retryOnLock(() async {
       await db.rawUpdate(
