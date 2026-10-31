@@ -7,79 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/license_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+export 'package:serenutos/providers/license_provider.dart' show LicenseStatus, licenseStatusProvider;
 
 // ── Design Constants ──────────────────────────────────────────────────────────
 const _kAmber = Color(0xFFF59E0B);
 const _kRed = Color(0xFFEF4444);
 const _kGreen = Color(0xFF10B981);
 
-// ── License Status Provider ───────────────────────────────────────────────────
-
-final licenseStatusProvider = Provider<LicenseStatus>((ref) {
-  // Entitlement/license objects are backed by SharedPreferences and keep a
-  // stable service identity. Recompute this derived snapshot whenever auth
-  // publishes a post-bootstrap refresh; otherwise Riverpod retains the old
-  // pre-activation "unlicensed" value for the lifetime of the process.
-  ref.watch(authNotifierProvider);
-  final service = ref.watch(licenseServiceProvider);
-  final trialManager = ref.watch(trialManagerProvider);
-
-  final isTrialActive = trialManager.isTrialActive();
-  final isCommercialActive = trialManager.isCommercialActive();
-  final remainingDays = trialManager.getRemainingDays();
-
-  if (isTrialActive) {
-    return LicenseStatus(
-      status: 'trial',
-      daysLeft: remainingDays,
-      tierName: 'DENEME',
-      expiryDate: trialManager.getExpiryDateSync(),
-      deviceUuid: service.getDeviceUuid(),
-    );
-  }
-
-  if (isCommercialActive) {
-    return LicenseStatus(
-      status: 'active',
-      daysLeft: remainingDays,
-      tierName: 'TİCARİ LİSANS',
-      expiryDate: trialManager.getExpiryDateSync(),
-      deviceUuid: service.getDeviceUuid(),
-    );
-  }
-
-  final status = service.checkLicenseStatus();
-  final info = service.getLicenseInfo();
-  final daysLeft = service.getRemainingDays();
-  final deviceUuid = service.getDeviceUuid();
-
-  return LicenseStatus(
-    status: status,
-    daysLeft: daysLeft,
-    tierName: info?.tier.name ?? 'UNLICENSED',
-    expiryDate: info?.expiryDate,
-    deviceUuid: deviceUuid,
-  );
-});
-
-class LicenseStatus {
-  final String status;
-  final int daysLeft;
-  final String tierName;
-  final DateTime? expiryDate;
-  final String deviceUuid;
-
-  const LicenseStatus({
-    required this.status,
-    required this.daysLeft,
-    required this.tierName,
-    this.expiryDate,
-    required this.deviceUuid,
-  });
-}
 
 // ── Trial Banner Widget ───────────────────────────────────────────────────────
 

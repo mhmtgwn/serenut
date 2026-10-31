@@ -27,7 +27,7 @@ import 'dart:convert';
 import 'package:excel/excel.dart' hide Border;
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/providers/audit_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/controllers/backup_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/config/router.dart';
@@ -562,8 +562,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           ref.invalidate(syncProvider);
           if (!kIsWeb) {
             await DataResetService.resetLocalDatabase();
-            final backupService = ref.read(backupServiceProvider);
-            await backupService.clearAllBackups();
+            await ref.read(backupControllerProvider.notifier).clearAllBackups();
             await DataResetService.clearProductImages();
           } else {
             InMemoryDb.reset();

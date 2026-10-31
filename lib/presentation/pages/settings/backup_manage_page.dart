@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/controllers/backup_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -31,7 +31,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
   Future<void> _refreshBackups() async {
     setState(() => _isLoading = true);
     try {
-      final files = await ref.read(backupServiceProvider).getBackupFiles();
+      final files = await ref.read(backupControllerProvider.notifier).getBackupFiles();
       setState(() {
         _backupFiles = files;
       });
@@ -49,7 +49,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
   Future<void> _createBackup() async {
     setState(() => _isLoading = true);
     try {
-      final path = await ref.read(backupServiceProvider).backupDatabase();
+      final path = await ref.read(backupControllerProvider.notifier).backupDatabase();
       if (mounted) {
         AppNotificationHost.show(
           SnackBar(
@@ -106,7 +106,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
         onGranted: (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
-        await ref.read(backupServiceProvider).restoreDatabase(file.path);
+        await ref.read(backupControllerProvider.notifier).restoreDatabase(file.path);
         if (mounted) {
           showDialog(
             context: context,
@@ -290,9 +290,7 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
                           icon: const Icon(Icons.share_rounded,
                               color: kGreen, size: 20),
                           tooltip: 'Paylaş',
-                          onPressed: () => ref
-                              .read(backupServiceProvider)
-                              .shareBackup(file.path),
+                          onPressed: () => ref.read(backupControllerProvider.notifier).shareBackup(file.path),
                         ),
                         IconButton(
                           icon: const Icon(Icons.restore_rounded,
