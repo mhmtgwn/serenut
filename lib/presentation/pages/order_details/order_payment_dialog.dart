@@ -288,9 +288,8 @@ class _OrderPaymentDialogState extends ConsumerState<_OrderPaymentDialog> {
             var safeSettings = settings;
             if (safeSettings == null) {
               try {
-                final repo =
-                    await container.read(settingsRepositoryProvider.future);
-                safeSettings = await repo.getSettings();
+                await container.read(settingsNotifierProvider.notifier).loadSettings();
+                safeSettings = container.read(settingsNotifierProvider).valueOrNull ?? container.read(settingsNotifierProvider).value;
               } catch (_) {
                 // Ignored: fallback or safe default applied
               }

@@ -19,8 +19,8 @@ Future<void> triggerOrderDeliveryPrint(
   var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
   if (settings == null) {
     try {
-      final repo = await read(settingsRepositoryProvider.future);
-      settings = await repo.getSettings();
+      await read(settingsNotifierProvider.notifier).loadSettings();
+      settings = read(settingsNotifierProvider).valueOrNull ?? read(settingsNotifierProvider).value;
     } catch (_) {
       // Ignored: fallback or safe default applied
     }

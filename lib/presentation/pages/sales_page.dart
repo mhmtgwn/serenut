@@ -465,8 +465,8 @@ class _SalesPageState extends ConsumerState<SalesPage>
     var settings = settingsAsync.valueOrNull ?? settingsAsync.value;
     if (settings == null) {
       try {
-        final repo = await ref.read(settingsRepositoryProvider.future);
-        settings = await repo.getSettings();
+        await ref.read(settingsNotifierProvider.notifier).loadSettings();
+        settings = ref.read(settingsNotifierProvider).valueOrNull ?? ref.read(settingsNotifierProvider).value;
       } catch (_) {
         // Ignored: fallback or safe default applied
       }
