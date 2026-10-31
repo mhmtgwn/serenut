@@ -156,4 +156,27 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   Future<void> checkAuth() async {
     await _initializeUser();
   }
+
+  /// Change user password
+  Future<void> changePassword({
+    required String userId,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _authService.changePassword(
+      userId: userId,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  /// Stored credentials and logout info helpers
+  bool isRememberMeEnabled() => _authService.isRememberMeEnabled();
+  String? getRememberedUsername() => _authService.getRememberedUsername();
+  String? getRememberedPassword() => _authService.getRememberedPassword();
+  String? getLastLogoutReason() => _authService.getLastLogoutReason();
+  String? getLastLogoutCode() => _authService.getLastLogoutCode();
+  String? getLastLogoutDetails() => _authService.getLastLogoutDetails();
+  DateTime? getLastLogoutTime() => _authService.getLastLogoutTime();
+  List<Map<String, dynamic>> getLogoutHistory() => _authService.getLogoutHistory();
 }

@@ -9,9 +9,9 @@ extension _SettingsUserManagementSheets on _SettingsPageState {
         builder: (context) => Consumer(
           builder: (routeCtx, ref, child) => StatefulBuilder(
             builder: (ctx, setPageState) {
-              final authService = ref.read(authServiceProvider);
+              final userController = ref.read(userManagementControllerProvider);
               return FutureBuilder<List<AuthUser>>(
-                future: authService.getUsers(),
+                future: userController.getUsers(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const FullScreenSettingsPage(
@@ -164,7 +164,7 @@ extension _SettingsUserManagementSheets on _SettingsPageState {
   // ── Granüler Yetki Atama Ekranı ────────────────────────────────────────────
   void _showPermissionsSheet(BuildContext context, WidgetRef ref, AuthUser user,
       VoidCallback onSaved) {
-    final authService = ref.read(authServiceProvider);
+    final userController = ref.read(userManagementControllerProvider);
     List<String> selectedPerms = List<String>.from(user.permissions);
 
     final permGroups = [
@@ -289,7 +289,7 @@ extension _SettingsUserManagementSheets on _SettingsPageState {
                         onPressed: () async {
                           final updated =
                               user.copyWith(permissions: selectedPerms);
-                          await authService.updateUser(updated);
+                          await userController.updateUser(updated);
                           onSaved();
                           if (ctx.mounted) Navigator.pop(ctx);
                         },
@@ -497,8 +497,8 @@ extension _SettingsUserManagementSheets on _SettingsPageState {
             ),
             ElevatedButton(
               onPressed: () async {
-                final authService = ref.read(authServiceProvider);
-                await authService.deleteUser(user.id);
+                final userController = ref.read(userManagementControllerProvider);
+                await userController.deleteUser(user.id);
                 onDeleted();
                 if (context.mounted) Navigator.pop(ctx);
               },

@@ -334,8 +334,8 @@ class AccountPage extends ConsumerWidget {
                           });
 
                           try {
-                            final authService = ref.read(authServiceProvider);
-                            await authService.changePassword(
+                            final authNotifier = ref.read(authNotifierProvider.notifier);
+                            await authNotifier.changePassword(
                               userId: user.id,
                               currentPassword: oldPass,
                               newPassword: newPass,
@@ -383,11 +383,11 @@ class AccountPage extends ConsumerWidget {
   }
 
   void _showLogoutHistoryDialog(BuildContext context, WidgetRef ref) {
-    final authService = ref.read(authServiceProvider);
-    final history = authService.getLogoutHistory();
-    final lastReason = authService.getLastLogoutReason();
-    final lastCode = authService.getLastLogoutCode();
-    final lastTime = authService.getLastLogoutTime();
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    final history = authNotifier.getLogoutHistory();
+    final lastReason = authNotifier.getLastLogoutReason();
+    final lastCode = authNotifier.getLastLogoutCode();
+    final lastTime = authNotifier.getLastLogoutTime();
 
     showDialog(
       context: context,

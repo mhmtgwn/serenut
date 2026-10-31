@@ -177,7 +177,7 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
         ElevatedButton(
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              final authService = ref.read(authServiceProvider);
+              final userController = ref.read(userManagementControllerProvider);
               final id = 'user-${DateTime.now().millisecondsSinceEpoch}';
               final businessCode =
                   ref.read(currentUserProvider)?.businessCode ?? 'DEFAULT';
@@ -193,14 +193,10 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                 permissions: AuthService.getPermissionsForRole(selectedRole),
                 createdAt: DateTime.now(),
               );
-              await authService.createUser(newUser, passCtrl.text.trim(),
+              await userController.createUser(newUser, passCtrl.text.trim(),
                   pin:
                       pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
-              ref.read(auditLogServiceProvider).log(
-                    action: 'user_created',
-                    details:
-                        '{"id":"${newUser.id}","name":"${newUser.name}","role":"${newUser.role.name}"}',
-                  );
+              // Audit logged in userController.createUser
               widget.onSaved();
               if (context.mounted) Navigator.pop(context);
             }
@@ -428,7 +424,7 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
         ElevatedButton(
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              final authService = ref.read(authServiceProvider);
+              final userController = ref.read(userManagementControllerProvider);
               final updated = widget.user.copyWith(
                 name: nameCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
@@ -440,7 +436,7 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                     ? widget.user.permissions
                     : AuthService.getPermissionsForRole(selectedRole),
               );
-              await authService.updateUser(updated,
+              await userController.updateUser(updated,
                   password: passCtrl.text.trim().isEmpty
                       ? null
                       : passCtrl.text.trim(),

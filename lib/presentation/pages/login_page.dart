@@ -24,9 +24,9 @@ class LoginPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
-    final authService = ref.watch(authServiceProvider);
-    final lastLogoutReason = authService.getLastLogoutReason();
-    final lastLogoutCode = authService.getLastLogoutCode();
+    final authNotifier = ref.watch(authNotifierProvider.notifier);
+    final lastLogoutReason = authNotifier.getLastLogoutReason();
+    final lastLogoutCode = authNotifier.getLastLogoutCode();
 
     return Scaffold(
       backgroundColor: POSColors.surface, // Açık gri-mavi zemin (0xFFF8FAFC)
@@ -250,10 +250,10 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
   }
 
   void _loadSavedCredentialsAndLogoutInfo() {
-    final authService = ref.read(authServiceProvider);
-    _rememberMe = authService.isRememberMeEnabled();
-    final savedUser = authService.getRememberedUsername();
-    final savedPass = authService.getRememberedPassword();
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    _rememberMe = authNotifier.isRememberMeEnabled();
+    final savedUser = authNotifier.getRememberedUsername();
+    final savedPass = authNotifier.getRememberedPassword();
     if (savedUser != null && savedUser.isNotEmpty) {
       _usernameCtrl.text = savedUser;
     }
@@ -261,10 +261,10 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
       _passwordCtrl.text = savedPass;
     }
 
-    _lastLogoutReason = authService.getLastLogoutReason();
-    _lastLogoutTime = authService.getLastLogoutTime();
-    _lastLogoutCode = authService.getLastLogoutCode();
-    _lastLogoutDetails = authService.getLastLogoutDetails();
+    _lastLogoutReason = authNotifier.getLastLogoutReason();
+    _lastLogoutTime = authNotifier.getLastLogoutTime();
+    _lastLogoutCode = authNotifier.getLastLogoutCode();
+    _lastLogoutDetails = authNotifier.getLastLogoutDetails();
     if (_lastLogoutReason != null &&
         _lastLogoutReason!.isNotEmpty &&
         _lastLogoutCode != 'MANUAL_LOGOUT') {
@@ -352,7 +352,7 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...ref.read(authServiceProvider).getLogoutHistory().take(5).map(
+              ...ref.read(authNotifierProvider.notifier).getLogoutHistory().take(5).map(
                     (h) => Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(10),
